@@ -3,7 +3,7 @@
 Last updated: 2026-09-05  
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/real-world-job-intake-plan`
+Working branch: `feat/real-world-job-intake-implementation`
 
 ## 1. Vision
 
@@ -176,7 +176,7 @@ All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 | 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified                           | Premature architecture lock-in                                         | GitHub CLI, Node LTS                           | Lint, typecheck, tests, build, Git/GitHub audit                     | COMPLETE    |
 | 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                                            | Incorrect rules or unsafe claims                                       | Phase 0, Zod, Drizzle, fixtures                | Unit/integration/E2E tests and production build                     | COMPLETE    |
 | 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                                                      | Site/policy changes, rate limits                                       | Phases 0-1                                     | Contract tests, fixture replay, manual policy audit                 | COMPLETE    |
-| 2.5   | Add real-world job intake                  | Source-neutral paste, multi-job, HTML, upload, preview, confirmation, and policy-gated URL intake  | Real ads enter one validated local pipeline and are evaluated only with a valid private profile; no scraping or invented facts | Untrusted content, demo-profile leakage, false splits, duplicate drift | Phase 2 normalization and persistence patterns | Parser/profile/security fixtures, integration/E2E, migration review | NOT_STARTED |
+| 2.5   | Add real-world job intake                  | Source-neutral paste, multi-job, HTML, upload, preview, confirmation, and policy-gated URL intake  | Real ads enter one validated local pipeline and are evaluated only with a valid private profile; no scraping or invented facts | Untrusted content, demo-profile leakage, false splits, duplicate drift | Phase 2 normalization and persistence patterns | Parser/profile/security fixtures, integration/E2E, migration review | IN_PROGRESS |
 | 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                                                        | Site/policy changes, bot controls                                      | Phases 0-2 patterns                            | Contract tests, fixture replay, manual audit                        | NOT_STARTED |
 | 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                                                    | Tenant variation                                                       | Adapter contracts                              | Contract/integration tests                                          | NOT_STARTED |
 | 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                  | Each adapter passes common contract suite and retains raw provenance                                                           | Vendor/tenant variation                                                | Phases 2-4 lessons                             | Per-adapter fixtures and policy/security checks                     | NOT_STARTED |
@@ -924,13 +924,21 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 
 # Phase 2.5 - Real-World Job Intake Blueprint
 
-- Blueprint status: `AWAITING_HUMAN_REVIEW`
-- Roadmap status: `NOT_STARTED`
+- Blueprint status: `APPROVED`
+- Roadmap status: `IN_PROGRESS`
 - Prepared on: 2026-09-05
 - Amended on: 2026-09-05 after human review identified the candidate-profile, hostname, URL-policy, credential-detection, identity, provenance, and retention gates below.
 - Planning branch: `feat/real-world-job-intake-plan`
 - Planning base: Phase 2 merge commit `cd3e13699cef3e41b8e3edd56239435ca647d66b`
 - Scope: blueprint only; no importer, parser, upload route, profile loader/provider, URL fetcher, source adapter, migration, or application behaviour is implemented by this planning pull request.
+
+Implementation checkpoint:
+
+- The owner explicitly approved PR #4 and the amended Phase 2.5 blueprint on 2026-09-05 and authorised a normal merge plus implementation.
+- Immediately before merge, PR #4 head `09c872d8939a3a58aca9f2a46b7fc3e6b1e17639` was `MERGEABLE`/`CLEAN`; both final `quality` runs passed; `npm audit` reported 0 vulnerabilities; the repository was private; the diff contained only `PROJECT_PLAN.md`; `data/profile.private.json` remained ignored; and no tracked private/session/database artifact was found apart from the intentionally committed `.env.example` template.
+- PR #4 merged normally into `main` as `11185763b1679c35fecfcb45fbd9172a4a3a6de2` at `2026-09-05T07:44:09Z`. Refreshed local `main` exactly matched `origin/main`; the fully merged planning branch was deleted locally and remotely.
+- Implementation branch `feat/real-world-job-intake-implementation` was created and pushed from that fresh merge commit. Phase 2.5 implementation is now authorised on this branch; its future pull request must remain unmerged for separate human review.
+- No live job-board access, production URL fetch, application action, private candidate content, or Phase 2.6/3 work is authorised.
 
 ## Blueprint framing
 
