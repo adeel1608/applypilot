@@ -3,7 +3,7 @@
 Last updated: 2026-09-05  
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/bootstrap-applypilot`
+Working branch: `feat/seek-discovery-adapter`
 
 ## 1. Vision
 
@@ -347,7 +347,7 @@ Candidate profile versions and raw job source records remain linked to downstrea
 - Added the preparation-only application runner, tri-state answer model, automation stop reasons, human-confirmation invariant, tracking statuses, and transition validation.
 - Built `/`, `/dashboard`, `/jobs`, `/jobs/[id]`, `/applications`, `/profile`, and `/settings` as responsive Next.js server-rendered fixture views. The job preparation controls are intentionally disabled.
 - Generated and inspected the fictional `JORDAN CV (Northside Homewares).pdf`: one A4 page at 594.96 by 841.92 points, 722 extractable characters, zero replacement characters, black Times text, minimum 10 pt, professional bullets, and no clipping or decorative elements. Poppler was unavailable locally, so PyMuPDF rendered the inspection PNG and pypdf performed structural/text checks; the temporary PNG was removed after review.
-- Opened pull request [#1](https://github.com/adeel1608/applypilot/pull/1) into `main`; it remains unmerged.
+- Merged pull request [#1](https://github.com/adeel1608/applypilot/pull/1) from `feat/bootstrap-applypilot` into `main` with normal merge commit `d4f15f862cbc0a976a82241a9a2ef76fda7099c0` at `2026-09-05T05:07:44Z`; the remote feature branch was deleted.
 
 ### Validation results
 
@@ -378,7 +378,7 @@ Intentional boundaries remain: source adapters are offline placeholders; persist
 
 Phase 2 is the next recommended task: implement a policy-reviewed SEEK discovery adapter using captured fixtures and contract tests, without live application submission or protection bypass.
 
-Exact recommended prompt (do not execute as part of Phase 0/1):
+Exact recommended implementation prompt after human approval (do not execute during this blueprint checkpoint):
 
 ```text
 PROJECT: ApplyPilot
@@ -394,3 +394,454 @@ Add contract, unit, integration, and fixture-replay tests for successful discove
 
 Run format check, lint, strict typecheck, unit tests, integration tests, Playwright tests, production build, and npm audit. Update PROJECT_PLAN.md with exact results, limitations, rollback, blocked items, and the next recommended phase. Push the feature branch and open an unmerged pull request into main. Never claim live SEEK support unless it was actually validated within the documented policy boundaries.
 ```
+
+# Phase 2 — SEEK Discovery Adapter Blueprint
+
+- Blueprint status: `AWAITING_HUMAN_REVIEW`
+- Phase roadmap status: `NOT_STARTED`
+- Prepared on: 2026-09-05
+- Implementation branch: `feat/seek-discovery-adapter`
+
+This section is an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code.
+
+## A. Current state
+
+- Phase 0/1 is merged into `main`. Pull request #1 (`feat/bootstrap-applypilot` -> `main`) was merged normally at `2026-09-05T05:07:44Z`; merge commit and current merged baseline are `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`. The remote bootstrap branch was deleted.
+- The repository is the private GitHub repository `adeel1608/applypilot`. Phase 0/1 was revalidated immediately before merge with green local and GitHub checks, no reviews or unresolved review blockers, and no unexpected drift from the original `main` commit `dd39c7f9d313081d8b983c5b3a9644c7ce19d0c4`.
+- The architecture is a strict TypeScript/npm-workspaces monorepo. `apps/web` is presentation-only; domain packages own schemas and deterministic behaviour; `packages/database` owns SQLite/Drizzle persistence; committed fixtures are fictional; authenticated browser state and candidate-private data remain local and ignored.
+- `JobSourceAdapter` currently provides `sourceName`, `capabilities()`, `discoverJobs()`, `fetchJob()`, and `normalizeJob()`. The SEEK entry is an offline `PlaceholderAdapter` that throws `AdapterNotImplementedError` for every operation. Its declared `DISCOVERY` and `JOB_DETAILS` capabilities are design targets rather than proof of live support; Phase 2 must make operational availability explicit.
+- `DiscoveryQuery` currently contains keyword and location arrays plus an optional opaque page cursor. `DiscoveryPage` contains source records plus an optional next cursor. These types need conservative, source-neutral extension for filters, limits, resumability, and validated checkpoint state.
+- `JobSchema` is the normalized boundary. It already models source identity, source URL, location, employment flags, salary, hours, schedule, explicit and preferred requirements, experience, education, licences, vehicle, work rights, physical requirements, dates, source metadata, document requirements, eligibility, fit, and application state. Several presentation fields such as title, company, location, category, and description are required strings; a source record missing one of these cannot be silently filled and must fail normalization safely.
+- `RawJobSourceRecord` currently preserves source, external ID, source URL, discovery time, and an unknown payload. `job_source_records` persists external ID, source URL, raw payload JSON, payload hash, discovery time, and fetch time against a normalized job. The `sourceId + externalId` unique index supplies a strong idempotency key.
+- The database already has `jobs`, `job_sources`, `job_source_records`, `settings`, and append-only `audit_events`. It has no dedicated discovery-run or checkpoint table.
+- The dashboard reads fifteen normalized `FIXTURE` jobs directly, evaluates eligibility and fit deterministically, and displays lists/details with disabled preparation controls. It is not database-backed and does not show refresh time, source URL, raw-record status, or adapter mode/readiness.
+- Current limitations are: no SEEK-specific raw schema, no source client, no access-method decision, no query validation beyond TypeScript, no page/checkpoint orchestration, no retry/error taxonomy, no SEEK mapper, no source-specific fixture replay, no persistence service, and no live source support.
+
+## B. Phase 2 objective
+
+Enable ApplyPilot to discover and normalize SEEK job listings safely and reliably while preserving raw provenance and respecting access, security, privacy, policy, and rate boundaries. Phase 2 covers discovery and job details only. It does not cover application preparation, form interaction, or submission.
+
+The implementation must remain useful in `FIXTURE_ONLY` and user-supplied-content modes if no public automated access method is approved. A public or browser-assisted mode is optional and may be implemented only after the research gate below records sufficient evidence and human approval.
+
+## C. Non-goals
+
+Phase 2 explicitly excludes:
+
+- applying to jobs, filling SEEK forms, submitting applications, or changing the human-confirmation invariant;
+- CAPTCHA, MFA, login, access-control, bot-detection, or rate-limit bypass;
+- stealth browser techniques, fingerprint manipulation, proxy rotation, or credential/session storage;
+- LinkedIn, Indeed, or any other source adapter;
+- production deployment or scheduled unattended discovery;
+- AI-generated candidate content, probabilistic requirement invention, semantic fuzzy merging, or inference that unknown fields are satisfied.
+
+## D. SEEK technical research plan
+
+No SEEK access was performed while preparing this blueprint. At implementation start, create an evidence-dated decision record in `docs/SEEK_ADAPTER.md` and investigate the following in order. Stop at the first method that is sufficiently complete, stable, and legitimately usable; do not assume scraping or authenticated access is required.
+
+1. Officially documented or public interfaces.
+2. Public listing pages.
+3. Server-rendered structured data.
+4. JSON-LD/schema.org `JobPosting` data.
+5. Network responses made by publicly accessible job pages, inspected without defeating controls.
+6. Browser-assisted discovery in a user-controlled local browser where legitimate.
+7. User-supplied URLs or content as a fallback.
+
+Every candidate method must be recorded with:
+
+- evidence URL, evidence retrieval date, reviewer, and decision (`ALLOWED`, `CONDITIONAL`, `NOT_ALLOWED`, or `UNKNOWN`);
+- whether authentication is required and whether any credential/session data would cross a trust boundary;
+- stability/versioning, field completeness, pagination behaviour, and whether details require a second fetch;
+- published limits and conservative request pacing, `Retry-After` handling, robots guidance, relevant terms/policy considerations, and acceptable use constraints;
+- observed access denials, login walls, CAPTCHA, bot protection, or other stop signals;
+- maintenance risk, failure visibility, and suitability for local automation;
+- an explicit statement of what evidence would invalidate or require re-review of the decision.
+
+The research matrix starts with every method marked `UNKNOWN/NOT_VALIDATED`. Reading public documentation does not by itself authorise page automation, and a technically reachable response is not automatically an approved interface. Network inspection must not replay private tokens, undocumented authenticated requests, or session-bound identifiers. If the review cannot establish a permitted automated path, Phase 2 proceeds with fixtures and user-supplied content only.
+
+## E. Access modes
+
+The SEEK implementation will use a runtime mode separate from capability names:
+
+| Mode                    | Intended behaviour                                                                  | Initial state   | Phase 2 disposition                                       |
+| ----------------------- | ----------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------- |
+| `FIXTURE_ONLY`          | Replay fictional/redacted local records with no network                             | Not implemented | Required first; default for development and CI            |
+| `PUBLIC_DISCOVERY`      | Discover jobs through an approved unauthenticated public method                     | Not validated   | Conditional on the research and human-review gates        |
+| `PUBLIC_JOB_DETAILS`    | Fetch details through an approved unauthenticated public method                     | Not validated   | Conditional on the research and human-review gates        |
+| `ASSISTED_BROWSER`      | Read a user-visible page in a local, user-controlled browser and stop on protection | Not validated   | Optional; no stealth, login automation, or session export |
+| `USER_SUPPLIED_URL`     | Process a URL explicitly supplied by the user through an otherwise approved method  | Not validated   | Conditional; a supplied URL does not waive access rules   |
+| `USER_SUPPLIED_CONTENT` | Parse content the user provides locally without retrieving it                       | Not implemented | Required fallback if the input can be safely validated    |
+
+Configuration must reject an unvalidated or disabled mode. Adapter/status UI and logs must distinguish `FIXTURE_ONLY`, `AVAILABLE`, `DISABLED`, `REQUIRES_REVIEW`, and `SECURITY_STOP`; no label may imply live SEEK support until it was actually validated.
+
+## F. Capability matrix
+
+| Capability             | Phase 2 target | Constraint                                                                                      |
+| ---------------------- | -------------- | ----------------------------------------------------------------------------------------------- |
+| `DISCOVERY`            | Yes            | Only in fixture mode and in a separately approved public/assisted mode that passed its contract |
+| `JOB_DETAILS`          | Yes            | Only in fixture mode and in a separately approved public/assisted mode that passed its contract |
+| `ASSISTED_APPLICATION` | No             | Out of scope                                                                                    |
+| `FORM_FILLING`         | No             | Must not be returned or implemented                                                             |
+| `APPLICATION_STATUS`   | No             | Must not be returned or implemented                                                             |
+| `SUBMISSION_SUPPORTED` | No             | Must not be introduced, returned, or implied                                                    |
+
+`capabilities()` must describe operations that work in the configured mode, not aspirational support. A richer status report may be added without weakening the shared `JobSourceAdapter` boundary. The adapter must never fall through from one mode to another silently.
+
+## G. Discovery query model
+
+Introduce a Zod-validated, source-neutral discovery query while retaining adapter compatibility:
+
+- `keywords: string[]`: trimmed, non-empty terms, de-duplicated case-insensitively.
+- `location`: optional object with `text`, `suburb`, four-digit `postcode`, Australian `state`, and `radiusKm`.
+- `employmentTypes`: zero or more of `CASUAL`, `PART_TIME`, `FULL_TIME`, `CONTRACT`, and `INTERNSHIP`; individual booleans must not contradict this list.
+- `datePostedWithinDays`: optional positive integer; an unsupported source filter must be rejected or applied locally and reported, never ignored silently.
+- `sortOrder`: `RELEVANCE` or `DATE_POSTED`.
+- `pageCursor`: optional opaque cursor bound to the canonical query fingerprint.
+- `pageSize`: optional positive integer with a local maximum of 100; the source-specific client may apply a smaller documented cap.
+
+The initial configured use case is `keywords: []`, `suburb: Preston`, `postcode: 3072`, `state: VIC`, with a user-configurable radius. The local default is 25 km until reviewed; the adapter must map it only to a validated source option or fail with an explicit unsupported-filter result. Canonical query serialization sorts set-like arrays and hashes the normalized value so retries and checkpoints cannot be attached to a different query.
+
+## H. Pagination and checkpointing
+
+Use an opaque, versioned cursor and a durable checkpoint with no credentials:
+
+- Cursor fields: schema version, source, access mode, query fingerprint, source cursor/page token, logical page number, and previous-page identity hash.
+- Checkpoint fields: schema version, run/query ID, source/mode, query fingerprint, next cursor, last successful fetch timestamp, last successfully committed page, processed page identities, discovered/added/updated/duplicate/failed counts, and expiry timestamp.
+- Validate every decoded cursor/checkpoint with Zod. Reject version, source, mode, or query-fingerprint mismatches.
+- Commit normalized jobs and source records transactionally; advance the checkpoint only after the page transaction succeeds. A process crash may replay the last page, which idempotency must make safe.
+- Compute a page identity from ordered external IDs/canonical URLs plus the page cursor. If the same page identity reappears without progress, stop with `DUPLICATE_PAGE` instead of looping.
+- Default limits: 10 pages and 200 distinct jobs per run. Both are locally configurable only within documented caps; reaching a cap returns a safe partial completion and resumable checkpoint.
+- A checkpoint older than 24 hours is stale by default. Resume requires the same canonical query and mode; otherwise start a new run while retaining a redacted audit event for the stale checkpoint.
+- Store checkpoints under a namespaced `settings` key such as `discovery.seek.checkpoint.<queryHash>` and never include URLs containing sensitive query parameters, cookies, headers, HTML, or browser state.
+
+## I. Rate-limit and failure model
+
+Add a typed `SeekAdapterError` with `code`, `retryable`, `humanActionRequired`, `safeRetryAfter` (an ISO 8601 timestamp or `null`), sanitized `sourceUrl`, redacted diagnostic code/message, and optional cause class without raw response content.
+
+| Code                     | Default retryable | Human action  | Required behaviour                                                           |
+| ------------------------ | ----------------- | ------------- | ---------------------------------------------------------------------------- |
+| `RATE_LIMITED`           | Yes               | No            | Honour valid `Retry-After`; stop the run; never evade the limit              |
+| `AUTH_REQUIRED`          | No                | Yes           | Stop; do not request, store, or replay credentials                           |
+| `CAPTCHA_DETECTED`       | No                | Yes           | Immediate security stop; no solver or alternate path                         |
+| `BOT_PROTECTION`         | No                | Yes           | Immediate security stop; do not disguise automation                          |
+| `ACCESS_DENIED`          | No                | Yes           | Stop and require policy/access review                                        |
+| `PAGE_CHANGED`           | No                | Yes           | Quarantine the record/fixture and require parser review                      |
+| `NETWORK_ERROR`          | Yes               | No            | Bounded retry with jitter; no retry when a protection signal is suspected    |
+| `MALFORMED_RESPONSE`     | No                | Yes           | Preserve safe provenance/hash, reject normalization, continue only by policy |
+| `JOB_REMOVED`            | No                | No            | Mark the source record unavailable; do not synthesize a replacement          |
+| `NOT_FOUND`              | No                | No            | Record a safe miss and stop retrying                                         |
+| `UNSUPPORTED_PAGE`       | No                | Yes           | Do not guess a parser                                                        |
+| `RETRYABLE_SERVER_ERROR` | Yes               | No            | Bounded retry using conservative backoff                                     |
+| `NON_RETRYABLE_ERROR`    | No                | As classified | Stop or skip according to the explicit run policy                            |
+| `DUPLICATE_PAGE`         | No                | Yes           | Stop pagination to prevent an infinite loop                                  |
+| `CHECKPOINT_MISMATCH`    | No                | Yes           | Refuse resume and keep the stale checkpoint for review                       |
+
+Retries are capped at three per request and five retryable failures per run. `safeRetryAfter` is the later of a valid server instruction and the local conservative backoff. Repeated rate limiting ends the run. Logs must never contain cookies, authorization headers, tokens, complete response bodies, or unredacted query strings.
+
+## J. Raw SEEK source record
+
+Create a Zod schema for a versioned `SeekRawJobRecord`. It will contain, where available:
+
+- source fixed to `SEEK`, schema/parser version, access mode, external job ID, canonical job URL, and discovery source-page URL;
+- title, company, advertiser, location, salary text, employment type/work type, classification, subclassification, posting text/date, description, and any source-provided requirements;
+- `discoveredAt`, `fetchedAt`, raw byte/content hash, content type, and retrieval result;
+- the untouched raw payload or locally supplied source content, plus a `fieldProvenance` map identifying the structured-data/visible-text/payload path used for each extracted field;
+- safe parser warnings and an `unknownFields` object. The Zod boundary should use deliberate passthrough/capture so newly observed source fields are retained rather than silently discarded.
+
+Hash the raw bytes before parsing. Successful persisted records retain the raw payload and hash in `job_source_records`; fixtures retain their fictional source content in Git. Live/user-supplied raw content remains local and is never logged or uploaded. Fields that are absent stay absent. A confidential employer label may be retained only if the source explicitly supplies it; a missing employer must not become a fabricated company.
+
+## K. Normalization mapping
+
+The SEEK mapper must produce a `JobSchema` value or a typed safe failure:
+
+| Normalized field                 | SEEK input/mapping rule                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `title`                          | Trim the explicit listing title; absence is `MALFORMED_RESPONSE`                                                |
+| `company`                        | Use explicit company/advertiser display text; if truly absent, fail safely rather than inventing a company      |
+| `location/suburb/postcode/state` | Preserve full text; populate components only from explicit structured fields or an unambiguous validated parser |
+| `employmentType` + flags         | Map explicit work-type text; otherwise `UNKNOWN` with all flags false                                           |
+| `salary`                         | Preserve salary text; parse bounds/currency/period only when syntax is deterministic, otherwise keep `null`     |
+| `hours`                          | Populate weekly/fortnightly ranges only from explicit numeric statements; otherwise `null`                      |
+| `schedule`                       | Preserve summary; set fixed/shifts only for explicit days/times, otherwise nullable/empty                       |
+| `requirements`                   | Include only spans classified `EXPLICIT_REQUIREMENT`                                                            |
+| `preferredRequirements`          | Include only spans classified `PREFERRED_REQUIREMENT`                                                           |
+| `experienceRequirements`         | Extract explicit description, mandatory marker, and numeric minimum only when stated                            |
+| `educationRequirements`          | Extract stated qualification text/keywords without equating related qualifications                              |
+| `licences`                       | Map explicitly named licence/check requirements; role title alone is not evidence                               |
+| `vehicleRequirement`             | `REQUIRED` only for explicit own-vehicle language; otherwise `NOT_REQUIRED` only if explicit, else `UNKNOWN`    |
+| `workRightsRequirement`          | Map explicit unrestricted/valid Australian work-right language; otherwise `NOT_SPECIFIED`/`UNKNOWN`             |
+| `physicalRequirements`           | Preserve explicit physical-duty/ability text without medical inference                                          |
+| `datePosted`                     | Use an explicit timestamp or the deterministic relative-date rule below; otherwise `null`                       |
+| `dateDiscovered`                 | Copy the validated discovery timestamp                                                                          |
+| `coverLetterRequired`            | `true` only from explicit source instruction; otherwise `false` plus raw unknown metadata if ambiguous          |
+
+`sourceMetadata` carries SEEK classification/subclassification, advertiser, work-type text, posting text, fetch time, raw hash, parser version, access mode, and normalization warnings. Raw text remains in the source record even after a structured value is produced. No source text may be strengthened: “preferred” cannot become mandatory, “valid work rights” cannot become unrestricted, and an absent fact cannot become positive.
+
+## L. Requirement extraction
+
+Use a deterministic, auditable sentence/list-item pipeline:
+
+1. Extract visible/structured requirement spans without rewriting them.
+2. Normalize whitespace and punctuation for matching while retaining the original span.
+3. Apply negation rules before positive markers, including `experience not required`, `no experience required`, and `training provided`.
+4. Classify strong markers such as `must have`, `required`, and `essential` as `EXPLICIT_REQUIREMENT` only when they grammatically govern the same span.
+5. Classify `preferred` and `desirable` as `PREFERRED_REQUIREMENT`.
+6. Classify conflicting, incomplete, scope-unclear, or unmatched material language as `AMBIGUOUS_REQUIREMENT` and append the original span to `job.ambiguities`.
+7. Apply narrow extractors for `unrestricted work rights`, `valid Australian working rights`, named driver licences, own-vehicle requirements, Working With Children Check/`WWCC`, and police checks. Never infer a licence or vehicle requirement from a driver/warehouse role title alone.
+
+Every extracted item records its class, original text, normalized text, matched rule ID, source field/path, and parser version. Unmatched language is preserved. This is a rules engine with golden fixtures, not an NLP generation or hallucination system.
+
+## M. Date normalization
+
+- Preserve the exact original posting text in raw/source metadata.
+- Prefer an explicit machine timestamp when present and valid.
+- For exact relative forms such as `Listed one day ago`, `Listed three days ago`, or `Listed eighteen days ago`, map the supported number word/integer and subtract that many 24-hour periods from the immutable `discoveredAt` instant, returning an ISO 8601 UTC timestamp.
+- `Listed today` may map to `discoveredAt`; ambiguous forms such as `about a month ago`, malformed numbers, future dates, or unsupported language produce `datePosted: null` plus a parser warning/ambiguity.
+- Tests use a fixed discovery clock and cover midnight/time-zone boundaries. Retries reuse the original discovery timestamp so the same raw record cannot drift by a day.
+
+## N. Duplication and idempotency
+
+Use only strong deterministic signals in Phase 2:
+
+1. Primary identity: `(source = SEEK, externalId)`.
+2. Secondary exact identity: normalized canonical URL when the external ID is absent or under review. Derive an external ID from a URL only after an exact, validated URL-pattern match; otherwise fail safely.
+3. Change detection: raw payload hash.
+4. Existing cross-source deduplication signals remain review-only; do not add semantic or fuzzy merging.
+
+Canonicalization removes fragments and only documented tracking parameters, retains parameters that may identify a job, normalizes host/path casing where safe, and records the original URL. An unchanged repeat increments duplicate counters and does not add a job. A changed hash updates the normalized job/source record transactionally and writes a redacted audit event containing old/new hashes and timestamps. Concurrent insertion relies on the existing unique source/external index and resolves conflicts by rereading, never by creating a second job. The checkpoint advances only after this outcome is committed.
+
+## O. Database impact
+
+Planned migration requirement: **NO**.
+
+- `jobs` stores the current normalized SEEK job and evaluation fields.
+- `job_sources` stores the SEEK source, enabled state, and actual capability/status metadata.
+- `job_source_records` stores current raw provenance, exact source URL, external ID, payload hash, discovery time, and last fetch time; its unique source/external index supports idempotent upsert.
+- `settings` stores versioned, namespaced checkpoint JSON validated on read/write.
+- `audit_events` records run start/completion, refresh/hash transitions, errors, caps, and security stops using redacted metadata.
+
+The Phase 2 implementation must first prove this design with transaction and restart tests. A migration is not approved by this blueprint. If the implementation demonstrates a genuine need for raw fetch history, failed-record quarantine, or queryable discovery-run analytics that the current tables cannot safely represent, stop, amend this blueprint with the exact migration and rollback, and obtain human review before changing the schema.
+
+## P. Dashboard impact
+
+Plan only minimal provenance/status additions:
+
+- Jobs list: add a `Source` column/badge and preserve existing decision/score presentation.
+- Job detail: show source, safe source URL, date discovered, date posted or `Unknown`, last refreshed, and a raw-provenance-present indicator/hash prefix without rendering the raw payload.
+- Settings: show SEEK adapter mode and state (`fixture`, disabled, review required, available, or security stopped) and make unsupported capabilities explicit.
+- Dashboard: optionally add a small per-source count/status line; do not redesign the page or add application controls.
+
+External links use safe `https` URLs and clear labels. The UI must never display cookies, request headers, raw authenticated content, or a misleading “live” status. Existing eligibility, fit, and disabled application controls remain unchanged.
+
+## Q. Security and privacy
+
+- Never store SEEK passwords in SQLite, config, fixtures, logs, or Git.
+- Never commit or upload cookies, browser profiles, session/storage states, authorization headers, tokens, downloaded personal documents, or authenticated response bodies.
+- Never place browser session state in a cloud component. An approved future assisted mode may use only a user-controlled local browser and must not export its state.
+- CAPTCHA, MFA, login walls, access restrictions, bot protection, unexpected interstitials, and rate limits stop automation and emit a redacted human-action event.
+- Do not rotate identities/proxies, spoof fingerprints, replay hidden tokens, or use alternative endpoints to route around a stop.
+- Redact URL query values except documented non-sensitive filters, strip fragments, cap diagnostic lengths, and log hashes/IDs rather than full payloads.
+- Validate all queries, cursors, checkpoints, source records, database JSON, and normalized jobs with Zod at their boundaries.
+- Candidate truth data is not an adapter input. Discovery and normalization must not send or derive candidate facts, and evaluation occurs only after normalized persistence.
+
+## R. Fixture strategy
+
+Create fictional/redacted fixture records under `fixtures/seek/` with a manifest and expected normalized/error outcomes. Planned files are:
+
+- `retail-assistant.json`
+- `nandos-team-member.redacted.json`
+- `junior-receptionist.json`
+- `customer-service.json`
+- `engineering-internship.json`
+- `warehouse-role.json`
+- `driver-role.json`
+- `healthcare-qualified-role.json`
+- `unrestricted-work-right-role.json`
+- `missing-salary.json`
+- `missing-company.json`
+- `missing-requirements.json`
+- `malformed-job.json`
+- `removed-job.json`
+- `duplicate-job-page.json`
+- `manifest.ts`
+
+The Nando's-style case is safely redacted/reconstructed rather than copied from a live advert. The duplicate fixture includes repeated and changed-hash variants. Fixtures contain fixed timestamps, fictional IDs/URLs/employers/contact-free descriptions, raw field-path provenance, and expected classification/mapping outcomes. No live content is committed merely because it is publicly viewable.
+
+## S. Test plan
+
+- Unit tests: raw/query/cursor/checkpoint Zod schemas, URL canonicalization/redaction, hashing, relative dates, salary/hours parsing, work-type mapping, and deterministic requirement rules.
+- Adapter contract tests: source name, mode-specific capabilities, discover/fetch/normalize behaviour, explicit unsupported methods, and no form/submission capability.
+- Fixture replay: every manifest case parses deterministically and matches its checked expected normalized result or typed failure.
+- Normalization tests: every mapping in section K, field provenance, passthrough unknown fields, explicit-vs-preferred-vs-ambiguous requirements, and required-field failures.
+- Pagination tests: next-cursor progression, query-bound cursors, empty final page, max pages/jobs, repeated pages, reordered records, and partial completion.
+- Checkpoint tests: crash before/after transaction, resume, stale/mismatched/corrupt checkpoints, and deterministic counters.
+- Idempotency/duplicate tests: same external ID/hash, same external ID/changed hash, canonical URL fallback, concurrent conflict, and no semantic merge.
+- Error/rate tests: every error code and flags, valid/invalid `Retry-After`, bounded retry, repeated-limit stop, server errors, removed/not-found jobs, and redaction.
+- Security-stop tests: CAPTCHA, MFA/login wall, bot protection, access denial, unexpected page, and assurance that no fallback/retry bypass occurs.
+- Unknown-field tests: missing salary, requirements, work rights, schedule, date, and unsupported extra fields remain unknown/preserved; missing required company fails safely.
+- Integration: SEEK fixture -> adapter -> raw schema -> normalization -> transactional persistence -> eligibility -> fit, including restart and repeat runs.
+- Regression: all existing fifteen fixture results, eligibility status counts, fit score bounds/explanations, candidate truth rules, database migration test, and preparation-only runner remain unchanged.
+- Dashboard integration/E2E: source/provenance/status fields render safely; unknown dates/companies are honest; submission controls remain disabled; raw content is not exposed.
+- Quality gates: format check, lint, strict typecheck, unit tests, integration tests, E2E tests, production build, dependency audit, secret/ignored-artifact audit, and GitHub CI.
+
+All tests use fixed clocks, fixture transports, mocks, and a temporary/in-memory SQLite database. CI performs no SEEK network request.
+
+## T. Observability
+
+Emit structured local events for:
+
+- `discovery.run.started` with run ID, mode, query hash, and configured caps;
+- `discovery.page.completed` with page number and aggregate counts;
+- `discovery.job.added`, `updated`, `duplicate`, or `failed` with redacted source ID/hash;
+- `discovery.rate_limited` with safe retry time;
+- `discovery.security_stopped` with stop code and human-action flag;
+- `discovery.run.completed` or `partial` with pages processed, jobs discovered/added/updated/duplicated/failed, checkpoint presence, and duration.
+
+Run IDs are random local identifiers. Logs/audit records exclude raw payloads, source descriptions, cookies, tokens, headers, browser state, candidate data, and unredacted URLs. Error causes are allowlisted into short stable diagnostic codes rather than serialized wholesale.
+
+## U. Implementation file plan
+
+Expected files to create:
+
+- `docs/SEEK_ADAPTER.md`
+- `packages/job-sources/src/seek/index.ts`
+- `packages/job-sources/src/seek/types.ts`
+- `packages/job-sources/src/seek/schemas.ts`
+- `packages/job-sources/src/seek/errors.ts`
+- `packages/job-sources/src/seek/query.ts`
+- `packages/job-sources/src/seek/dates.ts`
+- `packages/job-sources/src/seek/requirements.ts`
+- `packages/job-sources/src/seek/normalizer.ts`
+- `packages/job-sources/src/seek/fixture-client.ts`
+- `packages/job-sources/src/seek/adapter.ts`
+- `packages/job-sources/src/seek/schemas.test.ts`
+- `packages/job-sources/src/seek/normalizer.test.ts`
+- `packages/job-sources/src/seek/adapter.contract.test.ts`
+- `packages/database/src/job-discovery-repository.ts`
+- `packages/database/src/job-discovery-repository.test.ts`
+- the sixteen fixture/manifest files listed in section R
+- `tests/integration/seek-fixture-pipeline.test.ts`
+
+Expected files to modify:
+
+- `PROJECT_PLAN.md`
+- `ARCHITECTURE.md`
+- `SECURITY.md`
+- `README.md`
+- `docs/JOB_SOURCE_ADAPTERS.md`
+- `docs/JOB_NORMALIZATION.md`
+- `packages/job-sources/src/index.ts`
+- `packages/job-sources/src/index.test.ts`
+- `packages/job-sources/package.json` if explicit workspace dependencies or exports are required
+- `packages/database/src/index.ts`
+- `packages/database/package.json` if explicit workspace dependencies are required
+- `apps/web/lib/data.ts`
+- `apps/web/app/jobs/page.tsx`
+- `apps/web/app/jobs/[id]/page.tsx`
+- `apps/web/app/settings/page.tsx`
+- `tests/e2e/dashboard.spec.ts`
+- `tests/fixture-data.ts` and `tests/integration/fixture-pipeline.test.ts` only if the shared fixture loader needs a source-neutral extension
+
+Conditional file, forbidden until the access review explicitly approves a public method:
+
+- `packages/job-sources/src/seek/public-client.ts`
+
+No database migration, application-runner change, application form/submission file, browser-auth state, live payload, or generated personal document is planned. Every created/modified TypeScript file above is covered by a direct unit/contract/integration test or by the production build/E2E suite. Before editing `apps/web`, the implementation must read the applicable Next.js 16 guidance under `node_modules/next/dist/docs/` as required by `apps/web/AGENTS.md`.
+
+## V. Implementation order
+
+1. Re-read repository instructions/blueprint and confirm the branch still starts from the approved merged baseline.
+2. Complete the dated technical/policy research matrix and obtain human approval for any non-fixture access mode.
+3. Add source-neutral query, cursor, checkpoint, capability-status, and error contracts with Zod tests.
+4. Add the SEEK raw schema, safe hashing, provenance capture, and redaction utilities.
+5. Add deterministic date and requirement extractors with golden tests.
+6. Add the SEEK mapper into the existing normalized `Job` contract, including unknown and malformed cases.
+7. Implement `FIXTURE_ONLY` and `USER_SUPPLIED_CONTENT` clients, then pass the common adapter contract and all fixture replay tests.
+8. Implement pagination, caps, checkpoint validation/resume, retry classification, and security stops using fixture transports.
+9. Add transactional persistence/idempotent upsert using existing tables and prove restart/concurrency behaviour.
+10. Only if separately approved, implement the lowest-risk validated public or assisted source method in `public-client.ts`; otherwise record it as blocked and keep fixture/content modes.
+11. Integrate normalized fixture-derived SEEK records with eligibility and fit and confirm candidate truth invariants.
+12. Add the minimal dashboard provenance/status fields after reading the local Next.js 16 documentation.
+13. Complete unit, contract, fixture, integration, security, rate, duplicate, dashboard, and E2E tests.
+14. Update architecture, adapter, normalization, security, README, and this plan with actual behaviour and limitations.
+15. Run all quality/security audits, push the feature branch, and open an unmerged PR for human review.
+
+## W. Risks and mitigations
+
+| Risk                                | Mitigation                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| SEEK markup/structured data changes | Version parsers, validate boundaries, use fixture replay, emit `PAGE_CHANGED`, and require review before repair |
+| Policy or robots restrictions       | Evidence-dated access decision, fixture/content fallback, no access when status is unknown or disallowed        |
+| Anti-bot behaviour                  | Detect and stop; no stealth, proxy rotation, challenge solving, or alternate-route evasion                      |
+| Missing structured fields           | Preserve raw content, use null/`UNKNOWN`, fail required-field normalization safely, and surface review          |
+| Relative-date ambiguity             | Fixed discovery instant, narrow grammar, original text retention, and null plus warning for unsupported forms   |
+| Duplicate listings/pages            | Strong source ID/URL/hash keys, page identity, unique DB index, transactional checkpoint, no fuzzy merge        |
+| Removed listings                    | Typed terminal result and audit event; retain existing provenance without inventing current details             |
+| Location parsing                    | Prefer structured components, narrow Australian parser, preserve full text, and leave uncertain parts null      |
+| Salary parsing                      | Narrow deterministic grammar, raw text preservation, nullable structure, and currency/period validation         |
+| False requirement extraction        | Marker/negation precedence, original spans, rule IDs, ambiguity class, and golden/adversarial tests             |
+| Unexpected login walls              | `AUTH_REQUIRED` security stop; no credentials, session export, or automatic mode fallback                       |
+| Rate limiting/server instability    | Low caps, conservative pacing, `Retry-After`, bounded retries, resumable checkpoints, and run termination       |
+| Cursor/source drift                 | Version/query-bound cursors, stale expiry, duplicate-page detection, and explicit mismatch failures             |
+| Raw-content privacy/copyright       | Fictional/redacted committed fixtures; local-only user/live content; hashes/redacted metadata in logs           |
+| Existing-schema limits              | Prove current-table design first; stop and re-plan before any migration                                         |
+
+## X. Rollback plan
+
+- Keep all Phase 2 work on `feat/seek-discovery-adapter` and leave its PR unmerged until review and gates pass.
+- The adapter remains dependency-injected and defaults to `FIXTURE_ONLY`; disabling/removing SEEK registration restores the Phase 0/1 offline placeholder without touching candidate data or other adapters.
+- Revert Phase 2 commits normally. Do not rewrite `main` history or reset user changes.
+- No schema migration is planned. If Phase 2 is reverted, namespaced checkpoint settings and SEEK job/source/audit rows can be ignored; any cleanup of a real local database requires an explicit backup and separate user-approved operation.
+- Fixture-driven dashboard data remains the fallback. UI provenance additions are additive and can be reverted independently of eligibility, fit, resume, cover-letter, application-runner, and tracker packages.
+- Because no submission behaviour, candidate schema, or generated-document format changes are planned, rollback cannot trigger an application, alter profile truth, or invalidate existing documents.
+
+## Y. Phase 2 acceptance criteria
+
+Phase 2 must not be marked `COMPLETE` unless:
+
+- the SEEK implementation remains behind `JobSourceAdapter`, and `capabilities()`/mode status report only verified behaviour;
+- raw source provenance, source URL, external ID, discovery/fetch timestamps, parser version, and payload hash are preserved;
+- no candidate fact is invented or supplied to discovery, and no job requirement is silently inferred;
+- `EXPLICIT_REQUIREMENT`, `PREFERRED_REQUIREMENT`, and `AMBIGUOUS_REQUIREMENT` remain distinguishable and traceable to raw spans;
+- CAPTCHA, MFA/auth, bot-protection, access-denied, page-change, and rate-limit stops work without bypass or silent fallback;
+- pagination, caps, checkpoints, crash recovery, and stale handling are deterministic;
+- repeated discovery and concurrent conflicts are idempotent by source/external ID, canonical URL, and payload hash;
+- malformed, removed, missing, and unknown data fail or degrade safely while preserving permitted provenance;
+- fixture replay and the common adapter contract pass without a SEEK network request in CI;
+- eligibility and fit integration remain deterministic and all Phase 0/1 regressions pass;
+- the dashboard exposes only safe provenance/status and retains disabled submission controls;
+- no password, cookie, browser state, credential, live private payload, personal CV, private profile, or local database is tracked;
+- documentation states the validated access modes and limitations without overstating live support;
+- `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, and `npm audit` pass;
+- `PROJECT_PLAN.md` records actual commands/results, unfinished work, blockers, rollback status, and the next task;
+- the feature branch is pushed and an unmerged pull request into `main` exists for human review.
+
+## Z. Human review checkpoint
+
+Stop after this blueprint is committed, pushed, and opened as an unmerged documentation-only PR. Do not implement Phase 2, access SEEK, fetch public/live source content, write browser automation, change submission behaviour, or merge the Phase 2 PR until the owner approves the blueprint and issues the implementation task.
+
+## Blueprint checkpoint execution record
+
+The Phase 0/1 merge gate was re-run on 2026-09-05 before merging:
+
+- `npm run format:check`: passed.
+- `npm run lint`: passed with zero warnings.
+- `npm run typecheck`: passed in strict mode.
+- `npm test`: 37 tests passed across 9 files.
+- `npm run test:integration`: 1 integration test passed across the 15-job fixture pipeline.
+- `npm run build`: passed; 23 static pages generated.
+- `npm run test:e2e`: 4 Chromium tests passed.
+- `npm audit`: passed with 0 vulnerabilities.
+- `git diff --check` and `git fsck --no-reflogs --full`: passed.
+- On the Phase 2 branch, `npm run format` normalized the Windows checkout's CRLF-only working-copy mismatch without introducing an application-file diff; the subsequent `npm run format:check` and staged `git diff --check` passed.
+- Git/history audit: no high-confidence committed secrets; no tracked private profile, generated PDF, database, cookie, browser-session, or auth-state artifacts. The one local demonstration PDF was ignored and untracked.
+- GitHub: repository remained private; PR #1 was `MERGEABLE`/`CLEAN`; both `quality` checks passed; no reviews or review blockers existed; `main` had not drifted.
+
+Merge/branch results:
+
+- PR #1 status: `MERGED`.
+- Merge commit/main baseline: `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`.
+- Merge timestamp: `2026-09-05T05:07:44Z` (`2026-09-05 15:07:44 AEST`).
+- Remote `feat/bootstrap-applypilot`: deleted.
+- Phase 2 branch: `feat/seek-discovery-adapter`, created from the merged baseline and pushed.
+
+Unfinished work is the entire Phase 2 implementation described above. It is deliberately not started. No implementation blocker is declared at this planning checkpoint; approval and the access-method research decision are required gates, not assumed outcomes.
