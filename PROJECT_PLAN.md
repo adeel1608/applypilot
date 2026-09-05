@@ -173,8 +173,8 @@ All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 
 | Phase | Objective                                  | Tasks                                                                                              | Acceptance criteria                                                                                  | Key risks                             | Dependencies                           | Validation requirements                             | Status      |
 | ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------- | --------------------------------------------------- | ----------- |
-| 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified | Premature architecture lock-in        | GitHub CLI, Node LTS                   | Lint, typecheck, tests, build, Git/GitHub audit     | IN_PROGRESS |
-| 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                  | Incorrect rules or unsafe claims      | Phase 0, Zod, Drizzle, fixtures        | Unit/integration/E2E tests and production build     | IN_PROGRESS |
+| 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified | Premature architecture lock-in        | GitHub CLI, Node LTS                   | Lint, typecheck, tests, build, Git/GitHub audit     | COMPLETE    |
+| 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                  | Incorrect rules or unsafe claims      | Phase 0, Zod, Drizzle, fixtures        | Unit/integration/E2E tests and production build     | COMPLETE    |
 | 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | NOT_STARTED |
 | 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                              | Site/policy changes, bot controls     | Phases 0-2 patterns                    | Contract tests, fixture replay, manual audit        | NOT_STARTED |
 | 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                          | Tenant variation                      | Adapter contracts                      | Contract/integration tests                          | NOT_STARTED |
@@ -267,7 +267,7 @@ Candidate profile versions and raw job source records remain linked to downstrea
 **Dependencies**
 
 - Runtime: Next.js, React, React DOM, Zod, Drizzle ORM, and a SQLite driver.
-- Development: TypeScript, ESLint, Next ESLint config, Prettier, Vitest, Playwright Test, Drizzle Kit, and supporting type definitions.
+- Development: TypeScript, ESLint, Next ESLint config, Prettier, Vitest, Playwright Test, `tsx`, and supporting type definitions. Drizzle Kit was removed after its stable release retained vulnerable legacy build tooling; the checked-in SQL migration is executed directly in an in-memory SQLite test instead.
 - External: private GitHub repository and GitHub Actions. No paid API or runtime cloud dependency.
 
 **Risks**
@@ -336,15 +336,61 @@ Candidate profile versions and raw job source records remain linked to downstrea
 - Confirmed `adeel1608/applypilot` did not already exist.
 - Created `adeel1608/applypilot` with private visibility and the required description.
 - Initialized and pushed `main` with commit `dd39c7f`.
-- Created local feature branch `feat/bootstrap-applypilot`.
-- Added the permanent plan-first repository instructions and initial master blueprint (pending commit at this point).
+- Created and pushed feature branch `feat/bootstrap-applypilot`.
+- Added permanent plan-first instructions, the full 21-phase roadmap, architecture/security/contribution documentation, and focused domain documentation.
+- Bootstrapped the npm/TypeScript/Next.js workspace with strict type checking, flat ESLint configuration, Prettier, Vitest, Playwright, and GitHub Actions.
+- Added the strongly typed candidate truth store, fictional example profile, verification states, unsupported experience, forbidden claims, and provenance helpers.
+- Added the normalized job model, all fifteen fictional job scenarios, eight offline adapter placeholders, capability flags, source-record contracts, and conservative deduplication structures.
+- Added all thirteen required SQLite/Drizzle tables, indexes, foreign keys, an initial SQL migration, and an in-memory migration execution test.
+- Implemented deterministic eligibility and 0-100 fit engines with stable reason codes and positive/negative explanations.
+- Added all ten resume categories, deterministic selection, provenance-bound resume claims, forbidden-claim validation, A4 ATS HTML, Chromium PDF rendering, safe filenames, and a deterministic cover-letter foundation.
+- Added the preparation-only application runner, tri-state answer model, automation stop reasons, human-confirmation invariant, tracking statuses, and transition validation.
+- Built `/`, `/dashboard`, `/jobs`, `/jobs/[id]`, `/applications`, `/profile`, and `/settings` as responsive Next.js server-rendered fixture views. The job preparation controls are intentionally disabled.
+- Generated and inspected the fictional `JORDAN CV (Northside Homewares).pdf`: one A4 page at 594.96 by 841.92 points, 722 extractable characters, zero replacement characters, black Times text, minimum 10 pt, professional bullets, and no clipping or decorative elements. Poppler was unavailable locally, so PyMuPDF rendered the inspection PNG and pypdf performed structural/text checks; the temporary PNG was removed after review.
+- Opened pull request [#1](https://github.com/adeel1608/applypilot/pull/1) into `main`; it remains unmerged.
 
-Validation results will be appended here after implementation. Completion is not yet claimed.
+### Validation results
+
+Validated on 2026-09-05 with Node `v24.18.0`:
+
+- `npm run format:check`: passed.
+- `npm run lint`: passed with zero warnings.
+- `npm run typecheck`: passed in strict mode.
+- `npm test`: 37 tests passed across 9 files.
+- `npm run test:integration`: the full 15-job pipeline passed with 6 eligible, 1 review-required, and 8 ineligible results.
+- `npm run build`: passed; 23 static pages generated, including all 15 job details.
+- `npm run test:e2e`: 4 Chromium tests passed, including dashboard navigation, disabled submission control, private-profile messaging, and live A4 PDF style/structure checks.
+- `npm audit`: 0 vulnerabilities across production and development dependencies after upgrading Vitest and removing Drizzle Kit.
+- Git ignore audit: private profile, `.env`, browser-session state, SQLite files, and generated candidate PDFs are ignored.
+- Secret-pattern audit: no credential-like assignments found outside dependencies/build output.
+- GitHub Actions: both push and pull-request `quality` runs passed after correcting a Bash glob-expansion issue in the Vitest exclusions. The failed runs and their cause were not skipped.
+- GitHub audit: `adeel1608/applypilot` is private, `main` is the default branch, the feature branch is pushed, and PR #1 is open and unmerged.
+
+Phase 0/1 acceptance criteria are complete. No live job-board access, deployment, or application submission occurred.
 
 ## 27. Blocked work
 
-No work is currently blocked. Any unavailable or failed validation will be recorded here rather than silently skipped.
+No Phase 0/1 work is blocked.
+
+Intentional boundaries remain: source adapters are offline placeholders; persistence is schema/migration foundation rather than dashboard-backed CRUD; deduplication is a contract rather than a fuzzy matcher; only one common resume layout is rendered; cover-letter support is basic and deterministic; job actions are disabled; and all discovery, deployment, notification, analytics, AI-provider, and browser-assisted submission work remains assigned to later phases.
 
 ## 28. Next recommended task
 
-Finish and audit Phase 0/1 according to the blueprint above. After Phase 0/1 is complete, the next recommended task is Phase 2: implement a policy-reviewed SEEK discovery adapter using captured fixtures and contract tests, without live application submission or protection bypass. The exact next-phase prompt will be supplied in the Phase 0/1 final report and must not be executed as part of this task.
+Phase 2 is the next recommended task: implement a policy-reviewed SEEK discovery adapter using captured fixtures and contract tests, without live application submission or protection bypass.
+
+Exact recommended prompt (do not execute as part of Phase 0/1):
+
+```text
+PROJECT: ApplyPilot
+PHASE: 2 - SEEK job discovery adapter
+
+Continue from the merged Phase 0/1 foundation. Follow AGENTS.md and read PROJECT_PLAN.md in full. Inspect the repository and current GitHub state, then update the Phase 2 implementation blueprint in PROJECT_PLAN.md before changing application code. Work on a new feature branch named feat/seek-discovery-adapter.
+
+Implement only the SEEK discovery and job-details phase behind the existing JobSourceAdapter contract. First document a current technical and policy assessment of permitted access, authentication boundaries, robots/rate-limit considerations, and failure/stop conditions. Prefer an official/publicly permitted interface if one is available. Do not bypass CAPTCHA, MFA, bot detection, access controls, authentication protections, rate limits, robots guidance, or website restrictions. Do not implement job application submission, unattended form filling, credential storage, or LinkedIn automation.
+
+Use fictional, redacted, or safely captured fixtures and mocks for deterministic development. Add SEEK source-record validation, discovery pagination/checkpoint contracts, job-detail mapping into the normalized Job schema, raw provenance retention, idempotency, conservative retry/error classification, and explicit capability reporting. Unknown or ambiguous source fields must remain unknown and flow to REVIEW_REQUIRED where material; never invent candidate or job information. Keep the core usable without a paid API.
+
+Add contract, unit, integration, and fixture-replay tests for successful discovery, pagination, job details, malformed records, missing/ambiguous requirements, rate limiting, authentication/security stops, duplicates, and normalization provenance. Update relevant adapter/normalization/security documentation and the dashboard only as needed to display fixture-derived SEEK provenance; do not silently change architecture.
+
+Run format check, lint, strict typecheck, unit tests, integration tests, Playwright tests, production build, and npm audit. Update PROJECT_PLAN.md with exact results, limitations, rollback, blocked items, and the next recommended phase. Push the feature branch and open an unmerged pull request into main. Never claim live SEEK support unless it was actually validated within the documented policy boundaries.
+```

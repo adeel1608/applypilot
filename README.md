@@ -4,7 +4,7 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1 foundation is under active validation on `feat/bootstrap-applypilot`. The repository currently provides typed domain contracts, a fictional candidate truth store, fifteen normalized fixture jobs, deterministic eligibility and fit engines, SQLite/Drizzle schema, document-engine foundations, and a local Next.js dashboard.
+Phase 0/1 foundation is complete on `feat/bootstrap-applypilot` and is awaiting human review in pull request #1. The repository provides typed domain contracts, a fictional candidate truth store, fifteen normalized fixture jobs, deterministic eligibility and fit engines, SQLite/Drizzle schema, document-engine foundations, and a local Next.js dashboard.
 
 There are no live job-board connections, deployments, or application-submission capabilities in this phase. LinkedIn is explicitly assisted/manual only.
 
