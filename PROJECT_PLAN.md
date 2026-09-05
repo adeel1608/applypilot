@@ -3,7 +3,7 @@
 Last updated: 2026-09-05  
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/seek-discovery-implementation`
+Working branch: `feat/real-world-job-intake-plan`
 
 ## 1. Vision
 
@@ -171,29 +171,30 @@ There is no Phase 0/1 deployment. The preferred future topology is a cloud-hoste
 
 All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 
-| Phase | Objective                                  | Tasks                                                                                              | Acceptance criteria                                                                                  | Key risks                             | Dependencies                           | Validation requirements                             | Status      |
-| ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------- | --------------------------------------------------- | ----------- |
-| 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified | Premature architecture lock-in        | GitHub CLI, Node LTS                   | Lint, typecheck, tests, build, Git/GitHub audit     | COMPLETE    |
-| 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                  | Incorrect rules or unsafe claims      | Phase 0, Zod, Drizzle, fixtures        | Unit/integration/E2E tests and production build     | COMPLETE    |
-| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | COMPLETE    |
-| 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                              | Site/policy changes, bot controls     | Phases 0-2 patterns                    | Contract tests, fixture replay, manual audit        | NOT_STARTED |
-| 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                          | Tenant variation                      | Adapter contracts                      | Contract/integration tests                          | NOT_STARTED |
-| 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                  | Each adapter passes common contract suite and retains raw provenance                                 | Vendor/tenant variation               | Phases 2-4 lessons                     | Per-adapter fixtures and policy/security checks     | NOT_STARTED |
-| 6     | Refine normalization and deduplication     | Canonical fields, similarity signals, merge review UX                                              | Duplicate clusters are explainable and source records remain intact                                  | False merges                          | Multi-source fixtures                  | Precision/recall fixture suite and manual review    | NOT_STARTED |
-| 7     | Refine eligibility                         | Expand rules, confidence, override/audit workflow                                                  | Hard blockers and overrides are deterministic and audited                                            | False negatives                       | Candidate feedback and normalized data | Rule matrix, regression tests                       | NOT_STARTED |
-| 8     | Refine fit scoring                         | Calibrate weights and preference signals                                                           | Scores remain explainable and calibrated against reviewed outcomes                                   | Misleading precision/bias             | Outcome samples                        | Golden cases, sensitivity and bounds tests          | NOT_STARTED |
-| 9     | Complete CV template engine                | Implement categories and reusable layout validation                                                | ATS-safe categories render within configured page limits                                             | Layout drift                          | Truth store, Playwright                | PDF structure, page-count, visual QA                | NOT_STARTED |
-| 10    | Add automatic CV tailoring                 | Deterministic tailoring first; optional provider boundary                                          | Every claim has profile provenance; unsupported claims fail closed                                   | Hallucination                         | Phase 9 and truth provenance           | Adversarial truth-compliance tests                  | NOT_STARTED |
-| 11    | Complete cover-letter generation           | Requirement selection, tone configuration, layouts                                                 | Employer/role accurate, fact-safe, non-generic output                                                | Unsupported claims                    | Phase 10 patterns                      | Content provenance and PDF validation               | NOT_STARTED |
-| 12    | Build application preparation              | Question mapping, answer store, document checklist                                                 | Prepared packet identifies every unknown and required review                                         | Incorrect answers                     | Documents and normalized jobs          | Workflow integration tests                          | NOT_STARTED |
-| 13    | Add assisted browser filling               | Local runner, field mapping, pause/resume, confirmation gate                                       | Safe assisted filling works on approved fixtures; no unattended final submit                         | Credential leakage, site controls     | Phase 12, security review              | Synthetic-site E2E, threat-model review             | NOT_STARTED |
-| 14    | Complete tracking dashboard                | Persistent queues, timelines, status actions                                                       | Applications and events are filterable and auditable                                                 | State inconsistency                   | Database and runner events             | Transition and UI tests                             | NOT_STARTED |
-| 15    | Add scheduled discovery                    | Local/cloud schedules, checkpoints, idempotency                                                    | Runs are resumable and deduplicated without duplicate notifications                                  | Rate limiting, missed runs            | Source adapters                        | Scheduler/idempotency tests                         | NOT_STARTED |
-| 16    | Add notifications                          | Local/email/push option analysis and preferences                                                   | Opt-in notifications contain minimal sensitive data                                                  | Privacy and alert fatigue             | Phase 15                               | Preference and redaction tests                      | NOT_STARTED |
-| 17    | Add analytics                              | Conversion, source/template/category/company/location/time metrics                                 | Metrics derive reproducibly from event data                                                          | Small-sample bias                     | Tracking history                       | Query fixtures and metric reconciliation            | NOT_STARTED |
-| 18    | Add optional AI providers                  | Provider-neutral interface, redaction, consent, deterministic fallback                             | Base app works without AI; provider use is explicit and auditable                                    | Privacy, cost, hallucination          | Mature truth-safe engines              | Contract, redaction, fallback tests                 | NOT_STARTED |
-| 19    | Deploy approved topology                   | Hybrid runner/cloud implementation, migrations, operations                                         | Threat model approved; rollback and recovery tested                                                  | Secrets, availability, migration loss | Prior phases and hosting choice        | Staging, backup/restore, security tests             | NOT_STARTED |
-| 20    | Production security hardening              | Pen test, dependency policy, incident response, release gates                                      | Critical findings resolved and operational controls documented                                       | Unknown vulnerabilities               | Deployment candidate                   | SAST/dependency/manual security audits              | NOT_STARTED |
+| Phase | Objective                                  | Tasks                                                                                              | Acceptance criteria                                                                                                | Key risks                                        | Dependencies                                   | Validation requirements                                     | Status      |
+| ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ---------------------------------------------- | ----------------------------------------------------------- | ----------- |
+| 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified               | Premature architecture lock-in                   | GitHub CLI, Node LTS                           | Lint, typecheck, tests, build, Git/GitHub audit             | COMPLETE    |
+| 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                                | Incorrect rules or unsafe claims                 | Phase 0, Zod, Drizzle, fixtures                | Unit/integration/E2E tests and production build             | COMPLETE    |
+| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                                          | Site/policy changes, rate limits                 | Phases 0-1                                     | Contract tests, fixture replay, manual policy audit         | COMPLETE    |
+| 2.5   | Add real-world job intake                  | Source-neutral paste, multi-job, HTML, upload, preview, confirmation, and policy-gated URL intake  | Real user-supplied ads enter one validated local pipeline without scraping, invented facts, or application actions | Untrusted content, false splits, duplicate drift | Phase 2 normalization and persistence patterns | Parser/security fixtures, integration/E2E, migration review | NOT_STARTED |
+| 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                                            | Site/policy changes, bot controls                | Phases 0-2 patterns                            | Contract tests, fixture replay, manual audit                | NOT_STARTED |
+| 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                                        | Tenant variation                                 | Adapter contracts                              | Contract/integration tests                                  | NOT_STARTED |
+| 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                  | Each adapter passes common contract suite and retains raw provenance                                               | Vendor/tenant variation                          | Phases 2-4 lessons                             | Per-adapter fixtures and policy/security checks             | NOT_STARTED |
+| 6     | Refine normalization and deduplication     | Canonical fields, similarity signals, merge review UX                                              | Duplicate clusters are explainable and source records remain intact                                                | False merges                                     | Multi-source fixtures                          | Precision/recall fixture suite and manual review            | NOT_STARTED |
+| 7     | Refine eligibility                         | Expand rules, confidence, override/audit workflow                                                  | Hard blockers and overrides are deterministic and audited                                                          | False negatives                                  | Candidate feedback and normalized data         | Rule matrix, regression tests                               | NOT_STARTED |
+| 8     | Refine fit scoring                         | Calibrate weights and preference signals                                                           | Scores remain explainable and calibrated against reviewed outcomes                                                 | Misleading precision/bias                        | Outcome samples                                | Golden cases, sensitivity and bounds tests                  | NOT_STARTED |
+| 9     | Complete CV template engine                | Implement categories and reusable layout validation                                                | ATS-safe categories render within configured page limits                                                           | Layout drift                                     | Truth store, Playwright                        | PDF structure, page-count, visual QA                        | NOT_STARTED |
+| 10    | Add automatic CV tailoring                 | Deterministic tailoring first; optional provider boundary                                          | Every claim has profile provenance; unsupported claims fail closed                                                 | Hallucination                                    | Phase 9 and truth provenance                   | Adversarial truth-compliance tests                          | NOT_STARTED |
+| 11    | Complete cover-letter generation           | Requirement selection, tone configuration, layouts                                                 | Employer/role accurate, fact-safe, non-generic output                                                              | Unsupported claims                               | Phase 10 patterns                              | Content provenance and PDF validation                       | NOT_STARTED |
+| 12    | Build application preparation              | Question mapping, answer store, document checklist                                                 | Prepared packet identifies every unknown and required review                                                       | Incorrect answers                                | Documents and normalized jobs                  | Workflow integration tests                                  | NOT_STARTED |
+| 13    | Add assisted browser filling               | Local runner, field mapping, pause/resume, confirmation gate                                       | Safe assisted filling works on approved fixtures; no unattended final submit                                       | Credential leakage, site controls                | Phase 12, security review                      | Synthetic-site E2E, threat-model review                     | NOT_STARTED |
+| 14    | Complete tracking dashboard                | Persistent queues, timelines, status actions                                                       | Applications and events are filterable and auditable                                                               | State inconsistency                              | Database and runner events                     | Transition and UI tests                                     | NOT_STARTED |
+| 15    | Add scheduled discovery                    | Local/cloud schedules, checkpoints, idempotency                                                    | Runs are resumable and deduplicated without duplicate notifications                                                | Rate limiting, missed runs                       | Source adapters                                | Scheduler/idempotency tests                                 | NOT_STARTED |
+| 16    | Add notifications                          | Local/email/push option analysis and preferences                                                   | Opt-in notifications contain minimal sensitive data                                                                | Privacy and alert fatigue                        | Phase 15                                       | Preference and redaction tests                              | NOT_STARTED |
+| 17    | Add analytics                              | Conversion, source/template/category/company/location/time metrics                                 | Metrics derive reproducibly from event data                                                                        | Small-sample bias                                | Tracking history                               | Query fixtures and metric reconciliation                    | NOT_STARTED |
+| 18    | Add optional AI providers                  | Provider-neutral interface, redaction, consent, deterministic fallback                             | Base app works without AI; provider use is explicit and auditable                                                  | Privacy, cost, hallucination                     | Mature truth-safe engines                      | Contract, redaction, fallback tests                         | NOT_STARTED |
+| 19    | Deploy approved topology                   | Hybrid runner/cloud implementation, migrations, operations                                         | Threat model approved; rollback and recovery tested                                                                | Secrets, availability, migration loss            | Prior phases and hosting choice                | Staging, backup/restore, security tests                     | NOT_STARTED |
+| 20    | Production security hardening              | Pen test, dependency policy, incident response, release gates                                      | Critical findings resolved and operational controls documented                                                     | Unknown vulnerabilities                          | Deployment candidate                           | SAST/dependency/manual security audits                      | NOT_STARTED |
 
 ## 25. Current phase status
 
@@ -860,8 +861,8 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 
 - Execution date: 2026-09-05 (Australia/Sydney).
 - Implementation branch: `feat/seek-discovery-implementation`, created and pushed from blueprint merge `90a9eafaad32780a81653b3739c19ce95a22d951`.
-- Implementation pull request: #3, `https://github.com/adeel1608/applypilot/pull/3`, opened into `main` and intentionally left unmerged. Focused implementation commits are `6613f126e94845313dec4d2666f85ec7a9eb8370` (adapter/fixtures), `1998f289cf6077e88a349b6d62ca081813e0419e` (database), `0dbcfa954e55494c9650a0eb8efe99019abc361c` (dashboard), `ad8c7aad0a0b7f1248a0ee5ec05f82f4f278352d` / `10a2e51c53934d378c8f26eb412250480ac14a93` (implementation/CI records), and `6ad9e987d8bc8d4ced6abf7d28fdad36f3003416` (final truthfulness/retry refinement).
-- Current Phase 2 status: `COMPLETE`. The implementation is committed and pushed, pull request #3 is open and unmerged for human review, and both GitHub quality checks are green.
+- Implementation pull request: #3, `https://github.com/adeel1608/applypilot/pull/3`, opened into `main`, received the owner's explicit review/merge approval, and was merged normally at `2026-09-05T06:42:34Z`. The merge commit is `cd3e13699cef3e41b8e3edd56239435ca647d66b`. Focused implementation commits are `6613f126e94845313dec4d2666f85ec7a9eb8370` (adapter/fixtures), `1998f289cf6077e88a349b6d62ca081813e0419e` (database), `0dbcfa954e55494c9650a0eb8efe99019abc361c` (dashboard), `ad8c7aad0a0b7f1248a0ee5ec05f82f4f278352d` / `10a2e51c53934d378c8f26eb412250480ac14a93` (implementation/CI records), and `6ad9e987d8bc8d4ced6abf7d28fdad36f3003416` (final truthfulness/retry refinement).
+- Current Phase 2 status: `COMPLETE` and closed. Pull request #3 is merged, refreshed local `main` equals `origin/main` at the merge commit, and the implementation branch is deleted locally and remotely.
 - The evidence-dated research in `docs/SEEK_ADAPTER.md` completed the required method review in order. The official partner API remains `CONDITIONAL` and disabled because ApplyPilot has no SEEK approval/credentials and the reviewed documentation did not establish a permitted candidate-facing public discovery scope. SEEK website automation is `NOT_ALLOWED` under the reviewed terms. Robots guidance remains `UNKNOWN` and is not treated as permission.
 - Enabled modes are `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`. `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` are disabled and fail closed without fallback. No SEEK listing/page/network response was fetched, no `public-client.ts` was created, and live SEEK access is not claimed.
 
@@ -896,7 +897,7 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 - `npm run test:e2e`: 5 Chromium tests passed, including safe SEEK provenance/status, no raw-payload rendering, and disabled application preparation.
 - `npm audit`: passed with 0 vulnerabilities. `npm run audit:production` also passed with 0 vulnerabilities.
 - `git diff --check`: passed. High-confidence workspace secret-pattern scan, tracked sensitive-artifact scan, and tracked-ignored-file audit returned no matches. `git fsck --no-reflogs --full` returned success with one benign dangling blob. GitHub reported `adeel1608/applypilot` as `PRIVATE` with `main` as its default branch.
-- CI result: pull request #3 (`feat/seek-discovery-implementation` -> `main`) is open, mergeable, and unmerged. Both `quality` checks passed (GitHub Actions runs `33949628734` and `33949643299`). No review has yet been submitted.
+- Final CI result before merge: pull request #3 (`feat/seek-discovery-implementation` -> `main`) was mergeable and clean. Both final `quality` checks passed (GitHub Actions runs `33950063807` and `33950064759`); the owner supplied explicit approval in the Phase 2 closeout instruction.
 
 ### Errors encountered and fixes
 
@@ -918,5 +919,449 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 - Live SEEK discovery/details are unavailable. The official API requires a future approved integration and verified scope; website/URL/browser retrieval remains disabled. Fixture radius calculations are intentionally available only from postcode 3072 because the fixtures contain explicit distances from that origin; another origin fails as unsupported rather than being guessed.
 - `USER_SUPPLIED_CONTENT` is a programmatic local adapter entry point, not an upload/paste UI. It handles one validated raw/JSON-LD job record at a time and does not paginate or fetch links.
 - SQLite stores the current source payload per strong source/external ID, not raw version history. Cross-source/fuzzy semantic merging is intentionally deferred.
-- Remaining implementation work: none. The external workflow checkpoint is human review and an explicit decision on pull request #3; Codex must not merge it automatically.
-- Exact next recommended phase after human review and merge of the Phase 2 implementation PR: **Phase 3 — Indeed Discovery Adapter planning blueprint**, beginning with a fresh evidence-dated policy/technical access review and no implementation until that separate plan is approved.
+- Remaining Phase 2 implementation work: none. The human review/merge checkpoint was satisfied, the normal merge completed, and Phase 2 is closed without enabling live SEEK access.
+- Exact next approved planning checkpoint after merge of the Phase 2 implementation PR: **Phase 2.5 — Real-World Job Intake**, creating a source-neutral local paste/upload pipeline before any Phase 3 Indeed work. Phase 3 is not started.
+
+# Phase 2.5 - Real-World Job Intake Blueprint
+
+- Blueprint status: `AWAITING_HUMAN_REVIEW`
+- Roadmap status: `NOT_STARTED`
+- Prepared on: 2026-09-05
+- Planning branch: `feat/real-world-job-intake-plan`
+- Planning base: Phase 2 merge commit `cd3e13699cef3e41b8e3edd56239435ca647d66b`
+- Scope: blueprint only; no importer, parser, upload route, URL fetcher, source adapter, migration, or application behaviour is implemented by this planning pull request.
+
+## Blueprint framing
+
+### Current state
+
+- Pull request #3 (`feat/seek-discovery-implementation` -> `main`) was reviewed and merged normally on 2026-09-05 at `2026-09-05T06:42:34Z` (`2026-09-05 16:42:34 AEST`). The merge commit and refreshed `main` HEAD are `cd3e13699cef3e41b8e3edd56239435ca647d66b`; the implementation branch was deleted locally and remotely.
+- Immediately before merge, PR #3 was `OPEN`, `MERGEABLE`, and `CLEAN`, both GitHub `quality` checks passed, and its head was `2eabcb1475b0adbfb39c37e960be7ad2b0c95eae`. The repository remained private. The implementation diff contained no database migration, candidate-profile change, application-submission change, public SEEK client, live job-board request, credential/session artifact, real candidate data, or unignored private artifact.
+- The merge candidate passed `npm run format:check`, `npm run lint`, `npm run typecheck`, 63 unit tests across 13 files, 3 integration tests across 2 files, a 34-page production build, 5 Playwright tests, and `npm audit` with zero vulnerabilities.
+- Phase 2 provides reliable normalization, provenance, checkpoint, persistence, eligibility, and fit patterns, but real-world intake is still programmatic and single-record for user-supplied SEEK content. There is no `/import` workflow, multi-job splitter, upload boundary, source-neutral parser, preview/confirmation stage, or approved live URL retrieval.
+
+### Objective and success boundary
+
+Build a source-neutral, local-first intake path that lets a user bring job advertisements they are entitled to use into ApplyPilot, review exactly what was detected, and explicitly confirm persistence. The phase succeeds when paste and safe file-upload inputs can produce deterministic job previews and confirmed normalized jobs without unauthorized scraping, invented source/job facts, document generation, form filling, or application submission.
+
+### Assumptions, requirements, and dependencies
+
+- The user controls the supplied text/file and is responsible for having the right to use it. ApplyPilot does not republish imported content.
+- Real inputs are untrusted even when supplied by the local user. Byte limits, content-type checks, inert parsing, Zod validation, deterministic classification, and fail-closed review states are mandatory.
+- Candidate data is not an importer input. Eligibility and fit run only after a confirmed normalized job exists and use the existing validated local candidate truth store.
+- Existing Phase 2 SEEK parsing rules should be reused or extracted into shared deterministic helpers when their input preconditions are met. Source-neutral code must not copy and then silently diverge from those rules.
+- Runtime remains local Next.js 16, strict TypeScript, Zod, SQLite/Drizzle, Vitest, and Playwright. Before editing `apps/web`, implementation must read the repository's applicable Next.js 16 documentation and `apps/web/AGENTS.md` if present.
+- A small inert HTML parser such as `parse5` is the expected new runtime dependency. It must be pinned, audited, and used only server-side. No browser DOM, script engine, remote asset loader, OCR, PDF parser, or required paid/AI service is planned.
+
+### Non-goals
+
+- Phase 3 Indeed discovery, a Phase 2.6 ATS adapter, any other live job-board adapter, broad web crawling, search-engine discovery, authenticated retrieval, or browser automation.
+- Fetching a URL merely because the user supplied it; a URL is data, not permission.
+- CAPTCHA/MFA/login/access-control/rate-limit/bot-detection bypass, stealth, proxy rotation, fingerprint spoofing, cookie/session import, or hidden endpoint replay.
+- CV or cover-letter generation, application-question answering, form filling, application preparation, status updates, or submission.
+- Fuzzy/semantic duplicate matching, inferred job facts, probabilistic record boundaries, or AI extraction.
+- PDF/OCR, Word/Office documents, archives, images, executable content, or unknown/binary upload formats.
+
+### Architecture, risks, and rollback summary
+
+`@applypilot/job-importer` will own the source-neutral intake contracts and pure deterministic pipeline. `@applypilot/job-sources` will continue to own source-specific adapter/parsing behaviour. `@applypilot/database` will own import staging and confirmed persistence. `apps/web` will provide the local `/import` presentation and server actions only. The preview phase creates only local staging/audit metadata; the confirmation phase is the only path that may create/update normalized jobs and downstream evaluations.
+
+Primary risks are executable/untrusted HTML, denial-of-service through large/deep inputs, false multi-job splits, source misclassification, accidental raw-content exposure, false duplicate merges, forged URLs, SSRF if a future URL fetcher is enabled, and schema evolution against local databases. The controls in sections E, H, J, L, O, Q, and T are acceptance requirements, not optional hardening.
+
+Rollback is additive and local: keep implementation isolated on a future feature branch and leave its PR unmerged; disable the `/import` navigation/route and importer registration to restore the Phase 2 UI; revert code normally; never rewrite `main`; preserve imported user data unless the user separately approves deletion. Database rollback and backup requirements are exact in section O.
+
+## A. Product goal and planned inputs
+
+All intake modes converge on one `RawImportedJobDocument -> ImportedJobDraft[] -> preview -> confirmed normalization/persistence` pipeline. Planned inputs are:
+
+1. A pasted single job advertisement in plain text, Markdown-like text, JSON, JSON-LD, or HTML.
+2. Pasted search results containing multiple job cards or repeated structured job records.
+3. Pasted HTML copied or saved by the user, parsed inertly and never rendered as supplied markup.
+4. Local upload of a compatible `.txt`, `.md`, `.html`, `.htm`, or `.json` file.
+5. A job URL only when the URL policy registry says automated retrieval is explicitly supported by an approved source-specific plan; otherwise the UI requires user-supplied content.
+6. Future source adapters, email ingestion, browser extensions, CLI commands, and mobile share flows that construct the same validated raw-document contract rather than inventing parallel pipelines.
+
+The immediate Phase 2.5 implementation target is real user-supplied paste and upload. The URL input and registry are planned as a safe decision surface; this blueprint initially approves no live HTTP source. A future reviewed phase may enable a narrowly allowlisted `FETCH_ALLOWED` entry without changing the downstream pipeline.
+
+## B. `/import` user experience
+
+Add a local `/import` route with four explicit entry choices: **Paste one job**, **Paste multiple/search results**, **Upload a file**, and **Job URL**. Paste modes accept a source hint of `Auto-detect` or one of the supported source labels. Upload shows accepted formats and limits before file selection. URL mode evaluates policy before any retrieval and, for the initial registry, explains how to paste or upload content instead.
+
+Submitting content performs validation, inert extraction, deterministic source detection, splitting, and draft parsing, then displays a preview containing:
+
+- detected job count and overall split result;
+- per-record title, company, location, source guess, source confidence, stable warnings, and duplicate status;
+- whether a source URL/external ID was explicitly found;
+- missing required fields and material ambiguities;
+- a plain-text excerpt only, escaped by React, never supplied HTML;
+- `Import`, `Edit`, and `Skip` actions per record plus a bulk selection control.
+
+The user must explicitly confirm selected records. Confirmation revalidates the staged data and override set, normalizes each record, applies strong duplicate rules, persists it transactionally, evaluates eligibility and fit, and makes it visible in jobs/dashboard views. It does not shortlist the job, generate documents, prepare an application, change application status beyond the existing initial `NEW` state, or submit anything.
+
+The preview must remain usable by keyboard, associate warnings with their fields, preserve focus after edits, identify destructive/irreversible outcomes before confirmation, and avoid color-only status communication.
+
+## C. Multi-job pasted text and copied search results
+
+Multi-job mode accepts repeated text blocks, JSON arrays/graphs, or HTML job cards. It creates an ordered candidate-record list and never directly imports the entire page as one job when strong repeated structure is present. The preview exposes boundaries as numbered records so the user can inspect each title/company/location and edit, combine, split, or skip uncertain records before confirmation.
+
+Copied search-result cards often omit full descriptions. Such records may still preview, but a missing field required by `JobSchema` remains missing. The UI must request a manual edit or fuller pasted detail; it must not invent a description, company, location, URL, external ID, salary, requirement, or employment type. A structurally sound card without sufficient canonical fields is `REVIEW_REQUIRED`, not silently importable.
+
+Mixed-source input is permitted. Source detection runs per candidate record; the batch-level `detectedSource` becomes `MIXED` only when records have more than one confident source. A batch hint is never applied blindly to every record.
+
+## D. Deterministic source detection
+
+Define `DetectedJobSource` as `SEEK | INDEED | EMPLOYMENT_HERO | GREENHOUSE | LEVER | WORKDAY | GENERIC_COMPANY_SITE | UNKNOWN`, with batch-only `MIXED`. Every result includes `confidence: HIGH | MEDIUM | LOW`, ordered `ruleIds`, safe evidence paths/tokens, and conflicts.
+
+Detection order is deterministic:
+
+1. Explicit structured source values in a validated payload, when consistent with a recognized URL/payload contract.
+2. Exact allowlisted host/path shapes and stable identifiers: SEEK `/job/<id>`; Indeed `indeed.*` job/view-job shapes and explicit job keys; Employment Hero/Swag vendor-owned job hosts; Greenhouse `boards.greenhouse.io`, `job-boards.greenhouse.io`, or `boards-api.greenhouse.io` shapes; Lever `jobs.lever.co` or `api(.eu).lever.co/v0/postings` shapes; Workday `*.myworkdayjobs.com` job shapes.
+3. Vendor-specific structured JSON/JSON-LD keys or inert HTML markers that have fictional golden fixtures and at least two independent signals.
+4. Generic schema.org `JobPosting` plus an HTTPS employer/careers URL becomes `GENERIC_COMPANY_SITE` only when no vendor rule matches.
+5. Everything else is `UNKNOWN`.
+
+`HIGH` requires corroborated structured identity plus a recognized URL/payload shape. `MEDIUM` requires one strong vendor-owned shape or two independent structured markers. Text logos, CSS class names, and a user source hint alone are `LOW` and force review. A conflicting hint adds `SOURCE_HINT_CONFLICT`; it never overrides observed evidence. Detection performs no DNS lookup, HTTP request, authentication, or browser access.
+
+Rules are versioned and return evidence so later changes can be fixture-reviewed. Source detection classifies provenance; it never authorizes retrieval. That separate decision belongs only to section L.
+
+## E. Untrusted-content validation and sanitization
+
+Validate at both the web/server-action boundary and package boundary with Zod. Initial hard limits are:
+
+- maximum input/upload body: 1 MiB of raw UTF-8 bytes;
+- maximum URL length: 2,048 characters;
+- maximum 100 detected job candidates per batch;
+- maximum 128 KiB extracted text per candidate after normalization;
+- maximum 25,000 text lines, 256 JSON nesting levels, and 256 HTML tree depth; exceeding a limit fails before preview;
+- filename maximum 255 characters after basename extraction; paths, control characters, and NUL bytes are rejected;
+- parsing time and memory must be bounded and exercised with adversarial fixtures.
+
+Allow only UTF-8 `text/plain`, `text/markdown`, `text/html`, and `application/json`, with conservative aliases that match an allowed extension and successful content sniff. Hash original bytes before decoding. Reject invalid UTF-8 rather than silently replacing data. Normalize line endings and Unicode only in a derived parser view; raw bytes/text and the original hash remain unchanged locally.
+
+HTML is parsed server-side as an inert tree. Extract text and validated `application/ld+json` data only. Discard `script`, `style`, `noscript`, `template`, `iframe`, `frame`, `object`, `embed`, `applet`, `form`, `input`, `button`, `textarea`, `select`, `option`, `link`, `meta`, `base`, media, SVG/MathML, comments, processing instructions, inline event handlers, `style`, `srcdoc`, and active/remote resource attributes. Do not execute JavaScript, resolve CSS, submit forms, load fonts/images/media, follow links, or preserve executable DOM. Never use `dangerouslySetInnerHTML`; React must render extracted strings as text.
+
+JSON is parsed as data only. Prototype-polluting keys (`__proto__`, `prototype`, `constructor`) are rejected or removed by an explicitly tested recursive sanitizer, and all objects are copied into plain safe records before schema parsing. Parser failures return stable codes and short safe messages without echoing the body.
+
+## F. `RawImportedJobDocument`
+
+Define the source-neutral boundary as:
+
+```ts
+interface RawImportedJobDocument {
+  importId: string;
+  inputType: "PASTED_SINGLE" | "PASTED_MULTI" | "PASTED_HTML" | "FILE_UPLOAD" | "URL";
+  sourceHint: DetectedJobSource | null;
+  detectedSource: DetectedJobSource | "MIXED";
+  originalFilename: string | null;
+  sourceUrl: string | null;
+  contentHash: string;
+  createdAt: string;
+  parserVersion: string;
+  contentLength: number;
+  detectedJobs: number;
+  warnings: ImportWarning[];
+  content: string; // LOCAL_PRIVATE; excluded from logs, audit metadata, and client DTOs
+}
+```
+
+`importId` is a random local UUID. `contentHash` is SHA-256 over the exact accepted bytes. `createdAt` is an injected ISO 8601 clock value. `contentLength` is the pre-decode byte length. The web preview receives only selected escaped excerpts and typed fields, never the complete `content` field. Raw content remains in the ignored local SQLite database, is never uploaded to CI/cloud/analytics, and never appears in console, error, request-body, or audit logs.
+
+## G. One source-neutral parser contract and expected files
+
+Define one parser contract:
+
+```ts
+interface JobImportParser {
+  parseDocument(document: RawImportedJobDocument): ImportParseResult;
+  parseRecord(record: SplitImportedJobRecord, context: ImportContext): ImportedJobDraft;
+}
+```
+
+`ImportedJobDraft` carries only explicit extracted values for external ID, source URL, title, company, location, category, description, responsibilities, employment/salary/hours/schedule text, requirements, dates, and cover-letter instruction. Every field has `originalValue`, evidence path/range, extraction rule ID, and confidence. Absent facts are `null`/empty plus warnings. Parser output is validated before preview and again before normalization.
+
+SEEK input should reuse `createSeekRawJobRecord`, `parseUserSuppliedSeekContent`, requirement/date rules, and `normalizeSeekJob` where their validated preconditions are satisfied. Implementation may extract generally useful pure helpers into source-neutral modules with regression tests; it must not weaken the current SEEK URL gate or duplicate rules into a second untracked implementation. Other detected sources initially use generic schema.org/visible-text parsing and preserve the detected source as provenance; source-specific enrichments remain later adapter work.
+
+Expected future implementation files are:
+
+- Create `packages/job-importer/package.json`, `tsconfig.json`, and `src/{index,types,schemas,limits,sanitize,source-detector,multi-job-splitter,single-job-parser,url-policy,identity,import-service}.ts` with colocated unit tests.
+- Create `packages/database/src/job-import-repository.ts` and its migration/integration tests.
+- Conditionally create `packages/database/drizzle/0001_real_world_job_intake.sql` only after this blueprint and its migration recommendation are human-approved.
+- Create `apps/web/app/import/page.tsx`, `apps/web/app/import/actions.ts`, and focused `apps/web/components/job-import/*` components; modify navigation, dashboard/jobs data access, and styles minimally.
+- Create `fixtures/imports/manifest.ts` and the fictional files in section S.
+- Create `tests/integration/real-world-job-intake.test.ts`, `tests/e2e/import.spec.ts`, and `docs/REAL_WORLD_JOB_INTAKE.md`.
+- Modify `packages/job-model/src/index.ts`, `packages/job-sources` exports/helpers, `packages/database/src/{schema,index}.ts`, root/workspace TypeScript configuration as required, `README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `docs/JOB_SOURCE_ADAPTERS.md`, `docs/JOB_NORMALIZATION.md`, and this plan only to reflect verified implementation.
+- Do not create an HTTP content provider, network client, crawler, browser client, application form, document generator, or submission file in Phase 2.5. A future approved `FETCH_ALLOWED` source may add a narrowly scoped content provider.
+
+## H. Deterministic multi-job splitter
+
+`splitImportedJobs` returns ordered records plus one of `CONFIDENT`, `REVIEW_REQUIRED`, or `FAILED`:
+
+- `CONFIDENT`: boundaries come from a JSON array/`@graph` of independently valid `JobPosting` objects, repeated inert HTML job-card structures with explicit per-card title/link/company evidence, or explicit user separators where every segment independently meets the minimum draft shape.
+- `REVIEW_REQUIRED`: there are plausible repeated blocks, inconsistent structural markers, overlapping ranges, mixed full ads/cards, or one/more records missing required preview fields. Candidate boundaries are shown and nothing is persisted until the user confirms/edits them.
+- `FAILED`: no safe record boundary or viable single-record interpretation exists, the input is empty/disallowed/oversized, or all candidates fail minimum validation.
+
+The splitter uses this order: validated JSON/JSON-LD nodes; repeated HTML container/card structure; explicit delimiter/numbered-record grammar; repeated labelled field grammar; conservative single-record fallback. Blank lines, headings, bullet lists, repeated words such as “About us”, or title-looking sentences inside a description are never sufficient boundaries by themselves. A lower-confidence rule cannot override a higher-confidence structure.
+
+Every segment retains its ordinal, exact original byte/character range where possible, raw-fragment hash, boundary rule IDs, confidence, warnings, and extraction evidence. The parser never manufactures a delimiter, merges non-adjacent spans, or silently drops leftover text; unassigned content becomes a preview warning.
+
+## I. Preview, selection, and confirmation
+
+Each preview record shows title, company, location, detected source and confidence, external ID/URL presence, duplicate decision, split confidence, missing fields, warnings, and an escaped excerpt. Available actions are:
+
+- **Import**: select a reviewable record for the confirmation transaction;
+- **Edit**: change extracted fields or approved boundaries while preserving the immutable originals;
+- **Skip**: exclude the record and record a safe local reason/code;
+- **Bulk import selected** / **Bulk skip selected**: act only on explicitly checked records; no default “select all” when any item is `REVIEW_REQUIRED`.
+
+`CONFIDENT` records may be preselected, but the batch confirmation button remains explicit. `REVIEW_REQUIRED` records are never preselected and require an acknowledged warning after any necessary edit. `FAILED` records cannot import. The confirmation screen states counts for create/update/duplicate/skip/fail before commit. There is no CV, cover letter, shortlist, prepare, apply, or submit action on `/import`.
+
+Preview tokens are random, short-lived, local, and bound to `importId + contentHash + parserVersion + overrideHash`. Confirmation rejects stale/mismatched/replayed tokens and revalidates the stored raw document and selected records server-side.
+
+## J. Strong duplication and local identity
+
+Duplicate evaluation is deterministic and ordered:
+
+1. Exact `(detected source, validated externalId)` when both exist.
+2. Exact canonical source URL. Canonicalization requires HTTPS, lowercases only scheme/host, removes fragments/default ports, normalizes dot segments, preserves case-sensitive paths, and removes only an explicit allowlist of tracking parameters such as `utm_*`; unknown/identity query parameters are retained and sorted.
+3. Exact segment content hash for repeated identical supplied records.
+4. When no external ID or canonical URL exists, a versioned local fingerprint: `sha256("job-import-fingerprint-v1\n" + detectedSource + "\n" + normalizedTitle + "\n" + normalizedCompany + "\n" + normalizedLocation + "\n" + normalizedDescriptionHash)`. Normalization is limited to Unicode NFC, trim, whitespace folding, and locale-stable lowercase; no synonym, stemming, geocoding, or semantic similarity is used.
+
+The local fingerprint is used automatically only when title, company, location, and description are all explicit. Missing fields yield `REVIEW_REQUIRED`, not a partial fingerprint. The persisted record separately identifies whether identity came from `EXTERNAL_ID`, `CANONICAL_URL`, `CONTENT_HASH`, or `LOCAL_FINGERPRINT`; a derived fingerprint is never presented as a vendor external ID.
+
+Same identity plus same content hash is `DUPLICATE_UNCHANGED`. Same external ID/URL plus changed content hash is `UPDATE_REVIEW_REQUIRED` and must be visibly confirmed. Conflicting strong signals are `IDENTITY_CONFLICT` and cannot auto-merge. Cross-source and fuzzy matching remain Phase 6 review work.
+
+## K. Upload policy
+
+Allow only `.txt`, `.md`, `.html`, `.htm`, and compatible `.json` files. Extension, declared MIME, sniffed content, UTF-8 validity, and parser result must agree; a mismatch is rejected. The 1 MiB raw-byte limit applies before buffering/parsing, and the 100-record/128-KiB-per-record limits apply after splitting.
+
+Explicitly reject executables, scripts, installers, archives/compressed files, images, audio/video, fonts, PDFs, RTF, Microsoft Office/OpenDocument packages, email containers, SQLite/databases, unknown MIME, multipart files, encrypted/password-protected files, and binary data. Renaming a disallowed file to an allowed extension must still fail content sniffing. There is no PDF parsing or OCR in Phase 2.5.
+
+Uploaded content is read into local server memory within the bound, hashed, validated, and stored in the ignored local database. It is not written to a web-public directory, temp path with a user filename, Git-tracked path, CI artifact, or cloud service. Original filenames are basenames for display/provenance only and are never used as filesystem paths.
+
+## L. URL policy registry
+
+Define a versioned registry whose only decisions are:
+
+- `FETCH_ALLOWED`: an approved source-specific HTTPS host/path contract may be fetched by a separately reviewed bounded content provider.
+- `USER_CONTENT_REQUIRED`: ApplyPilot must not fetch; UI instructs the user to copy/paste or upload content they are entitled to use.
+- `UNSUPPORTED`: invalid protocol/host/path/content model or explicitly disallowed category; no fetch and no workaround.
+- `REVIEW_REQUIRED`: no current evidence-based policy decision; no fetch until a plan and human review change the registry.
+
+Initial Phase 2.5 dispositions are: SEEK `USER_CONTENT_REQUIRED`; Indeed `REVIEW_REQUIRED`; Greenhouse `REVIEW_REQUIRED`; Lever `REVIEW_REQUIRED`; Employment Hero `REVIEW_REQUIRED`; Workday `REVIEW_REQUIRED`; generic/unknown hosts `REVIEW_REQUIRED`; non-HTTPS, credential-bearing, localhost/private/link-local/loopback, IP-literal, non-web, and malformed URLs `UNSUPPORTED`. Therefore Phase 2.5 performs no live URL fetch. The URL UI explains the decision and offers paste/upload; it must not silently fall back to a browser or another endpoint.
+
+Any future `FETCH_ALLOWED` entry requires an evidence-dated source plan and human approval. Its fetcher must use an exact host/path allowlist, HTTPS only, no userinfo, no credentials/cookies/referrer, an honest fixed user agent, public-IP DNS resolution checked before connection and after every redirect, a maximum three redirects, five-second timeout, 1 MiB streamed response cap, permitted response MIME, conservative source rate limits/`Retry-After`, no JavaScript, and safe terminal errors. DNS rebinding, redirect-to-private-network, authentication, CAPTCHA, bot/access controls, and rate limits fail closed and emit redacted events.
+
+## M. Manual corrections and provenance
+
+Edits occur only in preview. Store immutable `originalExtractedFields`, a separate `editedFields` patch, `editedAt`, `editedBy: LOCAL_USER`, optional reason, acknowledged warning codes, and an `overrideHash`. The effective draft is a deterministic overlay; neither raw document nor original extraction is mutated.
+
+The UI shows original and edited values side-by-side for changed fields and identifies user-supplied corrections in job provenance. Clearing a field produces explicit `null`, not fallback to the original. Edits are revalidated, sanitized as text, and size-limited. Audit metadata records record ID, changed field names, before/after hashes, timestamp, and reason code—not raw field values, descriptions, or the full patch.
+
+Changing a detected source, external ID, URL, title, company, location, or record boundary recalculates identity and duplicate status and requires a fresh confirmation token. The normalized job retains parser version, raw hash, source-detection evidence, extraction evidence, and override provenance.
+
+## N. End-to-end pipeline and exact implementation order
+
+The only approved flow is:
+
+`input -> byte/MIME validation -> raw hash/local staging -> inert sanitize/extract -> source detection -> deterministic split -> per-record parse -> Zod draft validation -> preview + manual edits -> explicit confirmation -> identity/dedup decision -> source-specific/generic normalization -> JobSchema validation -> transactional persistence -> eligibility -> fit -> dashboard/jobs visibility`
+
+No downstream stage receives executable markup. No persistence of canonical jobs occurs before confirmation. If normalization, eligibility, fit, source-record write, or audit write fails, the selected record transaction rolls back and the preview remains available with a safe error. Batch completion may report per-record results, but a record cannot be half-imported.
+
+Exact future implementation steps:
+
+1. Start only after this planning PR is human-approved and merged; create `feat/real-world-job-intake-implementation` from fresh `main`, re-read all instructions/blueprint, and record implementation start in this plan before code.
+2. Read applicable Next.js 16 local documentation, inspect package/database boundaries, and pin/audit the minimum inert-parser dependency.
+3. Add source-neutral types, limits, schemas, safe hashing, sanitization, and no-body logging tests.
+4. Implement and test source detection and the URL policy registry with every initial state fail-closed and no network client.
+5. Implement the deterministic splitter and source-neutral single-record parser; reuse/refactor SEEK pure rules with regression coverage.
+6. Add identity/canonicalization/duplicate decisions and manual-override provenance.
+7. Apply the human-approved `0001` migration with upgrade/foreign-key/backup-restore tests, then add the import repository and transactional confirmation service.
+8. Integrate normalization, candidate-profile-based eligibility, and fit only after confirmed persistence; preserve unknown facts and immutable submission controls.
+9. Build the accessible `/import` paste/upload/URL-policy preview and edit/skip/confirm UX; do not add document or application actions.
+10. Add fictional fixtures, unit/property/adversarial tests, integration tests, E2E tests, regression tests, and explicit assertions that blocked URLs never call `fetch`.
+11. Update actual architecture/security/normalization/adapter/import docs and this plan with verified behaviour, limitations, commands, results, rollback, and unfinished work.
+12. Run all quality gates and audits, push the implementation branch, open an unmerged PR into `main`, wait for CI, and stop for human review. Do not begin Phase 3.
+
+## O. Database review, recommendation, migration, and rollback
+
+Database recommendation: **YES — add reviewed staging tables and make imported source identity truthful; no migration is created or run by this blueprint.**
+
+The existing tables are not sufficient by themselves. `job_source_records` requires a normalized `job_id`, non-null vendor `external_id`, non-null `source_url`, and fetched timestamp, so it cannot honestly represent a pre-confirmation batch, multiple candidate records, failed/review/skipped records, manual overrides, or pasted jobs without a URL/vendor ID. Generating fake external IDs/URLs would violate the truth-store principle, and putting staging JSON into `settings` would make lifecycle/query/retention unreliable.
+
+Proposed `0001_real_world_job_intake.sql` schema, subject to blueprint approval:
+
+```text
+import_batches
+  id TEXT PRIMARY KEY
+  input_type TEXT NOT NULL CHECK in the RawImportedJobDocument input types
+  source_hint TEXT NULL
+  detected_source TEXT NOT NULL
+  original_filename TEXT NULL
+  source_url TEXT NULL
+  content_hash TEXT NOT NULL
+  parser_version TEXT NOT NULL
+  content_length INTEGER NOT NULL CHECK 0 <= value <= 1048576
+  detected_jobs INTEGER NOT NULL DEFAULT 0 CHECK 0 <= value <= 100
+  warnings_json TEXT NOT NULL DEFAULT '[]'
+  raw_content_text TEXT NOT NULL
+  status TEXT NOT NULL CHECK in RECEIVED/PREVIEW_READY/CONFIRMED/COMPLETED/PARTIAL/FAILED
+  created_at TEXT NOT NULL
+  confirmed_at TEXT NULL
+  completed_at TEXT NULL
+
+import_records
+  id TEXT PRIMARY KEY
+  batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE CASCADE
+  ordinal INTEGER NOT NULL
+  split_status TEXT NOT NULL CHECK in CONFIDENT/REVIEW_REQUIRED/FAILED
+  record_status TEXT NOT NULL CHECK in PREVIEW_READY/REVIEW_REQUIRED/SELECTED/SKIPPED/IMPORTED/UPDATED/DUPLICATE/FAILED
+  detected_source TEXT NOT NULL
+  source_confidence TEXT NOT NULL CHECK in HIGH/MEDIUM/LOW
+  external_id TEXT NULL
+  source_url TEXT NULL
+  segment_content_hash TEXT NOT NULL
+  identity_kind TEXT NULL CHECK in EXTERNAL_ID/CANONICAL_URL/CONTENT_HASH/LOCAL_FINGERPRINT
+  identity_value TEXT NULL
+  boundary_json TEXT NOT NULL
+  original_fields_json TEXT NOT NULL
+  edited_fields_json TEXT NULL
+  override_metadata_json TEXT NULL
+  warnings_json TEXT NOT NULL DEFAULT '[]'
+  normalized_job_id TEXT NULL REFERENCES jobs(id)
+  created_at TEXT NOT NULL
+  updated_at TEXT NOT NULL
+  imported_at TEXT NULL
+  UNIQUE(batch_id, ordinal)
+```
+
+Add indexes on `import_batches(content_hash, created_at)`, `import_batches(status, created_at)`, `import_records(batch_id, record_status)`, `import_records(identity_kind, identity_value)`, and `import_records(normalized_job_id)`. JSON columns are Zod-validated on every read/write. `raw_content_text` and the database are `LOCAL_PRIVATE` and ignored.
+
+Rebuild `job_source_records` in the migration so `external_id` and `source_url` are nullable, add `identity_kind TEXT NOT NULL` and `identity_value TEXT NOT NULL`, backfill current Phase 2 rows as `EXTERNAL_ID` with their existing external ID, retain `payload_hash`, and replace the broad required-ID assumption with a unique `(source_id, identity_kind, identity_value)` index plus a partial unique `(source_id, external_id)` index where external ID is non-null. Update `JobSchema.externalId` and `JobSchema.sourceUrl` to nullable, add `UNKNOWN` to `JobSourceSchema`, and require import provenance to distinguish detected source from acquisition method. Existing fixture/SEEK values remain unchanged and regression-tested.
+
+Migration procedure: stop the local app; resolve the exact database path; create a timestamped backup beside the ignored database; run `PRAGMA integrity_check`; apply the forward migration in a transaction using a create/copy/verify/rename table-rebuild sequence; restore indexes/foreign keys; run `PRAGMA foreign_key_check` and row-count/hash assertions; start the app only after success. The implementation must not auto-migrate an existing real database at server startup; expose an explicit local migration command and preview/backup confirmation.
+
+Rollback: application code can be reverted normally while leaving additive import tables dormant. Schema reversal is not destructive by default. If no imported rows exist, a reviewed down migration may drop the two new tables and rebuild `job_source_records` to the original constraints after proving all external IDs/URLs are non-null. If any imported data exists, export/backup it and restore the pre-migration database; never silently coerce nulls, manufacture identifiers/URLs, drop imported content, or delete a local database. Any cleanup is a separate explicit user-approved operation.
+
+Privacy implication: this migration stores real supplied ad content locally. It must remain in ignored SQLite files, be excluded from logs/backups uploaded elsewhere, and have a future explicit local purge/export policy. The schema stores no candidate profile, document, application answer, credential, cookie, or browser session in import tables.
+
+## P. Minimal dashboard changes
+
+- Add `/import` to local navigation and an **Import jobs** entry point on jobs/dashboard.
+- Add a compact import summary: last local batch time, imported/updated/duplicate/review/failed counts, and a clear “user-supplied local content” label.
+- Add an `Imported`/source badge and safe provenance on job list/detail, including URL only when explicit and non-null, otherwise `No source URL supplied`.
+- Link a confirmed job back to a safe import ID/hash prefix and parser version without exposing raw content.
+- Keep current eligibility/fit presentation and all application/document controls unchanged; no dashboard redesign, live-source badge, auto-refresh, or submission action.
+
+## Q. Local privacy and content handling
+
+- Raw inputs, parsed fragments, edits, and database backups remain on the user's computer in ignored paths. There is no cloud sync, analytics payload, telemetry body, remote parser, AI provider, or CI artifact.
+- Never log request bodies, raw HTML/text/JSON, excerpts, descriptions, filenames containing paths, field values, cookies, headers, or candidate facts. Logs/audit events use IDs, hashes, lengths, counts, enumerated codes, and durations.
+- Treat job text as potentially sensitive/copyrighted even if public elsewhere. Display it only to the local user and do not commit real examples, snapshots, or test traces.
+- Reject authorization headers, cookies, bearer tokens, password fields, session/local-storage dumps, browser profiles, and recognizable secrets; do not retain a rejected body.
+- Use `Cache-Control: no-store` for import pages/actions and prevent raw content from entering URLs, server-rendered page source beyond bounded escaped preview fields, React error payloads, source maps, or browser storage.
+- Candidate profile information never enters source detection, splitting, or parsing. It is read only by existing eligibility/fit engines after job confirmation and is not copied into import records.
+- Final application submission still requires explicit human confirmation, and Phase 2.5 contains no path toward submission.
+
+## R. Safe audit and observability events
+
+Permit these local events with only `importId`, record ID/ordinal, enum states/codes, source/confidence, hashes or short hash prefixes, counts, sizes, parser/policy versions, durations, and timestamps:
+
+- `job_import.batch.received`
+- `job_import.validation.rejected`
+- `job_import.source.detected`
+- `job_import.split.completed`
+- `job_import.preview.ready`
+- `job_import.url.policy_blocked`
+- `job_import.record.edited`
+- `job_import.record.selected`
+- `job_import.record.skipped`
+- `job_import.batch.confirmed`
+- `job_import.record.imported`
+- `job_import.record.updated`
+- `job_import.record.duplicate`
+- `job_import.record.failed`
+- `job_import.batch.completed`
+- `job_import.batch.partial`
+- `job_import.batch.failed`
+
+No event may contain raw/edited fields, content excerpts, full source URLs/query strings, filename paths, request/response bodies, cookies, tokens, credentials, candidate data, or serialized exception objects. Errors are allowlisted stable codes with bounded safe messages.
+
+## S. Fictional fixture matrix
+
+All committed fixtures use invented companies, roles, IDs, and `.example.test` URLs. The manifest must cover:
+
+- one complete pasted plain-text job and one Markdown job;
+- one valid pasted SEEK JSON/raw record and one SEEK schema.org HTML record reusing Phase 2 rules;
+- copied search results with 2, 10, and exactly 100 distinct cards;
+- JSON array and JSON-LD `@graph` with multiple jobs;
+- repeated HTML cards, nested cards, adjacent unrelated content, and mixed full-ad/card input;
+- deterministic source evidence for SEEK, Indeed, Employment Hero, Greenhouse, Lever, Workday, generic company site, unknown, mixed sources, low-confidence hint, and conflicting hint;
+- missing title, company, location, description, external ID, and URL cases;
+- same source/external ID with same hash, same ID with changed hash, exact canonical URL duplicate, exact content duplicate, local-fingerprint duplicate, and conflicting strong identities;
+- malformed/invalid/deep JSON, malformed/deep HTML, invalid UTF-8, NUL/control bytes, oversized input, 101-record overflow, overlong field, and unassigned trailing content;
+- scripts, event handlers, `javascript:` links, forms/passwords, iframes, embeds, SVG, remote images/styles/fonts, prototype-pollution keys, cookie/header/session dumps, and secret-like values;
+- allowed `.txt/.md/.html/.htm/.json` MIME matches plus renamed executable, archive, PDF, Office file, image, database, and unknown MIME rejections;
+- URL examples for each `FETCH_ALLOWED`, `USER_CONTENT_REQUIRED`, `UNSUPPORTED`, and `REVIEW_REQUIRED` policy result using only reserved/test hosts; `FETCH_ALLOWED` is registry-contract-only and uses an injected fixture transport, never the public network;
+- manual edits, cleared fields, stale/replayed preview token, per-record skip, bulk selection, confirmation rollback, concurrent/repeated confirmation, and partial batch results.
+
+## T. Testing and validation plan
+
+- Unit/schema: every Zod boundary, byte/line/depth/count/field limit, UTF-8 handling, raw hash, stable parser version, and no-body error contract.
+- Sanitizer/adversarial: every active element/attribute/resource vector in section E, entity/encoding tricks, malformed trees, prototype keys, and assertions that no script executes, no remote resource loads, and preview markup contains only escaped text.
+- Source detection: all rule IDs, confidence levels, conflicting hints, mixed batches, ordering, versioning, and no network/DNS call.
+- Splitter/parser: all `CONFIDENT`/`REVIEW_REQUIRED`/`FAILED` paths, stable boundaries, leftover content, 1/2/10/100 records, missing fields, deterministic repeated execution, and exact evidence ranges/hashes.
+- Identity/dedup: external ID, canonical URL edge cases, tracking allowlist, content hash, local fingerprint, changed content, identity conflicts, no fuzzy/cross-source merge, and concurrent confirmation.
+- URL policy: every registry state, malformed/private/userinfo/redirect cases, SEEK fixed to `USER_CONTENT_REQUIRED`, initial registry produces zero real fetches, and an injected future fetcher contract stops on size/MIME/timeout/rate/auth/security signals.
+- Manual edits: immutable originals, overlay/clear semantics, provenance and hashes, sanitization, identity recalculation, stale token rejection, and redacted audit metadata.
+- Database/migration: upgrade a current `0000` database with SEEK rows, empty database, transaction failure, row/index/FK/hash preservation, nullable source identity, import cascade behaviour, backup/restore instructions, and no automatic startup migration.
+- Integration: paste/upload -> preview with no canonical job writes -> confirmed transaction -> source record/job -> eligibility -> fit -> dashboard; include duplicate/update/failure/restart/rollback/partial/concurrency cases and candidate truth regressions.
+- UI/E2E: all `/import` modes, accessible labels/errors/focus, preview/edit/skip/bulk/confirm, blocked URL guidance, nullable source URL rendering, dashboard visibility, no raw payload in page source, and no CV/application/submission action.
+- Regression: all 63 Phase 2 unit tests, 3 integration tests, 5 E2E tests, existing fixture counts/SEEK capability states, truth rules, document foundations, and human-confirmation gate remain green.
+- Quality/security: `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, `git diff --check`, secret/ignored-artifact audit, migration audit, and GitHub CI. CI must use only fictional fixtures and injected transports.
+
+## U. Acceptance criteria
+
+Phase 2.5 must not be marked `COMPLETE` unless:
+
+- the `/import` workflow accepts pasted single ads, pasted multi-job/search results, pasted HTML, and allowed local files through one source-neutral contract;
+- every untrusted boundary is bounded, inert, Zod-validated, and covered by adversarial tests;
+- source detection for all named sources is deterministic, evidence-bearing, confidence-rated, and separate from URL authorization;
+- the splitter returns only `CONFIDENT`, `REVIEW_REQUIRED`, or `FAILED`, never invents boundaries, and exposes uncertain records for review;
+- preview shows count/title/company/location/source guess/confidence/warnings/duplicate status and requires explicit confirmation before canonical persistence;
+- manual corrections preserve original extraction, raw content, timestamps, user override provenance, and identity recalculation;
+- raw content stays local, never executes, never loads remote assets, and never appears in logs/audit/CI/cloud/browser storage;
+- uploads enforce the exact allowlist/limits and reject archives, executables, binary Office files, unknown MIME, PDF, and OCR paths;
+- URL policy is default-deny, SEEK is `USER_CONTENT_REQUIRED`, no initial source fetches a live URL, and blocked decisions never silently fall back;
+- duplicate handling uses only approved strong identities/content hash/local fingerprint, requires review for changed/colliding identities, and performs no fuzzy merge;
+- database migration and backup/rollback tests pass, required source facts can remain null without fabrication, and no existing SEEK/provenance row changes meaning;
+- selected records normalize and persist transactionally, eligibility/fit run deterministically, and confirmed results appear in existing jobs/dashboard views;
+- no document generation, application preparation, form filling, status mutation beyond initial job state, or submission capability is added;
+- no live job-board access, candidate/private data, credential/session artifact, database, or real advertisement is committed or used in CI;
+- all local quality gates, dependency/security audits, and GitHub CI pass; actual results and limitations are recorded in this plan;
+- the implementation branch is pushed with an unmerged PR into `main` and stops for human review; Phase 3 remains unstarted.
+
+## V. Future extension points
+
+- Source adapters implement a `RawJobDocumentProvider` that emits the same `RawImportedJobDocument`; they do not bypass validation, preview, deduplication, or confirmation.
+- An email forwarder may transform an explicitly selected message/attachment locally, with sender/header/body privacy controls, into the same contract; mailbox-wide scanning is not implied.
+- A browser extension may export only user-selected visible content/URL into a local authenticated handoff, never cookies, storage, credentials, hidden network responses, or automated browsing.
+- A CLI may support `applypilot import <file>` and stdin with the same limits, preview manifest, and an explicit `--confirm` step; non-interactive auto-import is not the default.
+- A mobile share target may send a URL or selected text to the local intake API after pairing/authentication and must receive the same URL-policy result.
+- Future Greenhouse/Lever/Employment Hero/Workday/Indeed adapters plug in behind parser/provider registries with versioned capabilities and policy state. They may enrich source-specific fields but cannot weaken unknown handling or create application/submission paths.
+- Parser/version migrations may reprocess local raw content into a new preview, but never mutate an existing confirmed job silently; differences require review and auditable update confirmation.
+
+## W. Roadmap recommendation: public ATS discovery before Indeed
+
+Recommendation: **YES — after Phase 2.5 is implemented and reviewed, plan a separate Phase 2.6 for read-only Greenhouse and Lever public job-board adapters before Phase 3 Indeed. Do not add or start Phase 2.6 automatically from this recommendation.**
+
+Evidence reviewed on 2026-09-05, without requesting a live job listing:
+
+- The official [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html) states that published job-board data is publicly available and authentication is not required for GET endpoints; it documents list and retrieve job endpoints. Application POST is separately authenticated and remains out of scope.
+- The official [Lever Postings API](https://github.com/lever/postings-api) documents unauthenticated read access to a tenant's published postings, including list/detail JSON, while its application POST uses an API key and remains forbidden here.
+- Current [Indeed job-posting guidance](https://docs.indeed.com/job-postings/) focuses on ATS, agency, employer, and publishing-partner integrations rather than a general candidate discovery API. The [Indeed Developer Agreement](https://docs.indeed.com/legal-terms/developer-agreement) makes API access and integration approval discretionary and subject to written approval.
+
+Greenhouse and Lever therefore offer narrower, documented, tenant-scoped read interfaces that can validate the URL registry/provider extension with lower access ambiguity and real published data before the broader Indeed research gate. A Phase 2.6 blueprint must still perform current terms, host/tenant discovery, rate-limit, field-completeness, pagination, retention, and security review; use GET only; never call application endpoints; remain local-first; and open its own planning PR for human approval. The historical Phase 3/5 numbering remains unchanged until the owner explicitly approves a roadmap amendment.
+
+## Human review checkpoint
+
+This blueprint is intentionally unimplemented and `AWAITING_HUMAN_REVIEW`. The planning pull request may contain only `PROJECT_PLAN.md` and any separately approved design documentation. It must remain unmerged until the owner reviews the database migration, nullable source identity, parser/sanitizer boundaries, URL default-deny policy, UI confirmation model, and Phase 2.6 recommendation. No implementation prompt may be executed until that plan is merged.
