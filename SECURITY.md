@@ -2,7 +2,7 @@
 
 ## Local-first design
 
-ApplyPilot treats candidate profiles, personal documents, application answers, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 0/1 uses only fictional committed data and makes no live job-board requests.
+ApplyPilot treats candidate profiles, personal documents, application answers, user-supplied job content, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 2 commits only fictional source fixtures and makes no live job-board requests.
 
 ## Personal-data isolation
 
@@ -29,7 +29,9 @@ Authenticated Playwright state, cookies, browser profiles, MFA artifacts, and do
 
 Automation must respect applicable terms, access boundaries, and rate limits. CAPTCHA, MFA, bot detection, login challenges, rate limits, access-control responses, site restrictions, or unexpected form changes stop automation and create a human-action event. ApplyPilot must not evade, solve, suppress, or route around these protections.
 
-LinkedIn remains assisted/manual discovery until its policy and technical constraints are explicitly reviewed. Phase 0/1 adapters throw explicit not-implemented errors and never access live sources.
+LinkedIn remains assisted/manual discovery until its policy and technical constraints are explicitly reviewed. The Phase 2 SEEK research gate permits only local fixture discovery and explicit user-supplied-content parsing. Public discovery, public details, URL fetch, and automated browser modes fail closed. See `docs/SEEK_ADAPTER.md`.
+
+User-supplied SEEK content is parsed locally, never fetched from a supplied URL, and rejected if it contains recognizable cookie, authorization, password, token, or session-state material. Raw local content may be persisted in the local database for provenance, but only safe IDs, hashes, counts, timestamps, and stable codes enter audit metadata.
 
 ## Candidate claim safety
 
@@ -37,7 +39,7 @@ Generated content uses only facts marked `VERIFIED`. Missing facts are omitted. 
 
 ## Human confirmation
 
-Final application submission always requires explicit human confirmation. Phase 0/1 contains no submit method and renders preparation controls disabled. A future implementation must separate form filling, preview, confirmation, and the final submit action in both code and UI.
+Final application submission always requires explicit human confirmation. Phase 2 contains no submit method and keeps preparation controls disabled. A future implementation must separate form filling, preview, confirmation, and the final submit action in both code and UI.
 
 ## GitHub expectations
 

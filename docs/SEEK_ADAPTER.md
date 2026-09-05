@@ -121,7 +121,7 @@ Decision: URL `NOT_ALLOWED`; content `ALLOWED`.
 - Evidence: a supplied URL still requires ApplyPilot to perform network access, so it inherits the public-page decision. Parsing already supplied content performs no SEEK request.
 - Authentication: prohibited for the parser. Inputs containing credentials, cookies, authorization headers, or browser state are rejected by policy and must not be logged.
 - Data completeness: depends on the supplied content. Missing fields remain unknown; required-field absence returns a typed normalization failure.
-- Pagination: local content may contain a validated page envelope and opaque cursor; the fixture/content client never follows a network link.
+- Pagination: user-supplied content represents one job record. Fixture discovery uses a validated page query and opaque cursor; neither path follows a network link.
 - Stability: schema-versioned local inputs fail safely when unsupported.
 - Rate limits/robots: not applicable to local parsing.
 - Terms/policy: the user is responsible for supplying content they are entitled to use. ApplyPilot stores it locally and does not republish it.
@@ -134,6 +134,12 @@ Decision: URL `NOT_ALLOWED`; content `ALLOWED`.
 The SEEK adapter reports `DISCOVERY` and `JOB_DETAILS` only in `FIXTURE_ONLY`. `USER_SUPPLIED_CONTENT` exposes explicit local parse/normalize entry points and does not pretend to discover or fetch URLs. All network-backed mode construction fails closed with a typed access error.
 
 The adapter never reports or implements `ASSISTED_APPLICATION`, `FORM_FILLING`, `APPLICATION_STATUS`, `MANUAL_ONLY`, or submission support.
+
+## Implemented local data path
+
+`SeekFixtureClient` filters injected fixtures by keyword, structured Australian location/radius, employment type, posting window, and sort order, then returns query-bound opaque pages. `runSeekDiscovery` applies page/job caps, duplicate-page detection, 24-hour checkpoints, typed failures, and structured audit events. `JobDiscoveryRepository` atomically writes normalized jobs, current raw source payload/hash records, audit transitions, and the next checkpoint into the existing Phase 0/1 tables. No migration or public client was created.
+
+The committed manifest contains 15 fictional cases with fixed timestamps and safe `.example.test` URLs. It covers normal job families, missing/unknown fields, malformed and removed jobs, duplicate records/pages, distinct valid-versus-unrestricted work-rights language, date forms, and requirement classifications. CI tests replace all transport with these fixtures and assert that `fetch` is never invoked.
 
 ## Mandatory stops and handling
 

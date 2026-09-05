@@ -4,9 +4,9 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1 foundation is complete on `feat/bootstrap-applypilot` and is awaiting human review in pull request #1. The repository provides typed domain contracts, a fictional candidate truth store, fifteen normalized fixture jobs, deterministic eligibility and fit engines, SQLite/Drizzle schema, document-engine foundations, and a local Next.js dashboard.
+Phase 0/1 is merged. Phase 2 adds a review-gated SEEK adapter on `feat/seek-discovery-implementation`: deterministic fixture discovery and local parsing of explicitly user-supplied content, conservative normalization, resumable checkpoints, transactional SQLite persistence, and safe source status in the dashboard.
 
-There are no live job-board connections, deployments, or application-submission capabilities in this phase. LinkedIn is explicitly assisted/manual only.
+There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
 
 ## Why ApplyPilot exists
 
@@ -18,7 +18,7 @@ ApplyPilot uses npm workspaces:
 
 - `apps/web` contains the Next.js App Router dashboard.
 - `packages/candidate-profile` owns the verified candidate schema and forbidden-claim rules.
-- `packages/job-model`, `job-sources`, and `job-normalizer` own normalized vacancies, source boundaries, provenance, and future deduplication.
+- `packages/job-model`, `job-sources`, and `job-normalizer` own normalized vacancies, source boundaries, provenance, and deterministic source identity. The SEEK implementation is fixture/content-only and never performs a network request.
 - `packages/eligibility-engine` and `fit-scorer` provide pure deterministic decisions.
 - `packages/resume-engine` and `cover-letter-engine` build documents from verified facts.
 - `packages/application-runner` and `application-tracker` keep preparation, confirmation, and lifecycle state explicit.
@@ -73,7 +73,7 @@ Read [SECURITY.md](SECURITY.md) before handling any real candidate data.
 
 ## Development roadmap
 
-The 21-phase roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 0/1 establishes the safe foundation. The next planned phase is a policy-reviewed SEEK discovery adapter using fixtures and contract tests; it must not perform live applications or bypass site protections.
+The 21-phase roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2 proves the first source adapter without enabling live SEEK access. The exact next phase is selected only after the Phase 2 implementation PR receives human review and is merged.
 
 ## Screenshots
 
