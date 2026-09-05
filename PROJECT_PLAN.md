@@ -408,6 +408,7 @@ Implementation checkpoint:
 - Blueprint PR #2 was approved and merged normally into `main` with merge commit `90a9eafaad32780a81653b3739c19ce95a22d951` at `2026-09-05T05:34:50Z`.
 - The remote blueprint branch was deleted after merge.
 - Implementation started at `2026-09-05T15:35:08+10:00` on `feat/seek-discovery-implementation`, created and pushed from the merged blueprint commit.
+- The evidence-dated access assessment is recorded in `docs/SEEK_ADAPTER.md`. SEEK's official API is conditional on SEEK approval, OAuth credentials, and authorised hirer relationships; no approved public candidate-discovery API was established. Current website terms prohibit automated access outside a provided interface. Phase 2 therefore enables only `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`; `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` remain disabled.
 
 This section is an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code.
 
