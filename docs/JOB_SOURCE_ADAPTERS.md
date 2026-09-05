@@ -27,6 +27,12 @@ SEEK supports two explicit, network-free paths:
 
 Indeed, LinkedIn, Employment Hero, Workday, Greenhouse, Lever, and generic company sites remain offline placeholders. Calling their target operations throws `AdapterNotImplementedError`.
 
+## Phase 2.5 source-neutral intake
+
+`@applypilot/job-importer` is an intake boundary, not a live adapter. It accepts user-controlled paste/upload bytes, determines an evidence-based origin, and separately records `USER_SUPPLIED_CONTENT` or `FILE_UPLOAD` acquisition. A pasted SEEK advert is never represented as fetched by the SEEK adapter. Unknown evidence stays `UNKNOWN`.
+
+The URL registry is default-deny: SEEK requires pasted content; all other recognized or generic production sources require a future review; invalid/non-HTTPS/IP/local URLs are unsupported. No production entry permits a fetch, and no network provider exists. Future approved adapters must produce the same raw-document contract and still pass preview and explicit confirmation.
+
 LinkedIn exposes `MANUAL_ONLY` and `ASSISTED_APPLICATION`; it does not expose form filling or discovery. This remains unchanged until a documented policy/technical review.
 
 The SEEK query contract supports keywords, structured Australian location/radius, employment type, date window, stable sorting, page size, and an opaque query-bound cursor. Checkpoints are Zod-validated, expire after 24 hours by default, and advance only within the successful page persistence transaction.

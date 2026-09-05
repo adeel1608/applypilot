@@ -143,8 +143,8 @@ export class JobDiscoveryRepository implements SeekDiscoveryPersistence {
       const insertSourceRecord = this.sqlite.prepare(
         `INSERT INTO job_source_records
           (id, job_id, source_id, external_id, source_url, raw_payload_json,
-           payload_hash, discovered_at, fetched_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           payload_hash, discovered_at, fetched_at, identity_kind, identity_value, acquisition_method)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXTERNAL_ID', ?, ?)`,
       );
       const updateSourceRecord = this.sqlite.prepare(
         `UPDATE job_source_records SET
@@ -170,6 +170,8 @@ export class JobDiscoveryRepository implements SeekDiscoveryPersistence {
             record.rawPayloadHash,
             record.discoveredAt,
             record.fetchedAt,
+            record.externalId,
+            record.accessMode === "FIXTURE_ONLY" ? "FIXTURE" : "USER_SUPPLIED_CONTENT",
           );
           outcome.added += 1;
           eventType = "discovery.job.added";

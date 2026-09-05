@@ -14,6 +14,7 @@
     "dev": "npm run dev --workspace @applypilot/web",
     "build": "npm run build --workspace @applypilot/web",
     "start": "npm run start --workspace @applypilot/web",
+    "start:e2e": "tsx scripts/start-e2e-server.ts",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -22,6 +23,7 @@
     "test:watch": "vitest",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
+    "db:migrate": "tsx scripts/migrate-local-database.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "audit:production": "npm audit --omit=dev"
   },

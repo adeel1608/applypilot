@@ -72,16 +72,87 @@ export const jobSourceRecords = sqliteTable(
     sourceId: text("source_id")
       .notNull()
       .references(() => jobSources.id),
-    externalId: text("external_id").notNull(),
-    sourceUrl: text("source_url").notNull(),
+    externalId: text("external_id"),
+    sourceUrl: text("source_url"),
     rawPayloadJson: text("raw_payload_json").notNull(),
     payloadHash: text("payload_hash").notNull(),
     discoveredAt: text("discovered_at").notNull(),
-    fetchedAt: text("fetched_at").notNull(),
+    fetchedAt: text("fetched_at"),
+    identityKind: text("identity_kind").notNull(),
+    identityValue: text("identity_value").notNull(),
+    acquisitionMethod: text("acquisition_method").notNull(),
   },
   (table) => [
+    uniqueIndex("job_source_records_source_identity_idx").on(
+      table.sourceId,
+      table.identityKind,
+      table.identityValue,
+    ),
     uniqueIndex("job_source_records_source_external_idx").on(table.sourceId, table.externalId),
     index("job_source_records_job_idx").on(table.jobId),
+  ],
+);
+
+export const importBatches = sqliteTable(
+  "import_batches",
+  {
+    id: text("id").primaryKey(),
+    inputType: text("input_type").notNull(),
+    acquisitionMethod: text("acquisition_method").notNull(),
+    sourceHint: text("source_hint"),
+    detectedSource: text("detected_source").notNull(),
+    originalFilename: text("original_filename"),
+    sourceUrl: text("source_url"),
+    contentHash: text("content_hash").notNull(),
+    parserVersion: text("parser_version").notNull(),
+    contentLength: integer("content_length").notNull(),
+    detectedJobs: integer("detected_jobs").notNull().default(0),
+    warningsJson: text("warnings_json").notNull().default("[]"),
+    rawContentText: text("raw_content_text").notNull(),
+    status: text("status").notNull(),
+    createdAt: text("created_at").notNull(),
+    confirmedAt: text("confirmed_at"),
+    completedAt: text("completed_at"),
+  },
+  (table) => [
+    index("import_batches_hash_time_idx").on(table.contentHash, table.createdAt),
+    index("import_batches_status_time_idx").on(table.status, table.createdAt),
+  ],
+);
+
+export const importRecords = sqliteTable(
+  "import_records",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => importBatches.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    splitStatus: text("split_status").notNull(),
+    recordStatus: text("record_status").notNull(),
+    detectedSource: text("detected_source").notNull(),
+    acquisitionMethod: text("acquisition_method").notNull(),
+    sourceConfidence: text("source_confidence").notNull(),
+    externalId: text("external_id"),
+    sourceUrl: text("source_url"),
+    segmentContentHash: text("segment_content_hash").notNull(),
+    identityKind: text("identity_kind"),
+    identityValue: text("identity_value"),
+    boundaryJson: text("boundary_json").notNull(),
+    originalFieldsJson: text("original_fields_json").notNull(),
+    editedFieldsJson: text("edited_fields_json"),
+    overrideMetadataJson: text("override_metadata_json"),
+    warningsJson: text("warnings_json").notNull().default("[]"),
+    normalizedJobId: text("normalized_job_id").references(() => jobs.id),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    importedAt: text("imported_at"),
+  },
+  (table) => [
+    uniqueIndex("import_records_batch_ordinal_idx").on(table.batchId, table.ordinal),
+    index("import_records_batch_status_idx").on(table.batchId, table.recordStatus),
+    index("import_records_identity_idx").on(table.identityKind, table.identityValue),
+    index("import_records_job_idx").on(table.normalizedJobId),
   ],
 );
 
@@ -228,6 +299,8 @@ export const schema = {
   candidateProfileVersions,
   jobSources,
   jobSourceRecords,
+  importBatches,
+  importRecords,
   jobs,
   eligibilityResults,
   fitScores,

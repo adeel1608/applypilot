@@ -10,6 +10,7 @@ import { scoreJobFit, type FitScoreResult } from "@applypilot/fit-scorer";
 import type { Job } from "@applypilot/job-model";
 import { normalizeSeekJob } from "@applypilot/job-sources";
 import { selectResumeTemplate } from "@applypilot/resume-engine";
+import { getJobImportRepository } from "@web/lib/local-database";
 
 export const exampleProfile = parseCandidateProfile(profileJson);
 
@@ -29,6 +30,10 @@ for (const fixture of seekFixtureCases) {
   if (fixture.record.status === "REMOVED") continue;
   try {
     const job = normalizeSeekJob(fixture.record);
+    if (!job.externalId) {
+      seekFailureCount += 1;
+      continue;
+    }
     if (seenSeekExternalIds.has(job.externalId)) {
       seekDuplicateCount += 1;
       continue;
@@ -98,6 +103,27 @@ export function formatDiscoveryDate(value: string): string {
 
 export function getEvaluatedJob(id: string): EvaluatedJob | undefined {
   return evaluatedJobs.find(({ job }) => job.id === id);
+}
+
+export function getImportedJobs(): Job[] {
+  return getJobImportRepository()?.listImportedJobs() ?? [];
+}
+
+export function getImportedJob(id: string): Job | undefined {
+  return getImportedJobs().find((job) => job.id === id);
+}
+
+export function getImportSummary() {
+  return (
+    getJobImportRepository()?.latestSummary() ?? {
+      lastBatchAt: null,
+      imported: 0,
+      updated: 0,
+      duplicates: 0,
+      review: 0,
+      failed: 0,
+    }
+  );
 }
 
 const preparedStatuses = new Set([

@@ -8,7 +8,7 @@ All adapter output must pass `JobSchema` before reaching evaluation or persisten
 
 ## Source records
 
-A source record preserves the original source, external ID, URL, discovery/fetch timestamps, raw payload, hash, parser version, field provenance, warnings, and captured unknown fields. Normalization creates or updates a canonical job without discarding source evidence. Missing required presentation fields produce a typed safe failure.
+A source record preserves detected origin separately from acquisition method, nullable explicit external ID/URL/fetch time, raw payload hash, canonical identity kind/value, parser version, field provenance, warnings, and captured unknown fields. Normalization creates or updates a canonical job without discarding source evidence. Missing required presentation fields produce a typed review state or safe failure; placeholders are never manufactured.
 
 ## SEEK normalization
 
@@ -18,7 +18,7 @@ Requirement evidence retains original text, normalized text, source path, rule I
 
 ## Deduplication foundation
 
-Phase 2 SEEK persistence uses only the strong `source + externalId` key and payload hash. The same hash is unchanged, a changed hash updates the existing source job, and no fuzzy semantic merge is attempted. Broader cross-source deduplication remains a future reviewed phase.
+Phase 2.5 evaluates identity in order: explicit source/external ID, canonical HTTPS URL, exact segment content hash, then a versioned local fingerprint when title, company, location, and description are all explicit. The database records the selected identity kind/value and validates its evidence. Same identity plus same hash is unchanged; changed content requires explicit update confirmation; conflicting strong signals do not auto-merge. No fuzzy semantic merge is attempted. Broader cross-source deduplication remains a future reviewed phase.
 
 This conservative shape prevents an early fuzzy matcher from silently merging distinct vacancies. Phase 6 will calibrate matching with multi-source fixtures and precision/recall review.
 

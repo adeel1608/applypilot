@@ -12,10 +12,9 @@ import {
 } from "@applypilot/job-sources";
 import { JobDiscoveryRepository } from "./job-discovery-repository";
 
-const migration = readFileSync(
-  new URL("../drizzle/0000_applypilot_foundation.sql", import.meta.url),
-  "utf8",
-);
+const migration = ["0000_applypilot_foundation.sql", "0001_real_world_job_intake.sql"]
+  .map((file) => readFileSync(new URL(`../drizzle/${file}`, import.meta.url), "utf8"))
+  .join("\n");
 const fixedNow = () => new Date("2026-09-05T12:00:00.000Z");
 
 function checkpoint(overrides: Partial<SeekCheckpoint> = {}): SeekCheckpoint {

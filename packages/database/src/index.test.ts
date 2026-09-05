@@ -14,6 +14,8 @@ describe("database foundation", () => {
         "jobs",
         "jobSources",
         "jobSourceRecords",
+        "importBatches",
+        "importRecords",
         "eligibilityResults",
         "fitScores",
         "generatedDocuments",
@@ -24,6 +26,51 @@ describe("database foundation", () => {
         "settings",
       ]),
     );
+  });
+
+  it("upgrades the foundation schema without fabricating source identity", () => {
+    const foundation = readFileSync(
+      new URL("../drizzle/0000_applypilot_foundation.sql", import.meta.url),
+      "utf8",
+    );
+    const intake = readFileSync(
+      new URL("../drizzle/0001_real_world_job_intake.sql", import.meta.url),
+      "utf8",
+    );
+    const sqlite = new BetterSqlite3(":memory:");
+    sqlite.exec(foundation);
+    sqlite
+      .prepare(
+        "INSERT INTO job_sources (id,name,capabilities_json,enabled,created_at,updated_at) VALUES ('source:seek','SEEK','{}',1,'now','now')",
+      )
+      .run();
+    sqlite
+      .prepare(
+        "INSERT INTO jobs (id,title,company,category,location,employment_type,normalized_json,application_status,date_discovered,created_at,updated_at) VALUES ('job:1','Role','Company','Category','Sydney','CASUAL','{}','NEW','now','now','now')",
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO job_source_records
+          (id,job_id,source_id,external_id,source_url,raw_payload_json,payload_hash,discovered_at,fetched_at)
+         VALUES ('record:1','job:1','source:seek','seek-1','https://www.seek.com.au/job/1',?,?,'now','now')`,
+      )
+      .run(JSON.stringify({ accessMode: "FIXTURE_ONLY" }), "a".repeat(64));
+    sqlite.exec(intake);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT external_id, identity_kind, identity_value, acquisition_method FROM job_source_records",
+        )
+        .get(),
+    ).toEqual({
+      external_id: "seek-1",
+      identity_kind: "EXTERNAL_ID",
+      identity_value: "seek-1",
+      acquisition_method: "FIXTURE",
+    });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
   });
 
   it("opens an in-memory SQLite connection with foreign keys enabled", () => {

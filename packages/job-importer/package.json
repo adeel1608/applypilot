@@ -1,0 +1,11 @@
+{
+  "name": "@applypilot/job-importer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@applypilot/job-sources": "0.1.0",
+    "parse5": "8.0.1"
+  }
+}

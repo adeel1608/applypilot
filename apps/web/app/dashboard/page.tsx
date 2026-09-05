@@ -7,12 +7,18 @@ import {
   dashboardMetrics,
   evaluatedJobs,
   formatDiscoveryDate,
+  getImportSummary,
+  getImportedJobs,
   seekDiscoverySummary,
 } from "@web/lib/data";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
+  const importedJobs = getImportedJobs();
+  const importSummary = getImportSummary();
   const strongMatches = evaluatedJobs
     .filter(({ eligibility }) => eligibility.status !== "INELIGIBLE")
     .sort((left, right) => right.fit.score - left.fit.score)
@@ -21,13 +27,56 @@ export default function DashboardPage() {
     <div className="page-stack">
       <section className="page-heading split-heading">
         <div>
-          <div className="eyebrow">Local fixture workspace</div>
+          <div className="eyebrow">Local decision workspace</div>
           <h1>Decision dashboard</h1>
           <p>Explainable matches, explicit blockers, and a review gate before every application.</p>
         </div>
-        <Link className="button button--primary" href="/jobs">
-          Review all jobs
+        <Link className="button button--primary" href="/import">
+          Import jobs
         </Link>
+      </section>
+
+      <section className="panel" aria-labelledby="local-import-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Real-world intake</span>
+            <h2 id="local-import-heading">User-supplied local content</h2>
+          </div>
+          <span className="source-pill">{importedJobs.length} jobs visible</span>
+        </div>
+        <div className="source-summary-grid">
+          <div>
+            <span>Imported</span>
+            <strong>{importSummary.imported}</strong>
+          </div>
+          <div>
+            <span>Updated</span>
+            <strong>{importSummary.updated}</strong>
+          </div>
+          <div>
+            <span>Duplicates</span>
+            <strong>{importSummary.duplicates}</strong>
+          </div>
+          <div>
+            <span>Review</span>
+            <strong>{importSummary.review}</strong>
+          </div>
+          <div>
+            <span>Failed</span>
+            <strong>{importSummary.failed}</strong>
+          </div>
+          <div>
+            <span>Last batch</span>
+            <strong>
+              {importSummary.lastBatchAt ? formatDiscoveryDate(importSummary.lastBatchAt) : "None"}
+            </strong>
+          </div>
+        </div>
+        {importedJobs.some(({ eligibilityStatus }) => eligibilityStatus === null) && (
+          <p className="source-note">
+            Private candidate profile required for eligibility and fit analysis.
+          </p>
+        )}
       </section>
 
       <section className="metric-grid" aria-label="Application metrics">

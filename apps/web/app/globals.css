@@ -38,7 +38,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -697,6 +698,77 @@ td > span:not(.status, .action-label) {
   font-size: 13px;
 }
 
+.import-form,
+.import-record {
+  display: grid;
+  gap: 18px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.import-form label,
+.import-record label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+.import-form input,
+.import-form select,
+.import-form textarea,
+.import-record input,
+.import-record textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 10px 12px;
+}
+.import-form textarea,
+.import-record textarea {
+  resize: vertical;
+}
+.import-form small,
+.import-record small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.form-message {
+  margin: 0;
+  color: var(--forest);
+}
+.form-message--error {
+  color: var(--red);
+}
+.compact-facts {
+  margin: 0;
+}
+.import-excerpt {
+  max-width: 80ch;
+  padding: 14px;
+  border-left: 3px solid var(--line);
+  background: var(--canvas);
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.selection-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.selection-row label {
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+.selection-row input {
+  width: auto;
+}
+
 @media (max-width: 900px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -711,6 +783,9 @@ td > span:not(.status, .action-label) {
   .requirements-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
   }
   .job-row {
     grid-template-columns: 1fr auto 50px;

@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const navigation = [
   ["Dashboard", "/dashboard"],
   ["Jobs", "/jobs"],
+  ["Import", "/import"],
   ["Applications", "/applications"],
   ["Profile", "/profile"],
   ["Settings", "/settings"],
@@ -39,7 +40,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </header>
           <main>{children}</main>
           <footer>
-            <span>Fixture mode · no live job-board connections</span>
+            <span>Local fixture/import mode · no live job-board connections</span>
             <span>Final submission always requires human confirmation</span>
           </footer>
         </div>

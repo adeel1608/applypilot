@@ -11,10 +11,11 @@ import { JobSchema } from "@applypilot/job-model";
 import { runSeekDiscovery, SeekAdapter, SeekFixtureClient } from "@applypilot/job-sources";
 import { testProfile } from "../fixture-data";
 
-const migration = readFileSync(
-  new URL("../../packages/database/drizzle/0000_applypilot_foundation.sql", import.meta.url),
-  "utf8",
-);
+const migration = ["0000_applypilot_foundation.sql", "0001_real_world_job_intake.sql"]
+  .map((file) =>
+    readFileSync(new URL(`../../packages/database/drizzle/${file}`, import.meta.url), "utf8"),
+  )
+  .join("\n");
 const fixedNow = () => new Date("2026-09-05T12:00:00.000Z");
 
 describe("SEEK fixture discovery pipeline", () => {
