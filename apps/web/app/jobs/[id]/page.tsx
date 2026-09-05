@@ -79,7 +79,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <div>
               <dt>Cover letter</dt>
-              <dd>{job.coverLetterRequired ? "Required" : "Not required"}</dd>
+              <dd>
+                {job.source === "SEEK" && job.sourceMetadata.coverLetterRequired === null
+                  ? "Unknown"
+                  : job.coverLetterRequired
+                    ? "Required"
+                    : "Not required"}
+              </dd>
             </div>
             <div>
               <dt>Source URL</dt>

@@ -124,6 +124,7 @@ export async function executeWithSeekRetry<T>(
   options: {
     maxAttempts?: number;
     wait?: (safeRetryAfter: string | null) => Promise<void>;
+    random?: () => number;
   } = {},
 ): Promise<T> {
   const maxAttempts = Math.min(Math.max(options.maxAttempts ?? 3, 1), 3);
@@ -142,9 +143,9 @@ export async function executeWithSeekRetry<T>(
         // Do not retry before a declared Retry-After time. A scheduler can inject a wait function.
         throw error;
       } else {
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.min(100 * 2 ** (attempt - 1), 1_000)),
-        );
+        const jitter = 0.75 + (options.random ?? Math.random)() * 0.5;
+        const delayMs = Math.round(Math.min(100 * 2 ** (attempt - 1), 1_000) * jitter);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }

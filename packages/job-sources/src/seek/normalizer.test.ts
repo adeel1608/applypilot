@@ -26,6 +26,7 @@ describe("SEEK deterministic normalization", () => {
       );
       expect(job.sourceMetadata.rawPayloadHash).toMatch(/^[a-f0-9]{64}$/);
       expect(job.sourceMetadata.provenance).toEqual(fixture.record.provenance);
+      expect(job.sourceMetadata.coverLetterRequired).toBe(fixture.record.coverLetterRequired);
     }
   });
 
