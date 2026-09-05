@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
-import { evaluatedJobs, formatDiscoveryDate, getEvaluatedJob } from "@web/lib/data";
+import { evaluatedJobs, formatDiscoveryDate, getEvaluatedJob, getImportedJob } from "@web/lib/data";
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return evaluatedJobs.map(({ job }) => ({ id: job.id }));
@@ -17,12 +19,111 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const result = getEvaluatedJob(id);
-  return { title: result?.job.title ?? "Job not found" };
+  return { title: result?.job.title ?? getImportedJob(id)?.title ?? "Job not found" };
 }
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const result = getEvaluatedJob(id);
+  const imported = result ? undefined : getImportedJob(id);
+  if (imported) {
+    const provenance = imported.sourceMetadata.provenance as
+      | { acquisitionMethod?: string; importId?: string; parserVersion?: string }
+      | undefined;
+    return (
+      <div className="page-stack">
+        <Link className="back-link" href="/jobs">
+          ← Back to jobs
+        </Link>
+        <section className="job-hero">
+          <div>
+            <div className="eyebrow">Imported · {imported.category}</div>
+            <h1>{imported.title}</h1>
+            <p>
+              {imported.company} · {imported.location} ·{" "}
+              {imported.employmentType.replaceAll("_", " ")}
+            </p>
+            <div className="inline-pills">
+              {imported.eligibilityStatus && <StatusPill status={imported.eligibilityStatus} />}
+              <span className="source-pill">Detected source: {imported.source}</span>
+              <span className="source-pill">
+                Acquisition:{" "}
+                {String(provenance?.acquisitionMethod ?? "UNKNOWN").replaceAll("_", " ")}
+              </span>
+            </div>
+          </div>
+          {imported.fitScore === null ? (
+            <span className="source-pill">Not evaluated</span>
+          ) : (
+            <ScoreBadge score={imported.fitScore} />
+          )}
+        </section>
+        {imported.eligibilityStatus === null && (
+          <section className="safety-banner">
+            <div>
+              <span className="section-kicker">Evaluation unavailable</span>
+              <h2>Not evaluated</h2>
+            </div>
+            <p>Private candidate profile required for eligibility and fit analysis.</p>
+          </section>
+        )}
+        {imported.eligibilityStatus && imported.fitScore !== null && (
+          <section className="panel">
+            <span className="section-kicker">Private-profile analysis</span>
+            <h2>
+              {imported.eligibilityStatus.replaceAll("_", " ")} · {imported.fitScore} / 100
+            </h2>
+            <ul className="plain-reasons">
+              {[...imported.eligibilityReasons, ...imported.fitReasons].map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <section className="detail-grid">
+          <article className="panel">
+            <span className="section-kicker">Role brief</span>
+            <h2>Imported description</h2>
+            <p>{imported.description}</p>
+          </article>
+          <article className="panel">
+            <span className="section-kicker">Local provenance</span>
+            <h2>Confirmed user-supplied content</h2>
+            <dl className="fact-list">
+              <div>
+                <dt>Detected source</dt>
+                <dd>{imported.source}</dd>
+              </div>
+              <div>
+                <dt>Acquisition method</dt>
+                <dd>{String(provenance?.acquisitionMethod ?? "UNKNOWN").replaceAll("_", " ")}</dd>
+              </div>
+              <div>
+                <dt>Import ID</dt>
+                <dd>{String(provenance?.importId ?? "Unavailable")}</dd>
+              </div>
+              <div>
+                <dt>Parser version</dt>
+                <dd>{String(provenance?.parserVersion ?? "Unavailable")}</dd>
+              </div>
+              <div>
+                <dt>Source URL</dt>
+                <dd>
+                  {imported.sourceUrl ? (
+                    <a href={imported.sourceUrl} rel="noreferrer" target="_blank">
+                      Open source
+                    </a>
+                  ) : (
+                    "No source URL supplied"
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </article>
+        </section>
+      </div>
+    );
+  }
   if (!result) notFound();
   const { job, eligibility, fit, recommendedTemplate, recommendedAction } = result;
   const missingSkills = fit.contributions
@@ -90,9 +191,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <div>
               <dt>Source URL</dt>
               <dd>
-                <a href={job.sourceUrl} rel="noreferrer" target="_blank">
-                  Open source
-                </a>
+                {job.sourceUrl ? (
+                  <a href={job.sourceUrl} rel="noreferrer" target="_blank">
+                    Open source
+                  </a>
+                ) : (
+                  "No source URL supplied"
+                )}
               </dd>
             </div>
             <div>

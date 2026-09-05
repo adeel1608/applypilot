@@ -9,6 +9,7 @@ export const JobSourceSchema = z.enum([
   "GREENHOUSE",
   "LEVER",
   "GENERIC_COMPANY_SITE",
+  "UNKNOWN",
   "FIXTURE",
 ]);
 
@@ -54,9 +55,9 @@ const DaySchema = z.enum([
 
 export const JobSchema = z.object({
   id: z.string().min(1),
-  externalId: z.string().min(1),
+  externalId: z.string().min(1).nullable(),
   source: JobSourceSchema,
-  sourceUrl: z.url(),
+  sourceUrl: z.url().nullable(),
   title: z.string().min(1),
   company: z.string().min(1),
   category: z.string().min(1),

@@ -4,7 +4,7 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1 is merged. Phase 2 adds a review-gated SEEK adapter on `feat/seek-discovery-implementation`: deterministic fixture discovery and local parsing of explicitly user-supplied content, conservative normalization, resumable checkpoints, transactional SQLite persistence, and safe source status in the dashboard.
+Phase 0/1 and Phase 2 are merged. Phase 2.5 adds a review-gated real-world intake workflow on its implementation branch: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate.
 
 There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
 
@@ -18,7 +18,7 @@ ApplyPilot uses npm workspaces:
 
 - `apps/web` contains the Next.js App Router dashboard.
 - `packages/candidate-profile` owns the verified candidate schema and forbidden-claim rules.
-- `packages/job-model`, `job-sources`, and `job-normalizer` own normalized vacancies, source boundaries, provenance, and deterministic source identity. The SEEK implementation is fixture/content-only and never performs a network request.
+- `packages/job-model`, `job-sources`, `job-importer`, and `job-normalizer` own normalized vacancies, source boundaries, source-neutral local intake, provenance, and deterministic source identity. The SEEK implementation and Phase 2.5 importer never perform a network request.
 - `packages/eligibility-engine` and `fit-scorer` provide pure deterministic decisions.
 - `packages/resume-engine` and `cover-letter-engine` build documents from verified facts.
 - `packages/application-runner` and `application-tracker` keep preparation, confirmation, and lifecycle state explicit.
@@ -33,10 +33,14 @@ Requirements: Node.js 24 or newer, npm, and Git. The browser test and PDF demons
 ```bash
 npm install
 npx playwright install chromium
+npm run db:migrate
+npm run db:migrate -- --confirm
 npm run dev
 ```
 
-Open `http://localhost:3000`. Only the fictional `data/profile.example.json` is rendered. To prepare for later private local development, copy that shape to `data/profile.private.json`; the private file is ignored and is not yet loaded by the web application.
+Open `http://localhost:3000`. Use `/import` for local paste/upload intake. The first migration command previews the path; the confirmed command backs up an existing ignored database, applies the Phase 2.5 migration, and verifies integrity. The app does not auto-migrate at startup.
+
+Only the fictional `data/profile.example.json` is committed and rendered as demo content. A local `data/profile.private.json` with the same schema is Git-ignored, loaded only on the server, and required to evaluate real imported jobs. Without a valid private profile, imports remain usable but explicitly not evaluated.
 
 On Windows PowerShell systems that block `npm.ps1`, use `npm.cmd` and `npx.cmd`.
 
@@ -73,7 +77,7 @@ Read [SECURITY.md](SECURITY.md) before handling any real candidate data.
 
 ## Development roadmap
 
-The 21-phase roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2 proves the first source adapter without enabling live SEEK access. The exact next phase is selected only after the Phase 2 implementation PR receives human review and is merged.
+The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Its implementation PR requires human review and must not be merged automatically.
 
 ## Screenshots
 

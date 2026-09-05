@@ -252,3 +252,5 @@ export function verifiedCandidateName(profile: CandidateProfile): string | null 
   }
   return `${profile.identity.firstName.value} ${profile.identity.lastName.value}`;
 }
+
+export * from "./runtime";

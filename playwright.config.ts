@@ -13,7 +13,7 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    command: "node node_modules/next/dist/bin/next dev apps/web -H 127.0.0.1 -p 3100",
+    command: "npm run start:e2e",
     url: "http://127.0.0.1:3100/dashboard",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

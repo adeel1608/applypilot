@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 
 import { exampleProfile } from "@web/lib/data";
+import { getCandidateProfileStatus } from "@web/lib/candidate-profile-provider";
 
 export const metadata: Metadata = { title: "Profile" };
 
-export default function ProfilePage() {
+export const dynamic = "force-dynamic";
+
+export default async function ProfilePage() {
+  const profileStatus = await getCandidateProfileStatus();
   return (
     <div className="page-stack">
       <section className="page-heading">
@@ -13,6 +17,15 @@ export default function ProfilePage() {
         <p>Only verified facts can flow into generated documents or application answers.</p>
       </section>
       <section className="profile-grid">
+        <article className="panel profile-card">
+          <span className="section-kicker">Candidate profile</span>
+          <h2>{profileStatus.label}</h2>
+          <p>
+            {profileStatus.evaluationAvailable
+              ? "Real imported jobs can be evaluated locally."
+              : "Private candidate profile required for eligibility and fit analysis."}
+          </p>
+        </article>
         <article className="panel profile-card">
           <span className="section-kicker">Verified foundation</span>
           <h2>

@@ -31,7 +31,11 @@ Automation must respect applicable terms, access boundaries, and rate limits. CA
 
 LinkedIn remains assisted/manual discovery until its policy and technical constraints are explicitly reviewed. The Phase 2 SEEK research gate permits only local fixture discovery and explicit user-supplied-content parsing. Public discovery, public details, URL fetch, and automated browser modes fail closed. See `docs/SEEK_ADAPTER.md`.
 
-User-supplied SEEK content is parsed locally, never fetched from a supplied URL, and rejected if it contains recognizable cookie, authorization, password, token, or session-state material. Raw local content may be persisted in the local database for provenance, but only safe IDs, hashes, counts, timestamps, and stable codes enter audit metadata.
+User-supplied content is parsed locally and never fetched from a supplied URL in Phase 2.5. Exact/dot-boundary host recognition classifies origin but never authorizes retrieval; the production registry has zero `FETCH_ALLOWED` entries.
+
+Credential rejection is narrow and structure-aware: bearer authorization/cookie headers, recognized credential or browser-session containers, and PEM private keys fail before retention. Ordinary recruiter email addresses, URLs, vacancy IDs, and job prose about APIs, authentication, tokens, cookies, passwords, or security policies are accepted. Raw accepted content is retained only in the ignored local database for provenance/reprocessing; only safe IDs, hashes/counts, enums, timestamps, and stable codes enter audit metadata. There is no automatic cleanup in this phase.
+
+The fixed server-only candidate provider validates `data/profile.private.json` and distinguishes missing from invalid content without logging either. Real imports never fall back to `data/profile.example.json`. Candidate data is not passed to validation, sanitization, source detection, parsing, URL policy, identity, or import staging, and the browser receives only an allowlisted profile-state label.
 
 ## Candidate claim safety
 
