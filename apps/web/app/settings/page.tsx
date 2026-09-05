@@ -7,14 +7,15 @@ const safeguards = [
   ["LinkedIn discovery", "Assisted / manual only", "Locked"],
   ["Browser sessions", "Future local runner only", "Planned"],
   ["AI provider", "None required", "Off"],
-  ["Job sources", "Fictional fixtures only", "Safe"],
+  ["SEEK adapter", "Fixture-only discovery; local user-supplied content parsing", "Available"],
+  ["SEEK live modes", "Public discovery, details, URL fetch, and browser automation", "Disabled"],
 ] as const;
 
 export default function SettingsPage() {
   return (
     <div className="page-stack">
       <section className="page-heading">
-        <div className="eyebrow">Phase 0/1 policy</div>
+        <div className="eyebrow">Phase 2 policy</div>
         <h1>Settings & safeguards</h1>
         <p>Safety-critical controls are visible and cannot be relaxed in this foundation build.</p>
       </section>

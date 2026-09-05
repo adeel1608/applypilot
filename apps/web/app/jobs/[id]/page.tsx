@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
-import { evaluatedJobs, getEvaluatedJob } from "@web/lib/data";
+import { evaluatedJobs, formatDiscoveryDate, getEvaluatedJob } from "@web/lib/data";
 
 export function generateStaticParams() {
   return evaluatedJobs.map(({ job }) => ({ id: job.id }));
@@ -43,7 +43,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </p>
           <div className="inline-pills">
             <StatusPill status={eligibility.status} />
-            <span className="source-pill">{job.source} fixture</span>
+            <span className="source-pill">
+              {job.source} ·{" "}
+              {String(job.sourceMetadata.accessMode ?? "fixture").replaceAll("_", " ")}
+            </span>
           </div>
         </div>
         <ScoreBadge score={fit.score} />
@@ -77,6 +80,39 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <div>
               <dt>Cover letter</dt>
               <dd>{job.coverLetterRequired ? "Required" : "Not required"}</dd>
+            </div>
+            <div>
+              <dt>Source URL</dt>
+              <dd>
+                <a href={job.sourceUrl} rel="noreferrer" target="_blank">
+                  Open source
+                </a>
+              </dd>
+            </div>
+            <div>
+              <dt>Date discovered</dt>
+              <dd>{formatDiscoveryDate(job.dateDiscovered)}</dd>
+            </div>
+            <div>
+              <dt>Date posted</dt>
+              <dd>{job.datePosted ? formatDiscoveryDate(job.datePosted) : "Unknown"}</dd>
+            </div>
+            <div>
+              <dt>Last refreshed</dt>
+              <dd>
+                {typeof job.sourceMetadata.fetchedAt === "string"
+                  ? formatDiscoveryDate(job.sourceMetadata.fetchedAt)
+                  : "Not recorded"}
+              </dd>
+            </div>
+            <div>
+              <dt>Provenance</dt>
+              <dd>
+                {String(
+                  (job.sourceMetadata.provenance as { retrievalMethod?: unknown } | undefined)
+                    ?.retrievalMethod ?? "FIXTURE",
+                ).replaceAll("_", " ")}
+              </dd>
             </div>
           </dl>
         </article>

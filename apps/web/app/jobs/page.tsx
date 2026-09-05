@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
-import { evaluatedJobs } from "@web/lib/data";
+import { evaluatedJobs, formatDiscoveryDate } from "@web/lib/data";
 
 export const metadata: Metadata = { title: "Jobs" };
 
@@ -11,7 +11,7 @@ export default function JobsPage() {
   return (
     <div className="page-stack">
       <section className="page-heading">
-        <div className="eyebrow">15 normalized fixtures</div>
+        <div className="eyebrow">{evaluatedJobs.length} normalized fixtures</div>
         <h1>Jobs</h1>
         <p>
           Every result has source provenance, deterministic eligibility, and an explainable fit
@@ -24,6 +24,8 @@ export default function JobsPage() {
             <thead>
               <tr>
                 <th>Role</th>
+                <th>Source</th>
+                <th>Discovered</th>
                 <th>Type</th>
                 <th>Eligibility</th>
                 <th>Fit</th>
@@ -41,6 +43,10 @@ export default function JobsPage() {
                       {job.company} · {job.location}
                     </span>
                   </td>
+                  <td>
+                    <span className="source-pill">{job.source}</span>
+                  </td>
+                  <td>{formatDiscoveryDate(job.dateDiscovered)}</td>
                   <td>{job.employmentType.replaceAll("_", " ")}</td>
                   <td>
                     <StatusPill status={eligibility.status} />

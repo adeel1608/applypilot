@@ -2,11 +2,13 @@ import "server-only";
 
 import profileJson from "../../../data/profile.example.json";
 import { fixtureJobs } from "../../../fixtures/jobs";
+import { seekFixtureCases } from "../../../fixtures/seek/manifest";
 
 import { parseCandidateProfile } from "@applypilot/candidate-profile";
 import { evaluateEligibility, type EligibilityResult } from "@applypilot/eligibility-engine";
 import { scoreJobFit, type FitScoreResult } from "@applypilot/fit-scorer";
 import type { Job } from "@applypilot/job-model";
+import { normalizeSeekJob } from "@applypilot/job-sources";
 import { selectResumeTemplate } from "@applypilot/resume-engine";
 
 export const exampleProfile = parseCandidateProfile(profileJson);
@@ -19,7 +21,28 @@ export interface EvaluatedJob {
   recommendedAction: "SKIP" | "REVIEW" | "SHORTLIST";
 }
 
-export const evaluatedJobs: EvaluatedJob[] = fixtureJobs.map((job) => {
+const seekFixtureJobs: Job[] = [];
+const seenSeekExternalIds = new Set<string>();
+let seekDuplicateCount = 0;
+let seekFailureCount = 0;
+for (const fixture of seekFixtureCases) {
+  if (fixture.record.status === "REMOVED") continue;
+  try {
+    const job = normalizeSeekJob(fixture.record);
+    if (seenSeekExternalIds.has(job.externalId)) {
+      seekDuplicateCount += 1;
+      continue;
+    }
+    seenSeekExternalIds.add(job.externalId);
+    seekFixtureJobs.push(job);
+  } catch {
+    seekFailureCount += 1;
+  }
+}
+
+const allFixtureJobs = [...fixtureJobs, ...seekFixtureJobs];
+
+export const evaluatedJobs: EvaluatedJob[] = allFixtureJobs.map((job) => {
   const eligibility = evaluateEligibility(job, exampleProfile);
   const fit = scoreJobFit(job, exampleProfile, eligibility);
   return {
@@ -43,6 +66,35 @@ export const evaluatedJobs: EvaluatedJob[] = fixtureJobs.map((job) => {
             : "REVIEW",
   };
 });
+
+export const seekDiscoverySummary = {
+  source: "SEEK",
+  mode: "Fixture only",
+  status: "Complete",
+  counts: {
+    discovered: seekFixtureCases.filter(({ record }) => record.status === "ACTIVE").length,
+    added: seekFixtureJobs.length,
+    updated: 0,
+    duplicates: seekDuplicateCount,
+    failed: seekFailureCount,
+  },
+  lastSuccessfulFetchAt: seekFixtureCases
+    .filter(({ record }) => record.status === "ACTIVE")
+    .map(({ record }) => record.fetchedAt)
+    .sort()
+    .at(-1)!,
+  partial: false,
+  liveModesEnabled: false,
+} as const;
+
+export function formatDiscoveryDate(value: string): string {
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Australia/Melbourne",
+  }).format(new Date(value));
+}
 
 export function getEvaluatedJob(id: string): EvaluatedJob | undefined {
   return evaluatedJobs.find(({ job }) => job.id === id);
