@@ -175,7 +175,7 @@ All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 | ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------- | --------------------------------------------------- | ----------- |
 | 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified | Premature architecture lock-in        | GitHub CLI, Node LTS                   | Lint, typecheck, tests, build, Git/GitHub audit     | COMPLETE    |
 | 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                  | Incorrect rules or unsafe claims      | Phase 0, Zod, Drizzle, fixtures        | Unit/integration/E2E tests and production build     | COMPLETE    |
-| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | IN_PROGRESS |
+| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | COMPLETE    |
 | 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                              | Site/policy changes, bot controls     | Phases 0-2 patterns                    | Contract tests, fixture replay, manual audit        | NOT_STARTED |
 | 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                          | Tenant variation                      | Adapter contracts                      | Contract/integration tests                          | NOT_STARTED |
 | 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                  | Each adapter passes common contract suite and retains raw provenance                                 | Vendor/tenant variation               | Phases 2-4 lessons                     | Per-adapter fixtures and policy/security checks     | NOT_STARTED |
@@ -398,7 +398,7 @@ Run format check, lint, strict typecheck, unit tests, integration tests, Playwri
 # Phase 2 — SEEK Discovery Adapter Blueprint
 
 - Blueprint status: `APPROVED`
-- Phase roadmap status: `IN_PROGRESS`
+- Phase roadmap status: `COMPLETE`
 - Prepared on: 2026-09-05
 - Blueprint branch: `feat/seek-discovery-adapter`
 - Approved implementation branch: `feat/seek-discovery-implementation`
@@ -860,7 +860,8 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 
 - Execution date: 2026-09-05 (Australia/Sydney).
 - Implementation branch: `feat/seek-discovery-implementation`, created and pushed from blueprint merge `90a9eafaad32780a81653b3739c19ce95a22d951`.
-- Current Phase 2 status: `IN_PROGRESS` pending the implementation commit, pull request, and GitHub CI/human-review checkpoint. Local implementation and validation are complete.
+- Implementation pull request: #3, `https://github.com/adeel1608/applypilot/pull/3`, opened into `main` and intentionally left unmerged. Focused implementation commits are `6613f126e94845313dec4d2666f85ec7a9eb8370` (adapter/fixtures), `1998f289cf6077e88a349b6d62ca081813e0419e` (database), `0dbcfa954e55494c9650a0eb8efe99019abc361c` (dashboard), and `ad8c7aad0a0b7f1248a0ee5ec05f82f4f278352d` (implementation record before final CI reconciliation).
+- Current Phase 2 status: `COMPLETE`. The implementation is committed and pushed, pull request #3 is open and unmerged for human review, and both GitHub quality checks are green.
 - The evidence-dated research in `docs/SEEK_ADAPTER.md` completed the required method review in order. The official partner API remains `CONDITIONAL` and disabled because ApplyPilot has no SEEK approval/credentials and the reviewed documentation did not establish a permitted candidate-facing public discovery scope. SEEK website automation is `NOT_ALLOWED` under the reviewed terms. Robots guidance remains `UNKNOWN` and is not treated as permission.
 - Enabled modes are `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`. `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` are disabled and fail closed without fallback. No SEEK listing/page/network response was fetched, no `public-client.ts` was created, and live SEEK access is not claimed.
 
@@ -895,7 +896,7 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 - `npm run test:e2e`: 5 Chromium tests passed, including safe SEEK provenance/status, no raw-payload rendering, and disabled application preparation.
 - `npm audit`: passed with 0 vulnerabilities. `npm run audit:production` also passed with 0 vulnerabilities.
 - `git diff --check`: passed. High-confidence workspace secret-pattern scan, tracked sensitive-artifact scan, and tracked-ignored-file audit returned no matches. `git fsck --no-reflogs --full` returned success with one benign dangling blob. GitHub reported `adeel1608/applypilot` as `PRIVATE` with `main` as its default branch.
-- CI result: pending implementation push/pull request.
+- CI result: pull request #3 (`feat/seek-discovery-implementation` -> `main`) is open, mergeable, and unmerged. Both `quality` checks passed (GitHub Actions runs `33949628734` and `33949643299`). No review has yet been submitted.
 
 ### Errors encountered and fixes
 
@@ -916,5 +917,5 @@ Unfinished work is the entire Phase 2 implementation described above. It is deli
 - Live SEEK discovery/details are unavailable. The official API requires a future approved integration and verified scope; website/URL/browser retrieval remains disabled. Fixture radius calculations are intentionally available only from postcode 3072 because the fixtures contain explicit distances from that origin; another origin fails as unsupported rather than being guessed.
 - `USER_SUPPLIED_CONTENT` is a programmatic local adapter entry point, not an upload/paste UI. It handles one validated raw/JSON-LD job record at a time and does not paginate or fetch links.
 - SQLite stores the current source payload per strong source/external ID, not raw version history. Cross-source/fuzzy semantic merging is intentionally deferred.
-- Remaining Phase 2 work is to commit/push the implementation, open an unmerged PR into `main`, wait for CI, reconcile this record with the final commit/PR/check results, and leave the PR for human review.
+- Remaining implementation work: none. The external workflow checkpoint is human review and an explicit decision on pull request #3; Codex must not merge it automatically.
 - Exact next recommended phase after human review and merge of the Phase 2 implementation PR: **Phase 3 — Indeed Discovery Adapter planning blueprint**, beginning with a fresh evidence-dated policy/technical access review and no implementation until that separate plan is approved.
