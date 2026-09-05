@@ -1,0 +1,43 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-restaurant-002",
+    "canonicalUrl": "https://seek.example.test/job/restaurant-002",
+    "title": "Part-time Restaurant Team Member",
+    "company": "Emberbird Hospitality",
+    "location": {
+      "text": "Northcote VIC 3070",
+      "suburb": "Northcote",
+      "postcode": "3070",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Part-time",
+    "classification": "Hospitality & Tourism",
+    "description": "Welcome guests and prepare orders in a fictional quick-service restaurant.",
+    "requirementTexts": [
+      "Weekend availability is essential",
+      "Food handling certificate desirable"
+    ],
+    "scheduleText": "Evening and weekend roster",
+    "hoursText": "15 to 24 hours per week",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "restaurant-002", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/02-restaurant-part-time.json"
+    }
+  },
+  "distanceKmFrom3072": 3.4,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "PART_TIME",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": ["EXPLICIT_REQUIREMENT", "PREFERRED_REQUIREMENT"]
+  }
+}

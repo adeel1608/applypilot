@@ -1,0 +1,47 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-engineering-005",
+    "canonicalUrl": "https://seek.example.test/job/engineering-005",
+    "title": "Engineering Intern",
+    "company": "Southern Arc Engineering",
+    "location": {
+      "text": "Richmond VIC 3121",
+      "suburb": "Richmond",
+      "postcode": "3121",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Internship",
+    "classification": "Engineering",
+    "description": "Assist with design reviews on fictional civil projects.",
+    "requirementTexts": [
+      "Bachelor degree in civil engineering is essential",
+      "Unrestricted Australian working rights required"
+    ],
+    "requiredSkills": ["CAD skills preferred"],
+    "postingDate": "2026-09-03",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "engineering-005", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/05-engineering-graduate.json"
+    }
+  },
+  "distanceKmFrom3072": 8.2,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "INTERNSHIP",
+    "workRightsRequirement": "UNRESTRICTED_AUSTRALIA",
+    "requirementClassifications": [
+      "EXPLICIT_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT",
+      "PREFERRED_REQUIREMENT"
+    ]
+  }
+}

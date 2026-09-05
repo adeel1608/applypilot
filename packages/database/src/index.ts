@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { schema } from "./schema";
 
 export * from "./schema";
+export * from "./job-discovery-repository";
 
 export function openApplyPilotDatabase(path: string) {
   const sqlite = new BetterSqlite3(path);
@@ -13,6 +14,7 @@ export function openApplyPilotDatabase(path: string) {
   }
   return {
     db: drizzle(sqlite, { schema }),
+    sqlite,
     close: () => sqlite.close(),
   };
 }

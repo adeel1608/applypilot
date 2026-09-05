@@ -3,7 +3,7 @@
 Last updated: 2026-09-05  
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/seek-discovery-adapter`
+Working branch: `feat/seek-discovery-implementation`
 
 ## 1. Vision
 
@@ -175,7 +175,7 @@ All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 | ----- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------- | --------------------------------------------------- | ----------- |
 | 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified | Premature architecture lock-in        | GitHub CLI, Node LTS                   | Lint, typecheck, tests, build, Git/GitHub audit     | COMPLETE    |
 | 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard | All Phase 0/1 acceptance criteria in this plan pass                                                  | Incorrect rules or unsafe claims      | Phase 0, Zod, Drizzle, fixtures        | Unit/integration/E2E tests and production build     | COMPLETE    |
-| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | NOT_STARTED |
+| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                    | SEEK jobs normalize with provenance; no protection bypass                                            | Site/policy changes, rate limits      | Phases 0-1                             | Contract tests, fixture replay, manual policy audit | COMPLETE    |
 | 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                            | Indeed jobs normalize with provenance and safe failures                                              | Site/policy changes, bot controls     | Phases 0-2 patterns                    | Contract tests, fixture replay, manual audit        | NOT_STARTED |
 | 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                            | Supported public jobs normalize; unsupported flows declared                                          | Tenant variation                      | Adapter contracts                      | Contract/integration tests                          | NOT_STARTED |
 | 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                  | Each adapter passes common contract suite and retains raw provenance                                 | Vendor/tenant variation               | Phases 2-4 lessons                     | Per-adapter fixtures and policy/security checks     | NOT_STARTED |
@@ -398,14 +398,21 @@ Run format check, lint, strict typecheck, unit tests, integration tests, Playwri
 # Phase 2 — SEEK Discovery Adapter Blueprint
 
 - Blueprint status: `APPROVED`
-- Phase roadmap status: `NOT_STARTED`
+- Phase roadmap status: `COMPLETE`
 - Prepared on: 2026-09-05
 - Blueprint branch: `feat/seek-discovery-adapter`
 - Approved implementation branch: `feat/seek-discovery-implementation`
 
-This section is an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code.
+Implementation checkpoint:
 
-## A. Current state
+- Blueprint PR #2 was approved and merged normally into `main` with merge commit `90a9eafaad32780a81653b3739c19ce95a22d951` at `2026-09-05T05:34:50Z`.
+- The remote blueprint branch was deleted after merge.
+- Implementation started at `2026-09-05T15:35:08+10:00` on `feat/seek-discovery-implementation`, created and pushed from the merged blueprint commit.
+- The evidence-dated access assessment is recorded in `docs/SEEK_ADAPTER.md`. SEEK's official API is conditional on SEEK approval, OAuth credentials, and authorised hirer relationships; no approved public candidate-discovery API was established. Current website terms prohibit automated access outside a provided interface. Phase 2 therefore enables only `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`; `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` remain disabled.
+
+At blueprint approval, this section was an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code. The later implementation result is recorded after the blueprint checkpoint below.
+
+## A. State at blueprint approval
 
 - Phase 0/1 is merged into `main`. Pull request #1 (`feat/bootstrap-applypilot` -> `main`) was merged normally at `2026-09-05T05:07:44Z`; merge commit and current merged baseline are `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`. The remote bootstrap branch was deleted.
 - The repository is the private GitHub repository `adeel1608/applypilot`. Phase 0/1 was revalidated immediately before merge with green local and GitHub checks, no reviews or unresolved review blockers, and no unexpected drift from the original `main` commit `dd39c7f9d313081d8b983c5b3a9644c7ce19d0c4`.
@@ -846,3 +853,70 @@ Merge/branch results:
 - Phase 2 blueprint branch: `feat/seek-discovery-adapter`, created from the merged baseline and pushed.
 
 Unfinished work is the entire Phase 2 implementation described above. It is deliberately not started on the blueprint branch. Blueprint approval is complete; the access-method research decision remains an independent gate for any network-backed mode.
+
+## Phase 2 implementation execution record
+
+### State and access decision
+
+- Execution date: 2026-09-05 (Australia/Sydney).
+- Implementation branch: `feat/seek-discovery-implementation`, created and pushed from blueprint merge `90a9eafaad32780a81653b3739c19ce95a22d951`.
+- Implementation pull request: #3, `https://github.com/adeel1608/applypilot/pull/3`, opened into `main` and intentionally left unmerged. Focused implementation commits are `6613f126e94845313dec4d2666f85ec7a9eb8370` (adapter/fixtures), `1998f289cf6077e88a349b6d62ca081813e0419e` (database), `0dbcfa954e55494c9650a0eb8efe99019abc361c` (dashboard), `ad8c7aad0a0b7f1248a0ee5ec05f82f4f278352d` / `10a2e51c53934d378c8f26eb412250480ac14a93` (implementation/CI records), and `6ad9e987d8bc8d4ced6abf7d28fdad36f3003416` (final truthfulness/retry refinement).
+- Current Phase 2 status: `COMPLETE`. The implementation is committed and pushed, pull request #3 is open and unmerged for human review, and both GitHub quality checks are green.
+- The evidence-dated research in `docs/SEEK_ADAPTER.md` completed the required method review in order. The official partner API remains `CONDITIONAL` and disabled because ApplyPilot has no SEEK approval/credentials and the reviewed documentation did not establish a permitted candidate-facing public discovery scope. SEEK website automation is `NOT_ALLOWED` under the reviewed terms. Robots guidance remains `UNKNOWN` and is not treated as permission.
+- Enabled modes are `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`. `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` are disabled and fail closed without fallback. No SEEK listing/page/network response was fetched, no `public-client.ts` was created, and live SEEK access is not claimed.
+
+### Actual architecture implemented
+
+- The shared `DiscoveryQuery` was extended source-neutrally with structured Australian location/radius, employment types, posting window, sort order, cursor, and bounded page size while preserving `JobSourceAdapter` compatibility.
+- `packages/job-sources/src/seek/` now owns Zod contracts for mode/status/query/cursor/checkpoint/raw records/provenance/warnings, typed errors, canonical query and payload hashing, dates, requirements, normalization, the injected fixture client, local user-content parsing, and bounded checkpointed orchestration.
+- The registered SEEK adapter defaults to an empty `FIXTURE_ONLY` transport. Its operational capability report exposes only fixture discovery/details or local content details for the configured mode; disabled modes expose no capabilities. No application, form, status, or submission capability was added.
+- User-supplied JSON/raw or schema.org `JobPosting` content is parsed locally only after a validated HTTPS SEEK job URL pattern. URL-only input and recognizable authentication/session material are rejected. Exact supplied content is hashed and retained locally as raw provenance; audit events receive no raw content.
+- Deterministic normalization preserves source ID/URL, raw hash, fixed discovery/fetch timestamps, parser version, source field paths, warning evidence, and captured unknown fields. Required title/company-or-explicit-advertiser/location/country/category/description absence is a typed safe failure.
+- Requirement rules preserve original text, normalized text, source path, rule ID, classification, and negation. Valid Australian work rights stay distinct from unrestricted rights. Narrow date, employment, salary, hours, location, experience, education, licence, vehicle, physical, and training mappings never guess unsupported facts.
+- Fixture discovery supports filtering, date sorting, postcode-3072 radius calculations from explicit fixture distance metadata, query-bound opaque cursors, 10-page/200-record defaults, configurable caps, 24-hour checkpoint expiry, resume, empty results, maximum-page/job partial results, and repeated-page protection.
+- `JobDiscoveryRepository` reuses `jobs`, `job_sources`, `job_source_records`, `settings`, and `audit_events`. A page transaction inserts/updates normalized jobs and raw records, resolves same-hash duplicates, records redacted job transitions, and only then advances the validated checkpoint. Concurrent checkpoint owners fail with `SEEK_CONCURRENT_CHECKPOINT_CONFLICT` rather than creating duplicate jobs.
+- Structured events cover run start/page/job outcomes, rate limits, security stops, partial runs, and completed runs using safe IDs, hashes, counts, durations, timestamps, and stable codes. Errors retain only a cause class, sanitized HTTPS source path, and safe retry time rather than raw causes or query values.
+- The server-rendered fixture dashboard now evaluates 11 unique normalized SEEK jobs alongside the original 15 fixtures. It displays source, source URL, discovered/posted/refreshed dates, provenance, mode/status, counts, failures, duplicates, and the explicit live-mode limitation. Application preparation/submission controls remain disabled.
+
+### Files created or changed
+
+- Created the 10 planned SEEK implementation files and three direct test files under `packages/job-sources/src/seek/`.
+- Created 15 fictional/redacted JSON fixture cases plus `fixtures/seek/manifest.ts` with fixed timestamps, safe `.example.test` URLs, expected normalization/classification/errors, malformed/removed coverage, and duplicate-page data.
+- Created `packages/database/src/job-discovery-repository.ts`, its unit test, and `tests/integration/seek-fixture-pipeline.test.ts`; exported the repository/raw SQLite handle without changing the schema or migration.
+- Updated shared adapter registration/contracts, dashboard data/pages/settings/styles/E2E, `README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `docs/SEEK_ADAPTER.md`, `docs/JOB_SOURCE_ADAPTERS.md`, `docs/JOB_NORMALIZATION.md`, and this living plan.
+
+### Tests and validation completed locally
+
+- `npm run format:check`: passed; all matched files use Prettier formatting.
+- `npm run lint`: passed with zero warnings.
+- `npm run typecheck`: passed in strict mode.
+- `npm test`: 63 tests passed across 13 files. This includes the 15-case fixture replay, raw/query/cursor/checkpoint boundaries, requirement/date semantics, mode gating, pagination/caps/duplicate pages, every typed error contract, rate/security stops, sensitive-input rejection, no-network assertions, unknown fields, database idempotency/update/rollback/concurrency, and Phase 0/1 regressions.
+- `npm run test:integration`: 3 tests passed across 2 files. The SEEK pipeline covers checkpoint resume, 14 active discoveries, 11 inserts, 1 duplicate, 2 typed normalization failures, transactional persistence, completed-run replay, and downstream eligibility/fit evaluation.
+- `npm run build`: passed with Next.js 16.3.4; 34 static pages were generated, including 26 fixture-derived job detail paths.
+- `npm run test:e2e`: 5 Chromium tests passed, including safe SEEK provenance/status, no raw-payload rendering, and disabled application preparation.
+- `npm audit`: passed with 0 vulnerabilities. `npm run audit:production` also passed with 0 vulnerabilities.
+- `git diff --check`: passed. High-confidence workspace secret-pattern scan, tracked sensitive-artifact scan, and tracked-ignored-file audit returned no matches. `git fsck --no-reflogs --full` returned success with one benign dangling blob. GitHub reported `adeel1608/applypilot` as `PRIVATE` with `main` as its default branch.
+- CI result: pull request #3 (`feat/seek-discovery-implementation` -> `main`) is open, mergeable, and unmerged. Both `quality` checks passed (GitHub Actions runs `33949628734` and `33949643299`). No review has yet been submitted.
+
+### Errors encountered and fixes
+
+- Windows PowerShell blocked `npm.ps1`; all requested npm/npx commands were rerun successfully through `npm.cmd`/`npx.cmd`.
+- An exploratory `npm test -- --runInBand` invocation failed because Vitest 4 does not support that Jest option; the required repository command `npm test` was rerun and passed.
+- The first full fixture test found that a preferred customer-service experience statement was correctly retained as a non-mandatory experience rather than omitted; the assertion was corrected while keeping “no experience required” negated.
+- The first production build failed because a colon in the normalized SEEK job ID became an invalid Windows static-segment directory name. The deterministic separator was changed to a filesystem-safe hyphen; the subsequent build and E2E suite passed.
+- Final review identified that the required normalized boolean alone could display an absent cover-letter instruction as “not required.” The raw nullable value is now preserved in source metadata and the SEEK UI displays `Unknown`; bounded retries also use jitter while a future `Retry-After` still stops unscheduled retries. All local gates were rerun and passed after this refinement.
+
+### Database, migration, security, and rollback result
+
+- Database result: existing Phase 0/1 tables are sufficient. Transaction, restart/resume, same-hash duplicate, changed-hash update, rollback, and concurrent-owner behaviours are covered by tests.
+- Migration result: `NO`. `packages/database/drizzle/0000_applypilot_foundation.sql` is unchanged.
+- Security result: no CAPTCHA/MFA/access-control/bot/rate bypass, no silent access-mode fallback, no live source call, no candidate data in discovery, no weakened candidate truth or human-confirmation invariant, and no tracked credential/private profile/database/browser state/cookie/generated personal CV.
+- Rollback remains additive and ready: revert the Phase 2 implementation commits normally, restore the SEEK placeholder registration if required, and leave any local namespaced checkpoint/source/audit rows untouched unless the user separately approves a backed-up data cleanup. No schema rollback is needed.
+
+### Limitations, remaining work, and next task
+
+- Live SEEK discovery/details are unavailable. The official API requires a future approved integration and verified scope; website/URL/browser retrieval remains disabled. Fixture radius calculations are intentionally available only from postcode 3072 because the fixtures contain explicit distances from that origin; another origin fails as unsupported rather than being guessed.
+- `USER_SUPPLIED_CONTENT` is a programmatic local adapter entry point, not an upload/paste UI. It handles one validated raw/JSON-LD job record at a time and does not paginate or fetch links.
+- SQLite stores the current source payload per strong source/external ID, not raw version history. Cross-source/fuzzy semantic merging is intentionally deferred.
+- Remaining implementation work: none. The external workflow checkpoint is human review and an explicit decision on pull request #3; Codex must not merge it automatically.
+- Exact next recommended phase after human review and merge of the Phase 2 implementation PR: **Phase 3 — Indeed Discovery Adapter planning blueprint**, beginning with a fresh evidence-dated policy/technical access review and no implementation until that separate plan is approved.

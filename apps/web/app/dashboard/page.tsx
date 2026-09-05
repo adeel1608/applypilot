@@ -3,7 +3,12 @@ import Link from "next/link";
 
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
-import { dashboardMetrics, evaluatedJobs } from "@web/lib/data";
+import {
+  dashboardMetrics,
+  evaluatedJobs,
+  formatDiscoveryDate,
+  seekDiscoverySummary,
+} from "@web/lib/data";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -57,6 +62,46 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="panel" aria-labelledby="discovery-source-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Discovery source</span>
+            <h2 id="discovery-source-heading">SEEK adapter status</h2>
+          </div>
+          <span className="source-pill">{seekDiscoverySummary.status}</span>
+        </div>
+        <div className="source-summary-grid">
+          <div>
+            <span>Source</span>
+            <strong>{seekDiscoverySummary.source}</strong>
+          </div>
+          <div>
+            <span>Mode</span>
+            <strong>{seekDiscoverySummary.mode}</strong>
+          </div>
+          {Object.entries(seekDiscoverySummary.counts).map(([label, value]) => (
+            <div key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+          <div>
+            <span>Last successful fetch</span>
+            <strong>{formatDiscoveryDate(seekDiscoverySummary.lastSuccessfulFetchAt)}</strong>
+          </div>
+          <div>
+            <span>Partial run</span>
+            <strong>{seekDiscoverySummary.partial ? "Yes" : "No"}</strong>
+          </div>
+        </div>
+        {!seekDiscoverySummary.liveModesEnabled && (
+          <p className="source-note">
+            Live SEEK discovery and job-page retrieval are disabled. This view uses synthetic local
+            fixtures only; user-supplied content can be parsed locally in the adapter.
+          </p>
+        )}
       </section>
 
       <section className="safety-banner">

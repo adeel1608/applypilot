@@ -311,6 +311,43 @@ p {
   font-size: 12px;
 }
 
+.source-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--line);
+}
+.source-summary-grid > div {
+  display: grid;
+  min-height: 82px;
+  align-content: center;
+  gap: 4px;
+  padding: 14px;
+  background: var(--paper);
+}
+.source-summary-grid span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.source-summary-grid strong {
+  font-size: 14px;
+  text-transform: capitalize;
+}
+.source-note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid #c28a27;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 13px;
+}
+
 .job-list {
   border-top: 1px solid var(--line);
 }
@@ -664,6 +701,9 @@ td > span:not(.status, .action-label) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .source-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .detail-grid,
   .profile-grid {
     grid-template-columns: 1fr;
@@ -719,6 +759,9 @@ td > span:not(.status, .action-label) {
   }
   .metric-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .source-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .job-row {
     grid-template-columns: 1fr auto;

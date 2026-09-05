@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AdapterCapability, AdapterNotImplementedError, jobSourceAdapters } from "./index";
+import { AdapterCapability, jobSourceAdapters, SeekAdapterError } from "./index";
 
 describe("job source adapter placeholders", () => {
   it("keeps LinkedIn manual/assisted in the foundation", () => {
@@ -8,10 +8,13 @@ describe("job source adapter placeholders", () => {
     expect(jobSourceAdapters.linkedin.capabilities()).not.toContain(AdapterCapability.FORM_FILLING);
   });
 
-  it("fails explicitly instead of performing live discovery", async () => {
+  it("uses a network-free SEEK implementation with no implicit fixture data", async () => {
     await expect(
       jobSourceAdapters.seek.discoverJobs({ keywords: ["assistant"], locations: ["Melbourne"] }),
-    ).rejects.toBeInstanceOf(AdapterNotImplementedError);
+    ).resolves.toEqual({ records: [], nextCursor: undefined });
+    await expect(jobSourceAdapters.seek.fetchJob("unknown")).rejects.toBeInstanceOf(
+      SeekAdapterError,
+    );
   });
 
   it("exports every planned placeholder", () => {

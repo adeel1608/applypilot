@@ -1,0 +1,48 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-warehouse-006",
+    "canonicalUrl": "https://seek.example.test/job/warehouse-006",
+    "title": "Warehouse Storeperson",
+    "company": "Merri Creek Distribution",
+    "location": {
+      "text": "Thomastown VIC 3074",
+      "suburb": "Thomastown",
+      "postcode": "3074",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "salaryText": "$34 per hour",
+    "employmentTypeText": "Casual",
+    "classification": "Manufacturing, Transport & Logistics",
+    "description": "Pick and pack stock in a fictional local warehouse.",
+    "requirementTexts": [
+      "Driver licence required",
+      "Own reliable vehicle is required",
+      "Must have ability to lift 15 kg"
+    ],
+    "scheduleText": "Morning shift",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "warehouse-006", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/06-warehouse-casual.json"
+    }
+  },
+  "distanceKmFrom3072": 10.5,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "CASUAL",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": [
+      "EXPLICIT_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-service-004",
+    "canonicalUrl": "https://seek.example.test/job/service-004",
+    "title": "Customer Support Adviser",
+    "company": "Laneway Utilities",
+    "location": {
+      "text": "Melbourne VIC 3000",
+      "suburb": "Melbourne",
+      "postcode": "3000",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Part time",
+    "workType": "Hybrid",
+    "classification": "Call Centre & Customer Service",
+    "description": "Resolve account enquiries for a fictional utility provider.",
+    "requirementTexts": ["Clear telephone communication is required"],
+    "postingText": "Listed two days ago",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "service-004", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/04-customer-service-remote.json"
+    }
+  },
+  "distanceKmFrom3072": 9.1,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "PART_TIME",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": ["EXPLICIT_REQUIREMENT"]
+  }
+}

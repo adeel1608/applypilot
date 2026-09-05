@@ -1,0 +1,38 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-nosalary-010",
+    "canonicalUrl": "https://seek.example.test/job/nosalary-010",
+    "title": "Library Assistant",
+    "company": "Northern Pages Cooperative",
+    "location": {
+      "text": "Reservoir VIC 3073",
+      "suburb": "Reservoir",
+      "postcode": "3073",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Part-time",
+    "classification": "Education & Training",
+    "description": "Help visitors navigate a fictional community library collection.",
+    "requirementTexts": ["Customer service skills preferred"],
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "nosalary-010", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/10-missing-salary.json"
+    }
+  },
+  "distanceKmFrom3072": 2.9,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "PART_TIME",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": ["PREFERRED_REQUIREMENT"]
+  }
+}

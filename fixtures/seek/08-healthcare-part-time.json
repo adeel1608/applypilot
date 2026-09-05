@@ -1,0 +1,46 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-health-008",
+    "canonicalUrl": "https://seek.example.test/job/health-008",
+    "title": "Community Support Worker",
+    "company": "Fitzroy Neighbourhood Care",
+    "location": {
+      "text": "Fitzroy VIC 3065",
+      "suburb": "Fitzroy",
+      "postcode": "3065",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Part-time",
+    "classification": "Community Services & Development",
+    "description": "Support fictional community programs and participant activities.",
+    "requirementTexts": [
+      "Working with Children Check required",
+      "Police check is required",
+      "Certificate III desirable"
+    ],
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "health-008", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/08-healthcare-part-time.json"
+    }
+  },
+  "distanceKmFrom3072": 5.9,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "PART_TIME",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": [
+      "EXPLICIT_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT",
+      "PREFERRED_REQUIREMENT"
+    ]
+  }
+}

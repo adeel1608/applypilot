@@ -8,11 +8,17 @@ All adapter output must pass `JobSchema` before reaching evaluation or persisten
 
 ## Source records
 
-A source record preserves the original source, external ID, URL, discovery/fetch timestamps, raw payload, and hash. Normalization creates or updates a canonical job without discarding source evidence. Multiple source records may link to one job after a reviewed deduplication decision.
+A source record preserves the original source, external ID, URL, discovery/fetch timestamps, raw payload, hash, parser version, field provenance, warnings, and captured unknown fields. Normalization creates or updates a canonical job without discarding source evidence. Missing required presentation fields produce a typed safe failure.
+
+## SEEK normalization
+
+The Phase 2 SEEK mapper is deterministic. It supports narrow mappings for employment type, AUD salary ranges, weekly/fortnightly hours, Australian location parts, explicit/relative dates, requirements, experience, qualifications, licences, vehicles, work rights, and training. Unsupported syntax remains `null`, `UNKNOWN`, or an ambiguity with a warning.
+
+Requirement evidence retains original text, normalized text, source path, rule ID, negation, and one of `EXPLICIT_REQUIREMENT`, `PREFERRED_REQUIREMENT`, or `AMBIGUOUS_REQUIREMENT`. In particular, valid Australian work rights never become unrestricted work rights unless the source explicitly says unrestricted; “no experience required” does not become a requirement.
 
 ## Deduplication foundation
 
-Phase 0/1 defines signals and candidates, not a production matcher. Planned signals are canonical URL, source/external ID, normalized company, normalized title, normalized location, posting date, and a future description fingerprint. A possible duplicate carries confidence, matching signals, and `requiresHumanReview: true`.
+Phase 2 SEEK persistence uses only the strong `source + externalId` key and payload hash. The same hash is unchanged, a changed hash updates the existing source job, and no fuzzy semantic merge is attempted. Broader cross-source deduplication remains a future reviewed phase.
 
 This conservative shape prevents an early fuzzy matcher from silently merging distinct vacancies. Phase 6 will calibrate matching with multi-source fixtures and precision/recall review.
 

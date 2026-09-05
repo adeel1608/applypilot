@@ -1,0 +1,39 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-noreqs-012",
+    "canonicalUrl": "https://seek.example.test/job/noreqs-012",
+    "title": "Data Entry Clerk",
+    "company": "Yarra Records Studio",
+    "location": {
+      "text": "Preston VIC 3072",
+      "suburb": "Preston",
+      "postcode": "3072",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Temporary contract",
+    "classification": "Administration & Office Support",
+    "description": "Enter synthetic records into a local demonstration system.",
+    "requirementTexts": [],
+    "requiredSkills": [],
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "noreqs-012", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/12-missing-requirements.json"
+    }
+  },
+  "distanceKmFrom3072": 0,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "CONTRACT",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": []
+  }
+}

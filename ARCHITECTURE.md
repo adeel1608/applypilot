@@ -38,13 +38,13 @@ Job source fixture / future adapter
 
 ### Presentation
 
-`apps/web` renders local fixture views with Next.js server components. It may compose domain outputs but does not implement eligibility, scoring, source parsing, or truth rules.
+`apps/web` renders local fixture views with Next.js server components. It composes the original normalized fixtures with normalized synthetic SEEK fixtures and displays safe source/run provenance. It does not implement eligibility, scoring, source parsing, or truth rules.
 
 ### Domain
 
 - `candidate-profile`: Zod validation, fact verification states, forbidden claims, and verified-fact selectors.
 - `job-model`: normalized job and lifecycle enums.
-- `job-sources`: common adapter contract, capability flags, and offline Phase 0/1 placeholders.
+- `job-sources`: common adapter contract, capability flags, offline placeholders, and the Phase 2 SEEK fixture/user-content implementation. SEEK source data, queries, cursors, checkpoints, errors, provenance, dates, and requirements are Zod-validated or deterministically classified here.
 - `job-normalizer`: raw-record and conservative deduplication contracts.
 - `eligibility-engine`: hard blockers, ambiguity routing, and stable reason codes.
 - `fit-scorer`: bounded weighted contributions with positive/negative explanations.
@@ -58,13 +58,13 @@ Job source fixture / future adapter
 
 `packages/database` is deliberately separate because persistence is shared by the dashboard, future local runner, migrations, tests, and analytics. Drizzle defines an SQLite schema. Raw payload and explanation structures are serialized as JSON text, while query-critical identifiers/statuses remain first-class columns.
 
-The initial migration is `packages/database/drizzle/0000_applypilot_foundation.sql`. Runtime databases are ignored.
+The initial migration is `packages/database/drizzle/0000_applypilot_foundation.sql`. Phase 2 reuses it without a new migration: strong `source + externalId` identity and raw hashes drive transactional add/update/duplicate outcomes, while namespaced `settings` JSON holds validated checkpoints. Runtime databases are ignored.
 
 ## Trust boundaries
 
 - Committed fixture boundary: fictional candidate and job data only.
 - Local private boundary: future real profile, SQLite database, generated files, browser state, and sessions.
-- Source boundary: future untrusted web data validated before normalization.
+- Source boundary: untrusted fixture or explicitly user-supplied content is validated before normalization. Phase 2 performs no SEEK network access.
 - Cloud boundary: no sensitive data crosses it in Phase 0/1. A later hybrid design must classify and encrypt permitted data.
 - Human boundary: final submission cannot proceed without explicit confirmation.
 
@@ -74,11 +74,11 @@ Candidate profile versions are immutable snapshots. Job source records preserve 
 
 ## Runtime topology
 
-Phase 0/1 is one local Next.js process plus optional local SQLite and Chromium processes. Future deployment prefers a cloud dashboard/backend for non-sensitive coordination and a local runner for authenticated browser control and personal documents. See `docs/DEPLOYMENT_STRATEGY.md`.
+Phase 2 remains one local Next.js process plus optional local SQLite and Chromium processes. SEEK fixture discovery and pasted-content parsing are local and network-free. Future deployment prefers a cloud dashboard/backend for non-sensitive coordination and a local runner for any separately approved authenticated browser control and personal documents. See `docs/DEPLOYMENT_STRATEGY.md`.
 
 ## Deliberate constraints
 
-- No live adapter implementation in Phase 0/1.
+- No live SEEK adapter mode; `FIXTURE_ONLY` and `USER_SUPPLIED_CONTENT` are the only enabled SEEK modes.
 - No required LLM or paid API.
 - No final-submit implementation.
 - No semantic deduplication yet.
