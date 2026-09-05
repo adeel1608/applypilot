@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "profileId": "candidate-example-001",
+  "displayNameTemplate": "{firstName} {lastName}",
+  "documentFileNameTemplate": "{firstNameUpper} CV ({company}).pdf",
+  "identity": {
+    "firstName": {
+      "value": "Jordan",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "lastName": {
+      "value": "Example",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "preferredName": {
+      "value": "Jordan",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    }
+  },
+  "contact": {
+    "email": {
+      "value": "jordan@example.test",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "phone": {
+      "value": "+61 400 000 000",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "linkedInUrl": {
+      "value": "https://example.test/jordan",
+      "verification": "USER_CONFIRMATION_REQUIRED"
+    }
+  },
+  "location": {
+    "suburb": {
+      "value": "Preston",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "postcode": {
+      "value": "3072",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "state": {
+      "value": "VIC",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "country": {
+      "value": "Australia",
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    }
+  },
+  "education": [
+    {
+      "id": "education-mechatronics",
+      "institution": "Example Institute of Technology",
+      "qualification": "Bachelor of Engineering (Honours)",
+      "field": "Mechatronics Engineering",
+      "status": "IN_PROGRESS",
+      "startDate": "2025-02-24",
+      "endDate": "2028-11-30",
+      "verification": "VERIFIED"
+    }
+  ],
+  "employment": [
+    {
+      "id": "employment-community-desk",
+      "employer": "Example Community Centre",
+      "title": "Volunteer Welcome Desk Assistant",
+      "location": "Preston VIC",
+      "startDate": "2025-03-01",
+      "responsibilities": [
+        "Welcomed visitors and answered general enquiries",
+        "Maintained accurate booking notes",
+        "Worked with volunteers to resolve visitor requests"
+      ],
+      "achievementIds": ["achievement-bookings"],
+      "verification": "VERIFIED"
+    }
+  ],
+  "verifiedAchievements": [
+    {
+      "id": "achievement-bookings",
+      "statement": "Created a clearer booking checklist for the volunteer welcome desk",
+      "evidence": "Reviewed fictional example record",
+      "verification": "VERIFIED"
+    }
+  ],
+  "skills": [
+    {
+      "id": "skill-customer-service",
+      "name": "Customer service",
+      "level": "WORKING",
+      "evidence": "Volunteer welcome desk responsibilities",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-communication",
+      "name": "Communication",
+      "level": "PROFICIENT",
+      "evidence": "Volunteer welcome desk responsibilities",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-teamwork",
+      "name": "Teamwork",
+      "level": "PROFICIENT",
+      "evidence": "Volunteer welcome desk responsibilities",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-organisation",
+      "name": "Organisation",
+      "level": "WORKING",
+      "evidence": "Volunteer booking responsibilities",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-programming",
+      "name": "Programming",
+      "level": "WORKING",
+      "evidence": "Verified engineering coursework",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-cad",
+      "name": "CAD",
+      "level": "FOUNDATIONAL",
+      "evidence": "Verified engineering coursework",
+      "verification": "VERIFIED"
+    },
+    {
+      "id": "skill-robotics",
+      "name": "Robotics",
+      "level": "FOUNDATIONAL",
+      "evidence": "Verified engineering coursework",
+      "verification": "VERIFIED"
+    }
+  ],
+  "languages": [
+    {
+      "id": "language-english",
+      "name": "English",
+      "proficiency": "PROFESSIONAL",
+      "verification": "VERIFIED"
+    }
+  ],
+  "licences": [],
+  "certifications": [],
+  "workRights": {
+    "value": {
+      "country": "Australia",
+      "status": "RESTRICTED",
+      "maximumHoursPerFortnight": 48,
+      "notes": "Fictional example restriction for rule testing"
+    },
+    "verification": "VERIFIED",
+    "source": "fictional example"
+  },
+  "availability": {
+    "timezone": "Australia/Melbourne",
+    "recurring": [
+      {
+        "day": "MONDAY",
+        "startTime": "09:00",
+        "endTime": "21:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "TUESDAY",
+        "startTime": "09:00",
+        "endTime": "21:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "WEDNESDAY",
+        "startTime": "17:00",
+        "endTime": "21:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "THURSDAY",
+        "startTime": "09:00",
+        "endTime": "21:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "FRIDAY",
+        "startTime": "09:00",
+        "endTime": "21:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "SATURDAY",
+        "startTime": "08:00",
+        "endTime": "22:00",
+        "available": true,
+        "verification": "VERIFIED"
+      },
+      {
+        "day": "SUNDAY",
+        "startTime": "08:00",
+        "endTime": "20:00",
+        "available": true,
+        "verification": "VERIFIED"
+      }
+    ],
+    "fixedCommitments": [
+      {
+        "id": "class-wednesday",
+        "label": "University laboratory",
+        "day": "WEDNESDAY",
+        "startTime": "09:00",
+        "endTime": "16:00",
+        "verification": "VERIFIED"
+      }
+    ]
+  },
+  "transport": {
+    "vehicleAccess": {
+      "value": false,
+      "verification": "VERIFIED",
+      "source": "fictional example"
+    },
+    "modes": ["WALK", "PUBLIC_TRANSPORT"],
+    "maximumCommuteKm": {
+      "value": 30,
+      "verification": "VERIFIED",
+      "source": "fictional example preference"
+    }
+  },
+  "preferences": {
+    "preferredLocations": ["Preston", "Melbourne", "Northcote", "Coburg"],
+    "preferredWorkTypes": ["CASUAL", "PART_TIME", "INTERNSHIP"],
+    "preferredCategories": [
+      "Customer service",
+      "Retail and customer service",
+      "Hospitality",
+      "Administration",
+      "Engineering and automation"
+    ],
+    "maximumHoursPerWeek": {
+      "value": 24,
+      "verification": "VERIFIED",
+      "source": "fictional example preference"
+    },
+    "maximumHoursPerFortnight": {
+      "value": 48,
+      "verification": "VERIFIED",
+      "source": "fictional example restriction"
+    },
+    "earliestStartDate": {
+      "value": "2026-09-14",
+      "verification": "VERIFIED",
+      "source": "fictional example preference"
+    }
+  },
+  "unsupportedExperience": [
+    "retail experience",
+    "commercial kitchen experience",
+    "warehousing experience",
+    "POS experience",
+    "cash-handling experience"
+  ],
+  "forbiddenClaims": [
+    "Australian driver's licence",
+    "MR driver licence",
+    "unrestricted Australian work rights",
+    "Registered Nurse qualification",
+    "sonography qualification",
+    "commercial kitchen experience",
+    "warehousing experience",
+    "POS experience",
+    "cash-handling experience"
+  ],
+  "referees": [],
+  "candidatePreferences": {
+    "coverLetterTone": "DIRECT",
+    "includeRefereesOnResume": false,
+    "requireDocumentPreview": true,
+    "requireFinalSubmissionConfirmation": true
+  }
+}
