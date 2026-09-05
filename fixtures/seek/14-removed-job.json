@@ -1,0 +1,33 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-removed-014",
+    "canonicalUrl": "https://seek.example.test/job/removed-014",
+    "title": "Removed Fixture Role",
+    "company": "Archived Example Group",
+    "location": {
+      "text": "Preston VIC 3072",
+      "suburb": "Preston",
+      "postcode": "3072",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Casual",
+    "classification": "Retail & Consumer Products",
+    "description": "A synthetic record used to verify removed-job handling.",
+    "status": "REMOVED",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "removed-014", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/14-removed-job.json"
+    }
+  },
+  "distanceKmFrom3072": 0,
+  "expected": { "outcome": "REMOVED", "errorCode": "JOB_REMOVED", "requirementClassifications": [] }
+}

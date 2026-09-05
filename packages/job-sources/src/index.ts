@@ -14,7 +14,18 @@ export type AdapterCapability = (typeof AdapterCapability)[keyof typeof AdapterC
 export interface DiscoveryQuery {
   keywords: string[];
   locations: string[];
+  location?: {
+    text?: string;
+    suburb?: string;
+    postcode?: string;
+    state?: "ACT" | "NSW" | "NT" | "QLD" | "SA" | "TAS" | "VIC" | "WA";
+    radiusKm?: number;
+  };
+  employmentTypes?: Array<"CASUAL" | "PART_TIME" | "FULL_TIME" | "CONTRACT" | "INTERNSHIP">;
+  datePostedWithinDays?: number;
+  sortOrder?: "RELEVANCE" | "DATE_POSTED";
   pageCursor?: string;
+  pageSize?: number;
 }
 
 export interface DiscoveredJobRecord {
@@ -70,11 +81,12 @@ class PlaceholderAdapter implements JobSourceAdapter {
   }
 }
 
+export * from "./seek/index";
+
+import { SeekAdapter } from "./seek/adapter";
+
 export const jobSourceAdapters = {
-  seek: new PlaceholderAdapter("SEEK", [
-    AdapterCapability.DISCOVERY,
-    AdapterCapability.JOB_DETAILS,
-  ]),
+  seek: new SeekAdapter(),
   indeed: new PlaceholderAdapter("INDEED", [
     AdapterCapability.DISCOVERY,
     AdapterCapability.JOB_DETAILS,

@@ -1,0 +1,36 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-nocompany-011",
+    "canonicalUrl": "https://seek.example.test/job/nocompany-011",
+    "title": "Office Assistant",
+    "company": null,
+    "location": {
+      "text": "Preston VIC 3072",
+      "suburb": "Preston",
+      "postcode": "3072",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Casual",
+    "classification": "Administration & Office Support",
+    "description": "A deliberately incomplete synthetic fixture.",
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "nocompany-011", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/11-missing-company.json"
+    }
+  },
+  "distanceKmFrom3072": 0,
+  "expected": {
+    "outcome": "ERROR",
+    "errorCode": "MALFORMED_RESPONSE",
+    "requirementClassifications": []
+  }
+}

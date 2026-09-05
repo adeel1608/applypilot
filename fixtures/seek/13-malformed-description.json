@@ -1,0 +1,36 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-malformed-013",
+    "canonicalUrl": "https://seek.example.test/job/malformed-013",
+    "title": "Malformed Fixture Role",
+    "company": "Fixture Validation Works",
+    "location": {
+      "text": "Preston VIC 3072",
+      "suburb": "Preston",
+      "postcode": "3072",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Full-time",
+    "classification": "Information & Communication Technology",
+    "description": null,
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "malformed-013", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/13-malformed-description.json"
+    }
+  },
+  "distanceKmFrom3072": 0,
+  "expected": {
+    "outcome": "ERROR",
+    "errorCode": "MALFORMED_RESPONSE",
+    "requirementClassifications": []
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-rights-009",
+    "canonicalUrl": "https://seek.example.test/job/rights-009",
+    "title": "Operations Coordinator",
+    "company": "Paperbark Operations",
+    "location": {
+      "text": "Brunswick VIC 3056",
+      "suburb": "Brunswick",
+      "postcode": "3056",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Full-time",
+    "classification": "Administration & Office Support",
+    "description": "Coordinate schedules for a fictional operations team.",
+    "requirementTexts": ["Unrestricted work rights are essential"],
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "rights-009", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/09-unrestricted-rights.json"
+    }
+  },
+  "distanceKmFrom3072": 4.8,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "FULL_TIME",
+    "workRightsRequirement": "UNRESTRICTED_AUSTRALIA",
+    "requirementClassifications": ["EXPLICIT_REQUIREMENT"]
+  }
+}

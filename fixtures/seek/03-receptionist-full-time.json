@@ -1,0 +1,44 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-reception-003",
+    "canonicalUrl": "https://seek.example.test/job/reception-003",
+    "title": "Junior Receptionist",
+    "company": "Wattle Street Health",
+    "location": {
+      "text": "South Yarra VIC 3141",
+      "suburb": "South Yarra",
+      "postcode": "3141",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "salaryText": "$60000 - $68000 per year",
+    "employmentTypeText": "Full-time",
+    "classification": "Administration & Office Support",
+    "description": "Coordinate appointments for a fictional community clinic.",
+    "requirementTexts": [
+      "Must have strong written communication",
+      "Medical software experience preferred"
+    ],
+    "hoursText": "38 hours per week",
+    "coverLetterRequired": true,
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "reception-003", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/03-receptionist-full-time.json"
+    }
+  },
+  "distanceKmFrom3072": 12.8,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "FULL_TIME",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": ["EXPLICIT_REQUIREMENT", "PREFERRED_REQUIREMENT"]
+  }
+}

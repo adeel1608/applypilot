@@ -1,0 +1,38 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-driver-007",
+    "canonicalUrl": "https://seek.example.test/job/driver-007",
+    "title": "Local Delivery Driver",
+    "company": "Blue Wren Couriers",
+    "location": {
+      "text": "Coburg VIC 3058",
+      "suburb": "Coburg",
+      "postcode": "3058",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "employmentTypeText": "Contract",
+    "classification": "Manufacturing, Transport & Logistics",
+    "description": "Complete daytime deliveries for a fictional courier business.",
+    "requirementTexts": ["Driver's licence is required", "Valid Australian work rights required"],
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "driver-007", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/07-delivery-contract.json"
+    }
+  },
+  "distanceKmFrom3072": 6.7,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "CONTRACT",
+    "workRightsRequirement": "VALID_AUSTRALIA",
+    "requirementClassifications": ["EXPLICIT_REQUIREMENT", "EXPLICIT_REQUIREMENT"]
+  }
+}

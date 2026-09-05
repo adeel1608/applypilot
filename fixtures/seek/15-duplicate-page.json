@@ -1,0 +1,52 @@
+{
+  "record": {
+    "schemaVersion": 1,
+    "parserVersion": "seek-fixture-v1",
+    "source": "SEEK",
+    "accessMode": "FIXTURE_ONLY",
+    "externalId": "seek-fixture-retail-001",
+    "canonicalUrl": "https://seek.example.test/job/retail-001",
+    "title": "Casual Retail Assistant",
+    "company": "Harbour & Gum Retail",
+    "location": {
+      "text": "Preston VIC 3072",
+      "suburb": "Preston",
+      "postcode": "3072",
+      "state": "VIC",
+      "country": "Australia"
+    },
+    "salaryText": "$31.25 per hour",
+    "employmentTypeText": "Casual",
+    "classification": "Retail & Consumer Products",
+    "subclassification": "Retail Assistants",
+    "postingText": "Listed today",
+    "description": "Support customers and maintain a welcoming synthetic store fixture.",
+    "responsibilities": ["Assist customers", "Replenish shelves"],
+    "requirementTexts": [
+      "Customer service experience preferred",
+      "No experience required",
+      "Training provided"
+    ],
+    "hoursText": "12-20 hours per week",
+    "coverLetterRequired": false,
+    "discoveredAt": "2026-09-05T00:00:00.000Z",
+    "fetchedAt": "2026-09-05T00:00:00.000Z",
+    "rawPayload": { "fixture": "retail-001", "revision": 1 },
+    "provenance": {
+      "retrievalMethod": "FIXTURE",
+      "contentType": "application/json",
+      "sourceReference": "fixtures/seek/15-duplicate-page.json"
+    }
+  },
+  "distanceKmFrom3072": 0,
+  "expected": {
+    "outcome": "NORMALIZED",
+    "employmentType": "CASUAL",
+    "workRightsRequirement": "NOT_SPECIFIED",
+    "requirementClassifications": [
+      "PREFERRED_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT",
+      "EXPLICIT_REQUIREMENT"
+    ]
+  }
+}
