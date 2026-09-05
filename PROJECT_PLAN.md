@@ -199,12 +199,12 @@ All statuses use `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
 
 ### Phase 0/1 implementation blueprint
 
-**Current state**
+**State at the start of Phase 0/1**
 
 - GitHub CLI authenticated as `adeel1608`.
 - Private repository `adeel1608/applypilot` created on 2026-09-05.
-- `main` contains only the repository initialization commit.
-- Work is on `feat/bootstrap-applypilot`.
+- `main` contained only the repository initialization commit.
+- Phase 0/1 work was performed on `feat/bootstrap-applypilot`.
 - The workspace contained no pre-existing source files or user changes.
 - Node `v24.18.0` is available; npm must be invoked as `npm.cmd` in this PowerShell environment because script execution policy blocks `npm.ps1`.
 
@@ -296,7 +296,7 @@ Candidate profile versions and raw job source records remain linked to downstrea
 
 **Rollback strategy**
 
-- All work remains isolated on `feat/bootstrap-applypilot`; `main` stays at its initialization commit.
+- Phase 0/1 work remained isolated on `feat/bootstrap-applypilot`; `main` stayed at its initialization commit until the reviewed pull request was merged.
 - Commits are organized by concern so a problematic layer can be reverted without rewriting history.
 - Database evolution begins with migration `0000`; since Phase 0/1 has no real data, rollback is removal of the disposable ignored local database and checkout/revert of the migration commit.
 - No deployment or external application state is created.
@@ -364,7 +364,7 @@ Validated on 2026-09-05 with Node `v24.18.0`:
 - Git ignore audit: private profile, `.env`, browser-session state, SQLite files, and generated candidate PDFs are ignored.
 - Secret-pattern audit: no credential-like assignments found outside dependencies/build output.
 - GitHub Actions: both push and pull-request `quality` runs passed after correcting a Bash glob-expansion issue in the Vitest exclusions. The failed runs and their cause were not skipped.
-- GitHub audit: `adeel1608/applypilot` is private, `main` is the default branch, the feature branch is pushed, and PR #1 is open and unmerged.
+- GitHub audit: `adeel1608/applypilot` is private, `main` is the default branch, and PR #1 is merged with merge commit `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`.
 
 Phase 0/1 acceptance criteria are complete. No live job-board access, deployment, or application submission occurred.
 
@@ -397,10 +397,11 @@ Run format check, lint, strict typecheck, unit tests, integration tests, Playwri
 
 # Phase 2 — SEEK Discovery Adapter Blueprint
 
-- Blueprint status: `AWAITING_HUMAN_REVIEW`
+- Blueprint status: `APPROVED`
 - Phase roadmap status: `NOT_STARTED`
 - Prepared on: 2026-09-05
-- Implementation branch: `feat/seek-discovery-adapter`
+- Blueprint branch: `feat/seek-discovery-adapter`
+- Approved implementation branch: `feat/seek-discovery-implementation`
 
 This section is an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code.
 
@@ -787,7 +788,7 @@ No database migration, application-runner change, application form/submission fi
 
 ## X. Rollback plan
 
-- Keep all Phase 2 work on `feat/seek-discovery-adapter` and leave its PR unmerged until review and gates pass.
+- Keep the Phase 2 implementation on `feat/seek-discovery-implementation` and leave its implementation PR unmerged until review and gates pass.
 - The adapter remains dependency-injected and defaults to `FIXTURE_ONLY`; disabling/removing SEEK registration restores the Phase 0/1 offline placeholder without touching candidate data or other adapters.
 - Revert Phase 2 commits normally. Do not rewrite `main` history or reset user changes.
 - No schema migration is planned. If Phase 2 is reverted, namespaced checkpoint settings and SEEK job/source/audit rows can be ignored; any cleanup of a real local database requires an explicit backup and separate user-approved operation.
@@ -817,7 +818,7 @@ Phase 2 must not be marked `COMPLETE` unless:
 
 ## Z. Human review checkpoint
 
-Stop after this blueprint is committed, pushed, and opened as an unmerged documentation-only PR. Do not implement Phase 2, access SEEK, fetch public/live source content, write browser automation, change submission behaviour, or merge the Phase 2 PR until the owner approves the blueprint and issues the implementation task.
+The blueprint was committed, pushed, and opened as documentation-only PR #2. The owner approved it on 2026-09-05 and authorised a normal merge followed by implementation on the new `feat/seek-discovery-implementation` branch. The later implementation PR must remain unmerged for a separate human review. Network-backed SEEK modes still require the independent access-research approval defined in section D.
 
 ## Blueprint checkpoint execution record
 
@@ -842,6 +843,6 @@ Merge/branch results:
 - Merge commit/main baseline: `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`.
 - Merge timestamp: `2026-09-05T05:07:44Z` (`2026-09-05 15:07:44 AEST`).
 - Remote `feat/bootstrap-applypilot`: deleted.
-- Phase 2 branch: `feat/seek-discovery-adapter`, created from the merged baseline and pushed.
+- Phase 2 blueprint branch: `feat/seek-discovery-adapter`, created from the merged baseline and pushed.
 
-Unfinished work is the entire Phase 2 implementation described above. It is deliberately not started. No implementation blocker is declared at this planning checkpoint; approval and the access-method research decision are required gates, not assumed outcomes.
+Unfinished work is the entire Phase 2 implementation described above. It is deliberately not started on the blueprint branch. Blueprint approval is complete; the access-method research decision remains an independent gate for any network-backed mode.
