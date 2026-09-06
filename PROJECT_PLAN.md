@@ -1833,3 +1833,64 @@ Run the blueprint privacy audit without printing candidate/job values: clean Git
 
 Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
 ```
+
+# Phase 2.5A Execution
+
+- Status: `IN_PROGRESS`.
+- Started: 2026-09-06.
+- Execution branch: `feat/phase-2-5a-local-activation`.
+- Approved bugfix merge: PR #7 merged normally as `6f42b8f1edd5813d34c398aad56248555fae044d` at `2026-09-06T07:09:44Z`. Fresh local `main` matched `origin/main` at that SHA with a clean worktree; the merged bugfix branch was deleted locally/remotely before this branch was created and pushed.
+- Current local state: no `data/profile.private.json`, SQLite database, WAL/SHM file, or timestamped backup exists. No real vacancy content has been supplied or retained. Real-data operations have not started.
+
+## Current state, objective, and assumptions
+
+The merged Phase 2.5 application already provides local bounded intake, explicit preview/confirmation, strong identity, SQLite persistence, server-only private-profile resolution, deterministic eligibility/fit evaluation, and dashboard/detail views. The merged blocker fix protects the supported timestamped SQLite backup form. A dedicated safe profile validator is absent and must be implemented/tested before any real profile exists.
+
+The objective is to validate the complete local workflow with one owner-confirmed private profile and exactly one owner-supplied visible vacancy, without accessing a job board or enabling an application action. The default `data/applypilot.local.sqlite` path will be used. The owner has not yet supplied the required profile facts or vacancy body; those gates require interactive owner input after the fictional-only helper and baseline checks are complete. Unknown facts remain unknown, and no required value may be invented merely to satisfy the schema.
+
+## Operations and exact implementation changes
+
+1. Verify the merged ignore contract directly and run its permanent regression.
+2. Add `scripts/validate-private-profile.ts`, using the fixed repository-relative private-profile path, 1 MiB bound, JSON parsing, and the real `CandidateProfileSchema`. It emits only `VALID`, `MISSING`, or `INVALID`; invalid details are bounded paths/stable codes without values, contents, hash, exception, or absolute path.
+3. Add `profile:validate` to `package.json` and fictional/malformed/missing/oversized CLI tests under `tests/security/`. No package dependency or runtime/provider behavior changes.
+4. Run the full fictional baseline suite before requesting private facts.
+5. Use the schema-derived documentation as a local scaffolding checklist: collect owner-confirmed facts in small groups, assemble the ignored file locally, omit unnecessary/high-risk identity material and referee contacts, validate it, and report only state/codes. Do not require the owner to rewrite the large JSON template.
+6. Prove demo-profile isolation with the real file reversibly moved only to ignored `data/private/`, the validator reporting `MISSING`, and the existing focused fictional/in-memory integration tests. Restore atomically and require `VALID`.
+7. Stop all local app/E2E processes, preview and confirm the default migration, verify the exact backup is ignored if created, and require both migrations, expected user version, integrity, foreign-key, and success checks.
+8. Have the owner supply exactly one complete visible vacancy directly to local `/import`; manually validate every field and explicitly confirm only after the truth review.
+9. Verify truthful persistence, dashboard/detail rendering, `PRIVATE_LOCAL_PROFILE` provenance, eligibility, fit, and absence of document/application/submission behavior.
+10. Stop the app, complete the non-disclosing privacy audit and all quality gates, record safe results, push only source/docs, open an unmerged execution PR, wait for final-head CI, and stop for review.
+
+## Candidate-profile handling
+
+The only real profile path is `data/profile.private.json`, and it must be ignored/untracked before creation. The validator and runtime use `CandidateProfileSchema`; tests use fictional temporary files only. Owner-confirmed facts may be assembled locally, but TFN, bank/payment data, passport or visa grant numbers, passwords, OTPs, security answers, and unnecessary referee contacts are forbidden. The profile body, values, candidate contacts, work-right details, referee facts, hash, absolute path, and full validation input/errors never enter Git, chat output, logs, audits, screenshots/traces, browser storage, CI, source maps, or external services.
+
+The local scaffolding workflow is: review each required schema group with the owner; populate only supplied/confirmed values; preserve empty required arrays when the owner confirms there is nothing to assert; stop with a concise missing-fact path list when a truthful required value is unavailable; validate ignore/untracked state before writing; write only the ignored local file; then run the state-only validator. No fictional template value is carried into the real profile.
+
+## Database and real-job handling
+
+The default supported database path and its WAL/SHM/backup siblings must remain ignored and untracked. The app is stopped for migration. Preview precedes explicit confirmation; an existing database is never deleted, truncated, down-migrated, or directly edited, and an existing backup is retained. Only safe path classification, existence/backup booleans, migration IDs/version, integrity/foreign-key states, and exit status may be recorded.
+
+The one vacancy is pasted by the owner over loopback and never fetched. Raw content remains only in the owner's original source and ignored local database. SEEK origin requires evidence from supplied bytes, while acquisition remains `USER_SUPPLIED_CONTENT`. No real advert enters commands, Git, fixtures, automated tests, logs, traces, screenshots, CI, or PR text.
+
+## Privacy boundaries and manual validation
+
+Candidate data never enters import parsing/source detection/deduplication. Raw vacancy text never enters candidate-profile code or safe audit metadata. The browser receives only approved profile state plus the normal local job UI. Manual preview review covers title, company, location/postcode, employment type, hours, schedule, salary, required/preferred experience, qualifications/certifications/licences/checks, vehicle, work-right wording, physical requirements, dates, source/confidence/acquisition, external identity/URL, and cover-letter requirement. Unsupported facts remain null/unknown; wording is never strengthened; corrections require visible evidence and preserved override provenance.
+
+Eligibility review compares stable positive/blocking/review codes and field/evidence references with the private profile and original advert. Fit review inspects total, category contributions, positive/negative reasons, missing evidence, and preference/requirement signals without tuning weights. Final application submission, preparation, form filling, status advancement, document generation for the real job, live board access, Phase 2.6, and Phase 3 remain out of scope.
+
+## Testing and security strategy
+
+Before and after real activation, run `npm.cmd run format:check`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run test:integration`, `npm.cmd run build`, `npm.cmd run test:e2e`, `npm.cmd audit`, `npm.cmd run audit:production`, and `git diff --check`. General automated tests remain fictional. Focused checks cover the ignore regression, validator missing/invalid/valid/oversized states and redaction, and real-job demo isolation in memory. Real-data validation is manual/local and creates no screenshot or Playwright trace.
+
+The final privacy audit checks ignore/untracked state, changed/tracked/reachable paths, high-confidence secrets, logs/audit bodies, browser storage/rendered output/source maps, build/test artifacts, PR/CI scope, network absence, and application-action absence without printing candidate/job needles. Repository visibility must remain private.
+
+## Rollback
+
+Helper/source changes can be reverted normally or left in the unmerged execution PR. Before real import, remove or correct only the local private file through an explicit owner decision. Migration failure leaves the original database and ignored backup intact and stops the app. After migration/import, never delete or down-migrate the real database, backup, profile, or job automatically; preserve them for a separately reviewed recovery decision. Close the unmerged execution PR and delete its branch to roll back repository state.
+
+## Acceptance criteria and stop conditions
+
+Phase 2.5A is `COMPLETE` only when profile validation/Git isolation, demo isolation, default migration and backup policy, exactly one manually truth-checked import, private-profile provenance, eligibility, fit, dashboard/detail rendering, privacy audit, full local gates, and final-head CI all pass with no network source access or application action. Only source/documentation changes are committed and the execution PR remains unmerged.
+
+Stop and leave the phase `IN_PROGRESS` or `BLOCKED` for any trackable private path, missing/unconfirmed required profile fact, invalid profile, demo fallback, migration/integrity/foreign-key failure, unsupported parser inference, incorrect eligibility/fit behavior, privacy leak, live-source request, application action, failed local gate, or failed CI. The immediate permitted work ends after fictional helper/baseline validation if owner-confirmed profile facts are still unavailable.
