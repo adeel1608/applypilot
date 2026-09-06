@@ -1,6 +1,6 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-06  
+Last updated: 2026-09-06
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
 Working branch: `feat/phase-2-5a-local-activation`
