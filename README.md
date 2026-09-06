@@ -4,7 +4,7 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1 and Phase 2 are merged. Phase 2.5 adds a review-gated real-world intake workflow on its implementation branch: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate.
+Phase 0/1, Phase 2, and Phase 2.5 are merged. Phase 2.5 provides a review-gated real-world intake workflow: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate. Phase 2.5A local activation and one-vacancy smoke testing is awaiting blueprint review; no real private profile or vacancy is committed.
 
 There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
 
@@ -42,6 +42,8 @@ Open `http://localhost:3000`. Use `/import` for local paste/upload intake. The f
 
 Only the fictional `data/profile.example.json` is committed and rendered as demo content. A local `data/profile.private.json` with the same schema is Git-ignored, loaded only on the server, and required to evaluate real imported jobs. Without a valid private profile, imports remain usable but explicitly not evaluated.
 
+The schema-accurate, fictional setup reference for the later local activation checkpoint is [docs/PRIVATE_PROFILE_SETUP.md](docs/PRIVATE_PROFILE_SETUP.md). Do not add real candidate values to Git.
+
 On Windows PowerShell systems that block `npm.ps1`, use `npm.cmd` and `npx.cmd`.
 
 ## Quality checks
@@ -77,7 +79,7 @@ Read [SECURITY.md](SECURITY.md) before handling any real candidate data.
 
 ## Development roadmap
 
-The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Its implementation PR requires human review and must not be merged automatically.
+The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Phase 2.5A will validate one private local profile and one user-supplied vacancy only after its planning PR receives human approval.
 
 ## Screenshots
 
