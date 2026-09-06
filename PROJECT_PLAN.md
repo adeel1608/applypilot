@@ -1852,7 +1852,7 @@ The objective is to validate the complete local workflow with one owner-confirme
 
 1. Verify the merged ignore contract directly and run its permanent regression.
 2. Add `scripts/validate-private-profile.ts`, using the fixed repository-relative private-profile path, 1 MiB bound, JSON parsing, and the real `CandidateProfileSchema`. It emits only `VALID`, `MISSING`, or `INVALID`; invalid details are bounded paths/stable codes without values, contents, hash, exception, or absolute path.
-3. Add `profile:validate` to `package.json` and fictional/malformed/missing/oversized CLI tests under `tests/security/`. No package dependency or runtime/provider behavior changes.
+3. Add `profile:validate` to `package.json` and fictional/malformed/missing/oversized validator tests under `tests/security/`; align README/private-profile setup wording with the implemented command and current in-progress phase. No package dependency or runtime/provider behavior changes.
 4. Run the full fictional baseline suite before requesting private facts.
 5. Use the schema-derived documentation as a local scaffolding checklist: collect owner-confirmed facts in small groups, assemble the ignored file locally, omit unnecessary/high-risk identity material and referee contacts, validate it, and report only state/codes. Do not require the owner to rewrite the large JSON template.
 6. Prove demo-profile isolation with the real file reversibly moved only to ignored `data/private/`, the validator reporting `MISSING`, and the existing focused fictional/in-memory integration tests. Restore atomically and require `VALID`.

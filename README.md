@@ -4,7 +4,7 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1, Phase 2, and Phase 2.5 are merged. Phase 2.5 provides a review-gated real-world intake workflow: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate. Phase 2.5A local activation and one-vacancy smoke testing is awaiting blueprint review; no real private profile or vacancy is committed.
+Phase 0/1, Phase 2, and Phase 2.5 are merged. Phase 2.5 provides a review-gated real-world intake workflow: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate. The approved Phase 2.5A local activation and one-vacancy smoke test is in progress on a dedicated branch; no real private profile, vacancy, or database is committed.
 
 There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
 
@@ -79,7 +79,7 @@ Read [SECURITY.md](SECURITY.md) before handling any real candidate data.
 
 ## Development roadmap
 
-The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Phase 2.5A will validate one private local profile and one user-supplied vacancy only after its planning PR receives human approval.
+The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Phase 2.5A is validating one private local profile and one user-supplied vacancy under the approved local-only execution plan.
 
 ## Screenshots
 

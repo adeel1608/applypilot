@@ -24,6 +24,7 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate-local-database.ts",
+    "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "audit:production": "npm audit --omit=dev"
   },
