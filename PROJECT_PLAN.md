@@ -397,6 +397,106 @@ Add contract, unit, integration, and fixture-replay tests for successful discove
 Run format check, lint, strict typecheck, unit tests, integration tests, Playwright tests, production build, and npm audit. Update PROJECT_PLAN.md with exact results, limitations, rollback, blocked items, and the next recommended phase. Push the feature branch and open an unmerged pull request into main. Never claim live SEEK support unless it was actually validated within the documented policy boundaries.
 ```
 
+# Phase 2.5A Activation Blocker Fix
+
+- Status: `IMPLEMENTATION_IN_PROGRESS`; Phase 2.5A real-data activation remains **BLOCKED** until this dedicated bugfix pull request is reviewed and merged by the owner.
+- Working branch: `fix/ignore-sqlite-migration-backups`.
+- Fresh base: merged Phase 2.5A blueprint PR #6 at `48a5cf73a83a27dc2dea2d749d79cb3da45e0fe0`; local `main` and `origin/main` matched that commit with a clean worktree before this branch was created.
+- Blueprint merge: PR #6 merged normally at `2026-09-06T06:41:46Z`. The merged planning branch was deleted locally and remotely only after ancestry and ref equality were verified.
+- Objective: prevent the timestamped safety copy produced by the explicit local migration command from becoming trackable, lock the policy with a deterministic fictional-path regression, and stop at an unmerged human-review PR.
+
+## Problem
+
+When the selected database already exists, `scripts/migrate-local-database.ts` creates a sibling backup by appending a colon-normalized ISO timestamp and `.backup` to `databasePath`. For the supported ApplyPilot filename this produces `data/applypilot.local.sqlite.<timestamp>.backup`. The existing `.gitignore` covers active `.sqlite`, `.sqlite-wal`, and `.sqlite-shm` files, but not that appended backup form. A real migration could therefore leave a private local database copy visible to Git.
+
+Phase 2.5A real-data activation is **BLOCKED** until this fix is reviewed and merged. This task does not create a profile, inspect a CV, run the migration, create a backup, import a vacancy, or operate on real candidate/job data.
+
+## Evidence and assumptions
+
+- `scripts/migrate-local-database.ts` resolves `APPLYPILOT_DB_PATH` or defaults to `data/applypilot.local.sqlite`; for an existing file it copies `databasePath` to a sibling named by appending the colon-normalized ISO timestamp and `.backup`.
+- `apps/web/lib/local-database.ts` defaults to `applypilot.local.sqlite` and rejects filenames that do not end in `.sqlite`. The actual application database/backup suffix under the coordinated supported path is therefore `.sqlite.<YYYY-MM-DDTHH-MM-SS.sssZ>.backup`.
+- `.gitignore` also contains active-file rules for `.db` and `.sqlite3`, but no application runtime or separate backup path was found that produces timestamped `.db` or `.sqlite3` backups. The migration path override is unconstrained and must remain an explicitly coordinated/reviewed path; this fix does not speculate about unsupported filename suffixes.
+- On the fresh merged base, `git check-ignore -v -- data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` returned exit `1` with no matching rule. The probe is a fictional non-existent path; no database or backup was created.
+- On the same base, the active fictional path `data/applypilot.local.sqlite` matched `.gitignore` rule `*.sqlite`, while `packages/database/drizzle/0001_real_world_job_intake.sql` remained non-ignored/trackable.
+
+## Security and privacy impact
+
+Migration backups may contain private candidate facts, supplied vacancy text, normalized records, evaluation results, and audit state. Leaving a backup trackable creates an accidental-commit and remote-disclosure risk even though the active database is ignored. The fix must protect the exact supported backup form without broadly ignoring ordinary `.backup` files, source code, documentation, or reviewed migration SQL. No sensitive content is required to reproduce or validate this policy.
+
+## Architecture, data flow, and dependencies
+
+This is a repository-boundary fix only. The runtime data flow remains `explicit migration confirmation -> sibling timestamped copy when the database exists -> transactional migration and verification`. Git classification changes after the copy is named; migration behavior, database contents, schema, application runtime, source adapters, profile resolution, and submission gates do not change. The regression uses Node's standard child-process API and the repository's existing Git executable through Vitest; it adds no package or external-service dependency.
+
+## Exact proposed fix and file changes
+
+- `PROJECT_PLAN.md`: record the plan-first evidence, security analysis, implementation contract, actual validation, rollback, and remaining human gate.
+- `.gitignore`: add only `*.sqlite.*.backup` beside the existing SQLite rules. Do not add broad `*.backup`, database-directory, or generated-content patterns.
+- `tests/security/gitignore-policy.test.ts`: add a permanent fictional-path test that invokes `git check-ignore --no-index` and proves both protected and trackable cases.
+
+## Regression-test plan
+
+The dedicated test must prove:
+
+1. reviewed migration SQL remains trackable;
+2. an active `.sqlite` database is ignored;
+3. its `-wal` and `-shm` journals are ignored;
+4. `data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` is ignored; and
+5. ordinary TypeScript source and Markdown documentation remain trackable.
+
+All paths are fictional or already tracked source/document paths. The test must not create, read, copy, migrate, or delete a database. Run the focused regression plus `npm.cmd run format:check`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run test:integration`, `npm.cmd run build`, `npm.cmd run test:e2e`, `npm.cmd audit`, `npm.cmd run audit:production`, and `git diff --check`. Direct `git check-ignore` probes must confirm the exact new backup path is ignored and a normal source path is not.
+
+## Risks and mitigations
+
+- A rule that is too broad could conceal legitimate backup documentation or source artifacts. Mitigation: constrain the rule to names containing the supported `.sqlite` suffix before the appended backup segment and test non-database source/docs explicitly.
+- A test that checks tracked files without `--no-index` could produce a false negative because Git normally suppresses tracked matches. Mitigation: use `--no-index` for every assertion and check process exit status only.
+- Platform-specific shell behavior could weaken the regression. Mitigation: call `git` directly from Node without a shell and use repository-relative forward-slash paths.
+- The ignore rule prevents new accidental tracking but does not remove already committed secrets. Mitigation: audit reachable Git paths for private profiles and timestamped database backups before handoff.
+
+## Rollback
+
+Leave the bugfix PR unmerged and delete the branch, or normally revert its commits after merge. Removing the single ignore rule and regression restores the prior repository policy; no database/schema/runtime/data rollback is involved. No real database or backup may be deleted as part of rollback.
+
+## Acceptance criteria
+
+- The exact fresh-base bug is reproduced with exit `1`, and the post-fix exact fictional path is ignored specifically by `*.sqlite.*.backup`.
+- The permanent regression proves the migration SQL, ordinary source, and ordinary docs remain trackable while `.sqlite`, WAL, SHM, and timestamped SQLite backups are ignored.
+- No broad `*.backup` rule, application/schema/migration behavior change, real profile/job content, SQLite file, backup, credential, cookie, session, or generated application artifact is introduced.
+- Reachable-history and changed-file audits find no committed private profile or database backup.
+- All local quality gates and both dependency audits pass; GitHub CI is green at the final pushed head.
+- The bugfix branch is pushed and its pull request into `main` remains unmerged for explicit human review.
+- Operational status becomes `READY_FOR_ACTIVATION_PENDING_HUMAN_REVIEW`; Phase 2.5A remains not complete and real activation remains blocked until this PR is approved and merged.
+
+## Scope exclusions
+
+No real candidate profile creation or reading, CV inspection, real database migration/backup, real vacancy import, UI smoke test with real data, live job-board access, document generation, application preparation/form fill/status advance/submission, Phase 2.6, Phase 3, scoring change, schema change, or cleanup/export/delete capability is authorized here. The future Phase 2.5A implementation PR must not be merged automatically.
+
+## Exact implementation steps
+
+1. Commit this plan-first checkpoint before changing `.gitignore`.
+2. Add the single supported SQLite timestamped-backup ignore rule.
+3. Add the fictional-path Git policy regression and run it directly.
+4. Run the complete local validation and dependency-audit matrix.
+5. Perform changed-file, reachable-history, secret/runtime-artifact, and direct ignore-policy audits.
+6. Update this section with exact commands, results, commit SHAs, files changed, rollback state, and remaining blocker.
+7. Push the focused commits, open an unmerged PR into `main`, wait for final-head CI, and stop for human review.
+
+## Implementation and validation record
+
+- Operational status: `READY_FOR_ACTIVATION_PENDING_HUMAN_REVIEW`. The repository fix is implemented and locally validated, but Phase 2.5A real-data activation remains **BLOCKED** until this bugfix PR is explicitly reviewed and merged. Phase 2.5A itself is not complete.
+- Blueprint closeout: PR #6 was reverified `OPEN`, non-draft, `MERGEABLE`, and `CLEAN` at approved head `5922bf5aad413530b59bde7648e728db8ac609a1`; both final `quality` runs `33957728933` and `33957730885` passed, the repository was private, and the diff was limited to `PROJECT_PLAN.md`, `README.md`, and `docs/PRIVATE_PROFILE_SETUP.md`. It merged normally as `48a5cf73a83a27dc2dea2d749d79cb3da45e0fe0` at `2026-09-06T06:41:46Z`. Fresh local `main` matched `origin/main`, and the merged planning branch was then deleted locally/remotely.
+- Bug confirmation: before the ignore edit, fictional path `data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` was not ignored (`git check-ignore` exit `1`). The migration's actual supported application backup format is `data/<name>.sqlite.<YYYY-MM-DDTHH-MM-SS.sssZ>.backup`, produced by appending the colon-normalized ISO timestamp and `.backup` to the `.sqlite` database path.
+- Exact fix: `.gitignore` now contains only `*.sqlite.*.backup` for the appended migration backup form. The same direct fictional probe now matches `.gitignore` line 46 and exits `0`; a generic `notes/recovery.backup`, migration SQL, normal source, and normal documentation all exit `1` and remain trackable. No broad `*.backup` rule was added.
+- Suffix review: the active web runtime permits only `.sqlite` filenames, and the migration defaults to the same suffix. No separate `.db` or `.sqlite3` timestamped-backup producer exists. `.env.example` contains a legacy unused `APPLYPILOT_DATABASE_PATH` `.db` example, but repository search found no code consumer for that variable. The unconstrained migration override remains an explicitly reviewed coordination case rather than a basis for speculative broad ignore rules.
+- Regression: `tests/security/gitignore-policy.test.ts` calls Git directly without a shell and uses only fictional or existing repository paths. The focused run passed 7/7 assertions covering active SQLite, WAL, SHM, timestamped backup, reviewed migration SQL, TypeScript source, and Markdown documentation.
+- Files changed from the merged blueprint base: `.gitignore`, `PROJECT_PLAN.md`, and `tests/security/gitignore-policy.test.ts` only. The implementation did not change migration/database/schema/application/source/profile/evaluation/submission behavior.
+- Focused commits: plan-first checkpoint `689e850d26bf2363f151300f29f59ce6ca8cbf73`; narrow ignore fix `56ce37a85dfdee73f6c4daf5d5d7d3a5b4d1e322`; permanent regression `f16009ed0fac0ecfe1d0d6de6a4580407a2dc748`.
+- Formatting: the first `npm.cmd run format:check` stopped on the two freshly merged documentation files with the known Windows line-ending mismatch. Prettier normalized `README.md` and `docs/PRIVATE_PROFILE_SETUP.md`; Git comparison confirmed no substantive or staged diff. The full rerun passed.
+- Successful local gates on Node 24: `npm.cmd run lint` passed; strict `npm.cmd run typecheck` passed; `npm.cmd test` passed 87 tests across 17 files; `npm.cmd run test:integration` passed 9 tests across 3 files; `npm.cmd run build` compiled the production application and generated 31 static segments across the eight routes; `npm.cmd run test:e2e` passed all 9 browser tests; `npm.cmd audit` and `npm.cmd run audit:production` each reported 0 vulnerabilities; and `git diff --check` passed. Browser execution emitted only the existing non-fatal `NO_COLOR`/`FORCE_COLOR` warnings.
+- Security/privacy audit: the changed-file set is exact, high-confidence secret scan count is zero, and tracked-tree plus all-reachable-ref path checks found no private profile, SQLite/database/journal, migration backup, cookie, or browser/session artifact. Direct checks prove the timestamped backup is ignored without hiding generic backups/source/docs. Required E2E created only its fictional `applypilot.e2e.sqlite` plus WAL/SHM files; the repository-owned controlled shutdown removed those exact artifacts, port 3100 is closed, and the final local private/runtime-file count is zero. No real candidate profile, CV, vacancy, database, migration backup, credential, browser state, job-board request, document/application action, or submission was created, read, performed, or committed.
+- Rollback remains the normal unmerged-PR/branch deletion or commit revert described above. There is no database, schema, real-data, runtime, network, or application state to undo.
+- Pull request and CI checkpoint: bugfix PR #7 (`https://github.com/adeel1608/applypilot/pull/7`) was opened into `main` with title `fix: ignore local migration backups before activation` and intentionally left unmerged. At implementation/results head `0f853e90c19d23498acf0d61183e2a61a2556d2c`, push `quality` run `34017740553` passed in 2m0s and pull-request run `34017743172` passed in 1m51s. This checkpoint-record-only commit must also pass its new final-head runs; those final IDs belong in the handoff rather than a recursive plan update.
+- Remaining gate: explicit owner review and merge of PR #7. Only after that approval/merge may a fresh-main Phase 2.5A execution branch perform the separately approved local activation workflow. The PR remains unmerged, and no activation action is performed here.
+
 # Phase 2 — SEEK Discovery Adapter Blueprint
 
 - Blueprint status: `APPROVED`
