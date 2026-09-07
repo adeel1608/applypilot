@@ -209,11 +209,9 @@ locally, and remove optional fields that do not apply.
 }
 ```
 
-## Planned safe validation command
+## Safe validation command
 
-The current Phase 2.5 application exposes only a safe profile-state label; it does
-not yet provide a dedicated CLI validator. Phase 2.5A execution should add a small
-local-only command:
+Phase 2.5A provides the local-only command:
 
 ```bash
 npm run profile:validate
@@ -231,6 +229,8 @@ paths and stable error codes, but never values, input fragments, the file body, 
 full exception, or the resolved private path. The command must not write the
 profile to SQLite, start the web app, contact a network service, or place it in a
 build/test artifact.
+
+`VALID` exits `0`, `MISSING` exits `2`, and `INVALID` exits `3`.
 
 Before any real smoke test, also confirm that Git ignores the file:
 

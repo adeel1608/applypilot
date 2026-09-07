@@ -6,6 +6,10 @@ ApplyPilot is local-first, deterministic by default, provenance-aware, and human
 
 ## System context
 
+Current supported real-data path ends at local import, private-profile eligibility/fit and owner review. Document preparation, browser execution and submission arrows below describe the intended product, not an implemented end-to-end real workflow. PR #8's shared server-only root-data resolver now makes workspace starts resolve the same ignored root profile/database as validation and migration scripts.
+
+The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) is the forward design baseline: immutable source observations -> typed requirement evidence -> conservative canonical identity -> versioned evaluation -> fact-bound local artifacts/packet -> isolated local runner -> fresh owner final gate -> durable outcome events. Each future boundary and migration needs review before implementation. See the [source capability matrix](docs/SOURCE_CAPABILITY_MATRIX.md) and [threat model](docs/THREAT_MODEL_V1.md).
+
 ```text
 Job source fixture / local user content / future adapter
               |
@@ -64,7 +68,7 @@ The foundation migration is `packages/database/drizzle/0000_applypilot_foundatio
 ## Trust boundaries
 
 - Committed fixture boundary: fictional candidate and job data only.
-- Local private boundary: future real profile, SQLite database, generated files, browser state, and sessions.
+- Local private boundary: real profile and SQLite runtime already used for supervised activation; future generated files, browser state and sessions remain local too. GitHub source visibility is PUBLIC, not runtime-data visibility.
 - Source boundary: untrusted fixture or explicitly user-supplied content is validated before normalization. Phase 2 performs no SEEK network access.
 - Import boundary: raw bytes are bounded and parsed inertly; detected origin is independent from paste/upload acquisition. Canonical job writes require explicit confirmation.
 - Candidate runtime boundary: demo profiles can evaluate explicitly labelled fixtures only. Real imports require a validated private local profile after persistence or remain `NOT_EVALUATED`.
