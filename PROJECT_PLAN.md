@@ -1,9 +1,9 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-05  
+Last updated: 2026-09-07  
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `chore/phase-2-5a-local-activation-plan`
+Working branch: `fix/resolve-local-runtime-data`
 
 ## 1. Vision
 
@@ -1831,5 +1831,36 @@ Do not tune scoring during this smoke test. Record non-blocking calibration obse
 
 Run the blueprint privacy audit without printing candidate/job values: clean Git status; profile/database/WAL/SHM/timestamped backups ignored and untracked; no private profile in logs, traces, screenshots, browser storage, HTML/source maps, Git, CI, or audit bodies; no real raw advert in Git/logs/traces/CI/audits; no job-board request; no document/application/form-fill/status/submission action. Do not retain real-data screenshots or traces.
 
-Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
+Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
 ```
+
+# Phase 2.5A runtime data-path bugfix
+
+Status: `IN_PROGRESS`. Started 2026-09-07 on `fix/resolve-local-runtime-data`, from fresh `origin/main` at approved PR #7 merge `6f42b8f1edd5813d34c398aad56248555fae044d`. Work occurs in an isolated worktree with no real profile, vacancy, or database. The activation branch and its ignored local data remain preserved.
+
+## Problem, objective, and reproduction
+
+The documented npm workspace start changes the working directory to `apps/web`. The web profile provider and database resolver currently look under `process.cwd()/data`, whereas the root validation and migration commands use repository-root `data`. A valid profile is consequently reported missing and the migrated database is unavailable. A local HTTP check confirmed the profile-state mismatch before any real vacancy was staged or imported.
+
+Use only fictional temporary repositories to reproduce: create the ApplyPilot root manifest, `apps/web`, a valid fictional root profile, and a migrated fictional root database; start resolution with the workspace working directory. Expected: the same root profile/database as from repository root. Actual: missing profile and database. Workspace-local decoys must never override repository-root data.
+
+## Requirements, architecture, and proposed files
+
+- Add a shared server-only `apps/web/lib/local-data-directory.ts` resolver that walks ancestors from the launch directory to the nearest validated ApplyPilot root manifest and returns that root's `data` directory. Validate manifest shape with Zod; return a bounded error code if the repository cannot be identified. Do not search globally, create directories, relocate data, expose paths to client props, or use a public environment variable.
+- Use the resolver in `candidate-profile-provider.ts` and `local-database.ts`. Preserve explicit test profile paths, the 1 MiB/schema validation, demo isolation, database filename validation, schema-readiness gate, and no automatic migration. Resolve the default profile path inside the existing safe error boundary.
+- Add fictional regression coverage in `tests/security/local-runtime-paths.test.ts` for root/workspace launches, decoys, missing data, unknown roots, and invalid database filenames. No new dependency is needed.
+- Launch the existing fictional E2E server with the web workspace working directory, matching the documented npm runtime. Root-owned E2E migration/cleanup paths remain explicit. Update `docs/REAL_WORLD_JOB_INTAKE.md` to document the shared directory contract.
+
+## Data flow, risks, and privacy
+
+Launch directory -> validated repository manifest -> repository `data` -> existing server-only profile/database gates -> existing safe DTOs. This changes path selection only; no job parsing, scoring, candidate schema, SQL schema, migration, application behavior, or data format changes. Missing/unrecognized roots fail closed. The resolver must not select `apps/web/data`, an unrelated ancestor project, or another worktree. Runtime files remain ignored. Profile/vacancy bytes, hashes, contact details, and absolute private paths must not enter logs, Git, CI, or PR text.
+
+## Tests, rollback, acceptance, and exact steps
+
+1. Commit this blueprint before runtime code changes.
+2. Add and run fictional regressions against the old implementation; record the root/workspace failures.
+3. Implement the shared resolver, update its two consumers, align the E2E launch directory, and document behavior.
+4. Run focused tests, formatting, lint, strict typecheck, unit/security tests, integration tests, production build, fictional E2E, both dependency audits, and `git diff --check`.
+5. Verify only intended source/docs enter the diff and that the original activation data is unchanged; push and open an unmerged bugfix PR, wait for final-head CI, and stop for human review.
+
+Acceptance requires consistent root/workspace resolution, safe missing/invalid behavior, no implicit data creation or migration, passing local/CI gates, and no real-data artifact in the worktree/PR. Rollback is a normal revert or closing the unmerged PR; never delete or modify the original local profile/database. Phase 2.5A remains blocked pending bugfix review/merge and the still-unfinished real preview, import, evaluation, privacy audit, and activation gates.
