@@ -2,6 +2,10 @@
 
 ## Local-first design
 
+Current GitHub visibility is PUBLIC by explicit owner authorisation on 2026-09-07. Historical private-repository checkpoints do not change the current setting. Private profile, real input, SQLite/WAL/backups, personal documents and sessions remain local/ignored. Keep npm `"private": true` unchanged.
+
+The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes existing controls from missing release gates. Current supervised intake is not hosted-production readiness. Known gaps include local-origin/session hardening, all-field semantic claim validation, verified-only fit evidence, explicit audit provenance, preview retention and tested recovery. They must be addressed before their affected V1 capabilities are enabled; no future train is implemented by this review.
+
 ApplyPilot treats candidate profiles, personal documents, application answers, user-supplied job content, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 2 commits only fictional source fixtures and makes no live job-board requests.
 
 ## Personal-data isolation
@@ -47,7 +51,7 @@ Final application submission always requires explicit human confirmation. Phase 
 
 ## GitHub expectations
 
-- Keep the repository private unless the owner deliberately changes the security plan.
+- The owner deliberately authorised the PUBLIC source repository; keep all candidate/runtime data excluded and audit every publication. Do not change visibility or other settings without new authority.
 - Require pull requests and passing CI before merge when branch protection is configured.
 - Review dependency alerts and workflow permission changes.
 - Pin action major versions and grant workflows only required permissions.

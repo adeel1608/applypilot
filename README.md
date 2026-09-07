@@ -4,7 +4,11 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1, Phase 2, and Phase 2.5 are merged. Phase 2.5 provides a review-gated real-world intake workflow: bounded local paste/upload parsing, inert HTML handling, preview/edit/skip, explicit confirmation, strong identity, SQLite provenance, and a server-only private-profile evaluation gate. The approved Phase 2.5A local activation and one-vacancy smoke test is in progress on a dedicated branch; no real private profile, vacancy, or database is committed.
+Phase 0/1, Phase 2, Phase 2.5 and the approved runtime-path fix PR #8 are merged. Phase 2.5A has demonstrated one real, owner-reviewed local UI import and private-profile evaluation; its activation/master-plan checkpoint awaits human review. Intake supports bounded paste/upload parsing, inert HTML, preview/edit/skip, explicit confirmation, SQLite identity/provenance and server-only private evaluation. Several requirements remain unextracted/unknown and fit weights are uncalibrated. No real private profile, vacancy or database is committed.
+
+GitHub repository `adeel1608/applypilot` is PUBLIC by explicit owner authorisation. Candidate/runtime data remains LOCAL and ignored. npm `"private": true` remains unchanged to prevent accidental package publication.
+
+The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) defines R0–R11, [go-live gates](docs/GO_LIVE_CHECKLIST.md), [source strategy](docs/SOURCE_CAPABILITY_MATRIX.md), [threat model](docs/THREAT_MODEL_V1.md) and [local runbook](docs/RELEASE_RUNBOOK.md). These are proposals, not implemented capabilities. Current use is supervised local intake/review only; beta, full V1 and hosted production are not ready.
 
 There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
 
@@ -35,7 +39,7 @@ npm install
 npx playwright install chromium
 npm run db:migrate
 npm run db:migrate -- --confirm
-npm run dev
+npm run dev --workspace @applypilot/web -- --hostname 127.0.0.1
 ```
 
 Open `http://localhost:3000`. Use `/import` for local paste/upload intake. The first migration command previews the path; the confirmed command backs up an existing ignored database, applies the Phase 2.5 migration, and verifies integrity. The app does not auto-migrate at startup.
