@@ -1,10 +1,11 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
+import { localDatabasePath } from "./lib/runtime-safety";
 
-const databasePath = resolve(process.env.APPLYPILOT_DB_PATH ?? "data/applypilot.local.sqlite");
+const databasePath = localDatabasePath();
 const confirmed = process.argv.includes("--confirm");
 
 if (!confirmed) {

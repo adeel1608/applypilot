@@ -24,6 +24,11 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate-local-database.ts",
+    "db:status": "tsx scripts/database-status.ts",
+    "migration:status": "tsx scripts/database-status.ts",
+    "privacy:audit": "tsx scripts/privacy-audit.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "quality": "npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build",
     "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "audit:production": "npm audit --omit=dev"
