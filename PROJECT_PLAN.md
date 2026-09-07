@@ -3,11 +3,11 @@
 Last updated: 2026-09-07
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/phase-2-5a-local-activation`
+Working branch: `feat/personal-live-beta-core`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: [Personal Live V1](docs/PERSONAL_LIVE_V1.md), status `AWAITING_HUMAN_REVIEW`. The R0-R11 release trains below supersede the sequence of the historical roadmap, not its evidence. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: the [Personal Live V1](docs/PERSONAL_LIVE_V1.md) blueprint is the owner-approved design baseline. Phase 2.5A is `COMPLETE`, supervised Local Live Alpha is available, and Personal Live Beta Core is `IN_PROGRESS` on the branch above. Personal Live V1 and hosted production are not ready. The R0-R11 release trains below supersede the sequence of the historical roadmap, not its evidence. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -181,7 +181,7 @@ Roadmap statuses use `NOT_STARTED`, `AWAITING_HUMAN_REVIEW`, `IN_PROGRESS`, `COM
 | 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard  | All Phase 0/1 acceptance criteria in this plan pass                                                                            | Incorrect rules or unsafe claims                                       | Phase 0, Zod, Drizzle, fixtures                | Unit/integration/E2E tests and production build                     | COMPLETE    |
 | 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                     | SEEK jobs normalize with provenance; no protection bypass                                                                      | Site/policy changes, rate limits                                       | Phases 0-1                                     | Contract tests, fixture replay, manual policy audit                 | COMPLETE    |
 | 2.5   | Add real-world job intake                  | Source-neutral paste, multi-job, HTML, upload, preview, confirmation, and policy-gated URL intake   | Real ads enter one validated local pipeline and are evaluated only with a valid private profile; no scraping or invented facts | Untrusted content, demo-profile leakage, false splits, duplicate drift | Phase 2 normalization and persistence patterns | Parser/profile/security fixtures, integration/E2E, migration review | COMPLETE    |
-| 2.5A  | Validate local real-world activation       | One private local profile, one user-supplied vacancy, migration, evaluation, UI, and privacy checks | The real local workflow is truthful and leak-free; no source fetch or application action                                       | Private-data leakage, parser mismatch, demo fallback, invalid profile  | Merged Phase 2.5 implementation                | Manual comparison, isolation/privacy audit, full regression suite   | IN_PROGRESS |
+| 2.5A  | Validate local real-world activation       | One private local profile, one user-supplied vacancy, migration, evaluation, UI, and privacy checks | The real local workflow is truthful and leak-free; no source fetch or application action                                       | Private-data leakage, parser mismatch, demo fallback, invalid profile  | Merged Phase 2.5 implementation                | Manual comparison, isolation/privacy audit, full regression suite   | COMPLETE    |
 | 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                             | Indeed jobs normalize with provenance and safe failures                                                                        | Site/policy changes, bot controls                                      | Phases 0-2 patterns                            | Contract tests, fixture replay, manual audit                        | NOT_STARTED |
 | 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                             | Supported public jobs normalize; unsupported flows declared                                                                    | Tenant variation                                                       | Adapter contracts                              | Contract/integration tests                                          | NOT_STARTED |
 | 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                   | Each adapter passes common contract suite and retains raw provenance                                                           | Vendor/tenant variation                                                | Phases 2-4 lessons                             | Per-adapter fixtures and policy/security checks                     | NOT_STARTED |
@@ -2032,3 +2032,209 @@ The first production build succeeded but warned that dynamic filesystem paths co
 - Build/runtime/CI audit: a separate working-tree and output scan used 59 in-memory private needles across 160 repository/document files and 777 artifact files (327,103,180 bytes), including all 12 Next output trace manifests. It found zero private-value or private-runtime trace entries. No package publication guard changed. The real browser created no screenshot, video, trace or storage-state artifact; its 16 server-log entries were only local route/timing metadata, with no credential header or profile JSON. The repository has zero GitHub Actions artifacts and zero releases. Current Actions history therefore exposes no uploaded artifact, and PR #8 remains merged at the exact approved merge SHA.
 - Phase 2.5A result: `PASS` for supervised local intake/evaluation, with the documented extraction/calibration limitations. Exactly one real canonical job and one source record were created through one completed UI import; three additional batches are unconfirmed preview audit records and are not jobs/imported duplicates. Current local-live classification is `SUPERVISED LOCAL INTAKE ALPHA`. Local Live Alpha is ready within that narrow boundary; Personal Live Beta, Personal Live V1 and hosted production are not ready.
 - Publication handoff: commit and push only the safe activation/master-plan scope, audit the resulting local/remote commit and PR surfaces, confirm final-head CI, and leave the new PR unmerged. The final PR number, head, and CI result are reported directly to the owner after publication rather than committed, avoiding a recursive checkpoint-commit loop. Human review of that PR is the next gate; no R1-R11 implementation is authorised by this checkpoint.
+
+# Personal Live Beta Core implementation blueprint
+
+- Status: `IN_PROGRESS`.
+- Approved scope: the owner's combined Beta Core implementation task, stages 0-64, without automatic merge of the final implementation pull request.
+- Implementation branch: `feat/personal-live-beta-core`.
+- Fresh base: PR #9 was reverified at its approved head with a clean merge state, successful required checks, no review threads, and a private-data-safe diff. It merged normally on 2026-09-07 as `471ab1055743249ff51a46d7187e541d0b5008af`. Local `main` then matched `origin/main`; this branch was created from that exact merge.
+- Baseline result: Phase 2.5A is `COMPLETE`; supervised Local Live Alpha is available with the recorded extraction and calibration limitations. The Personal Live V1 blueprint is the approved baseline. Personal Live Beta is in development. Personal Live V1 and hosted production remain not ready.
+
+## Current implementation state
+
+The repository has a local Next.js 16 UI, candidate truth store, bounded paste/upload importer, two explicit SQLite migrations, profile-versioned eligibility/fit results, an HTML/PDF resume foundation, a basic cover-letter generator, runner/tracker contracts, fictional source fixtures, validation/migration helpers, and read-only CI. One owner-supplied job is preserved in the ignored local database with one source record, one eligibility result, one fit result, and three unconfirmed preview audit records. No application or generated-document rows exist.
+
+Code inspection confirms the Beta gaps:
+
+- generic text parsing is label/section-oriented, searches the whole body for employment type, and does not produce typed requirement spans, field evidence, schedule/hours/geography, or tri-state document requirements;
+- canonical identity is source-scoped and current records are mutable snapshots; there are no immutable source observations, reviewable cross-source clusters, canonical versions, or correction records;
+- eligibility does not classify legal limits, preferences, and employer requirements separately; hours handling conflates weekly preferences and work-right ceilings;
+- fit scoring reads some unverified preferences and all employment evidence, provides no coverage/confidence model, and has no local calibration harness;
+- ten resume enum values share one general data model/renderer, semantic claim entailment is not enforced, page limits are not measured, output paths are not fully confined, and DOCX does not exist;
+- application preparation returns an empty answer list and missing-document names; durable packets, question disclosure decisions, readiness, real lifecycle events, runnable checkpoints, and one-use final consent do not exist;
+- all production URL fetching is disabled, operational doctor/privacy/status/backup/restore/start-stop commands do not exist, Actions use mutable major tags, and the loopback mutation boundary is not yet explicitly origin/session hardened.
+
+## Objective and product boundary
+
+Deliver one coherent, local-first Personal Live Beta Core that improves real-job extraction and matching, provides truthful private documents and application-packet preparation, durable tracking, repeatable local operations/privacy controls, default-disabled Greenhouse and Lever readers, and an executable synthetic-only browser runner with a frozen final-review gate.
+
+The completed Beta may prepare a real application locally, but it may not operate an external employer form without a separately approved target-specific plan. Real submission remains disabled. Every irreversible real submission continues to require a fresh deliberate owner action for one frozen packet; no background, batch, scheduled, timed, implicit-Enter, or reusable consent is permitted.
+
+## Permanent requirements and non-goals
+
+- Candidate-facing content uses only facts validated by the candidate truth store. A fact being true and the owner approving disclosure of that fact are separate states.
+- Unknown, unparsed, conditional, conflicting, expired, stale, unverified, or forbidden information never becomes true, supported, required, satisfied, or recommended by default.
+- Candidate profile data never enters discovery, source identity, deduplication, importer parsing, or external source requests. Real/demo evaluation contexts remain non-interchangeable.
+- No CAPTCHA, MFA, authentication, access-control, bot-detection, rate-limit, robots, site-restriction, or destination-control bypass; no stealth, proxy rotation, hidden endpoint replay, credential capture, or automated login.
+- No real background discovery or application. Greenhouse/Lever readers are GET-only, owner-started, tenant-allowlisted, strictly bounded, default-disabled, and independently stoppable.
+- No real browser runner or external form interaction in this implementation. The executable runner operates only against the repository's synthetic loopback application site. Real-runner capability reports `TARGET_APPROVAL_REQUIRED`.
+- No private profile, real vacancy, SQLite/WAL/SHM/backup, personal document, answer, browser state, cookie, credential, allowlist, or calibration label enters Git, CI, build traces, test recordings, pull-request text, or public documentation.
+- Existing local rows and files are preserved. No automatic migration, destructive cleanup, direct real-SQL repair, silent replacement, or output overwrite.
+- npm `private: true` remains unchanged. No hosted deployment, tunnel, public bind, paid required API, primary AI matcher/writer, scheduling, notifications, or broad job-board crawling is included.
+
+## Architecture and data flow
+
+The Beta retains domain ownership outside the web layer and adds versioned contracts at each material boundary:
+
+`owner content or approved tenant GET -> bounded immutable SourceObservation -> inert extraction -> RequirementEvidence + field provenance -> CanonicalJobVersion -> duplicate review -> profile-versioned EvaluationVersion with coverage -> durable shortlist -> verified ClaimSelection -> private DocumentArtifact -> tri-state ApplicationPacket -> synthetic runner checkpoint -> frozen review -> one-use consent -> synthetic result -> append-only application event`
+
+Real local data follows the same contracts but stops at packet preparation. Source readers receive source capability/tenant configuration only; candidate facts are joined after local persistence. All boundary inputs and persisted JSON are Zod-validated. Audit events use typed event-specific allowlists rather than substring key filtering, retaining safe enums such as `PRIVATE_LOCAL_PROFILE` while rejecting nested values/bodies.
+
+### Additive persistence plan
+
+Add the next migration, `0002_personal_live_beta_core.sql`, without rewriting migrations 0000/0001. It will add only versioned/additive structures needed by the approved Beta:
+
+- immutable `source_observations`, canonical `job_versions`, typed `job_field_evidence`, `requirement_evidence`, and audited `job_corrections`;
+- `duplicate_clusters` and `duplicate_cluster_members` with explicit suggested/linked/rejected/split states and retained observations;
+- `evaluation_versions` containing job/profile/rule/weight versions, eligibility class/reasons, fit contributions, coverage/confidence, provenance enum, and stale state;
+- local `calibration_labels` and `calibration_pairs`, never exported by privacy tooling;
+- `job_queue_entries` for durable shortlist/review/preparation state separate from eligibility;
+- immutable `document_artifacts` and `document_approvals`, including type/template/format/path/digest/job/profile/rule versions, claim evidence, layout result, and approval invalidation;
+- `application_packets`, `application_packet_documents`, `application_questions`, `application_answer_versions`, and disclosure decisions;
+- append-only Beta lifecycle `application_events_v2`, plus projections that preserve legacy NEW/REVIEWED/APPLIED evidence while mapping to DISCOVERED/REVIEWING/SUBMITTED;
+- synthetic `application_runs`, `runner_checkpoints`, and expiring single-use `final_action_consents`; no credential or browser-state columns;
+- source `capability_configs` and `discovery_runs` containing only tenant IDs, allowlisted hosts/paths, policy versions, budgets, cursors, counts, and safe errors.
+
+The migration copies/maps existing real job/source/evaluation evidence into new version rows only after an explicit preview, consistent backup, row-count/hash/FK assertions, and owner-authorized `--confirm`. It retains the legacy tables for compatibility and historical evidence. The application never auto-migrates. Rollback uses the protected pre-migration backup or a normal code revert; no down migration drops real rows.
+
+## Staged implementation contract
+
+### Stages 3-9: truthful intake, evidence, observations, and identity
+
+- Close Phase 2.5A as complete in current status wording and clearly distinguish available Local Live Alpha, Beta in development, V1 not ready, and hosted production not ready.
+- Replace ad-wide employment-type searching with precedence-aware, field-local parsing. Add Australian state normalization, location/postcode evidence, exact/relative dates, salary period/range, weekly and fortnightly hours, roster/day/time parsing, typed responsibilities, qualification/licence/check/work-right/vehicle/physical/experience/skills evidence, and tri-state document requirements.
+- Add `RequirementEvidence` with exact bounded span/path, source observation ID, modality `REQUIRED | PREFERRED | CONDITIONAL | UNKNOWN | NEGATED`, condition, certainty, extractor version, and stable rule ID. Empty extraction means incomplete coverage, never no requirements.
+- Preserve complete local source text for side-by-side review while browser DTOs use bounded escaped views. Show original source versus normalized value, evidence/modality/confidence, user correction, missing/unparsed fields, and stale/version state.
+- Create immutable observations on each accepted source version. Corrections overlay, never mutate, original evidence and record actor/reason/timestamp/hash without raw values in public audit output.
+- Treat `(source, tenant, externalId)` as observation identity. Cross-source canonical linking requires exact application target/requisition plus consistent corroboration; uncertain pairs enter a reversible review cluster. Similar title alone never auto-merges; changed reposts preserve history.
+
+### Stages 10-17: eligibility, fit, coverage, calibration, and queue
+
+- Classify each decision input as `LEGAL_LIMIT`, `CANDIDATE_PREFERENCE`, or `EMPLOYER_REQUIREMENT`; retain evidence version/effective dates/units. Preferences rank or require an explicit owner rule but never waive law or employer requirements.
+- Keep weekly and fortnightly units separate. Model current work-right ceiling independently from preferred hours and already-worked/period context. No implicit weekly conversion establishes legal compliance. Unknown legal evidence is review-required.
+- Add overnight and week-boundary schedule handling, timezone, dated exceptions, verified fixed commitments, unknown roster review, and date/start/expiry checks.
+- Cover work rights, legal hours, candidate hours, qualifications, licences and jurisdiction/expiry, own vehicle versus commute, availability, location/commute, experience, certifications, physical demands, age, contradictions, negation, and conditional statements with stable reason codes and synthetic matrix tests.
+- Replace broad audit-key filtering with per-event schemas so safe `PRIVATE_LOCAL_PROFILE`/engine/profile-version enums survive and any candidate values, paths, snapshots, hashes exposed to the browser, or raw job content fail validation.
+- Fit uses only verified facts and verified preferences. Unverified employment is excluded. Score and ranking report input coverage/confidence and missing/ambiguous dimensions. Ineligible jobs cannot be recommended irrespective of score.
+- Add a local-only calibration harness for golden labels and pairwise rankings, rule/weight version comparison, sensitivity and monotonicity. Private labels stay ignored; committed tests are fictional. Do not claim calibration targets from the existing single real job.
+- Add a durable real-job queue with review/shortlist/skip/preparing states, stale evaluation visibility, filters, and audited owner actions. Job detail shows source/evidence comparison, duplicate review, evaluation version/provenance, reasons, contributions, coverage, missing inputs, and preparation entry points.
+
+### Stages 18-25: truthful private documents
+
+- Implement genuinely differentiated strategies for all ten named templates, with category-specific evidence priorities/section ordering while sharing a safe renderer. All substantive summary, skill, experience, project, education, achievement, availability, and work-right text is created by allowlisted transformations from verified facts and retains fact IDs.
+- The claim validator proves both reference validity and transformation/entailment; arbitrary prose paired with a valid fact ID fails. Forbidden/unsupported claims are checked across every field and heading.
+- Enforce Australian English, selectable ATS text, black Times-compatible typography, minimum 10 pt, real bullets, no images/graphics/sidebar/skill bars/photo, one-page casual target, and two-page engineering maximum. Deterministically trim lower-priority evidence before overflow and never shrink below the floor.
+- Confine output beneath an ignored private document root using resolved/real paths; reject traversal, UNC, ADS, junction/symlink escape, Windows reserved names, unsafe characters and collisions. Create new versioned files without overwriting.
+- Keep PDF and add an audited, maintained DOCX dependency with explicit style/paragraph structure. Validate page/text/font/reading order for PDF and structure/text parity for DOCX. No real artifact appears in CI.
+- Add private document preview/generation/approval/invalidation UI. Cover letters use exact reviewed employer/role, at most three verified evidence links, tri-state requirement, owner tone, concise output, shared claim safety, PDF/DOCX only when required/requested, and immutable approval versions.
+- Perform one real private CV smoke for the preserved job only after code, migration, and privacy gates pass; do not publish content, names, hashes, screenshots, or path. Owner approval is local and does not authorize upload.
+
+### Stages 26-32: packets and durable tracking
+
+- Build immutable application packets from current canonical job/evaluation/profile, approved CV, optional/required letter, document checklist, target URL/domain, question versions, answer versions, and disclosure decisions.
+- Answer states remain `VERIFIED_ANSWER`, `USER_CONFIRMATION_REQUIRED`, and `UNKNOWN`. Truth and permission to disclose are separate. Sensitive, demographic, health, background, work-right, salary, availability, and start-date questions never default to affirmative or disclosed.
+- `READY_TO_APPLY` requires current versions, approved CV, required approved letter/documents, no blocking unknown answer, valid destination, unexpired requirements, no duplicate danger, and eligibility other than `INELIGIBLE`. Any dependency change invalidates readiness.
+- Prepare a private packet for the preserved real job locally. Unanswered questions remain unknown; `PREPARING` or `REVIEW_REQUIRED` is acceptable and must not be coerced to ready.
+- Implement lifecycle `DISCOVERED -> REVIEWING -> SHORTLISTED -> PREPARING -> READY_TO_APPLY -> APPLICATION_IN_PROGRESS -> READY_FOR_FINAL_REVIEW -> SUBMITTED -> ASSESSMENT/INTERVIEW -> OFFER/REJECTED`, with WITHDRAWN/EXPIRED branches and PAUSED/OUTCOME_UNKNOWN run states. Events are append-only, transactional, actor/timestamp/versioned, idempotent, and retain legacy evidence.
+- Replace fixture-only applications UI with real local packet/status timelines, filters, missing-input/recovery views, owner-entered outcome attribution, and explicit empty/loading/error states.
+
+### Stages 33-41: security and local operations
+
+- Enforce loopback binding plus explicit Host/Origin validation, foreign-origin mutation denial, forwarded-host distrust unless explicitly configured, local session/CSRF nonce binding, replay protection, safe no-store responses, and tests for DNS-rebinding/cross-port/foreign-origin cases. Loopback is not treated as authentication.
+- Centralize confined path creation/read/write with root allowlists, `realpath`/parent checks, no-follow/create-new semantics, safe permissions where supported, and platform-focused traversal/junction/ADS/reserved-name/collision tests.
+- Implement `privacy:audit` with safe paths/commit IDs/categories only, scanning index, tracked tree, all refs/history, PR diff, ignored-boundary probes, build/traces/maps/test artifacts, output roots, and configured CI artifacts. Never print matching values.
+- Implement read-only `doctor`, `db:status`, `migration:status`, `preflight`, and `release:check`; a complete `quality` command; consistent SQLite `backup` and preview/confirm `restore`; and owned loopback `local:start`/`local:stop` with PID ownership, collision/root/bind checks, no auto-migration, no unrelated process termination, and no data deletion.
+- Backup uses stopped writers or SQLite's consistent snapshot API, a confined ignored destination, create-new behavior, integrity/FK/schema/count manifest, and no overwrite. Restore verifies into a new location first and requires a separate exact-target owner confirmation.
+- Pin GitHub Actions dependencies to immutable commit SHAs with represented tags documented in comments, preserve read-only permissions and no artifact upload, and test/update lockfile/dependency policy without weakening npm publication guards.
+
+### Stages 42-46: default-disabled Greenhouse and Lever readers
+
+- Add source-specific official GET-only clients behind the existing adapter contract. Greenhouse supports owner-configured board token and list/detail only; Lever supports owner-configured region/site and list/detail pagination only. Application POST endpoints are absent and method guards reject every non-GET.
+- Configuration is accepted only from ignored `data/private/source-allowlist.json`, validated with exact source/tenant/host/path/policy version/expiry/budget and explicit owner approval. Missing, invalid, expired, or unapproved configuration reports `SOURCE_READY_AWAITING_TENANT`/disabled without network.
+- Use HTTPS, exact host/path, no userinfo/cookies/auth/referrer/candidate data, public-address resolution before connection and redirects, redirect revalidation, byte/time/page/record/request budgets, one in-flight request per tenant, honest user agent, bounded retries, `Retry-After`, 401/403/429/security stops, cursor-loop termination, and immutable local observations.
+- If the private allowlist exists and explicitly approves a tenant, perform at most one owner-started bounded read-only smoke for that configured source. Otherwise perform no live call and report waiting for an approved tenant. Never enumerate tenants or substitute a public company opportunistically.
+- Discovery UI shows effective capabilities, disabled/waiting reason, policy expiry, owner-started controls and safe counts/errors; it never exposes the allowlist path/body or implies continuous discovery. There is no scheduler.
+
+### Stages 47-51: executable synthetic runner and final gate
+
+- Implement a local runner state machine and synthetic loopback application site only: prepared, opened, mapped, filled, paused/review, final review, synthetic submitted, or outcome unknown. Checkpoints are durable and resumable without storing credentials/session state.
+- Map only approved packet values; unknown/sensitive questions pause. Validate target/form action at every navigation. Upload only the approved synthetic document digest. Stop on CAPTCHA, MFA, auth, bot detection, 401/403, rate limit, site restriction, page/form/version/destination changes, and any unsupported field. No bypass or automatic resume.
+- Freeze the exact packet, host/form version, documents/digests, answers, disclosures, and unresolved state for final review. Generate an expiring, single-use consent only when no blockers remain. Changed/expired/replayed consent causes zero clicks; a valid fixture causes exactly one synthetic irreversible click.
+- A lost response writes `OUTCOME_UNKNOWN` and never retries automatically. Real target capability remains `TARGET_APPROVAL_REQUIRED`; no external site/browser profile/authentication/upload/submit smoke is authorized.
+
+### Stages 52-58: UX, migration, preserved real workflow, and security suite
+
+- Update all eight routes with truthful mode separation, real queue/packets/timelines, clear missing/stale/error states, and effective source/runner/operation status. Keep demo content explicitly isolated and off the real-job default view.
+- Meet keyboard/focus/error-summary/status-announcement/label/contrast/200%-zoom/narrow-viewport/long-content requirements with fictional browser tests. Do not create real-data screenshots or traces.
+- Apply migration 0002 to a synthetic upgrade first. For the real database: stop owned processes, preview, verify backup confinement/ignore, explicitly confirm, assert legacy counts/relationships/content digests, apply, run FKs/integrity, and preserve the original backup. Never edit real rows by hand.
+- Re-evaluate the preserved real job through the public domain/repository service, creating a new evaluation version while retaining its historical Phase 2.5A evaluation. Verify private provenance and truthful evidence/coverage without printing job/profile values.
+- Run the real local Beta path only through supported UI/services: review/shortlist, generate one private CV, optional cover letter only if locally appropriate, prepare one packet, leave unknowns unresolved, and stop before any employer form. No external upload, source fetch except separately approved read-only tenant smoke, browser application, or submission.
+- Add executable security fixtures for every listed content, host/origin, SSRF/DNS, path, token/session, audit, claim, stale-version, duplicate, migration/backup, runner-stop, consent replay, lost-response, and build/publication boundary. Automated data remains fictional.
+
+### Stages 59-64: validation, audit, documentation, and handoff
+
+- Run formatting, lint, strict typecheck, unit, integration, security, migration, document-layout/DOCX, synthetic-runner/browser, production build, full/production dependency audits, privacy audit, doctor/status/preflight, backup/restore rehearsal, local start/stop, diff/fsck/history checks, and final-head CI. Record every failure and fix; no skipped gate is called pass.
+- Repeat the public-repository privacy audit against private profile, vacancy, database/backups, generated documents, answer/calibration/allowlist/browser state, build artifacts, refs/history, PR body/diff, logs and CI artifacts without emitting values.
+- Update README, architecture, security, Personal Live V1, go-live checklist, source matrix, threat model, runbook, and this plan to distinguish implemented, disabled/waiting, synthetic-only, and still-blocked behavior.
+- Classify manual-intake Beta separately from source-enabled Beta and V1. The likely safe terminal states are manual-intake Beta ready after all local gates, source-enabled Beta waiting unless a tenant is privately approved, and V1 not ready because the real runner remains target-approval-required.
+- Commit by concern, push one branch, open one large implementation PR into `main`, verify its exact head and required checks, and leave it unmerged for direct ChatGPT/human review. Do not merge, deploy, enable a real target, or delete private/runtime data.
+
+## Expected source and file changes
+
+- Domain: extend `job-model`, `job-importer`, `job-normalizer`, `candidate-profile`, `eligibility-engine`, `fit-scorer`, `resume-engine`, `cover-letter-engine`, `application-runner`, and `application-tracker` with versioned schemas/services and focused tests.
+- Persistence: migration 0002, schema exports, Beta repositories for observations/evidence/evaluations/queue/artifacts/packets/events/runs/capabilities, explicit migration/status/backup/restore support, and synthetic upgrade/recovery tests.
+- Sources: `job-sources` Greenhouse/Lever readers, common safe HTTP transport, allowlist/capability schemas, fixtures/contract/security tests; no application client.
+- Web: server-only Beta service boundary; loopback/origin/session guards; all eight route views/actions/components; local synthetic application route accessible only in the synthetic test mode; Next.js code follows the installed version's documentation.
+- Operations: root scripts for doctor, status, privacy, quality, backup/restore, preflight/release, and owned start/stop; package scripts and hardened workflow pins.
+- Documents/tests/docs: ten fictional CV golden cases, DOCX/PDF/layout checks, application/synthetic-runner fixtures, security fixtures, and reality/status documentation. Private artifacts and source configuration use only already-ignored or newly narrow ignored local paths.
+
+## Dependency policy
+
+Before adding a DOCX library, inspect current official package metadata, licence, maintenance activity, dependency tree, Node 24 support, and advisories. Pin the selected exact version and audit both full and production graphs. Prefer no other new runtime dependency. Source HTTP uses Node's built-in facilities with dependency injection; SQLite and Playwright remain existing dependencies. Any unavoidable package or Action change is documented with represented version/tag and rollback.
+
+## Testing strategy and acceptance criteria
+
+Acceptance requires all stage-specific checks above plus:
+
+- deterministic, evidence-preserving extraction across fictional plain text, HTML, JSON-LD, Workday-like, Greenhouse-like, Lever-like, casual/part-time/full-time/contract/internship, negated, conditional, contradictory, long, malformed, and missing-field cases;
+- immutable observation and evaluation history, reversible human duplicate decisions, same-source/cross-source idempotency, and no loss of the existing real row relationships;
+- zero unverified/unknown/forbidden evidence used for positive eligibility, score, claim, answer, readiness, or synthetic form mapping;
+- all ten templates materially differ in ordering/priorities and pass semantic-claim, ATS, page, text, DOCX parity, path, version/approval and private-output gates;
+- packets correctly block stale/missing/unapproved documents, expired job evidence, duplicate danger, invalid destinations, ineligibility, unknown required answers, and undisclosed facts;
+- application event projections are reproducible and cannot erase or reverse a real submission; synthetic lost outcomes never retry;
+- source clients cannot issue write requests, use unapproved tenants, send candidate data, escape hosts/addresses/budgets, or continue after auth/rate/security stops;
+- foreign-origin/host/replay mutations fail; path/junction/traversal/collision escapes fail; audit/log/build/CI serialization cannot contain private canaries;
+- the existing private profile, vacancy, database, one canonical job/source/evaluation chain, and unconfirmed preview evidence remain preserved; the new real evaluation/document/packet smoke stays local and no employer form is touched;
+- final local gates and exact-head CI pass, the public PR contains source/fictional tests/safe documentation only, and the implementation PR remains open and unmerged.
+
+## Risks and mitigations
+
+- Large combined scope can create incompatible partial states. Work in concern commits and stop only at a compiling/test-safe checkpoint; record completed/remaining stages and continue on this same branch rather than claiming completion.
+- Extraction false positives can change legal or application meaning. Preserve exact spans/modalities, expose coverage, require review, and keep legacy/raw evidence.
+- Migration can corrupt the single real local history. Exercise synthetic upgrades first, stop writers, create/verify a consistent ignored backup, compare counts/hashes/FKs, and retain the original.
+- Document generation can overclaim or leak identity. Use controlled transformations, all-field validation, private path confinement, no real test recordings, and local approval/version invalidation.
+- Source reads can violate scope or expose local networks. Remain default-disabled, require private allowlist approval, GET-only exact routes, address/redirect checks and conservative stop budgets.
+- Loopback/browser actions can be induced cross-origin or repeated. Bind local session/origin/form versions, use one-use tokens, and deny any changed context.
+- Public-source history cannot be recalled. Run repeatable privacy audits before every push and stop publication on any unexplained finding.
+
+## Rollback and continuation strategy
+
+Repository changes remain isolated on the feature branch and can be reverted by concern or closed unmerged. New capabilities default disabled; disable the individual source, document, packet, runner, or mutation surface without deleting observations/events. Keep existing and migrated private databases/backups intact. Restore only after a separate preview and exact owner confirmation. Never auto-retry an unknown submission, rewrite shared history, or delete private artifacts to simplify rollback.
+
+If a turn/runtime limit prevents completion, update this section with exact completed stages, commands, failures, private-smoke status, and remaining work; commit and push a coherent compiling/test-safe checkpoint; and continue on `feat/personal-live-beta-core`. Do not open a misleading complete PR.
+
+## Exact implementation order
+
+1. Commit this blueprint/status checkpoint before application code.
+2. Read the applicable installed Next.js 16 documentation; research/pin the DOCX dependency and current official Greenhouse/Lever contracts; resolve immutable Action SHAs.
+3. Implement extraction/evidence/observation/dedup contracts and migration/repositories with synthetic upgrade tests.
+4. Implement eligibility/fit/coverage/calibration/queue semantics and UI with regressions.
+5. Implement claims, ten templates, private PDF/DOCX artifacts, cover letters, approval UI and fictional layout verification.
+6. Implement packets, disclosure-aware tri-state answers, readiness, lifecycle/event projection and applications UI.
+7. Implement loopback/session/path hardening and operational commands, backup/restore rehearsal, privacy tooling and workflow pinning.
+8. Implement default-disabled Greenhouse/Lever GET readers and perform no tenant call unless the ignored approved allowlist permits one bounded smoke.
+9. Implement the synthetic site/runner, stop conditions, frozen review and one-use final gate; retain real target disabled.
+10. Apply the additive migration to the preserved real database only after synthetic gates and explicit backup/confirmation; re-evaluate and run the approved local private document/packet smoke without employer interaction.
+11. Complete all-route UX/accessibility/security/browser tests and the full validation/privacy/publication matrix.
+12. Update reality documentation, create focused commits, push, open one implementation PR, verify exact-head CI, and stop without merging.
