@@ -1,6 +1,6 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-07  
+Last updated: 2026-09-07
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
 Working branch: `fix/resolve-local-runtime-data`
@@ -1831,12 +1831,12 @@ Do not tune scoring during this smoke test. Record non-blocking calibration obse
 
 Run the blueprint privacy audit without printing candidate/job values: clean Git status; profile/database/WAL/SHM/timestamped backups ignored and untracked; no private profile in logs, traces, screenshots, browser storage, HTML/source maps, Git, CI, or audit bodies; no real raw advert in Git/logs/traces/CI/audits; no job-board request; no document/application/form-fill/status/submission action. Do not retain real-data screenshots or traces.
 
-Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
+Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
 ```
 
 # Phase 2.5A runtime data-path bugfix
 
-Status: `IN_PROGRESS`. Started 2026-09-07 on `fix/resolve-local-runtime-data`, from fresh `origin/main` at approved PR #7 merge `6f42b8f1edd5813d34c398aad56248555fae044d`. Work occurs in an isolated worktree with no real profile, vacancy, or database. The activation branch and its ignored local data remain preserved.
+Status: `AWAITING_HUMAN_REVIEW`. Started 2026-09-07 on `fix/resolve-local-runtime-data`, from fresh `origin/main` at approved PR #7 merge `6f42b8f1edd5813d34c398aad56248555fae044d`. Work occurs in an isolated worktree with no real profile, vacancy, or database. The activation branch and its ignored local data remain preserved.
 
 ## Problem, objective, and reproduction
 
@@ -1864,3 +1864,18 @@ Launch directory -> validated repository manifest -> repository `data` -> existi
 5. Verify only intended source/docs enter the diff and that the original activation data is unchanged; push and open an unmerged bugfix PR, wait for final-head CI, and stop for human review.
 
 Acceptance requires consistent root/workspace resolution, safe missing/invalid behavior, no implicit data creation or migration, passing local/CI gates, and no real-data artifact in the worktree/PR. Rollback is a normal revert or closing the unmerged PR; never delete or modify the original local profile/database. Phase 2.5A remains blocked pending bugfix review/merge and the still-unfinished real preview, import, evaluation, privacy audit, and activation gates.
+
+### Build-tracing refinement
+
+The first production build succeeded but warned that dynamic filesystem paths could trace the whole project into deployment output. Private runtime files must never be packaged. Apply the installed Next.js compiler's documented `turbopackIgnore` call annotation to these deliberate runtime-only filesystem/path operations and avoid redundant path resolution of the already-absolute working directory. Rebuild and inspect output trace manifests; use fictional ignored sentinel files to verify that local profile/database/private paths are absent. This is required to preserve the original privacy boundary, not an acceptance of the warning.
+
+## Bugfix execution results
+
+- Blueprint committed before runtime changes as `837a955`. Five fictional path regressions cover both launch locations, workspace decoys, missing root data, filename traversal/override, and an unrecognized root. The old implementation failed the workspace, decoy, override, and unrecognized-root expectations. Cold module-graph imports also initially exceeded test/hook timeouts; imports were moved outside the timed assertions with a bounded startup hook, and all five cases plus the two existing provider tests then passed.
+- The first `npm.cmd ci` attempted a native `node-gyp` rebuild and failed because Visual Studio C++ build tools are unavailable on this Windows host. A test retry while dependencies were incomplete failed to load its configuration. `npm.cmd ci --ignore-scripts` subsequently installed the unchanged lockfile successfully; the packaged SQLite native binary passed an in-memory query, and the final test runner was the locked Vitest `4.1.11`. No dependency/lockfile change or native toolchain installation is included.
+- The fresh worktree's Windows CRLF checkout caused the first formatting check to flag 146 files. `npm.cmd run format` normalized them; Git normalization confirmed that only the seven intended source/documentation files differ. A blueprint whitespace issue was corrected. No unrelated source changes were retained.
+- Final local gates: `npm.cmd run format:check`, `npm.cmd run lint`, and `npm.cmd run typecheck` passed. `npm.cmd test` passed 92 unit/security tests across 18 files; `npm.cmd run test:integration` passed 9 tests across 3 files. `npm.cmd run build` passed with 31 generated segments and no dynamic-filesystem tracing warnings after the refinement. `npm.cmd run test:e2e` passed all 9 fictional browser tests from the workspace launch directory. Both `npm.cmd audit` and `npm.cmd run audit:production` reported 0 vulnerabilities. `git diff --check` passed. E2E emitted only the existing non-fatal color-environment warnings.
+- Build privacy: three ignored fictional profile/private/database sentinels were present for the rebuilt artifact check. All 12 output trace manifests contained zero private runtime entries; the build contained zero sentinel-content matches. The three test files were removed after verification.
+- Production runtime proof: start the built app through the npm web workspace with a temporary valid fictional root profile. `/profile` returned HTTP 200 and `Private profile loaded`, while the unique fictional profile ID/name/email sentinels were absent from rendered HTML. The server was stopped and the temporary fictional profile removed; ports 3000, 3100, and 3200 have no listeners.
+- Real-data isolation: no real profile or vacancy was copied to this worktree. A non-disclosing scan of its 153 tracked files found zero matches for checked private contact/name/vacancy needles. The original runtime paths remain ignored; its database integrity is valid, with zero jobs, source records, import batches/records, eligibility/fit rows, applications, or generated documents. Repository visibility remains `PRIVATE`.
+- Handoff: open an unmerged bugfix PR and report its final-head CI result separately to avoid a recursive checkpoint-commit loop. Only this path-resolution defect is addressed. The complete real vacancy remains locally available, but its manual preview, import, evaluation, and final activation audit are unfinished. Review/merge this fix before refreshing and resuming the activation branch. No real source access, application action, or Phase 2.6 work occurred.

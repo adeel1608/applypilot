@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type BetterSqlite3 from "better-sqlite3";
 
 import { JobImportRepository, openApplyPilotDatabase } from "@applypilot/database";
+import { resolveLocalDataDirectory } from "./local-data-directory";
 
 type Connection = ReturnType<typeof openApplyPilotDatabase>;
 let connection: Connection | null | undefined;
@@ -15,7 +16,8 @@ function databasePath(): string {
   if (!/^[A-Za-z0-9._-]+\.sqlite$/.test(filename)) {
     throw new Error("INVALID_LOCAL_DATABASE_FILENAME");
   }
-  return join(process.cwd(), "data", filename);
+  // Local database files must not enter the deployment trace.
+  return join(/* turbopackIgnore: true */ resolveLocalDataDirectory(), filename);
 }
 
 function hasImportSchema(sqlite: BetterSqlite3.Database): boolean {
@@ -29,7 +31,7 @@ function hasImportSchema(sqlite: BetterSqlite3.Database): boolean {
 export function getLocalDatabase(): Connection | null {
   if (connection !== undefined) return connection;
   const path = databasePath();
-  if (!existsSync(path)) {
+  if (!existsSync(/* turbopackIgnore: true */ path)) {
     connection = null;
     return null;
   }
