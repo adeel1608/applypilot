@@ -539,26 +539,11 @@ export function resumeFileName(profile: CandidateProfile, company: string): stri
     .replaceAll("{company}", company.replace(/[<>:"/\\|?*]/g, "").trim());
 }
 
-export async function renderResumePdf(document: ResumeDocument, outputPath: string): Promise<void> {
-  const { chromium } = await import("playwright");
-  await mkdir(dirname(outputPath), { recursive: true });
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(renderResumeHtml(document), { waitUntil: "load" });
-    await page.pdf({
-      path: outputPath,
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-      tagged: true,
-    });
-  } finally {
-    await browser.close();
-  }
-}
-
-export function assertPrivateDocumentOutputPath(outputPath: string, privateRoot: string): string {
+function assertPrivateOutputPath(
+  outputPath: string,
+  privateRoot: string,
+  extension: ".docx" | ".pdf",
+): string {
   const root = resolve(privateRoot);
   if (isAbsolute(outputPath)) throw new Error("ABSOLUTE_DOCUMENT_OUTPUT_FORBIDDEN");
   const segments = outputPath.split(/[\\/]+/);
@@ -584,8 +569,54 @@ export function assertPrivateDocumentOutputPath(outputPath: string, privateRoot:
   if (!fromRoot || fromRoot.startsWith(`..${sep}`) || fromRoot === ".." || isAbsolute(fromRoot)) {
     throw new Error("DOCUMENT_OUTPUT_OUTSIDE_PRIVATE_ROOT");
   }
-  if (extname(target).toLowerCase() !== ".docx") throw new Error("DOCX_OUTPUT_REQUIRED");
+  if (extname(target).toLowerCase() !== extension) {
+    throw new Error(extension === ".docx" ? "DOCX_OUTPUT_REQUIRED" : "PDF_OUTPUT_REQUIRED");
+  }
   return target;
+}
+
+export function assertPrivateDocumentOutputPath(outputPath: string, privateRoot: string): string {
+  return assertPrivateOutputPath(outputPath, privateRoot, ".docx");
+}
+
+export function assertPrivatePdfOutputPath(outputPath: string, privateRoot: string): string {
+  return assertPrivateOutputPath(outputPath, privateRoot, ".pdf");
+}
+
+async function preparePrivateOutputTarget(target: string, privateRoot: string): Promise<void> {
+  const root = resolve(privateRoot);
+  await mkdir(root, { recursive: true });
+  await mkdir(dirname(target), { recursive: true });
+  const resolvedRoot = await realpath(root);
+  const resolvedParent = await realpath(dirname(target));
+  const fromRoot = relative(resolvedRoot, resolvedParent);
+  if (fromRoot.startsWith(`..${sep}`) || fromRoot === ".." || isAbsolute(fromRoot)) {
+    throw new Error("DOCUMENT_OUTPUT_SYMLINK_ESCAPE");
+  }
+}
+
+export async function renderResumePdf(
+  document: ResumeDocument,
+  outputPath: string,
+  privateRoot: string,
+): Promise<void> {
+  const target = assertPrivatePdfOutputPath(outputPath, privateRoot);
+  await preparePrivateOutputTarget(target, privateRoot);
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(renderResumeHtml(document), { waitUntil: "load" });
+    const bytes = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+      tagged: true,
+    });
+    await writeFile(target, bytes, { flag: "wx" });
+  } finally {
+    await browser.close();
+  }
 }
 
 function docxSectionHeading(text: string, typeface: string): Paragraph {
@@ -675,13 +706,6 @@ export async function renderResumeDocx(
     ],
   });
   const root = resolve(privateRoot);
-  await mkdir(root, { recursive: true });
-  await mkdir(dirname(target), { recursive: true });
-  const resolvedRoot = await realpath(root);
-  const resolvedParent = await realpath(dirname(target));
-  const fromRoot = relative(resolvedRoot, resolvedParent);
-  if (fromRoot.startsWith(`..${sep}`) || fromRoot === ".." || isAbsolute(fromRoot)) {
-    throw new Error("DOCUMENT_OUTPUT_SYMLINK_ESCAPE");
-  }
+  await preparePrivateOutputTarget(target, root);
   await writeFile(target, await Packer.toBuffer(docx), { flag: "wx" });
 }

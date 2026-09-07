@@ -15,6 +15,7 @@ test("exposes every synthetic stop fixture only on loopback", async ({ page }) =
   for (const [fixture, reason] of [
     ["captcha", "CAPTCHA"],
     ["mfa", "MFA"],
+    ["auth-required", "AUTHENTICATION_REQUIRED"],
     ["access-denied", "ACCESS_CONTROL"],
     ["rate-limit", "RATE_LIMIT"],
   ] as const) {
@@ -22,6 +23,43 @@ test("exposes every synthetic stop fixture only on loopback", async ({ page }) =
     await expect(page.locator(`[data-stop-reason="${reason}"]`)).toBeVisible();
   }
   expect(externalRequest).toBe(false);
+});
+
+test("exposes changed and unsupported controls and bounded response outcomes", async ({ page }) => {
+  await page.goto("/synthetic-application?case=changed-field");
+  await expect(page.locator('[data-form-change="FIELD_ADDED"]')).toBeVisible();
+  await page.goto("/synthetic-application?case=unsupported-control");
+  await expect(page.locator("[data-unsupported-control]")).toBeVisible();
+
+  for (const [fixture, status, reason] of [
+    ["http-401", 401, "AUTHENTICATION_REQUIRED"],
+    ["http-403", 403, "ACCESS_CONTROL"],
+    ["http-429", 429, "RATE_LIMIT"],
+  ] as const) {
+    const response = await page.request.post(`/synthetic-application/submit?case=${fixture}`, {
+      headers: { origin: "http://127.0.0.1:3100" },
+      multipart: { formVersion: "synthetic-form-v1" },
+    });
+    expect(response.status()).toBe(status);
+    expect(await response.json()).toEqual({ status: "PAUSED", reason });
+  }
+
+  const started = Date.now();
+  const slow = await page.request.post("/synthetic-application/submit?case=slow-response", {
+    headers: { origin: "http://127.0.0.1:3100" },
+    multipart: { formVersion: "synthetic-form-v1" },
+  });
+  expect(Date.now() - started).toBeGreaterThanOrEqual(250);
+  expect(slow.ok()).toBe(true);
+
+  const receipt = await page.request.post("/synthetic-application/submit?case=success-receipt", {
+    headers: { origin: "http://127.0.0.1:3100" },
+    multipart: { formVersion: "synthetic-form-v1" },
+  });
+  expect(await receipt.json()).toMatchObject({
+    status: "SYNTHETIC_SUBMITTED",
+    receipt: "fixture-receipt-001",
+  });
 });
 
 test("submits exactly the fictional local simple form", async ({ page }) => {

@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -31,6 +32,19 @@ export interface BackupManifest extends DatabaseSnapshot {
   byteLength: number;
   sha256: string;
 }
+
+const BackupManifestSchema = z.object({
+  version: z.literal(1),
+  backupId: BackupIdSchema,
+  fileName: z.string().regex(/^backup-[0-9TZ.-]+-[a-f0-9]{8}\.sqlite\.backup$/),
+  createdAt: z.iso.datetime(),
+  byteLength: z.number().int().positive(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  schemaVersion: z.number().int().nonnegative(),
+  integrity: z.enum(["PASS", "FAIL"]),
+  foreignKeyIssues: z.number().int().nonnegative(),
+  tableCounts: z.record(z.string().regex(/^[A-Za-z0-9_]+$/), z.number().int().nonnegative()),
+});
 
 function safeTables(sqlite: BetterSqlite3.Database): string[] {
   return (
@@ -89,6 +103,11 @@ function backupPaths(backupRoot: string, backupId: string) {
   };
 }
 
+function assertBackupLocationForDatabase(databasePath: string, backupRoot: string): void {
+  const expected = resolve(dirname(resolve(databasePath)), "private", "backups");
+  if (resolve(backupRoot) !== expected) throw new Error("BACKUP_ROOT_DOES_NOT_MATCH_DATABASE");
+}
+
 function assertDatabaseQuiescent(databasePath: string): void {
   const sqlite = new BetterSqlite3(databasePath, { fileMustExist: true, timeout: 1_000 });
   try {
@@ -116,6 +135,7 @@ export async function createDatabaseBackup(input: {
   now?: Date;
   randomSuffix?: string;
 }): Promise<BackupManifest> {
+  assertBackupLocationForDatabase(input.databasePath, input.backupRoot);
   const now = input.now ?? new Date();
   const suffix = input.randomSuffix ?? randomUUID().replaceAll("-", "").slice(0, 8);
   if (!/^[a-f0-9]{8}$/.test(suffix)) throw new Error("INVALID_BACKUP_SUFFIX");
@@ -126,33 +146,39 @@ export async function createDatabaseBackup(input: {
   if (sourceBefore.integrity !== "PASS" || sourceBefore.foreignKeyIssues) {
     throw new Error("SOURCE_DATABASE_INVALID");
   }
-  const source = new BetterSqlite3(input.databasePath, { readonly: true, fileMustExist: true });
   try {
-    await source.backup(paths.database);
-  } finally {
-    source.close();
+    const source = new BetterSqlite3(input.databasePath, { readonly: true, fileMustExist: true });
+    try {
+      await source.backup(paths.database);
+    } finally {
+      source.close();
+    }
+    const backup = inspectDatabase(paths.database);
+    if (
+      backup.integrity !== "PASS" ||
+      backup.foreignKeyIssues ||
+      backup.schemaVersion !== sourceBefore.schemaVersion ||
+      JSON.stringify(backup.tableCounts) !== JSON.stringify(sourceBefore.tableCounts)
+    ) {
+      throw new Error("BACKUP_VERIFICATION_FAILED");
+    }
+    const bytes = readFileSync(paths.database);
+    const manifest = BackupManifestSchema.parse({
+      version: 1,
+      backupId,
+      fileName: basename(paths.database),
+      createdAt: now.toISOString(),
+      byteLength: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      ...backup,
+    });
+    writeFileSync(paths.manifest, JSON.stringify(manifest, null, 2), { flag: "wx", mode: 0o600 });
+    return manifest;
+  } catch (error) {
+    rmSync(paths.database, { force: true });
+    rmSync(paths.manifest, { force: true });
+    throw error;
   }
-  const backup = inspectDatabase(paths.database);
-  if (
-    backup.integrity !== "PASS" ||
-    backup.foreignKeyIssues ||
-    backup.schemaVersion !== sourceBefore.schemaVersion ||
-    JSON.stringify(backup.tableCounts) !== JSON.stringify(sourceBefore.tableCounts)
-  ) {
-    throw new Error("BACKUP_VERIFICATION_FAILED");
-  }
-  const bytes = readFileSync(paths.database);
-  const manifest: BackupManifest = {
-    version: 1,
-    backupId,
-    fileName: basename(paths.database),
-    createdAt: now.toISOString(),
-    byteLength: bytes.byteLength,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
-    ...backup,
-  };
-  writeFileSync(paths.manifest, JSON.stringify(manifest, null, 2), { flag: "wx", mode: 0o600 });
-  return manifest;
 }
 
 export function previewDatabaseRestore(input: {
@@ -160,7 +186,9 @@ export function previewDatabaseRestore(input: {
   backupId: string;
 }): BackupManifest {
   const paths = backupPaths(input.backupRoot, input.backupId);
-  const manifest = JSON.parse(readFileSync(paths.manifest, "utf8")) as BackupManifest;
+  const manifest = BackupManifestSchema.parse(
+    JSON.parse(readFileSync(paths.manifest, "utf8")) as unknown,
+  );
   if (manifest.backupId !== input.backupId || manifest.fileName !== basename(paths.database)) {
     throw new Error("BACKUP_MANIFEST_BINDING_MISMATCH");
   }
@@ -192,6 +220,7 @@ export async function restoreDatabase(input: {
 }): Promise<{ restored: DatabaseSnapshot; recoveryBackupId: string | null }> {
   if (input.confirmation !== `RESTORE:${input.backupId}`)
     throw new Error("RESTORE_CONFIRMATION_REQUIRED");
+  assertBackupLocationForDatabase(input.databasePath, input.backupRoot);
   const manifest = previewDatabaseRestore(input);
   const paths = backupPaths(input.backupRoot, input.backupId);
   const target = resolve(input.databasePath);

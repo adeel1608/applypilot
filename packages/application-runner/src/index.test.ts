@@ -147,4 +147,118 @@ describe("Phase 0/1 application runner", () => {
       }),
     ).toThrow("Target URL host does not match targetHost");
   });
+
+  it.each([
+    "CAPTCHA",
+    "MFA",
+    "AUTHENTICATION_REQUIRED",
+    "ACCESS_CONTROL",
+    "RATE_LIMIT",
+    "UNSUPPORTED_CONTROL",
+  ] as const)("pauses on %s with zero irreversible clicks", (reason) => {
+    const runner = new SyntheticApplicationRunner(readyPacket(), "synthetic-form-v1");
+    expect(runner.stop(reason)).toMatchObject({ state: "PAUSED", stopReason: reason });
+    expect(runner.snapshot().irreversibleClicks).toBe(0);
+  });
+
+  it("allows zero clicks for an unknown mandatory answer", () => {
+    const runner = new SyntheticApplicationRunner(
+      readyPacket({
+        answers: [
+          {
+            questionId: "unknown",
+            questionText: "Unknown mandatory answer",
+            required: true,
+            sensitive: false,
+            value: null,
+            truthState: "UNKNOWN",
+            disclosureState: "UNKNOWN",
+            factReferences: [],
+          },
+        ],
+      }),
+      "synthetic-form-v1",
+    );
+    runner.open();
+    expect(runner.map()).toMatchObject({
+      state: "PAUSED",
+      stopReason: "UNKNOWN_REQUIRED_ANSWER",
+    });
+    expect(runner.snapshot().irreversibleClicks).toBe(0);
+  });
+
+  it.each(["packet", "document", "domain", "form"] as const)(
+    "allows zero clicks when the consent-bound %s changes",
+    (changed) => {
+      const packet = readyPacket();
+      const runner = readyRunner(packet);
+      const consent = runner.createConsent();
+      const originalDigest = packetDigest(packet);
+      if (changed === "document") packet.documents[0]!.digest = "b".repeat(64);
+      if (changed === "packet") packet.profileVersionId = "profile-version:changed";
+      const result = runner.submitSynthetic({
+        token: consent.token,
+        packetDigest: originalDigest,
+        targetHost: changed === "domain" ? "localhost" : "127.0.0.1",
+        formVersion: changed === "form" ? "synthetic-form-v2" : "synthetic-form-v1",
+      });
+      expect(result).toMatchObject({ state: "PAUSED", stopReason: "PAGE_CHANGED" });
+      expect(runner.snapshot().irreversibleClicks).toBe(0);
+    },
+  );
+
+  it("allows zero clicks for expired consent", () => {
+    let now = new Date("2026-09-08T00:00:00.000Z");
+    const packet = readyPacket();
+    const runner = readyRunner(packet, () => now);
+    const consent = runner.createConsent(1);
+    now = new Date("2026-09-08T00:00:01.000Z");
+    expect(
+      runner.submitSynthetic({
+        token: consent.token,
+        packetDigest: packetDigest(packet),
+        targetHost: "127.0.0.1",
+        formVersion: "synthetic-form-v1",
+      }),
+    ).toMatchObject({ state: "PAUSED", stopReason: "CONSENT_EXPIRED" });
+    expect(runner.snapshot().irreversibleClicks).toBe(0);
+  });
+
+  it("records an unknown outcome after one click and never retries", () => {
+    const packet = readyPacket();
+    const runner = readyRunner(packet);
+    const consent = runner.createConsent();
+    expect(
+      runner.submitSynthetic({
+        token: consent.token,
+        packetDigest: packetDigest(packet),
+        targetHost: "127.0.0.1",
+        formVersion: "synthetic-form-v1",
+        responseLost: true,
+      }),
+    ).toMatchObject({ state: "OUTCOME_UNKNOWN" });
+    expect(runner.snapshot().irreversibleClicks).toBe(1);
+    expect(() =>
+      runner.submitSynthetic({
+        token: consent.token,
+        packetDigest: packetDigest(packet),
+        targetHost: "127.0.0.1",
+        formVersion: "synthetic-form-v1",
+      }),
+    ).toThrow("RUN_TERMINAL");
+    expect(runner.snapshot().irreversibleClicks).toBe(1);
+  });
 });
+
+function readyRunner(packet: ApplicationPacket, now?: () => Date): SyntheticApplicationRunner {
+  const runner = new SyntheticApplicationRunner(packet, "synthetic-form-v1", now);
+  runner.open();
+  runner.map();
+  runner.fill({
+    host: "127.0.0.1",
+    formVersion: "synthetic-form-v1",
+    documentDigests: packet.documents.map(({ digest }) => digest),
+  });
+  runner.readyForFinalReview();
+  return runner;
+}

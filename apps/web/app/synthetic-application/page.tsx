@@ -6,11 +6,19 @@ const fixtureCases = [
   "conditional",
   "document-upload",
   "changed-page",
+  "changed-field",
   "redirect",
   "captcha",
   "mfa",
+  "auth-required",
+  "http-401",
+  "http-403",
+  "http-429",
   "access-denied",
   "rate-limit",
+  "unsupported-control",
+  "slow-response",
+  "success-receipt",
   "different-action",
   "lost-response",
 ] as const;
@@ -49,6 +57,11 @@ export default async function SyntheticApplicationPage({
           MFA marker
         </div>
       ) : null}
+      {fixture === "auth-required" ? (
+        <div role="alert" data-stop-reason="AUTHENTICATION_REQUIRED">
+          Authentication required marker
+        </div>
+      ) : null}
       {fixture === "access-denied" ? (
         <div role="alert" data-stop-reason="ACCESS_CONTROL">
           Access denied marker
@@ -76,6 +89,12 @@ export default async function SyntheticApplicationPage({
           Fictional contact email
           <input name="contactEmail" type="email" autoComplete="off" required />
         </label>
+        {fixture === "changed-field" ? (
+          <label>
+            Newly introduced required field
+            <input name="newRequiredField" required data-form-change="FIELD_ADDED" />
+          </label>
+        ) : null}
         {fixture === "required-unknown" ? (
           <label>
             Unsupported required answer
@@ -96,6 +115,12 @@ export default async function SyntheticApplicationPage({
         {fixture === "document-upload" ? (
           <label>
             Approved synthetic document <input type="file" name="document" required />
+          </label>
+        ) : null}
+        {fixture === "unsupported-control" ? (
+          <label>
+            Unsupported fictional control
+            <input type="color" name="unsupportedControl" required data-unsupported-control />
           </label>
         ) : null}
         <button type="submit">Submit fictional fixture</button>

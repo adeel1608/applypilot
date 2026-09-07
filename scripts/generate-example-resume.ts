@@ -1,5 +1,6 @@
 import profileJson from "../data/profile.example.json";
 import { fixtureJobs } from "../fixtures/jobs";
+import { join } from "node:path";
 
 import { parseCandidateProfile } from "@applypilot/candidate-profile";
 import { generateResumeDocument, renderResumePdf, resumeFileName } from "@applypilot/resume-engine";
@@ -10,8 +11,9 @@ async function main() {
   if (!job) throw new Error("Retail fixture not found");
 
   const document = generateResumeDocument(profile, job);
-  const outputPath = `output/pdf/${resumeFileName(profile, job.company)}`;
-  await renderResumePdf(document, outputPath);
+  const privateRoot = join(process.cwd(), "data", "private");
+  const outputPath = join("generated", "examples", resumeFileName(profile, job.company));
+  await renderResumePdf(document, outputPath, privateRoot);
   process.stdout.write(`${outputPath}\n`);
 }
 

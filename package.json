@@ -30,9 +30,11 @@
     "restore": "tsx scripts/restore.ts",
     "privacy:audit": "tsx scripts/privacy-audit.ts",
     "doctor": "tsx scripts/doctor.ts",
-    "preflight": "npm run doctor && npm run db:status && npm run privacy:audit",
+    "preflight": "npm run doctor && npm run db:status && npm run privacy:audit && tsx scripts/preflight-summary.ts",
     "quality": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build",
-    "release:check": "npm run preflight && npm run quality && npm audit && npm run audit:production",
+    "release:check": "npm run preflight && npm run quality && npm audit && npm run audit:production && tsx scripts/release-summary.ts",
+    "local:start": "tsx scripts/local-start.ts",
+    "local:stop": "tsx scripts/local-stop.ts",
     "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "audit:production": "npm audit --omit=dev"

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 import { fixtureJob, testProfile } from "../../../tests/fixture-data";
 import {
   generateResumeDocument,
+  assertPrivatePdfOutputPath,
   renderResumeDocx,
   renderResumeHtml,
+  renderResumePdf,
   resumeTemplateDesigns,
   resumeFileName,
   selectResumeTemplate,
@@ -93,6 +95,56 @@ describe("resume engine", () => {
           privateRoot,
         ),
       ).rejects.toThrow("UNSAFE_DOCUMENT_OUTPUT_NAME");
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("confines PDF output and creates a new A4 PDF without overwrite", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "applypilot-resume-pdf-"));
+    const privateRoot = join(temporaryRoot, "private");
+    const outputPath = join("generated", "safe-example.pdf");
+    const document = generateResumeDocument(testProfile, fixtureJob("job-retail-sales-assistant"));
+    try {
+      await renderResumePdf(document, outputPath, privateRoot);
+      const bytes = await readFile(join(privateRoot, outputPath));
+      expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      expect(bytes.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(1);
+      await expect(renderResumePdf(document, outputPath, privateRoot)).rejects.toMatchObject({
+        code: "EEXIST",
+      });
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    "../outside.pdf",
+    "C:\\outside.pdf",
+    "\\\\server\\share\\outside.pdf",
+    "generated/file.pdf:stream",
+    "generated/CON.pdf",
+    "generated/trailing.pdf ",
+    "generated/wrong.docx",
+  ])("rejects unsafe PDF output %s", (outputPath) => {
+    expect(() => assertPrivatePdfOutputPath(outputPath, "C:\\fixture\\private")).toThrow();
+  });
+
+  it("rejects a PDF output directory junction that escapes the private root", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "applypilot-resume-junction-"));
+    const privateRoot = join(temporaryRoot, "private");
+    const outside = join(temporaryRoot, "outside");
+    await mkdir(privateRoot);
+    await mkdir(outside);
+    await symlink(outside, join(privateRoot, "escaped"), "junction");
+    try {
+      await expect(
+        renderResumePdf(
+          generateResumeDocument(testProfile, fixtureJob("job-retail-sales-assistant")),
+          join("escaped", "resume.pdf"),
+          privateRoot,
+        ),
+      ).rejects.toThrow("DOCUMENT_OUTPUT_SYMLINK_ESCAPE");
     } finally {
       await rm(temporaryRoot, { recursive: true, force: true });
     }
