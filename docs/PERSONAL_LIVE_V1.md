@@ -41,7 +41,7 @@ Scheduling/notifications, analytics, AI and hosting are OPTIONAL_POST_V1 unless 
 
 ## Activation interpretation and known defects
 
-The local job was `REVIEW_REQUIRED`, score 47: base 50, -8 eligibility ambiguity, +8 employment-type preference, -3 unclassified category. This is not a probability, hire prediction, legal clearance or positive suitability verdict. Required work rights and transport remain ambiguous; hours, schedule, suburb, commute, structured duties/requirements and supported dates are not established. The raw ad preserves these passages, so the owner can review them without inventing normalized facts.
+The exact real job-specific eligibility result, score and contributions remain private local evaluation metadata and are reported directly to the owner, not published in this public repository. It is not a probability, hire prediction, legal clearance or positive suitability verdict. Work-right and transport requirements remain ambiguous; hours, schedule, suburb, commute, structured duties/requirements and supported dates are not established. The raw ad preserves these passages locally, so the owner can review them without inventing normalized facts.
 
 The UI required title entry from the source heading and source-URL copying. URL edits do not reclassify `UNKNOWN` origin; origin and `USER_SUPPLIED_CONTENT` acquisition must remain separate. Preview resets its original input form and shows only a 500-character excerpt; a full side-by-side source/normalized review is needed. Three abandoned preview records are retained locally; there is no preview-cleanup UX. Future cleanup needs explicit retention/confirmation, not direct deletion during activation.
 
