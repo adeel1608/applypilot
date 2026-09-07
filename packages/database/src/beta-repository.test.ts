@@ -49,7 +49,9 @@ describe("Beta repository", () => {
         now,
       );
     sqlite
-      .prepare("INSERT INTO candidate_profiles (id,created_at,updated_at) VALUES ('profile:1',?,?)")
+      .prepare(
+        "INSERT INTO candidate_profiles (id,active_version_id,created_at,updated_at) VALUES ('profile:1','profile-version:1',?,?)",
+      )
       .run(now, now);
     sqlite
       .prepare(
@@ -132,6 +134,16 @@ describe("Beta repository", () => {
            'data/private/generated/safe-example.docx',?,'[]','{}',1,0,?)`,
       )
       .run(job.id, version.id, "profile-version:1", "a".repeat(64), now);
+    const approvalId = repository.approveDocument({
+      documentArtifactId: "document:cv",
+      contentDigest: "a".repeat(64),
+    });
+    expect(
+      repository.approveDocument({
+        documentArtifactId: "document:cv",
+        contentDigest: "a".repeat(64),
+      }),
+    ).toBe(approvalId);
     const packet = ApplicationPacketSchema.parse({
       id: "packet:1",
       jobId: job.id,
@@ -190,6 +202,36 @@ describe("Beta repository", () => {
     repository.recordRunnerCheckpoint(runId, runner.readyForFinalReview());
     const consent = runner.createConsent();
     repository.persistFinalActionConsent(runId, consent);
+    const discoveredEvent = repository.appendApplicationEvent({
+      applicationId: null,
+      packetId: packet.id,
+      toStatus: "DISCOVERED",
+      eventType: "APPLICATION_DISCOVERED",
+      actor: "SYSTEM",
+      idempotencyKey: "packet:1:discovered",
+      metadata: { packetVersion: 1 },
+      occurredAt: now,
+    });
+    const repeatedEvent = repository.appendApplicationEvent({
+      applicationId: null,
+      packetId: packet.id,
+      toStatus: "DISCOVERED",
+      eventType: "APPLICATION_DISCOVERED",
+      actor: "SYSTEM",
+      idempotencyKey: "packet:1:discovered",
+      metadata: { packetVersion: 1 },
+      occurredAt: now,
+    });
+    repository.appendApplicationEvent({
+      applicationId: null,
+      packetId: packet.id,
+      toStatus: "REVIEWING",
+      eventType: "APPLICATION_REVIEWING",
+      actor: "LOCAL_USER",
+      idempotencyKey: "packet:1:reviewing",
+      metadata: { reasonCode: "LOCAL_USER_REVIEW" },
+      occurredAt: "2026-09-07T04:00:01.000Z",
+    });
 
     expect(version).toMatchObject({ version: 1, created: true });
     expect(repeated).toMatchObject({ id: version.id, version: 1, created: false });
@@ -214,6 +256,29 @@ describe("Beta repository", () => {
     expect(storedConsent.tokenHash).toBe(consent.tokenHash);
     expect(JSON.stringify(storedConsent)).not.toContain(consent.token);
     expect(packetDigest(packet)).toHaveLength(64);
+    expect(discoveredEvent.created).toBe(true);
+    expect(repeatedEvent).toMatchObject({ created: false, eventId: discoveredEvent.eventId });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM application_events_v2").get()).toEqual({
+      count: 2,
+    });
+    const changedVersion = repository.recordJobVersion({
+      job: { ...job, description: `${job.description} Updated.` },
+      sourceObservationId: "observation:1",
+    });
+    expect(
+      repository.invalidateStaleDependencies({
+        jobId: job.id,
+        currentJobVersionId: changedVersion.id,
+        currentProfileVersionId: "profile-version:1",
+        reasonCode: "JOB_VERSION_CHANGED",
+      }),
+    ).toEqual({ evaluations: 1, documents: 1, packets: 1 });
+    expect(
+      sqlite.prepare("SELECT stale FROM document_artifacts WHERE id = 'document:cv'").get(),
+    ).toEqual({ stale: 1 });
+    expect(
+      sqlite.prepare("SELECT status FROM application_packets WHERE id = 'packet:1'").get(),
+    ).toEqual({ status: "INVALIDATED" });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

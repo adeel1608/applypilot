@@ -1,5 +1,7 @@
 import type { ApplicationStatus } from "@applypilot/job-model";
-import type { BetaApplicationStatus } from "@applypilot/job-model";
+import { z } from "zod";
+
+import { BetaApplicationStatusSchema, type BetaApplicationStatus } from "@applypilot/job-model";
 
 export interface ApplicationEvent {
   id: string;
@@ -79,4 +81,57 @@ export function legacyStatusToBeta(status: ApplicationStatus): BetaApplicationSt
     return "REVIEWING";
   }
   return status as BetaApplicationStatus;
+}
+
+export const BetaApplicationEventSchema = z.object({
+  id: z.string().min(1),
+  applicationId: z.string().min(1).nullable(),
+  packetId: z.string().min(1).nullable(),
+  fromStatus: BetaApplicationStatusSchema.nullable(),
+  toStatus: BetaApplicationStatusSchema,
+  eventType: z.string().regex(/^[A-Z][A-Z0-9_]{1,99}$/),
+  actor: z.enum(["LOCAL_USER", "SYSTEM", "SOURCE", "RUNNER"]),
+  idempotencyKey: z.string().min(1).max(200),
+  metadata: z
+    .object({
+      reasonCode: z.string().min(1).max(100).optional(),
+      packetVersion: z.number().int().positive().optional(),
+      outcomeSource: z.enum(["LOCAL_USER", "SYNTHETIC_FIXTURE", "SOURCE_STATUS"]).optional(),
+    })
+    .strict(),
+  occurredAt: z.iso.datetime(),
+});
+
+export type BetaApplicationEvent = z.infer<typeof BetaApplicationEventSchema>;
+
+export function projectBetaApplicationEvents(events: BetaApplicationEvent[]): {
+  status: BetaApplicationStatus | null;
+  timeline: BetaApplicationEvent[];
+} {
+  let status: BetaApplicationStatus | null = null;
+  const timeline: BetaApplicationEvent[] = [];
+  const idempotency = new Map<string, string>();
+  for (const candidate of events) {
+    const event = BetaApplicationEventSchema.parse(candidate);
+    const serialized = JSON.stringify(event);
+    const previous = idempotency.get(event.idempotencyKey);
+    if (previous) {
+      if (previous !== serialized) throw new Error("APPLICATION_EVENT_IDEMPOTENCY_CONFLICT");
+      continue;
+    }
+    if (status === null) {
+      if (event.fromStatus !== null || event.toStatus !== "DISCOVERED") {
+        throw new Error("APPLICATION_TIMELINE_MUST_START_DISCOVERED");
+      }
+    } else {
+      if (event.fromStatus !== status) throw new Error("APPLICATION_EVENT_FROM_STATUS_MISMATCH");
+      if (!canTransitionBetaApplication(status, event.toStatus)) {
+        throw new Error(`Application cannot transition from ${status} to ${event.toStatus}`);
+      }
+    }
+    idempotency.set(event.idempotencyKey, serialized);
+    timeline.push(event);
+    status = event.toStatus;
+  }
+  return { status, timeline };
 }

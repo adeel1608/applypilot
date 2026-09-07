@@ -17,6 +17,8 @@ const environment = {
   ...process.env,
   APPLYPILOT_DB_PATH: databasePath,
   APPLYPILOT_DB_FILENAME: filename,
+  APPLYPILOT_PROFILE_FILENAME: "profile.e2e.private.json",
+  APPLYPILOT_SYNTHETIC_MODE: "1",
 };
 const sqlite = new BetterSqlite3(databasePath);
 try {

@@ -20,6 +20,14 @@ import {
 const maximumPrivateProfileBytes = 1024 * 1024;
 const demoProfile = parseCandidateProfile(profileJson);
 
+function privateProfileFilename(): string {
+  const filename = process.env.APPLYPILOT_PROFILE_FILENAME ?? "profile.private.json";
+  if (!/^profile(?:\.[A-Za-z0-9-]+)?\.private\.json$/.test(filename)) {
+    throw new Error("INVALID_PRIVATE_PROFILE_FILENAME");
+  }
+  return filename;
+}
+
 export class LocalCandidateProfileProvider implements CandidateProfileProvider {
   constructor(private readonly privateProfilePath?: string) {}
 
@@ -28,7 +36,8 @@ export class LocalCandidateProfileProvider implements CandidateProfileProvider {
     let handle;
     try {
       const path =
-        this.privateProfilePath ?? join(resolveLocalDataDirectory(), "profile.private.json");
+        this.privateProfilePath ??
+        join(/* turbopackIgnore: true */ resolveLocalDataDirectory(), privateProfileFilename());
       // The owner's runtime file is never a deployable build dependency.
       handle = await open(/* turbopackIgnore: true */ path, "r");
       const stats = await handle.stat();

@@ -6,11 +6,16 @@ import { z } from "zod";
 export const PublicPostingCapabilitySchema = z
   .object({
     source: z.enum(["GREENHOUSE", "LEVER"]),
+    alias: z.string().regex(/^[A-Za-z0-9 _-]{1,80}$/),
     tenant: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
     region: z.enum(["GLOBAL", "EU"]).optional(),
     allowedHost: z.string().min(1).max(253),
     allowedPathPrefix: z.string().startsWith("/").max(500),
-    allowedOperations: z.array(z.literal("LIST_JOBS")).min(1).max(1),
+    allowedOperations: z
+      .array(z.enum(["LIST_JOBS", "GET_JOB"]))
+      .min(1)
+      .max(2)
+      .refine((items) => new Set(items).size === items.length, "Operations must be unique"),
     approved: z.literal(true),
     policyReviewedAt: z.iso.datetime(),
     policyExpiresAt: z.iso.datetime(),
@@ -79,7 +84,7 @@ export function publicSourceReadiness(
   return {
     status: "SOURCE_ENABLED",
     source: parsed.data.source,
-    tenantAlias: parsed.data.tenant,
+    tenantAlias: parsed.data.alias,
   };
 }
 
@@ -134,6 +139,15 @@ const defaultDependencies: PublicGetDependencies = {
 export class PublicSourceError extends Error {
   constructor(readonly code: string) {
     super(code);
+  }
+}
+
+export function assertPublicSourceOperation(
+  capability: PublicPostingCapability,
+  operation: "LIST_JOBS" | "GET_JOB",
+): void {
+  if (!capability.allowedOperations.includes(operation)) {
+    throw new PublicSourceError("OPERATION_NOT_APPROVED");
   }
 }
 

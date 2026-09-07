@@ -8,6 +8,7 @@ import {
   evaluateJobUrlPolicy,
   prepareJobImport,
 } from "@applypilot/job-importer";
+import { assertLoopbackMutationRequest } from "@applypilot/shared";
 import { candidateProfileProvider } from "@web/lib/candidate-profile-provider";
 import { getJobImportRepository } from "@web/lib/local-database";
 
@@ -55,12 +56,11 @@ export interface ImportActionState {
 
 async function assertLocalRequest(): Promise<void> {
   const requestHeaders = await headers();
-  const host = (requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "")
-    .toLowerCase()
-    .trim();
-  if (!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(host) && !/^\[::1\](?::\d+)?$/.test(host)) {
-    throw new Error("LOCAL_REQUEST_REQUIRED");
-  }
+  assertLoopbackMutationRequest({
+    host: requestHeaders.get("host"),
+    origin: requestHeaders.get("origin"),
+    forwardedHost: requestHeaders.get("x-forwarded-host"),
+  });
 }
 
 function safeMessage(error: unknown): string {
@@ -68,6 +68,11 @@ function safeMessage(error: unknown): string {
   if (error instanceof Error) {
     const messages: Record<string, string> = {
       LOCAL_REQUEST_REQUIRED: "Imports are available only through the local ApplyPilot server.",
+      MUTATION_ORIGIN_REQUIRED: "The local import request did not include a trusted origin.",
+      MUTATION_ORIGIN_INVALID: "The local import request origin was invalid.",
+      FOREIGN_MUTATION_ORIGIN: "The import request came from a non-local origin.",
+      MUTATION_ORIGIN_MISMATCH: "The import request origin did not match this local server.",
+      FORWARDED_HOST_UNTRUSTED: "Forwarded-host import requests are disabled.",
       MISSING_REQUIRED_IMPORT_FIELDS:
         "Complete the title, company, location, and description before importing.",
       REVIEW_ACKNOWLEDGEMENT_REQUIRED:

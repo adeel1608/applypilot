@@ -13,7 +13,7 @@ test("resume renders as one selectable A4 page with black text and safe font siz
 
   const text = await page.locator("body").innerText();
   expect(text).toContain("Jordan Example");
-  expect(text).toContain("PROFESSIONAL PROFILE");
+  expect(text).toContain("CUSTOMER SERVICE PROFILE");
   expect(text.toLowerCase()).not.toContain("retail experience");
 
   const visualRules = await page.locator("body, body *").evaluateAll((elements) =>

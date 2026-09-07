@@ -2268,3 +2268,43 @@ Verification at this checkpoint:
 No real profile, vacancy, database row, CV, cover letter, packet, source tenant, browser session, employer form, or submission was read into Git or published. No live source request or external application action occurred. The preserved real migration/re-evaluation/private smoke is deliberately deferred until backup/restore, full synthetic document/runner/privacy gates, and UI/service integration are complete.
 
 Next continuation order: finish backup/restore and owned loopback operations; add allowlist loading and source pagination/detail persistence; complete event projection and packet/document approvals; read the remaining installed Next.js mutation/cookie/header guidance before web edits; implement loopback request guards, queue/job/document/application/source UI, and the synthetic fixture site; then run full fictional integration/E2E/layout/security gates before any explicitly previewed and backed-up real migration.
+
+## Beta Core 50-minute continuation checkpoint — 2026-09-07
+
+Status remains `IN_PROGRESS`. This run started from `778755b10ffd0f834d62cc892cb7b7b21b6e25a4` on `feat/personal-live-beta-core`. No final implementation pull request was opened and no pull request was merged.
+
+Completed in this bounded run:
+
+- Added verified, create-new-only SQLite backup and exact-confirmation restore tooling. Backup uses SQLite's consistent backup operation and records a private manifest with digest, byte count, schema version, integrity/FK result, and table counts. Restore re-verifies the backup, asserts writer quiescence, creates and verifies a recovery backup, verifies a staged copy before replacement, rejects collisions, and rolls back the displaced original if final verification fails. The executable test uses only a synthetic temporary database; the preserved real database was not read, backed up, migrated, restored, or otherwise touched.
+- Added strict append-only Beta application-event validation, deterministic event projection, transactional event persistence, transition/from-state validation, idempotency conflict rejection, digest-bound document approval, packet derivation from current persisted job/profile/evaluation/document truth, and transactional stale-dependency invalidation.
+- Added the private source-allowlist reader for the single ignored path `data/private/source-allowlist.json`. Missing configuration remains `SOURCE_READY_AWAITING_TENANT`; file/symlink/size/realpath/schema checks fail closed, while readiness exposes a non-secret alias rather than a tenant token. Added explicit Greenhouse/Lever `LIST_JOBS` and `GET_JOB` operation guards and detail readers. Tests used fictional temporary configuration and injected transports only; real source calls remained zero.
+- Extended the privacy audit from tracked-tree and history-path checks to bounded all-ref historical blob-content checks. The first per-object implementation was interrupted after proving too slow and was replaced by one bounded `git cat-file --batch` process. The final audit passed without printing candidate values.
+- Added composite `preflight`, `quality`, and `release:check` commands, while leaving owned process start/stop for a later continuation.
+- Added a shared loopback mutation guard and applied it to import actions. It requires an exact loopback Host and matching Origin/port, rejects DNS-rebinding-style hosts, foreign/cross-port origins, missing origins, and mismatched forwarded hosts. Installed Next.js 16 mutation, Server Action, and header documentation was read before the web change.
+- Added a synthetic-mode-only loopback application site and POST route with fictional simple, unknown-required, conditional, upload, changed-page, redirect, CAPTCHA, MFA, access-denied, rate-limit, different-action, and lost-response cases. Browser integration proves mapping, synthetic upload digest verification, frozen review, one-use consent, exactly one local POST, replay rejection, and terminal `OUTCOME_UNKNOWN`; it performs no external application action.
+- Corrected E2E profile isolation by adding a validated filename-only override and configuring the E2E server to use a nonexistent ignored test profile. An initial failed browser run had loaded and rendered the owner's local profile into a local ignored failure artifact. No value was printed, committed, uploaded, or sent externally. The exact artifact directory was moved without inspection into ignored, recoverable `data/private/quarantine/e2e-failure-2026-09-07T1445`; the repeated full suite passed with the real profile excluded.
+- Corrected the production-build private-profile path annotation after Turbopack warned that the dynamic path could trace the whole project. The repeat build passed without that warning.
+
+Validation results:
+
+- `npm.cmd run format:check`: PASS after the repository formatting pass.
+- `npm.cmd run lint`: PASS after removing one unused import.
+- `npm.cmd run typecheck`: PASS.
+- `npm.cmd test`: PASS, 133 tests across 25 files. One concurrent run timed out in an existing Git-ignore subprocess test while four gates competed for resources; the isolated full rerun passed.
+- `npm.cmd run test:integration`: PASS, 9 tests across 3 files.
+- `npm.cmd run test:e2e`: PASS, 12 fictional/local browser tests. The focused synthetic application suite also passed 4 tests after its runner integration was added.
+- `npm.cmd run build`: PASS after the path-tracing correction; 32 route segments including the disabled-by-default synthetic routes were generated.
+- `npm.cmd run privacy:audit`: PASS, 179 tracked files, 305 historical path entries, and 306 historical blobs checked.
+- `npm.cmd audit`: PASS, zero vulnerabilities.
+- `npm.cmd run audit:production`: PASS, zero vulnerabilities.
+- `git diff --check`: PASS.
+
+Remaining highest-priority work:
+
+1. Implement owned loopback start/stop and finish the preflight/release-command rehearsal without touching the real database.
+2. Complete PDF output confinement, measured layout/overflow checks, full PDF/DOCX text parity, document approval UI, and remaining ten-template fictional golden coverage.
+3. Add session/nonce/replay protection beyond the Host/Origin boundary and complete queue, job, document, packet, application, and source-capability UI/service integration.
+4. Persist bounded source observations/detail pagination through the approved repository boundary; keep all real source calls disabled unless a private tenant is explicitly approved.
+5. Complete runner checkpoint/event persistence, all stop-condition browser coverage, accessibility/long-content/narrow-viewport checks, and the broader security suite.
+6. Only in a later time-bounded run with adequate recovery time: preview and verify a real backup, apply migration 0002 to the preserved private database, run integrity/FK/isolation checks, and perform the approved local re-evaluation/document/packet smoke. No employer form or real submission is authorized.
+7. Finish reality documentation, full release/privacy/history/CI checks, then open one implementation pull request only when the Beta Core is coherent; leave it unmerged.

@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   boundedPublicGet,
   isBlockedNetworkAddress,
+  loadPrivateSourceAllowlist,
   publicSourceReadiness,
+  readGreenhouseJob,
   readGreenhouseJobs,
   readLeverJobs,
   type PublicGetDependencies,
@@ -19,11 +21,12 @@ function capability(
   const tenant = "fictional";
   return {
     source,
+    alias: "Fictional tenant",
     tenant,
     region: "GLOBAL",
     allowedHost: source === "GREENHOUSE" ? "boards-api.greenhouse.io" : "api.lever.co",
     allowedPathPrefix: source === "GREENHOUSE" ? `/v1/boards/${tenant}/` : `/v0/postings/${tenant}`,
-    allowedOperations: ["LIST_JOBS"],
+    allowedOperations: ["LIST_JOBS", "GET_JOB"],
     approved: true,
     policyReviewedAt: "2026-09-01T00:00:00.000Z",
     policyExpiresAt: "2026-10-01T00:00:00.000Z",
@@ -59,6 +62,32 @@ describe("default-disabled public posting readers", () => {
     ).toEqual({ status: "SOURCE_DISABLED", reason: "CAPABILITY_EXPIRED" });
   });
 
+  it("loads configuration only from the confined private allowlist and exposes its alias", async () => {
+    const root = await mkdtemp(join(tmpdir(), "applypilot-allowlist-"));
+    const privateRoot = join(root, "data", "private");
+    await mkdir(privateRoot, { recursive: true });
+    try {
+      expect(await loadPrivateSourceAllowlist(root)).toEqual({
+        status: "SOURCE_READY_AWAITING_TENANT",
+        capabilities: [],
+      });
+      const approved = capability("GREENHOUSE");
+      await writeFile(
+        join(privateRoot, "source-allowlist.json"),
+        JSON.stringify({ version: 1, capabilities: [approved] }),
+      );
+      const loaded = await loadPrivateSourceAllowlist(root);
+      expect(loaded.status).toBe("SOURCE_ALLOWLIST_READY");
+      expect(loaded.capabilities).toHaveLength(1);
+      expect(publicSourceReadiness(loaded.capabilities[0], now)).toMatchObject({
+        status: "SOURCE_ENABLED",
+        tenantAlias: "Fictional tenant",
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("maps bounded official Greenhouse GET data without authentication", async () => {
     const deps = dependencies({
       jobs: [
@@ -85,6 +114,27 @@ describe("default-disabled public posting readers", () => {
     const init = vi.mocked(deps.fetch).mock.calls[0]?.[1];
     expect(init).toMatchObject({ method: "GET", credentials: "omit", redirect: "manual" });
     expect(JSON.stringify(init?.headers)).not.toMatch(/authorization|cookie|candidate/i);
+  });
+
+  it("requires an explicit detail operation for a single posting", async () => {
+    const payload = {
+      id: 123,
+      title: "Fictional Service Role",
+      absolute_url: "https://boards.greenhouse.io/fictional/jobs/123",
+      content: "A fictional role.",
+    };
+    await expect(
+      readGreenhouseJob(capability("GREENHOUSE", { allowedOperations: ["LIST_JOBS"] }), "123", {
+        now,
+        dependencies: dependencies(payload),
+      }),
+    ).rejects.toThrow("OPERATION_NOT_APPROVED");
+    await expect(
+      readGreenhouseJob(capability("GREENHOUSE"), "123", {
+        now,
+        dependencies: dependencies(payload),
+      }),
+    ).resolves.toMatchObject({ externalId: "123" });
   });
 
   it("maps the official Lever public postings shape", async () => {
@@ -165,3 +215,6 @@ describe("default-disabled public posting readers", () => {
     ).rejects.toThrow("RECORD_CAP_EXCEEDED");
   });
 });
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
