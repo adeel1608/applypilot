@@ -1,6 +1,6 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
 Working branch: `feat/phase-2-5a-local-activation`
@@ -1933,3 +1933,10 @@ Stop and leave the phase `IN_PROGRESS` or `BLOCKED` for any trackable private pa
 - Activation is blocked before staging or confirming the vacancy. The local app was stopped, and the real profile, vacancy, and migrated database are preserved. The earlier incomplete-content gate is resolved; no additional owner vacancy content is needed.
 - Follow the approved failure procedure on `fix/resolve-local-runtime-data`, created from fresh `origin/main` in an isolated worktree containing no real local data. Reproduce the root/workspace discrepancy with fictional files, share a server-only repository-root data resolver between the provider and database, retain existing validation/filename/no-auto-migration boundaries, run all gates, and open an unmerged bugfix PR.
 - After bugfix review/merge, refresh the activation branch and resume the complete preview truth review. Conservative requirement extraction and document-requirement defaults still require examination at that gate; they have not been accepted as validated real-job behavior.
+
+### Runtime-path fix prepared for review
+
+- Bugfix PR #8: `https://github.com/adeel1608/applypilot/pull/8`, branch `fix/resolve-local-runtime-data`, implementation commit `4b3ad6567de3cfcad16a449b597d79305f7fbee3`. The PR is unmerged and addresses root/workspace data resolution with a shared server-only resolver, five fictional regression cases, workspace-launched E2E, and explicit exclusion of runtime files from build tracing.
+- Local bugfix validation passed 92 unit/security tests, 9 integration tests, 9 fictional E2E tests, formatting, lint, typecheck, production build, both zero-vulnerability audits, and diff checks. All 12 build trace manifests excluded fictional private-data sentinels. A production HTTP check loaded a temporary fictional root profile while withholding its unique values from rendered HTML.
+- The isolated worktree's initial dependency install failed because the Windows native build toolchain was unavailable; the unchanged lockfile installed with lifecycle scripts disabled, and its packaged SQLite binary was verified. The normal CI install remains part of the PR gate. Final PR-head CI is reported in the handoff.
+- Original activation state remains preserved: profile `VALID`; root database integrity `PASS`; zero job/import/evaluation/application/document rows; real vacancy still local and unimported; no application or live-source action. No additional vacancy content is needed. Resume only after this concrete fix is reviewed and normally merged, then complete the outstanding preview, evaluation, privacy, and activation checks.
