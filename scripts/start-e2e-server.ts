@@ -31,16 +31,8 @@ try {
 
 const server = spawn(
   process.execPath,
-  [
-    join("node_modules", "next", "dist", "bin", "next"),
-    "dev",
-    "apps/web",
-    "-H",
-    "127.0.0.1",
-    "-p",
-    "3100",
-  ],
-  { cwd: process.cwd(), env: environment, stdio: "inherit" },
+  [resolve("node_modules", "next", "dist", "bin", "next"), "dev", "-H", "127.0.0.1", "-p", "3100"],
+  { cwd: resolve("apps/web"), env: environment, stdio: "inherit" },
 );
 function cleanup(): void {
   for (const suffix of ["", "-shm", "-wal"]) {
