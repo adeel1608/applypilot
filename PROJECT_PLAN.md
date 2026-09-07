@@ -2238,3 +2238,33 @@ If a turn/runtime limit prevents completion, update this section with exact comp
 10. Apply the additive migration to the preserved real database only after synthetic gates and explicit backup/confirmation; re-evaluate and run the approved local private document/packet smoke without employer interaction.
 11. Complete all-route UX/accessibility/security/browser tests and the full validation/privacy/publication matrix.
 12. Update reality documentation, create focused commits, push, open one implementation PR, verify exact-head CI, and stop without merging.
+
+## Beta Core implementation continuation checkpoint — 2026-09-07
+
+Status remains `IN_PROGRESS`; this is a coherent, compiling checkpoint rather than Beta completion. PR #9 was merged at `471ab1055743249ff51a46d7187e541d0b5008af`; the active branch remains `feat/personal-live-beta-core`. Concern commits are `5059985` (approved blueprint), `aa62164` (domain, migration, documents, packets, runner safety), and `09fe761` (governed readers and initial operations).
+
+Completed or materially implemented at this checkpoint:
+
+- Stages 0-3: approved merge/base/branch/blueprint and Phase 2.5A closure are complete.
+- Stages 4-6 and 8-14: typed extraction, exact source spans, modality/kind/certainty, Australian location/salary/week/fortnight/document tri-state fields, immutable source/job/evaluation persistence, cross-source human-review dedup, legal-vs-preference reason classes, verified-preference fit inputs, and coverage reporting are implemented. Extraction provenance UI and the larger adversarial/golden matrix remain.
+- Stages 18-24: all ten CV categories now carry category-specific section ordering, evidence priorities, summary strategy, skills/experience/project selection policy, and Times-family ATS rendering. Candidate projects are an optional verified fact type. Arbitrary prose attached to a valid fact ID fails semantic validation. DOCX `9.7.1` is exact-pinned after licence/maintenance/dependency review; a real DOCX is generated in tests. New DOCX paths reject absolute/traversal/ADS/reserved names, symlink escape, and overwrite. PDF confinement, page-overflow/layout extraction, full PDF/DOCX content parity, approval versions/UI, and private real-document smoke remain. Cover letters support DIRECT/WARM/FORMAL style with shared semantic claim checks and preserve `UNKNOWN` rather than treating it as false.
+- Stages 26-31 and 47/49-51 domain layer: packet truth/disclosure states, readiness blockers, Beta lifecycle transitions, persistent packets/questions/answers/runs/checkpoints, target/form/document digest binding, ordered synthetic runner states, stop reasons, expiring single-use consent, terminal lost-response behavior, and plaintext-token non-persistence are implemented and unit-tested. Real targets remain permanently paused as `TARGET_APPROVAL_REQUIRED`. Event projection/UI, executable browser integration, synthetic fixture site, resume support, and full stop-condition E2E remain.
+- Stage 54 synthetic migration foundation: additive migration `0002_personal_live_beta_core.sql`, Drizzle exports, empty/foundation/intake upgrade tests, legacy source-observation/job-version backfill verification, and a Beta repository are implemented. The preserved real database is healthy at schema v1 with one pending migration and has not been migrated.
+- Stages 35-37 and 39/41 initial operations: repeatable current-tree/history-path privacy audit, doctor, DB/migration status, a composite quality command, data-root confinement for migration, and immutable `actions/checkout`/`actions/setup-node` v4 pins are implemented. Backup/restore, preflight/release checks, owned local start/stop, build/CI artifact scanning, and all-ref historical content scanning remain.
+- Stages 42-45 reader core: official-shape Greenhouse Job Board and Lever Postings GET readers are implemented without any POST/auth/cookie surface. Capabilities are default-disabled, owner/tenant/host/path/expiry/budget/cap bound, with HTTPS/userinfo/port/DNS/IP/redirect/timeout/byte/concurrency/retry/401/403/429 stops. Fictional tests only were used. No private tenant was selected, loaded, printed, or contacted; effective status is `SOURCE_READY_AWAITING_TENANT`. Private allowlist loading/persistence, pagination/detail support, discovery UI, and any separately approved one-call smoke remain.
+
+Verification at this checkpoint:
+
+- `npm.cmd run lint`: PASS.
+- `npm.cmd run typecheck`: PASS.
+- `npm.cmd test`: PASS, 121 tests across 23 files.
+- Synthetic migration tests: PASS for fresh and existing intake databases; foreign-key checks are clean.
+- `npm.cmd run privacy:audit`: PASS, 171 tracked files and 292 historical path entries checked; known synthetic credential sentinel fixtures are explicitly normalized only for value-pattern scanning while their paths remain audited.
+- `npm.cmd run doctor`: PASS; private profile/directory, SQLite, and real environment boundaries are ignored as required.
+- `npm.cmd run db:status`: healthy preserved local database, schema v1, one pending migration, integrity PASS, zero foreign-key issues. No values or hashes were printed.
+- `git diff --check`: PASS before both implementation commits.
+- `npm.cmd run format:check`: not yet a final pass. It exposed existing formatting drift in repository documentation plus several then-unformatted new files; every changed source file reported at that point was normalized. A whole-repository final formatting pass and verification remain required before PR publication.
+
+No real profile, vacancy, database row, CV, cover letter, packet, source tenant, browser session, employer form, or submission was read into Git or published. No live source request or external application action occurred. The preserved real migration/re-evaluation/private smoke is deliberately deferred until backup/restore, full synthetic document/runner/privacy gates, and UI/service integration are complete.
+
+Next continuation order: finish backup/restore and owned loopback operations; add allowlist loading and source pagination/detail persistence; complete event projection and packet/document approvals; read the remaining installed Next.js mutation/cookie/header guidance before web edits; implement loopback request guards, queue/job/document/application/source UI, and the synthetic fixture site; then run full fictional integration/E2E/layout/security gates before any explicitly previewed and backed-up real migration.
