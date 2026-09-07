@@ -99,6 +99,7 @@ export interface ParsedJobFields {
   responsibilities: string[];
   datePosted: string | null;
   coverLetterRequired: boolean | null;
+  beta?: import("./beta-extraction").BetaExtractedFields;
 }
 
 export type EditableImportField =

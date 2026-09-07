@@ -1,4 +1,6 @@
 export * from "./identity";
+export * from "./beta-extraction";
+export * from "./requirement-evidence";
 export * from "./import-service";
 export * from "./limits";
 export * from "./multi-job-splitter";

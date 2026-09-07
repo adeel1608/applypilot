@@ -1,5 +1,7 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
+import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
+
+import { Document, HeadingLevel, Packer, Paragraph, TextRun, convertInchesToTwip } from "docx";
 
 import {
   isVerified,
@@ -44,6 +46,10 @@ export interface ResumeDocument {
     dates: string;
     claims: FactBoundClaim[];
   }>;
+  projects: Array<{
+    heading: string;
+    claims: FactBoundClaim[];
+  }>;
   education: Array<{
     heading: string;
     dates: string;
@@ -63,6 +69,155 @@ const engineeringTemplates = new Set<ResumeTemplateCategory>([
   ResumeTemplateCategory.AUTOMATION_CONTROLS,
   ResumeTemplateCategory.EMBEDDED_SYSTEMS,
 ]);
+
+export interface ResumeTemplateDesign {
+  id: ResumeTemplateCategory;
+  profileHeading: string;
+  skillsHeading: string;
+  experienceHeading: string;
+  educationHeading: string;
+  projectsHeading: string;
+  typeface: "Times New Roman";
+  sectionOrder: Array<
+    "SUMMARY" | "SKILLS" | "EXPERIENCE" | "PROJECTS" | "EDUCATION" | "ACHIEVEMENTS"
+  >;
+  evidencePriorities: string[];
+  summaryStrategy: "CAPABILITY" | "SERVICE" | "OPERATIONS" | "TECHNICAL" | "ENGINEERING";
+}
+
+const casualOrder: ResumeTemplateDesign["sectionOrder"] = [
+  "SUMMARY",
+  "SKILLS",
+  "EXPERIENCE",
+  "EDUCATION",
+  "PROJECTS",
+  "ACHIEVEMENTS",
+];
+const engineeringOrder: ResumeTemplateDesign["sectionOrder"] = [
+  "SUMMARY",
+  "SKILLS",
+  "PROJECTS",
+  "EXPERIENCE",
+  "EDUCATION",
+  "ACHIEVEMENTS",
+];
+
+function templateDesign(input: Omit<ResumeTemplateDesign, "typeface">): ResumeTemplateDesign {
+  return { ...input, typeface: "Times New Roman" };
+}
+
+export const resumeTemplateDesigns: Record<ResumeTemplateCategory, ResumeTemplateDesign> = {
+  "casual-general": templateDesign({
+    id: "casual-general",
+    profileHeading: "Profile",
+    skillsHeading: "Key strengths",
+    experienceHeading: "Experience",
+    projectsHeading: "Projects",
+    educationHeading: "Education",
+    sectionOrder: casualOrder,
+    evidencePriorities: ["reliability", "communication", "team"],
+    summaryStrategy: "CAPABILITY",
+  }),
+  "retail-customer-service": templateDesign({
+    id: "retail-customer-service",
+    profileHeading: "Customer service profile",
+    skillsHeading: "Service skills",
+    experienceHeading: "Customer-facing experience",
+    projectsHeading: "Relevant projects",
+    educationHeading: "Education",
+    sectionOrder: casualOrder,
+    evidencePriorities: ["customer", "service", "communication", "sales"],
+    summaryStrategy: "SERVICE",
+  }),
+  "hospitality-front-of-house": templateDesign({
+    id: "hospitality-front-of-house",
+    profileHeading: "Hospitality profile",
+    skillsHeading: "Front-of-house strengths",
+    experienceHeading: "Hospitality experience",
+    projectsHeading: "Relevant projects",
+    educationHeading: "Training and education",
+    sectionOrder: casualOrder,
+    evidencePriorities: ["hospitality", "customer", "team", "food"],
+    summaryStrategy: "SERVICE",
+  }),
+  "admin-reception": templateDesign({
+    id: "admin-reception",
+    profileHeading: "Administrative profile",
+    skillsHeading: "Administrative skills",
+    experienceHeading: "Professional experience",
+    projectsHeading: "Administrative projects",
+    educationHeading: "Education",
+    sectionOrder: casualOrder,
+    evidencePriorities: ["administration", "records", "office", "communication"],
+    summaryStrategy: "OPERATIONS",
+  }),
+  "warehouse-operations": templateDesign({
+    id: "warehouse-operations",
+    profileHeading: "Operations profile",
+    skillsHeading: "Operational strengths",
+    experienceHeading: "Operations experience",
+    projectsHeading: "Operations projects",
+    educationHeading: "Training and education",
+    sectionOrder: ["SUMMARY", "SKILLS", "EXPERIENCE", "ACHIEVEMENTS", "EDUCATION", "PROJECTS"],
+    evidencePriorities: ["warehouse", "safety", "inventory", "team"],
+    summaryStrategy: "OPERATIONS",
+  }),
+  "technical-casual": templateDesign({
+    id: "technical-casual",
+    profileHeading: "Technical profile",
+    skillsHeading: "Technical capabilities",
+    experienceHeading: "Relevant experience",
+    projectsHeading: "Technical projects",
+    educationHeading: "Technical education",
+    sectionOrder: ["SUMMARY", "SKILLS", "PROJECTS", "EDUCATION", "EXPERIENCE", "ACHIEVEMENTS"],
+    evidencePriorities: ["technical", "software", "systems", "problem"],
+    summaryStrategy: "TECHNICAL",
+  }),
+  "engineering-general": templateDesign({
+    id: "engineering-general",
+    profileHeading: "Engineering profile",
+    skillsHeading: "Engineering capabilities",
+    experienceHeading: "Engineering experience",
+    projectsHeading: "Engineering projects",
+    educationHeading: "Engineering education",
+    sectionOrder: engineeringOrder,
+    evidencePriorities: ["engineering", "design", "analysis", "systems"],
+    summaryStrategy: "ENGINEERING",
+  }),
+  "robotics-mechatronics": templateDesign({
+    id: "robotics-mechatronics",
+    profileHeading: "Robotics and mechatronics profile",
+    skillsHeading: "Robotics capabilities",
+    experienceHeading: "Project and work experience",
+    projectsHeading: "Robotics projects",
+    educationHeading: "Mechatronics education",
+    sectionOrder: engineeringOrder,
+    evidencePriorities: ["robotics", "mechatronics", "control", "mechanical"],
+    summaryStrategy: "ENGINEERING",
+  }),
+  "automation-controls": templateDesign({
+    id: "automation-controls",
+    profileHeading: "Automation and controls profile",
+    skillsHeading: "Controls capabilities",
+    experienceHeading: "Automation experience",
+    projectsHeading: "Controls projects",
+    educationHeading: "Engineering education",
+    sectionOrder: engineeringOrder,
+    evidencePriorities: ["automation", "control", "plc", "instrumentation"],
+    summaryStrategy: "ENGINEERING",
+  }),
+  "embedded-systems": templateDesign({
+    id: "embedded-systems",
+    profileHeading: "Embedded systems profile",
+    skillsHeading: "Embedded capabilities",
+    experienceHeading: "Systems experience",
+    projectsHeading: "Embedded systems projects",
+    educationHeading: "Technical education",
+    sectionOrder: engineeringOrder,
+    evidencePriorities: ["embedded", "firmware", "microcontroller", "software"],
+    summaryStrategy: "TECHNICAL",
+  }),
+};
 
 export function selectResumeTemplate(job: Job): ResumeTemplateCategory {
   const search = normalizeText(`${job.title} ${job.category} ${job.description}`);
@@ -99,6 +254,7 @@ function verifiedFactIds(profile: CandidateProfile): Set<string> {
   for (const value of [
     ...profile.skills,
     ...profile.employment,
+    ...profile.projects,
     ...profile.education,
     ...profile.verifiedAchievements,
     ...profile.languages,
@@ -110,15 +266,45 @@ function verifiedFactIds(profile: CandidateProfile): Set<string> {
   return ids;
 }
 
+function verifiedFactEvidence(profile: CandidateProfile): Map<string, string[]> {
+  const evidence = new Map<string, string[]>();
+  const add = (id: string, values: Array<string | undefined>) => {
+    evidence.set(id, values.filter((value): value is string => Boolean(value)).map(normalizeText));
+  };
+  add("identity.firstName", [profile.identity.firstName.value]);
+  add("identity.lastName", [profile.identity.lastName.value]);
+  add("contact.email", [profile.contact.email.value]);
+  add("contact.phone", [profile.contact.phone.value]);
+  add("location.suburb", [profile.location.suburb.value]);
+  add("location.state", [profile.location.state.value]);
+  for (const item of profile.skills) add(item.id, [item.name, item.evidence]);
+  for (const item of profile.employment) {
+    add(item.id, [item.title, item.employer, item.location, ...item.responsibilities]);
+  }
+  for (const item of profile.projects) {
+    add(item.id, [item.name, item.summary, ...item.bullets, ...item.skills]);
+  }
+  for (const item of profile.education) {
+    add(item.id, [item.qualification, item.field, item.institution]);
+  }
+  for (const item of profile.verifiedAchievements) add(item.id, [item.statement, item.evidence]);
+  for (const item of profile.languages) add(item.id, [item.name, item.proficiency]);
+  for (const item of profile.licences) add(item.id, [item.name, item.jurisdiction]);
+  for (const item of profile.certifications) add(item.id, [item.name, item.issuer]);
+  return evidence;
+}
+
 export function validateResumeTruth(
   document: ResumeDocument,
   profile: CandidateProfile,
 ): ResumeValidationResult {
   const verifiedIds = verifiedFactIds(profile);
+  const evidenceById = verifiedFactEvidence(profile);
   const claims = [
     ...document.summary,
     ...document.skills,
     ...document.employment.flatMap(({ claims: employmentClaims }) => employmentClaims),
+    ...document.projects.flatMap(({ claims: projectClaims }) => projectClaims),
     ...document.achievements,
   ];
   const errors: string[] = [];
@@ -129,6 +315,12 @@ export function validateResumeTruth(
     for (const reference of claim.factReferences) {
       if (!verifiedIds.has(reference)) {
         errors.push(`Claim references an unverified or missing fact ${reference}: ${claim.text}`);
+        continue;
+      }
+      const normalizedClaim = normalizeText(claim.text);
+      const evidence = evidenceById.get(reference) ?? [];
+      if (!evidence.some((value) => value.length >= 2 && normalizedClaim.includes(value))) {
+        errors.push(`Claim text is not semantically bound to fact ${reference}: ${claim.text}`);
       }
     }
   }
@@ -156,15 +348,34 @@ export function generateResumeDocument(profile: CandidateProfile, job: Job): Res
   }
 
   const template = selectResumeTemplate(job);
+  const design = resumeTemplateDesigns[template];
+  const jobSignals = [job.title, job.category, ...job.requiredSkills, ...job.requirements]
+    .map(normalizeText)
+    .join(" ");
+  const relevance = (values: string[]) => {
+    const text = normalizeText(values.join(" "));
+    return (
+      design.evidencePriorities.filter((keyword) => text.includes(keyword)).length * 2 +
+      job.requiredSkills.filter((required) => {
+        const normalized = normalizeText(required);
+        return text.includes(normalized) || normalized.includes(text);
+      }).length +
+      (jobSignals.split(" ").filter((token) => token.length > 3 && text.includes(token)).length > 0
+        ? 1
+        : 0)
+    );
+  };
   const skills = profile.skills
     .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
-    .filter(({ name }) =>
-      job.requiredSkills.some((required) => {
+    .filter(({ name }) => {
+      const explicitlyRequired = job.requiredSkills.some((required) => {
         const skill = normalizeText(name);
         const requirement = normalizeText(required);
         return skill.includes(requirement) || requirement.includes(skill);
-      }),
-    )
+      });
+      return explicitlyRequired || relevance([name]) > 0;
+    })
+    .sort((left, right) => relevance([right.name]) - relevance([left.name]))
     .map(({ id, name }) => ({ text: name, factReferences: [id] }));
 
   const education = profile.education
@@ -180,10 +391,17 @@ export function generateResumeDocument(profile: CandidateProfile, job: Job): Res
     profile.skills
       .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
       .map(({ id, name }) => ({ text: name, factReferences: [id] }))[0];
+  const strategyLead = {
+    CAPABILITY: "Candidate",
+    SERVICE: "Service-focused candidate",
+    OPERATIONS: "Operations-focused candidate",
+    TECHNICAL: "Technically focused candidate",
+    ENGINEERING: "Engineering-focused candidate",
+  }[design.summaryStrategy];
   const summary = summarySource
     ? [
         {
-          text: `Candidate with verified ${summarySource.text.toLocaleLowerCase("en-AU")} capability seeking to contribute to ${job.title}.`,
+          text: `${strategyLead} with verified ${summarySource.text.toLocaleLowerCase("en-AU")} capability seeking to contribute to ${job.title}.`,
           factReferences: summarySource.factReferences,
         },
       ]
@@ -200,10 +418,29 @@ export function generateResumeDocument(profile: CandidateProfile, job: Job): Res
     skills,
     employment: profile.employment
       .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
+      .sort(
+        (left, right) =>
+          relevance([right.title, right.employer, ...right.responsibilities]) -
+          relevance([left.title, left.employer, ...left.responsibilities]),
+      )
       .map((role) => ({
         heading: `${role.title} - ${role.employer}`,
         dates: `${role.startDate} - ${role.endDate ?? "Present"}`,
         claims: role.responsibilities.map((text) => ({ text, factReferences: [role.id] })),
+      })),
+    projects: profile.projects
+      .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
+      .sort(
+        (left, right) =>
+          relevance([right.name, right.summary, ...right.bullets, ...right.skills]) -
+          relevance([left.name, left.summary, ...left.bullets, ...left.skills]),
+      )
+      .map((project) => ({
+        heading: project.name,
+        claims: [project.summary, ...project.bullets].map((text) => ({
+          text,
+          factReferences: [project.id],
+        })),
       })),
     education,
     achievements: profile.verifiedAchievements.map(({ id, statement }) => ({
@@ -233,6 +470,36 @@ function bulletList(claims: FactBoundClaim[]): string {
 }
 
 export function renderResumeHtml(document: ResumeDocument): string {
+  const design = resumeTemplateDesigns[document.template];
+  const sections: Record<ResumeTemplateDesign["sectionOrder"][number], string> = {
+    SUMMARY: `<h2>${escapeHtml(design.profileHeading)}</h2>${document.summary
+      .map(({ text }) => `<p>${escapeHtml(text)}</p>`)
+      .join("")}`,
+    SKILLS: `<h2>${escapeHtml(design.skillsHeading)}</h2>${bulletList(document.skills)}`,
+    EXPERIENCE: `<h2>${escapeHtml(design.experienceHeading)}</h2>${document.employment
+      .map(
+        ({ heading, dates, claims }) =>
+          `<section><h3>${escapeHtml(heading)}</h3><p class="dates">${escapeHtml(dates)}</p>${bulletList(claims)}</section>`,
+      )
+      .join("")}`,
+    PROJECTS: document.projects.length
+      ? `<h2>${escapeHtml(design.projectsHeading)}</h2>${document.projects
+          .map(
+            ({ heading, claims }) =>
+              `<section><h3>${escapeHtml(heading)}</h3>${bulletList(claims)}</section>`,
+          )
+          .join("")}`
+      : "",
+    EDUCATION: `<h2>${escapeHtml(design.educationHeading)}</h2>${document.education
+      .map(
+        ({ heading, dates }) =>
+          `<p class="education-entry"><strong>${escapeHtml(heading)}</strong><span class="dates">${escapeHtml(dates)}</span></p>`,
+      )
+      .join("")}`,
+    ACHIEVEMENTS: document.achievements.length
+      ? `<h2>Verified achievements</h2>${bulletList(document.achievements)}`
+      : "",
+  };
   return `<!doctype html>
 <html lang="en-AU">
 <head>
@@ -242,7 +509,7 @@ export function renderResumeHtml(document: ResumeDocument): string {
     @page { size: A4; margin: 15mm 17mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: white; color: black; }
-    body { font-family: "Times New Roman", Times, serif; font-size: 10.5pt; line-height: 1.28; }
+    body { font-family: "${design.typeface}", Arial, sans-serif; font-size: 10.5pt; line-height: 1.28; }
     h1 { margin: 0; text-align: center; font-size: 18pt; font-weight: bold; }
     .contact { margin: 2mm 0 4mm; text-align: center; }
     h2 { margin: 3.5mm 0 1.5mm; border-bottom: 0.6pt solid black; font-size: 12pt; text-transform: uppercase; }
@@ -255,30 +522,11 @@ export function renderResumeHtml(document: ResumeDocument): string {
     .target { text-align: center; margin-bottom: 2mm; }
   </style>
 </head>
-<body>
+<body data-template="${escapeHtml(design.id)}">
   <h1>${escapeHtml(document.candidateName)}</h1>
   <p class="contact">${escapeHtml(document.contactLine)}</p>
   <p class="target">Application: ${escapeHtml(document.targetRole)} - ${escapeHtml(document.targetCompany)}</p>
-  <h2>Professional profile</h2>
-  ${document.summary.map(({ text }) => `<p>${escapeHtml(text)}</p>`).join("")}
-  <h2>Verified skills</h2>
-  ${bulletList(document.skills)}
-  <h2>Experience</h2>
-  ${document.employment
-    .map(
-      ({ heading, dates, claims }) =>
-        `<section><h3>${escapeHtml(heading)}</h3><p class="dates">${escapeHtml(dates)}</p>${bulletList(claims)}</section>`,
-    )
-    .join("")}
-  <h2>Education</h2>
-  ${document.education
-    .map(
-      ({ heading, dates }) =>
-        `<p class="education-entry"><strong>${escapeHtml(heading)}</strong><span class="dates">${escapeHtml(dates)}</span></p>`,
-    )
-    .join("")}
-  <h2>Verified achievements</h2>
-  ${bulletList(document.achievements)}
+  ${design.sectionOrder.map((section) => sections[section]).join("\n  ")}
 </body>
 </html>`;
 }
@@ -308,4 +556,132 @@ export async function renderResumePdf(document: ResumeDocument, outputPath: stri
   } finally {
     await browser.close();
   }
+}
+
+export function assertPrivateDocumentOutputPath(outputPath: string, privateRoot: string): string {
+  const root = resolve(privateRoot);
+  if (isAbsolute(outputPath)) throw new Error("ABSOLUTE_DOCUMENT_OUTPUT_FORBIDDEN");
+  const segments = outputPath.split(/[\\/]+/);
+  const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+  if (
+    segments.some(
+      (part) =>
+        !part ||
+        part === "." ||
+        part === ".." ||
+        part.includes(":") ||
+        part.endsWith(".") ||
+        part.endsWith(" ") ||
+        reserved.test(part),
+    )
+  ) {
+    throw new Error("UNSAFE_DOCUMENT_OUTPUT_NAME");
+  }
+  const target = resolve(root, outputPath);
+  const pathSegments = root.split(/[\\/]+/).map((part) => part.toLowerCase());
+  if (!pathSegments.includes("private")) throw new Error("PRIVATE_DOCUMENT_ROOT_REQUIRED");
+  const fromRoot = relative(root, target);
+  if (!fromRoot || fromRoot.startsWith(`..${sep}`) || fromRoot === ".." || isAbsolute(fromRoot)) {
+    throw new Error("DOCUMENT_OUTPUT_OUTSIDE_PRIVATE_ROOT");
+  }
+  if (extname(target).toLowerCase() !== ".docx") throw new Error("DOCX_OUTPUT_REQUIRED");
+  return target;
+}
+
+function docxSectionHeading(text: string, typeface: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 160, after: 60 },
+    children: [new TextRun({ text, bold: true, font: typeface, size: 22 })],
+  });
+}
+
+export async function renderResumeDocx(
+  document: ResumeDocument,
+  outputPath: string,
+  privateRoot: string,
+): Promise<void> {
+  const target = assertPrivateDocumentOutputPath(outputPath, privateRoot);
+  const design = resumeTemplateDesigns[document.template];
+  const children: Paragraph[] = [
+    new Paragraph({
+      heading: HeadingLevel.TITLE,
+      alignment: "center",
+      children: [new TextRun({ text: document.candidateName, bold: true, font: design.typeface })],
+    }),
+    new Paragraph({ text: document.contactLine, alignment: "center" }),
+    new Paragraph({
+      text: `Application: ${document.targetRole} - ${document.targetCompany}`,
+      alignment: "center",
+    }),
+  ];
+  const sections: Record<ResumeTemplateDesign["sectionOrder"][number], Paragraph[]> = {
+    SUMMARY: [
+      docxSectionHeading(design.profileHeading, design.typeface),
+      ...document.summary.map(({ text }) => new Paragraph({ text })),
+    ],
+    SKILLS: [
+      docxSectionHeading(design.skillsHeading, design.typeface),
+      ...document.skills.map(({ text }) => new Paragraph({ text, bullet: { level: 0 } })),
+    ],
+    EXPERIENCE: [docxSectionHeading(design.experienceHeading, design.typeface)],
+    PROJECTS: document.projects.length
+      ? [docxSectionHeading(design.projectsHeading, design.typeface)]
+      : [],
+    EDUCATION: [docxSectionHeading(design.educationHeading, design.typeface)],
+    ACHIEVEMENTS: document.achievements.length
+      ? [docxSectionHeading("Verified achievements", design.typeface)]
+      : [],
+  };
+  for (const role of document.employment) {
+    sections.EXPERIENCE.push(
+      new Paragraph({ children: [new TextRun({ text: role.heading, bold: true })] }),
+      new Paragraph({ text: role.dates }),
+      ...role.claims.map(({ text }) => new Paragraph({ text, bullet: { level: 0 } })),
+    );
+  }
+  for (const project of document.projects) {
+    sections.PROJECTS.push(
+      new Paragraph({ children: [new TextRun({ text: project.heading, bold: true })] }),
+      ...project.claims.map(({ text }) => new Paragraph({ text, bullet: { level: 0 } })),
+    );
+  }
+  for (const education of document.education) {
+    sections.EDUCATION.push(
+      new Paragraph({ children: [new TextRun({ text: education.heading, bold: true })] }),
+      new Paragraph({ text: education.dates }),
+    );
+  }
+  sections.ACHIEVEMENTS.push(
+    ...document.achievements.map(({ text }) => new Paragraph({ text, bullet: { level: 0 } })),
+  );
+  for (const section of design.sectionOrder) children.push(...sections[section]);
+  const docx = new Document({
+    styles: { default: { document: { run: { font: design.typeface, size: 21 } } } },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: convertInchesToTwip(0.55),
+              right: convertInchesToTwip(0.65),
+              bottom: convertInchesToTwip(0.55),
+              left: convertInchesToTwip(0.65),
+            },
+          },
+        },
+        children,
+      },
+    ],
+  });
+  const root = resolve(privateRoot);
+  await mkdir(root, { recursive: true });
+  await mkdir(dirname(target), { recursive: true });
+  const resolvedRoot = await realpath(root);
+  const resolvedParent = await realpath(dirname(target));
+  const fromRoot = relative(resolvedRoot, resolvedParent);
+  if (fromRoot.startsWith(`..${sep}`) || fromRoot === ".." || isAbsolute(fromRoot)) {
+    throw new Error("DOCUMENT_OUTPUT_SYMLINK_ESCAPE");
+  }
+  await writeFile(target, await Packer.toBuffer(docx), { flag: "wx" });
 }

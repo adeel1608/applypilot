@@ -1,5 +1,7 @@
 import type { Job, JobSource } from "@applypilot/job-model";
 
+export * from "./cross-source-dedup";
+
 export interface RawJobSourceRecord {
   source: JobSource;
   externalId: string;

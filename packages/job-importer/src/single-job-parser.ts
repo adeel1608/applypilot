@@ -7,6 +7,7 @@ import type {
   SplitImportedJobRecord,
 } from "./types";
 import { normalizeSeekJob, parseUserSuppliedSeekContent } from "@applypilot/job-sources";
+import { extractBetaJobFields } from "./beta-extraction";
 
 function asText(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) {
@@ -98,7 +99,19 @@ function dateTime(value: unknown): string | null {
 }
 
 function employmentType(value: string | null, text: string): ParsedJobFields["employmentType"] {
-  const candidate = `${value ?? ""} ${text}`.toLowerCase();
+  const explicit = (value ?? "").toLowerCase();
+  const explicitMatches = [
+    ["CASUAL", /\bcasual\b/],
+    ["PART_TIME", /\bpart[ -]?time\b/],
+    ["FULL_TIME", /\bfull[ -]?time\b/],
+    ["CONTRACT", /\bcontract(?:or)?\b/],
+    ["INTERNSHIP", /\bintern(?:ship)?\b/],
+  ] as const;
+  const explicitResult = explicitMatches.find(([, pattern]) => pattern.test(explicit))?.[0];
+  if (explicitResult) return explicitResult;
+  const bodyMatches = explicitMatches.filter(([, pattern]) => pattern.test(text.toLowerCase()));
+  if (bodyMatches.length !== 1) return "UNKNOWN";
+  const candidate = text.toLowerCase();
   if (/\bcasual\b/.test(candidate)) return "CASUAL";
   if (/\bpart[ -]?time\b/.test(candidate)) return "PART_TIME";
   if (/\bfull[ -]?time\b/.test(candidate)) return "FULL_TIME";
@@ -157,6 +170,7 @@ export function parseImportedJobRecord(
       : section(record.text, ["responsibilities", "duties", "what you will do"]),
     datePosted: dateTime(structured.datePosted),
     coverLetterRequired: null,
+    beta: extractBetaJobFields({ text: record.text, location }),
   });
   const extractionRuleIds = [record.structured ? "STRUCTURED_JOB_FIELDS" : "LABELLED_VISIBLE_TEXT"];
   if (
@@ -190,6 +204,7 @@ export function parseImportedJobRecord(
           typeof job.sourceMetadata.coverLetterRequired === "boolean"
             ? job.sourceMetadata.coverLetterRequired
             : null,
+        beta: extractBetaJobFields({ text: record.text, location: job.location }),
       });
       extractionRuleIds.push("SEEK_PHASE_2_PARSER_REUSE");
     } catch {

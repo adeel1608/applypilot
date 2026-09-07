@@ -61,6 +61,14 @@ try {
       ),
     );
   }
+  if (version < 2) {
+    sqlite.exec(
+      readFileSync(
+        new URL("../packages/database/drizzle/0002_personal_live_beta_core.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+  }
   const migratedSnapshot = sqlite
     .prepare(
       `SELECT id, job_id, source_id, external_id, source_url, payload_hash, discovered_at, fetched_at
@@ -72,6 +80,14 @@ try {
     .digest("hex");
   if (sourceSnapshot.length !== migratedSnapshot.length || sourceDigest !== migratedDigest) {
     throw new Error("Source-record row-count or hash verification failed after migration.");
+  }
+  const observationCount = Number(
+    sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get(),
+  );
+  const jobVersionCount = Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get());
+  const jobCount = Number(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get());
+  if (observationCount !== migratedSnapshot.length || jobVersionCount !== jobCount) {
+    throw new Error("Beta observation/job-version mapping verification failed after migration.");
   }
   const foreignKeys = sqlite.pragma("foreign_key_check") as unknown[];
   const finalIntegrity = sqlite.pragma("integrity_check", { simple: true });

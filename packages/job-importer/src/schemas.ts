@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { IMPORT_LIMITS } from "./limits";
 import { detectedJobSources } from "./types";
+import { RequirementEvidenceSchema } from "@applypilot/job-model";
 
 export const DetectedJobSourceSchema = z.enum(detectedJobSources);
 export const AcquisitionMethodSchema = z.enum([
@@ -50,6 +51,86 @@ export const ParsedJobFieldsSchema = z.object({
   responsibilities: z.array(z.string().min(1).max(4096)).max(500),
   datePosted: z.iso.datetime().nullable(),
   coverLetterRequired: z.boolean().nullable(),
+  beta: z
+    .object({
+      location: z.object({
+        suburb: z.string().min(1).nullable(),
+        postcode: z
+          .string()
+          .regex(/^\d{4}$/)
+          .nullable(),
+        state: z.enum(["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"]).nullable(),
+        country: z.string().min(1),
+      }),
+      salary: z
+        .object({
+          minimum: z.number().nonnegative().nullable(),
+          maximum: z.number().nonnegative().nullable(),
+          currency: z.string().length(3),
+          period: z.enum(["HOUR", "WEEK", "FORTNIGHT", "MONTH", "YEAR"]),
+          text: z.string().min(1).nullable(),
+        })
+        .nullable(),
+      hoursPerWeek: z
+        .object({
+          minimum: z.number().nonnegative().nullable(),
+          maximum: z.number().nonnegative().nullable(),
+        })
+        .nullable(),
+      hoursPerFortnight: z
+        .object({
+          minimum: z.number().nonnegative().nullable(),
+          maximum: z.number().nonnegative().nullable(),
+        })
+        .nullable(),
+      schedule: z.object({
+        summary: z.string().min(1).nullable(),
+        fixed: z.boolean().nullable(),
+        shifts: z.array(z.any()),
+      }),
+      preferredRequirements: z.array(z.string().min(1)),
+      requiredSkills: z.array(z.string().min(1)),
+      experienceRequirements: z.array(
+        z.object({
+          key: z.string().min(1),
+          description: z.string().min(1),
+          mandatory: z.boolean(),
+          minimumYears: z.number().nonnegative().nullable(),
+        }),
+      ),
+      educationRequirements: z.array(
+        z.object({
+          description: z.string().min(1),
+          mandatory: z.boolean(),
+          qualificationKeywords: z.array(z.string().min(1)),
+        }),
+      ),
+      licences: z.array(z.object({ name: z.string().min(1), mandatory: z.boolean() })),
+      vehicleRequirement: z.enum(["REQUIRED", "NOT_REQUIRED", "UNKNOWN"]),
+      workRightsRequirement: z.enum([
+        "UNRESTRICTED_AUSTRALIA",
+        "VALID_AUSTRALIA",
+        "NOT_SPECIFIED",
+        "UNKNOWN",
+      ]),
+      physicalRequirements: z.array(z.string().min(1)),
+      trainingProvided: z.boolean().nullable(),
+      documentRequirements: z.object({
+        resume: z.enum(["REQUIRED", "NOT_REQUIRED", "UNKNOWN"]),
+        coverLetter: z.enum(["REQUIRED", "NOT_REQUIRED", "UNKNOWN"]),
+        other: z.array(z.string().min(1)),
+      }),
+      requirementEvidence: z.array(RequirementEvidenceSchema),
+      extractionCoverage: z.object({
+        known: z.number().int().nonnegative(),
+        unknown: z.number().int().nonnegative(),
+        ambiguous: z.number().int().nonnegative(),
+        percent: z.number().min(0).max(100),
+        confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
+      }),
+      warnings: z.array(z.string().min(1)),
+    })
+    .optional(),
 });
 
 export const PrepareJobImportInputSchema = z.object({

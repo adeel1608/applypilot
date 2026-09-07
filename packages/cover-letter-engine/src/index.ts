@@ -1,6 +1,8 @@
 import { type CandidateProfile, verifiedCandidateName } from "@applypilot/candidate-profile";
 import type { Job } from "@applypilot/job-model";
-import { VerificationStatus } from "@applypilot/shared";
+import { normalizeText, VerificationStatus } from "@applypilot/shared";
+
+export type CoverLetterRequirementStatus = "REQUIRED" | "OPTIONAL" | "NOT_REQUIRED" | "UNKNOWN";
 
 export interface CoverLetterClaim {
   text: string;
@@ -15,6 +17,50 @@ export interface CoverLetterDocument {
   paragraphs: string[];
   claims: CoverLetterClaim[];
   requiresHumanReview: true;
+  tone: CandidateProfile["candidatePreferences"]["coverLetterTone"];
+}
+
+export function coverLetterRequirementStatus(job: Job): CoverLetterRequirementStatus {
+  const metadata = job.sourceMetadata as
+    | { documentRequirementStates?: { coverLetter?: unknown } }
+    | undefined;
+  const state = metadata?.documentRequirementStates?.coverLetter;
+  if (state === "REQUIRED" || state === "NOT_REQUIRED") return state;
+  if (job.coverLetterRequired) return "REQUIRED";
+  return "UNKNOWN";
+}
+
+export function validateCoverLetterTruth(
+  document: CoverLetterDocument,
+  profile: CandidateProfile,
+): { valid: boolean; errors: string[] } {
+  const verifiedSkills = new Map(
+    profile.skills
+      .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
+      .map(({ id, name }) => [id, normalizeText(name)]),
+  );
+  const errors: string[] = [];
+  for (const claim of document.claims) {
+    if (claim.profileFactReferences.length === 0) {
+      errors.push(`Claim has no profile provenance: ${claim.text}`);
+    }
+    for (const reference of claim.profileFactReferences) {
+      const evidence = verifiedSkills.get(reference);
+      if (!evidence) errors.push(`Claim references an unverified or missing fact ${reference}`);
+      else if (!normalizeText(claim.text).includes(evidence)) {
+        errors.push(`Claim text is not semantically bound to fact ${reference}`);
+      }
+    }
+  }
+  const allText = normalizeText(
+    [...document.paragraphs, ...document.claims.map(({ text }) => text)].join(" "),
+  );
+  for (const forbidden of profile.forbiddenClaims) {
+    if (allText.includes(normalizeText(forbidden))) {
+      errors.push(`Document contains forbidden claim: ${forbidden}`);
+    }
+  }
+  return { valid: errors.length === 0, errors };
 }
 
 export function generateBasicCoverLetter(profile: CandidateProfile, job: Job): CoverLetterDocument {
@@ -37,22 +83,40 @@ export function generateBasicCoverLetter(profile: CandidateProfile, job: Job): C
     ? claims.map(({ text }) => text).join(" ")
     : "I would welcome the opportunity to discuss which verified parts of my background are relevant.";
 
-  return {
+  const tone = profile.candidatePreferences.coverLetterTone;
+  const opening = {
+    DIRECT: `I am applying for the ${job.title} position with ${job.company}.`,
+    WARM: `I am pleased to apply for the ${job.title} position with ${job.company}.`,
+    FORMAL: `Please accept my application for the ${job.title} position with ${job.company}.`,
+  }[tone];
+  const closing = {
+    DIRECT: "Thank you for considering my application.",
+    WARM: "Thank you for considering my application; I would value the opportunity to discuss the role.",
+    FORMAL:
+      "Thank you for your consideration. I would welcome the opportunity to discuss my application.",
+  }[tone];
+  const document: CoverLetterDocument = {
     candidateName,
     employer: job.company,
     roleTitle: job.title,
     salutation: "Dear Hiring Manager,",
     paragraphs: [
-      `I am applying for the ${job.title} position with ${job.company}.`,
+      opening,
       requirementText
         ? `I understand that the role calls for ${requirementText.toLocaleLowerCase("en-AU")}.`
         : "I have reviewed the responsibilities described for the role.",
       evidenceParagraph,
-      "Thank you for considering my application. I would welcome an opportunity to discuss the role.",
+      closing,
     ],
     claims,
     requiresHumanReview: true,
+    tone,
   };
+  const validation = validateCoverLetterTruth(document, profile);
+  if (!validation.valid) {
+    throw new Error(`Cover letter truth validation failed: ${validation.errors.join("; ")}`);
+  }
+  return document;
 }
 
 export function coverLetterFileName(profile: CandidateProfile, company: string): string {

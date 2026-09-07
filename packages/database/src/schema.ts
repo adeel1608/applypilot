@@ -294,6 +294,353 @@ export const settings = sqliteTable("settings", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const sourceObservations = sqliteTable("source_observations", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  sourceRecordId: text("source_record_id").references(() => jobSourceRecords.id, {
+    onDelete: "set null",
+  }),
+  source: text("source").notNull(),
+  tenant: text("tenant"),
+  externalId: text("external_id"),
+  sourceUrl: text("source_url"),
+  acquisitionMethod: text("acquisition_method").notNull(),
+  contentHash: text("content_hash").notNull(),
+  rawSnapshotReference: text("raw_snapshot_reference").notNull(),
+  observedAt: text("observed_at").notNull(),
+  postedAt: text("posted_at"),
+  expiresAt: text("expires_at"),
+  parserVersion: text("parser_version").notNull(),
+  policyVersion: text("policy_version"),
+  runId: text("run_id"),
+  supersedesObservationId: text("supersedes_observation_id"),
+});
+
+export const jobVersions = sqliteTable("job_versions", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  normalizedJson: text("normalized_json").notNull(),
+  contentDigest: text("content_digest"),
+  sourceObservationId: text("source_observation_id").references(() => sourceObservations.id, {
+    onDelete: "set null",
+  }),
+  createdAt: text("created_at").notNull(),
+});
+
+export const jobFieldEvidence = sqliteTable("job_field_evidence", {
+  id: text("id").primaryKey(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "cascade" }),
+  fieldName: text("field_name").notNull(),
+  sourceObservationId: text("source_observation_id").references(() => sourceObservations.id),
+  sourcePath: text("source_path").notNull(),
+  originalText: text("original_text").notNull(),
+  normalizedValueJson: text("normalized_value_json").notNull(),
+  certainty: text("certainty").notNull(),
+  ruleId: text("rule_id").notNull(),
+  extractorVersion: text("extractor_version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const requirementEvidence = sqliteTable("requirement_evidence", {
+  id: text("id").primaryKey(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "cascade" }),
+  sourceObservationId: text("source_observation_id").references(() => sourceObservations.id),
+  sourcePath: text("source_path").notNull(),
+  startOffset: integer("start_offset").notNull(),
+  endOffset: integer("end_offset").notNull(),
+  originalText: text("original_text").notNull(),
+  normalizedProposition: text("normalized_proposition").notNull(),
+  modality: text("modality").notNull(),
+  kind: text("kind").notNull(),
+  conditionText: text("condition_text"),
+  certainty: text("certainty").notNull(),
+  ruleId: text("rule_id").notNull(),
+  extractorVersion: text("extractor_version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const jobCorrections = sqliteTable("job_corrections", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  fromJobVersionId: text("from_job_version_id")
+    .notNull()
+    .references(() => jobVersions.id),
+  toJobVersionId: text("to_job_version_id")
+    .notNull()
+    .references(() => jobVersions.id),
+  actor: text("actor").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  changedFieldsJson: text("changed_fields_json").notNull(),
+  beforeDigest: text("before_digest").notNull(),
+  afterDigest: text("after_digest").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const duplicateClusters = sqliteTable("duplicate_clusters", {
+  id: text("id").primaryKey(),
+  canonicalJobId: text("canonical_job_id").references(() => jobs.id),
+  state: text("state").notNull(),
+  reasonCodesJson: text("reason_codes_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const duplicateClusterMembers = sqliteTable("duplicate_cluster_members", {
+  clusterId: text("cluster_id")
+    .notNull()
+    .references(() => duplicateClusters.id, {
+      onDelete: "cascade",
+    }),
+  sourceObservationId: text("source_observation_id")
+    .notNull()
+    .references(() => sourceObservations.id, { onDelete: "cascade" }),
+  decision: text("decision").notNull(),
+  addedAt: text("added_at").notNull(),
+});
+
+export const evaluationVersions = sqliteTable("evaluation_versions", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  jobVersionId: text("job_version_id").references(() => jobVersions.id),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id),
+  evaluationContext: text("evaluation_context").notNull(),
+  eligibilityStatus: text("eligibility_status").notNull(),
+  eligibilityReasonsJson: text("eligibility_reasons_json").notNull(),
+  fitScore: integer("fit_score").notNull(),
+  fitContributionsJson: text("fit_contributions_json").notNull(),
+  coverageJson: text("coverage_json").notNull(),
+  eligibilityEngineVersion: text("eligibility_engine_version").notNull(),
+  fitEngineVersion: text("fit_engine_version").notNull(),
+  weightVersion: text("weight_version").notNull(),
+  stale: integer("stale", { mode: "boolean" }).notNull().default(false),
+  evaluatedAt: text("evaluated_at").notNull(),
+});
+
+export const calibrationLabels = sqliteTable("calibration_labels", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  reasonCodesJson: text("reason_codes_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const calibrationPairs = sqliteTable("calibration_pairs", {
+  id: text("id").primaryKey(),
+  preferredJobId: text("preferred_job_id")
+    .notNull()
+    .references(() => jobs.id),
+  otherJobId: text("other_job_id")
+    .notNull()
+    .references(() => jobs.id),
+  reasonCodesJson: text("reason_codes_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const jobQueueEntries = sqliteTable("job_queue_entries", {
+  jobId: text("job_id")
+    .primaryKey()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  state: text("state").notNull(),
+  evaluationVersionId: text("evaluation_version_id").references(() => evaluationVersions.id),
+  reasonCode: text("reason_code").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const documentArtifacts = sqliteTable("document_artifacts", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  jobVersionId: text("job_version_id").references(() => jobVersions.id),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id),
+  type: text("type").notNull(),
+  template: text("template").notNull(),
+  format: text("format").notNull(),
+  fileName: text("file_name").notNull(),
+  localPath: text("local_path").notNull(),
+  contentDigest: text("content_digest").notNull(),
+  claimEvidenceJson: text("claim_evidence_json").notNull(),
+  layoutResultJson: text("layout_result_json").notNull(),
+  version: integer("version").notNull(),
+  stale: integer("stale", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+});
+
+export const documentApprovals = sqliteTable("document_approvals", {
+  id: text("id").primaryKey(),
+  documentArtifactId: text("document_artifact_id")
+    .notNull()
+    .references(() => documentArtifacts.id, { onDelete: "cascade" }),
+  contentDigest: text("content_digest").notNull(),
+  approvedBy: text("approved_by").notNull(),
+  approvedAt: text("approved_at").notNull(),
+  invalidatedAt: text("invalidated_at"),
+  invalidationReason: text("invalidation_reason"),
+});
+
+export const applicationPackets = sqliteTable("application_packets", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  jobVersionId: text("job_version_id").references(() => jobVersions.id),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id),
+  evaluationVersionId: text("evaluation_version_id").references(() => evaluationVersions.id),
+  targetUrl: text("target_url"),
+  targetHost: text("target_host"),
+  status: text("status").notNull(),
+  readinessJson: text("readiness_json").notNull(),
+  version: integer("version").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const applicationPacketDocuments = sqliteTable("application_packet_documents", {
+  packetId: text("packet_id")
+    .notNull()
+    .references(() => applicationPackets.id, {
+      onDelete: "cascade",
+    }),
+  documentArtifactId: text("document_artifact_id")
+    .notNull()
+    .references(() => documentArtifacts.id),
+  required: integer("required", { mode: "boolean" }).notNull(),
+});
+
+export const applicationQuestions = sqliteTable("application_questions", {
+  id: text("id").primaryKey(),
+  packetId: text("packet_id")
+    .notNull()
+    .references(() => applicationPackets.id, {
+      onDelete: "cascade",
+    }),
+  questionKey: text("question_key").notNull(),
+  questionText: text("question_text").notNull(),
+  optionsJson: text("options_json").notNull(),
+  required: integer("required", { mode: "boolean" }).notNull(),
+  sensitive: integer("sensitive", { mode: "boolean" }).notNull(),
+  version: integer("version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const applicationAnswerVersions = sqliteTable("application_answer_versions", {
+  id: text("id").primaryKey(),
+  questionId: text("question_id")
+    .notNull()
+    .references(() => applicationQuestions.id, {
+      onDelete: "cascade",
+    }),
+  answerJson: text("answer_json"),
+  certainty: text("certainty").notNull(),
+  factReferencesJson: text("fact_references_json").notNull(),
+  disclosureState: text("disclosure_state").notNull(),
+  version: integer("version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const applicationEventsV2 = sqliteTable("application_events_v2", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id").references(() => applications.id, { onDelete: "cascade" }),
+  packetId: text("packet_id").references(() => applicationPackets.id),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  eventType: text("event_type").notNull(),
+  actor: text("actor").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  metadataJson: text("metadata_json").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+});
+
+export const applicationRuns = sqliteTable("application_runs", {
+  id: text("id").primaryKey(),
+  packetId: text("packet_id")
+    .notNull()
+    .references(() => applicationPackets.id, {
+      onDelete: "cascade",
+    }),
+  targetKind: text("target_kind").notNull(),
+  targetHost: text("target_host").notNull(),
+  formVersion: text("form_version").notNull(),
+  state: text("state").notNull(),
+  stopReason: text("stop_reason"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const runnerCheckpoints = sqliteTable("runner_checkpoints", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => applicationRuns.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  state: text("state").notNull(),
+  safeMetadataJson: text("safe_metadata_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const finalActionConsents = sqliteTable("final_action_consents", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => applicationRuns.id, { onDelete: "cascade" }),
+  packetDigest: text("packet_digest").notNull(),
+  targetHost: text("target_host").notNull(),
+  formVersion: text("form_version").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const capabilityConfigs = sqliteTable("capability_configs", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  tenant: text("tenant").notNull(),
+  region: text("region"),
+  allowedHost: text("allowed_host").notNull(),
+  allowedPathPrefix: text("allowed_path_prefix").notNull(),
+  policyVersion: text("policy_version").notNull(),
+  approved: integer("approved", { mode: "boolean" }).notNull(),
+  expiresAt: text("expires_at").notNull(),
+  requestBudget: integer("request_budget").notNull(),
+  recordBudget: integer("record_budget").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const discoveryRuns = sqliteTable("discovery_runs", {
+  id: text("id").primaryKey(),
+  capabilityConfigId: text("capability_config_id")
+    .notNull()
+    .references(() => capabilityConfigs.id),
+  status: text("status").notNull(),
+  cursorJson: text("cursor_json"),
+  requestCount: integer("request_count").notNull(),
+  recordCount: integer("record_count").notNull(),
+  safeErrorCode: text("safe_error_code"),
+  startedAt: text("started_at").notNull(),
+  completedAt: text("completed_at"),
+});
+
 export const schema = {
   candidateProfiles,
   candidateProfileVersions,
@@ -310,4 +657,27 @@ export const schema = {
   applicationAnswers,
   auditEvents,
   settings,
+  sourceObservations,
+  jobVersions,
+  jobFieldEvidence,
+  requirementEvidence,
+  jobCorrections,
+  duplicateClusters,
+  duplicateClusterMembers,
+  evaluationVersions,
+  calibrationLabels,
+  calibrationPairs,
+  jobQueueEntries,
+  documentArtifacts,
+  documentApprovals,
+  applicationPackets,
+  applicationPacketDocuments,
+  applicationQuestions,
+  applicationAnswerVersions,
+  applicationEventsV2,
+  applicationRuns,
+  runnerCheckpoints,
+  finalActionConsents,
+  capabilityConfigs,
+  discoveryRuns,
 };

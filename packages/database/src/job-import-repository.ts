@@ -117,9 +117,12 @@ function normalizeImportedJob(
   if (!fields.title || !fields.company || !fields.location || !fields.description) {
     throw new Error("MISSING_REQUIRED_IMPORT_FIELDS");
   }
-  const postcode = fields.location.match(/\b(\d{4})\b/)?.[1] ?? null;
+  const postcode =
+    fields.beta?.location.postcode ?? fields.location.match(/\b(\d{4})\b/)?.[1] ?? null;
   const state =
-    fields.location.match(/\b(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b/i)?.[1]?.toUpperCase() ?? null;
+    fields.beta?.location.state ??
+    fields.location.match(/\b(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b/i)?.[1]?.toUpperCase() ??
+    null;
   const normalizedState = state as Job["state"];
   return JobSchema.parse({
     id,
@@ -130,10 +133,10 @@ function normalizeImportedJob(
     company: fields.company,
     category: fields.category ?? "Unclassified",
     location: fields.location,
-    suburb: null,
+    suburb: fields.beta?.location.suburb ?? null,
     postcode,
     state: normalizedState,
-    country: state || postcode ? "Australia" : "Unknown",
+    country: fields.beta?.location.country ?? (state || postcode ? "Australia" : "Unknown"),
     estimatedCommuteKm: null,
     employmentType: fields.employmentType,
     casual: fields.employmentType === "CASUAL",
@@ -141,28 +144,29 @@ function normalizeImportedJob(
     fullTime: fields.employmentType === "FULL_TIME",
     contract: fields.employmentType === "CONTRACT",
     internship: fields.employmentType === "INTERNSHIP",
-    salary: fields.salaryText
-      ? { minimum: null, maximum: null, currency: "AUD", period: "YEAR", text: fields.salaryText }
-      : null,
-    hoursPerWeek: null,
-    hoursPerFortnight: null,
-    schedule: { summary: null, fixed: null, shifts: [] },
+    salary: fields.beta?.salary ?? null,
+    hoursPerWeek: fields.beta?.hoursPerWeek ?? null,
+    hoursPerFortnight: fields.beta?.hoursPerFortnight ?? null,
+    schedule: fields.beta?.schedule ?? { summary: null, fixed: null, shifts: [] },
     description: fields.description,
     responsibilities: fields.responsibilities,
     requirements: fields.requirements,
-    preferredRequirements: [],
-    requiredSkills: [],
-    experienceRequirements: [],
-    educationRequirements: [],
-    licences: [],
-    vehicleRequirement: "UNKNOWN",
-    workRightsRequirement: "UNKNOWN",
-    physicalRequirements: [],
-    trainingProvided: null,
+    preferredRequirements: fields.beta?.preferredRequirements ?? [],
+    requiredSkills: fields.beta?.requiredSkills ?? [],
+    experienceRequirements: fields.beta?.experienceRequirements ?? [],
+    educationRequirements: fields.beta?.educationRequirements ?? [],
+    licences: fields.beta?.licences ?? [],
+    vehicleRequirement: fields.beta?.vehicleRequirement ?? "UNKNOWN",
+    workRightsRequirement: fields.beta?.workRightsRequirement ?? "UNKNOWN",
+    physicalRequirements: fields.beta?.physicalRequirements ?? [],
+    trainingProvided: fields.beta?.trainingProvided ?? null,
     ambiguities: [
       ...(fields.category ? [] : ["Job category was not supplied; shown as unclassified."]),
       ...(fields.employmentType === "UNKNOWN"
         ? ["Employment type was not explicitly detected."]
+        : []),
+      ...(fields.beta?.requirementEvidence.length === 0
+        ? ["Material requirement coverage is unknown because no typed evidence was extracted."]
         : []),
     ],
     datePosted: fields.datePosted,
@@ -179,6 +183,13 @@ function normalizeImportedJob(
         manuallyEditedFields: provenance.editedFields,
       },
       coverLetterRequired: fields.coverLetterRequired,
+      requirementEvidence: fields.beta?.requirementEvidence ?? [],
+      extractionCoverage: fields.beta?.extractionCoverage ?? null,
+      documentRequirementStates: fields.beta?.documentRequirements ?? {
+        resume: "UNKNOWN",
+        coverLetter: "UNKNOWN",
+        other: [],
+      },
     },
     eligibilityStatus: null,
     eligibilityReasons: [],
@@ -186,11 +197,11 @@ function normalizeImportedJob(
     fitReasons: [],
     applicationStatus: "NEW",
     documentRequirements: {
-      resumeRequired: true,
-      coverLetterRequired: fields.coverLetterRequired === true,
+      resumeRequired: fields.beta?.documentRequirements.resume !== "NOT_REQUIRED",
+      coverLetterRequired: fields.beta?.documentRequirements.coverLetter === "REQUIRED",
       other: [],
     },
-    coverLetterRequired: fields.coverLetterRequired === true,
+    coverLetterRequired: fields.beta?.documentRequirements.coverLetter === "REQUIRED",
   });
 }
 
@@ -841,11 +852,23 @@ export class JobImportRepository {
     entityId: string,
     metadata: Record<string, unknown>,
   ): void {
-    const safe = Object.fromEntries(
-      Object.entries(metadata).filter(
-        ([key]) => !/(content|description|fieldValue|profile|token|cookie|secret)/i.test(key),
-      ),
-    );
+    const allowlists: Record<string, readonly string[]> = {
+      "job_import.preview.ready": ["detectedJobs", "detectedSource", "acquisitionMethod"],
+      "job_import.evaluation.completed": ["profileState", "engineVersion"],
+      "job_import.evaluation.unavailable": ["profileState", "reasonCode"],
+    };
+    const common = [
+      "reasonCode",
+      "recordId",
+      "identityKind",
+      "detectedSource",
+      "acquisitionMethod",
+      "changedFields",
+      "result",
+      "count",
+    ];
+    const allowed = new Set([...(allowlists[eventType] ?? []), ...common]);
+    const safe = Object.fromEntries(Object.entries(metadata).filter(([key]) => allowed.has(key)));
     this.sqlite
       .prepare(
         `INSERT INTO audit_events
