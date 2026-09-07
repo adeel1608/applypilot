@@ -1916,3 +1916,12 @@ Stop and leave the phase `IN_PROGRESS` or `BLOCKED` for any trackable private pa
 - Process/migration gate: ports 3000 and 3100 had no listeners and no ApplyPilot Node/npm process was running. Migration preview resolved the documented default local SQLite path, returned exit `0`, and created no file. The active database and prospective timestamped backup both matched their narrow ignore rules.
 - Confirmed migration: `npm.cmd run db:migrate -- --confirm` returned `ApplyPilot local database is migrated and verified.` Migration `0000` foundation and `0001` intake tables were present, `user_version` was `1`, `PRAGMA integrity_check` passed, and `PRAGMA foreign_key_check` returned no issue. This was a fresh database, so backup created is `NO`; the database exists locally, is ignored, and is untracked.
 - Current stop/input gate: no real vacancy has been supplied or imported. The owner must now place exactly one complete visible advertisement in the local-only handoff and retain the original for side-by-side review. No job-board search/fetch, real import, eligibility/fit evaluation, document/application action, or submission has occurred. Phase 2.5A remains `IN_PROGRESS`.
+
+## Vacancy handoff checkpoint
+
+- Checked: 2026-09-07.
+- Boundary result: the single local handoff was non-empty, within the 1 MiB intake limit, ignored, untracked, and free of the bounded high-confidence credential patterns checked before local use.
+- Truth-review result: `FAIL`. The supplied content was an incomplete search-result excerpt with visibly truncated wording rather than the complete visible advertisement required by the approved activation procedure. Missing advertisement content cannot be fetched, inferred, or strengthened.
+- Import result: `NOT_STARTED`. ApplyPilot was stopped before any preview or confirmation. Ports 3000 and 3100 are closed, and the local database still has zero jobs, source records, import batches, import records, eligibility results, and fit scores.
+- Safety result: no job-board request, link follow, browser automation against a job board, application action, document generation, status advancement, or submission occurred. The private profile and migrated ignored database remain intact.
+- Current stop/input gate: replace the ignored local vacancy handoff with the complete visible advertisement for exactly one vacancy, then rerun the boundary and manual truth-review workflow. Phase 2.5A remains `IN_PROGRESS`.
