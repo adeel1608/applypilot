@@ -1,7 +1,9 @@
 import "server-only";
 
 import { open } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join } from "node:path";
+
+import { resolveLocalDataDirectory } from "./local-data-directory";
 
 import profileJson from "../../../data/profile.example.json";
 import {
@@ -19,15 +21,16 @@ const maximumPrivateProfileBytes = 1024 * 1024;
 const demoProfile = parseCandidateProfile(profileJson);
 
 export class LocalCandidateProfileProvider implements CandidateProfileProvider {
-  constructor(
-    private readonly privateProfilePath = resolve(process.cwd(), "data", "profile.private.json"),
-  ) {}
+  constructor(private readonly privateProfilePath?: string) {}
 
   async resolve(context: JobEvaluationContext): Promise<CandidateProfileResolution> {
     if (context === "DEMO_FIXTURE_JOB") return { state: "DEMO_PROFILE", profile: demoProfile };
     let handle;
     try {
-      handle = await open(this.privateProfilePath, "r");
+      const path =
+        this.privateProfilePath ?? join(resolveLocalDataDirectory(), "profile.private.json");
+      // The owner's runtime file is never a deployable build dependency.
+      handle = await open(/* turbopackIgnore: true */ path, "r");
       const stats = await handle.stat();
       if (!stats.isFile() || stats.size <= 0 || stats.size > maximumPrivateProfileBytes) {
         return { state: "INVALID_PRIVATE_PROFILE", reasonCode: "PRIVATE_PROFILE_INVALID" };

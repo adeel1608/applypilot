@@ -1,9 +1,9 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-05  
+Last updated: 2026-09-07
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `chore/phase-2-5a-local-activation-plan`
+Working branch: `fix/resolve-local-runtime-data`
 
 ## 1. Vision
 
@@ -1833,3 +1833,49 @@ Run the blueprint privacy audit without printing candidate/job values: clean Git
 
 Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
 ```
+
+# Phase 2.5A runtime data-path bugfix
+
+Status: `AWAITING_HUMAN_REVIEW`. Started 2026-09-07 on `fix/resolve-local-runtime-data`, from fresh `origin/main` at approved PR #7 merge `6f42b8f1edd5813d34c398aad56248555fae044d`. Work occurs in an isolated worktree with no real profile, vacancy, or database. The activation branch and its ignored local data remain preserved.
+
+## Problem, objective, and reproduction
+
+The documented npm workspace start changes the working directory to `apps/web`. The web profile provider and database resolver currently look under `process.cwd()/data`, whereas the root validation and migration commands use repository-root `data`. A valid profile is consequently reported missing and the migrated database is unavailable. A local HTTP check confirmed the profile-state mismatch before any real vacancy was staged or imported.
+
+Use only fictional temporary repositories to reproduce: create the ApplyPilot root manifest, `apps/web`, a valid fictional root profile, and a migrated fictional root database; start resolution with the workspace working directory. Expected: the same root profile/database as from repository root. Actual: missing profile and database. Workspace-local decoys must never override repository-root data.
+
+## Requirements, architecture, and proposed files
+
+- Add a shared server-only `apps/web/lib/local-data-directory.ts` resolver that walks ancestors from the launch directory to the nearest validated ApplyPilot root manifest and returns that root's `data` directory. Validate manifest shape with Zod; return a bounded error code if the repository cannot be identified. Do not search globally, create directories, relocate data, expose paths to client props, or use a public environment variable.
+- Use the resolver in `candidate-profile-provider.ts` and `local-database.ts`. Preserve explicit test profile paths, the 1 MiB/schema validation, demo isolation, database filename validation, schema-readiness gate, and no automatic migration. Resolve the default profile path inside the existing safe error boundary.
+- Add fictional regression coverage in `tests/security/local-runtime-paths.test.ts` for root/workspace launches, decoys, missing data, unknown roots, and invalid database filenames. No new dependency is needed.
+- Launch the existing fictional E2E server with the web workspace working directory, matching the documented npm runtime. Root-owned E2E migration/cleanup paths remain explicit. Update `docs/REAL_WORLD_JOB_INTAKE.md` to document the shared directory contract.
+
+## Data flow, risks, and privacy
+
+Launch directory -> validated repository manifest -> repository `data` -> existing server-only profile/database gates -> existing safe DTOs. This changes path selection only; no job parsing, scoring, candidate schema, SQL schema, migration, application behavior, or data format changes. Missing/unrecognized roots fail closed. The resolver must not select `apps/web/data`, an unrelated ancestor project, or another worktree. Runtime files remain ignored. Profile/vacancy bytes, hashes, contact details, and absolute private paths must not enter logs, Git, CI, or PR text.
+
+## Tests, rollback, acceptance, and exact steps
+
+1. Commit this blueprint before runtime code changes.
+2. Add and run fictional regressions against the old implementation; record the root/workspace failures.
+3. Implement the shared resolver, update its two consumers, align the E2E launch directory, and document behavior.
+4. Run focused tests, formatting, lint, strict typecheck, unit/security tests, integration tests, production build, fictional E2E, both dependency audits, and `git diff --check`.
+5. Verify only intended source/docs enter the diff and that the original activation data is unchanged; push and open an unmerged bugfix PR, wait for final-head CI, and stop for human review.
+
+Acceptance requires consistent root/workspace resolution, safe missing/invalid behavior, no implicit data creation or migration, passing local/CI gates, and no real-data artifact in the worktree/PR. Rollback is a normal revert or closing the unmerged PR; never delete or modify the original local profile/database. Phase 2.5A remains blocked pending bugfix review/merge and the still-unfinished real preview, import, evaluation, privacy audit, and activation gates.
+
+### Build-tracing refinement
+
+The first production build succeeded but warned that dynamic filesystem paths could trace the whole project into deployment output. Private runtime files must never be packaged. Apply the installed Next.js compiler's documented `turbopackIgnore` call annotation to these deliberate runtime-only filesystem/path operations and avoid redundant path resolution of the already-absolute working directory. Rebuild and inspect output trace manifests; use fictional ignored sentinel files to verify that local profile/database/private paths are absent. This is required to preserve the original privacy boundary, not an acceptance of the warning.
+
+## Bugfix execution results
+
+- Blueprint committed before runtime changes as `837a955`. Five fictional path regressions cover both launch locations, workspace decoys, missing root data, filename traversal/override, and an unrecognized root. The old implementation failed the workspace, decoy, override, and unrecognized-root expectations. Cold module-graph imports also initially exceeded test/hook timeouts; imports were moved outside the timed assertions with a bounded startup hook, and all five cases plus the two existing provider tests then passed.
+- The first `npm.cmd ci` attempted a native `node-gyp` rebuild and failed because Visual Studio C++ build tools are unavailable on this Windows host. A test retry while dependencies were incomplete failed to load its configuration. `npm.cmd ci --ignore-scripts` subsequently installed the unchanged lockfile successfully; the packaged SQLite native binary passed an in-memory query, and the final test runner was the locked Vitest `4.1.11`. No dependency/lockfile change or native toolchain installation is included.
+- The fresh worktree's Windows CRLF checkout caused the first formatting check to flag 146 files. `npm.cmd run format` normalized them; Git normalization confirmed that only the seven intended source/documentation files differ. A blueprint whitespace issue was corrected. No unrelated source changes were retained.
+- Final local gates: `npm.cmd run format:check`, `npm.cmd run lint`, and `npm.cmd run typecheck` passed. `npm.cmd test` passed 92 unit/security tests across 18 files; `npm.cmd run test:integration` passed 9 tests across 3 files. `npm.cmd run build` passed with 31 generated segments and no dynamic-filesystem tracing warnings after the refinement. `npm.cmd run test:e2e` passed all 9 fictional browser tests from the workspace launch directory. Both `npm.cmd audit` and `npm.cmd run audit:production` reported 0 vulnerabilities. `git diff --check` passed. E2E emitted only the existing non-fatal color-environment warnings.
+- Build privacy: three ignored fictional profile/private/database sentinels were present for the rebuilt artifact check. All 12 output trace manifests contained zero private runtime entries; the build contained zero sentinel-content matches. The three test files were removed after verification.
+- Production runtime proof: start the built app through the npm web workspace with a temporary valid fictional root profile. `/profile` returned HTTP 200 and `Private profile loaded`, while the unique fictional profile ID/name/email sentinels were absent from rendered HTML. The server was stopped and the temporary fictional profile removed; ports 3000, 3100, and 3200 have no listeners.
+- Real-data isolation: no real profile or vacancy was copied to this worktree. A non-disclosing scan of its 153 tracked files found zero matches for checked private contact/name/vacancy needles. The original runtime paths remain ignored; its database integrity is valid, with zero jobs, source records, import batches/records, eligibility/fit rows, applications, or generated documents. Repository visibility remains `PRIVATE`.
+- Handoff: open an unmerged bugfix PR and report its final-head CI result separately to avoid a recursive checkpoint-commit loop. Only this path-resolution defect is addressed. The complete real vacancy remains locally available, but its manual preview, import, evaluation, and final activation audit are unfinished. Review/merge this fix before refreshing and resuming the activation branch. No real source access, application action, or Phase 2.6 work occurred.

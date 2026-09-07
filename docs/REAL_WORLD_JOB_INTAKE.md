@@ -13,6 +13,8 @@ npm run db:migrate -- --confirm
 
 The first command previews the resolved path. The confirmed command checks database integrity, creates a timestamped backup when a database already exists, applies pending checked-in migrations, and runs integrity and foreign-key checks. The web application never migrates an existing database during startup.
 
+Run the setup commands from the repository root. The web application resolves that same root `data` directory when started through the npm web workspace, so `data/profile.private.json` and `data/applypilot.local.sqlite` do not move when the working directory is `apps/web`. Workspace-local `apps/web/data` files are not used. An unrecognized repository root fails closed; no data directory or database is created implicitly. The existing filename override remains limited to a SQLite basename within root `data`.
+
 Start the application and open `/import`. A preview is staged locally, but canonical jobs are not created until the user selects records and presses **Import selected**. Inferred splits require a separate acknowledgement. Changed content with an existing strong identity requires explicit update confirmation. Preview tokens expire after 30 minutes and cannot be replayed after confirmation.
 
 ## Pipeline and trust boundaries
