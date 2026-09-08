@@ -1,6 +1,10 @@
 # Source capability and policy review
 
-Reviewed 2026-09-07 using official documentation only. No real listing, search endpoint, authenticated account, or application URL was fetched for this review. Documentation access is not live discovery. The implementation still has **zero production `FETCH_ALLOWED` providers**.
+Reviewed 2026-09-07 using official documentation only. No real listing, search endpoint, authenticated account, or application URL was fetched for this review. Documentation access is not live discovery. The implementation has bounded Greenhouse and Lever GET readers but **zero enabled production capabilities**.
+
+## Beta Core implementation state — 2026-09-08
+
+Greenhouse list/detail and Lever paged list/detail are implemented behind one ignored `data/private/source-allowlist.json` boundary. Configuration must bind source, tenant, operation, exact HTTPS host/path, approval/policy version, expiry, byte/request/record/page budgets, and concurrency. DNS/address/redirect, credential URL, timeout, size, loop, 401/403/429, and capability checks fail closed. Discovery runs, pages, cursors, observations, and versions have durable safe metadata. Fictional injected-transport tests passed. No private allowlist was present and no real tenant call was authorised or made, so source-enabled Beta remains `SOURCE_READY_AWAITING_TENANT`.
 
 Each source needs an owner-approved capability record: source + tenant + operation + documented interface + terms/robots review date + allowed hosts + budgets + expiry + approval reference. An API being public does not by itself authorise this use. No account/tenant enumeration, hidden-endpoint reverse engineering, or security bypass. Missing permission or unclear evidence means disabled.
 

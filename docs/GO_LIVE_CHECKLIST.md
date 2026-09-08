@@ -1,39 +1,40 @@
 # Personal go-live gates and test matrix
 
-Status: proposed acceptance gates, not a claim all capabilities are implemented. Actual commands/results are in [PROJECT_PLAN](../PROJECT_PLAN.md). Release checkboxes remain open until their named release is independently reviewed.
+Status: manual-intake Beta gates implemented and privately exercised; final implementation PR review remains open. Source-enabled Beta and Personal Live V1 gates remain open. Exact commands/results are in [PROJECT_PLAN](../PROJECT_PLAN.md).
 
 ## Earliest safe use — eight answers
 
 1. Real pasted jobs can be used now for owner-reviewed local intake and conservative eligibility/fit inspection, with a valid local profile and migrated DB. Unparsed requirements remain unknown; scores are uncalibrated.
 2. Phase 2.5A establishes one real UI import/private evaluation and scoped privacy/regression evidence. It does not establish general extraction accuracy, document readiness or applications.
-3. Real automated discovery needs an approved source/tenant/read-only interface, R1 bounded reader, SSRF controls, idempotency/provenance and an authorised smoke. Currently zero fetch providers are enabled.
-4. CV tailoring needs R2 typed evidence and R3 all-field claim validation, templates, page/font/text checks, confined exports and owner preview.
-5. Assisted filling needs R4 approved packet, R5 supported target adapter, origin/session/privacy controls, disclosure consent, pause/recovery fixtures and policy review.
+3. Real automated discovery still needs an approved source/tenant/read-only interface and an authorised smoke. Bounded readers and controls exist, but zero capabilities are enabled.
+4. CV/letter preparation now uses typed verified evidence, semantic claim validation, template policy, page/font/text checks, confined exports, parity checks, and owner approval.
+5. Packet preparation and synthetic filling proofs exist. Real assisted filling still needs a supported target adapter and separate policy/owner approval.
 6. Final submission support needs frozen packet review, fresh one-use owner consent, approved target, exactly-once fixture proof and unknown-outcome reconciliation. No submit capability exists now.
 7. Cloud is unnecessary: recommend loopback UI, local SQLite and local runner for personal V1.
 8. Scheduling, alerts/email, broader sources, advanced analytics, AI and hosting can wait. Truth, privacy, recovery and immediate final review cannot.
 
 ## Release definitions
 
-| Level              | Entry criteria                                                                                                                                 | Exit / promotion criteria                                                                                     | Current assessment                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| LOCAL LIVE ALPHA   | Validated ignored private profile; reviewed/migrated DB; truthful real UI import; no source fetch/application action; privacy/regression gates | Owner accepts intake/scoring/unknown limitations and approves R0 evidence; stronger use waits for later gates | Demonstrated for supervised intake only; final gate results in project plan |
-| PERSONAL LIVE BETA | R0 approved; one approved reader; R2 evidence/identity fixes; R3/R4 truthful packet preview                                                    | Owner-reviewed golden jobs/documents; runner fixture and operational recovery proof before promotion          | NOT_READY                                                                   |
-| PERSONAL LIVE V1   | R0–R6 and mandatory R11 controls; one approved discovery and application path; full matrix; owner release approval                             | Scoped supported operation; regressions disable affected capability pending reviewed fix                      | NOT_READY                                                                   |
-| HOSTED PRODUCTION  | Separate R10/R11 authz/isolation/keys/pairing/retention/residency/security approval                                                            | Staging, restore, rollback, internet-facing acceptance and explicit deploy/spend authority                    | NOT_READY; unnecessary for personal V1                                      |
+| Level               | Entry criteria                                                                                                                                 | Exit / promotion criteria                                                                                     | Current assessment                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| LOCAL LIVE ALPHA    | Validated ignored private profile; reviewed/migrated DB; truthful real UI import; no source fetch/application action; privacy/regression gates | Owner accepts intake/scoring/unknown limitations and approves R0 evidence; stronger use waits for later gates | Demonstrated for supervised intake only; final gate results in project plan |
+| MANUAL-INTAKE BETA  | R0 approved; owner-supplied intake; R2 evidence/identity fixes; R3/R4 truthful packet preview                                                  | Final implementation PR review; continued owner review of every real artifact                                 | IMPLEMENTED; private smoke PASS; PR review pending                          |
+| SOURCE-ENABLED BETA | Manual-intake Beta plus one owner-approved read-only source/tenant capability and scoped smoke                                                 | Tenant policy/budget remains current; owner accepts source-specific residual risk                             | WAITING_FOR_APPROVED_TENANT; zero real calls                                |
+| PERSONAL LIVE V1    | R0–R6 and mandatory R11 controls; one approved discovery and application path; full matrix; owner release approval                             | Scoped supported operation; regressions disable affected capability pending reviewed fix                      | NOT_READY                                                                   |
+| HOSTED PRODUCTION   | Separate R10/R11 authz/isolation/keys/pairing/retention/residency/security approval                                                            | Staging, restore, rollback, internet-facing acceptance and explicit deploy/spend authority                    | NOT_READY; unnecessary for personal V1                                      |
 
 ## Release acceptance checklist
 
 - [ ] Exact source/tenant/runner capability and policy versions approved.
-- [ ] Legal limits, preferences and employer requirements remain distinct; unknown never becomes true.
-- [ ] Real jobs never use demo profiles; stale inputs invalidate evaluation/document/packet readiness.
-- [ ] Duplicates preserve every source and one canonical application state.
-- [ ] Ten CV templates and letters pass all-field claim, font, text, page and path gates.
-- [ ] Answers are tri-state; unknown mandatory answers block readiness.
-- [ ] Browser protection stops, disclosure consent and fresh single-application final review pass.
-- [ ] Paused/unknown-outcome runs and DB backups can be recovered without automatic resubmission.
-- [ ] Eight routes pass keyboard, mobile, loading, empty and failure-state acceptance.
-- [ ] Clean install, dependency/privacy/build/restore/shutdown gates pass at the exact reviewed head.
+- [x] Legal limits, preferences and employer requirements remain distinct; unknown never becomes true.
+- [x] Real jobs never use demo profiles; stale inputs invalidate evaluation/document/packet readiness.
+- [x] Duplicates preserve every source and one canonical application state.
+- [x] Ten CV categories and letters pass semantic claim, font, text, page, parity, and path gates.
+- [x] Answers are tri-state; unknown mandatory answers block readiness.
+- [x] Synthetic browser protection stops, disclosure consent, and fresh single-application final review pass.
+- [x] Paused/unknown-outcome runs and DB backups can be recovered without automatic resubmission.
+- [x] Default routes pass labelled-control and narrow-viewport acceptance; synthetic routes cover empty/error/stop states.
+- [ ] Exact-head CI and final human review pass for the implementation PR.
 - [ ] Human reviews the final implementation PR and separately authorises release.
 
 ## Test matrix

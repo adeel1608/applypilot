@@ -24,8 +24,94 @@ describe("database foundation", () => {
         "applicationAnswers",
         "auditEvents",
         "settings",
+        "sourceObservations",
+        "jobVersions",
+        "requirementEvidence",
+        "evaluationVersions",
+        "jobQueueEntries",
+        "documentArtifacts",
+        "applicationPackets",
+        "applicationRuns",
+        "finalActionConsents",
+        "capabilityConfigs",
+        "discoveryRuns",
       ]),
     );
+  });
+
+  it("upgrades an existing intake database additively with observation and job history", () => {
+    const foundation = readFileSync(
+      new URL("../drizzle/0000_applypilot_foundation.sql", import.meta.url),
+      "utf8",
+    );
+    const intake = readFileSync(
+      new URL("../drizzle/0001_real_world_job_intake.sql", import.meta.url),
+      "utf8",
+    );
+    const beta = readFileSync(
+      new URL("../drizzle/0002_personal_live_beta_core.sql", import.meta.url),
+      "utf8",
+    );
+    const sqlite = new BetterSqlite3(":memory:");
+    sqlite.exec(foundation);
+    sqlite
+      .prepare(
+        "INSERT INTO job_sources (id,name,capabilities_json,enabled,created_at,updated_at) VALUES ('source:fixture','FIXTURE','{}',1,'now','now')",
+      )
+      .run();
+    sqlite
+      .prepare(
+        "INSERT INTO jobs (id,title,company,category,location,employment_type,normalized_json,application_status,date_discovered,created_at,updated_at) VALUES ('job:1','Role','Company','Category','Sydney','PART_TIME','{}','NEW','now','now','now')",
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO job_source_records
+          (id,job_id,source_id,external_id,source_url,raw_payload_json,payload_hash,discovered_at,fetched_at)
+         VALUES ('record:1','job:1','source:fixture','fixture-1','https://careers.example.test/job/1',?,?,'now','now')`,
+      )
+      .run(JSON.stringify({ accessMode: "FIXTURE_ONLY" }), "b".repeat(64));
+
+    sqlite.exec(intake);
+    sqlite.exec(beta);
+
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(2);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("applies all migrations to a fresh empty database", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+    ]) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    const tables = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(tables).toEqual(
+      expect.arrayContaining([
+        "source_observations",
+        "job_versions",
+        "evaluation_versions",
+        "document_artifacts",
+        "application_packets",
+        "application_runs",
+        "capability_configs",
+      ]),
+    );
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
   });
 
   it("upgrades the foundation schema without fabricating source identity", () => {

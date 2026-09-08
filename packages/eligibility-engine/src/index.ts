@@ -7,6 +7,9 @@ import {
 } from "@applypilot/candidate-profile";
 import type { EligibilityStatus, Job } from "@applypilot/job-model";
 import { normalizeText, VerificationStatus } from "@applypilot/shared";
+import type { EvaluationEvidenceClass } from "./types";
+
+export * from "./types";
 
 export const ELIGIBILITY_ENGINE_VERSION = "1.0.0";
 
@@ -18,6 +21,8 @@ export interface EligibilityReason {
   message: string;
   jobFields: string[];
   profileFields: string[];
+  evidenceClass: EvaluationEvidenceClass;
+  evidenceReferences: string[];
 }
 
 export interface EligibilityResult {
@@ -56,7 +61,18 @@ export function evaluateEligibility(job: Job, profile: CandidateProfile): Eligib
     message: string,
     jobFields: string[],
     profileFields: string[],
-  ) => reasons.push({ code, severity, message, jobFields, profileFields });
+    evidenceClass: EvaluationEvidenceClass = "EMPLOYER_REQUIREMENT",
+    evidenceReferences: string[] = jobFields,
+  ) =>
+    reasons.push({
+      code,
+      severity,
+      message,
+      jobFields,
+      profileFields,
+      evidenceClass,
+      evidenceReferences,
+    });
 
   if (job.workRightsRequirement === "UNRESTRICTED_AUSTRALIA") {
     if (profile.workRights.verification !== VerificationStatus.VERIFIED) {
@@ -204,32 +220,56 @@ export function evaluateEligibility(job: Job, profile: CandidateProfile): Eligib
   ) {
     add(
       "WEEKLY_HOURS_EXCEED_LIMIT",
-      "BLOCKER",
-      `The minimum ${weeklyMinimum} hours per week exceeds the verified ${profile.preferences.maximumHoursPerWeek.value}-hour limit.`,
+      "REVIEW",
+      "The stated weekly minimum exceeds the candidate's verified weekly preference and needs an explicit preference decision.",
       ["hoursPerWeek"],
       ["preferences.maximumHoursPerWeek"],
+      "CANDIDATE_PREFERENCE",
     );
   }
 
-  const fortnightMinimum =
-    job.hoursPerFortnight?.minimum ??
-    (weeklyMinimum === null || weeklyMinimum === undefined ? null : weeklyMinimum * 2);
-  const candidateFortnightLimit = Math.min(
-    profile.preferences.maximumHoursPerFortnight.value,
-    profile.workRights.value.maximumHoursPerFortnight ?? Number.POSITIVE_INFINITY,
-  );
+  const fortnightMinimum = job.hoursPerFortnight?.minimum ?? null;
+  if (
+    fortnightMinimum !== null &&
+    profile.workRights.verification === VerificationStatus.VERIFIED &&
+    profile.workRights.value.maximumHoursPerFortnight !== null &&
+    fortnightMinimum > profile.workRights.value.maximumHoursPerFortnight
+  ) {
+    add(
+      "LEGAL_FORTNIGHTLY_HOURS_LIMIT_EXCEEDED",
+      "BLOCKER",
+      "The stated fortnightly minimum exceeds the verified current work-right hours limit.",
+      ["hoursPerFortnight"],
+      ["workRights"],
+      "LEGAL_LIMIT",
+    );
+  }
   if (
     fortnightMinimum !== null &&
     profile.preferences.maximumHoursPerFortnight.verification === VerificationStatus.VERIFIED &&
-    profile.workRights.verification === VerificationStatus.VERIFIED &&
-    fortnightMinimum > candidateFortnightLimit
+    fortnightMinimum > profile.preferences.maximumHoursPerFortnight.value
   ) {
     add(
-      "FORTNIGHTLY_HOURS_EXCEED_LIMIT",
-      "BLOCKER",
-      `The minimum ${fortnightMinimum} hours per fortnight exceeds the verified ${candidateFortnightLimit}-hour limit.`,
-      ["hoursPerFortnight", "hoursPerWeek"],
-      ["preferences.maximumHoursPerFortnight", "workRights"],
+      "CANDIDATE_FORTNIGHTLY_HOURS_PREFERENCE_EXCEEDED",
+      "REVIEW",
+      "The stated fortnightly minimum exceeds the candidate's verified preference and needs an explicit preference decision.",
+      ["hoursPerFortnight"],
+      ["preferences.maximumHoursPerFortnight"],
+      "CANDIDATE_PREFERENCE",
+    );
+  }
+  if (
+    profile.workRights.verification === VerificationStatus.VERIFIED &&
+    profile.workRights.value.maximumHoursPerFortnight !== null &&
+    fortnightMinimum === null
+  ) {
+    add(
+      "JOB_HOURS_UNKNOWN_FOR_LEGAL_LIMIT",
+      "REVIEW",
+      "The job does not state fortnightly hours, so the verified legal hours limit cannot be assessed.",
+      ["hoursPerFortnight"],
+      ["workRights"],
+      "LEGAL_LIMIT",
     );
   }
 
@@ -244,6 +284,35 @@ export function evaluateEligibility(job: Job, profile: CandidateProfile): Eligib
       `Estimated commute of ${job.estimatedCommuteKm} km exceeds the verified ${profile.transport.maximumCommuteKm.value} km limit.`,
       ["estimatedCommuteKm"],
       ["transport.maximumCommuteKm"],
+      "CANDIDATE_PREFERENCE",
+    );
+  }
+
+  if (
+    job.estimatedCommuteKm === null &&
+    profile.transport.maximumCommuteKm.verification === VerificationStatus.VERIFIED
+  ) {
+    add(
+      "COMMUTE_UNKNOWN",
+      "REVIEW",
+      "Commute distance is unknown and was not inferred from the location.",
+      ["estimatedCommuteKm"],
+      ["transport.maximumCommuteKm"],
+      "CANDIDATE_PREFERENCE",
+    );
+  }
+
+  if (
+    (job.schedule.rosterType === "VARIABLE" || job.schedule.rosterType === "FLEXIBLE") &&
+    job.schedule.shifts.length === 0
+  ) {
+    add(
+      "JOB_ROSTER_UNKNOWN",
+      "REVIEW",
+      "The role describes a variable or flexible roster without enough shift detail to establish compatibility.",
+      ["schedule"],
+      ["availability"],
+      "EMPLOYER_REQUIREMENT",
     );
   }
 

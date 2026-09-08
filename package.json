@@ -24,12 +24,25 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate-local-database.ts",
+    "db:status": "tsx scripts/database-status.ts",
+    "migration:status": "tsx scripts/database-status.ts",
+    "backup": "tsx scripts/backup.ts",
+    "restore": "tsx scripts/restore.ts",
+    "privacy:audit": "tsx scripts/privacy-audit.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "preflight": "npm run doctor && npm run db:status && npm run privacy:audit && tsx scripts/preflight-summary.ts",
+    "quality": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build",
+    "release:check": "npm run doctor && npm run db:status && tsx scripts/preflight-summary.ts && npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build && npm run test:e2e && npm run privacy:audit && npm audit && npm run audit:production && tsx scripts/release-summary.ts --quality-gates-complete",
+    "local:start": "tsx scripts/local-start.ts",
+    "local:stop": "tsx scripts/local-stop.ts",
     "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
+    "smoke:private-beta": "tsx scripts/private-beta-smoke.ts",
     "audit:production": "npm audit --omit=dev"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
+    "docx": "9.7.1",
     "drizzle-orm": "0.45.2",
     "next": "16.3.4",
     "react": "19.2.8",
@@ -44,10 +57,11 @@
     "@types/react-dom": "19.2.2",
     "eslint": "9.39.1",
     "eslint-config-next": "16.3.4",
+    "pdfjs-dist": "6.3.289",
     "playwright": "1.63.0",
     "prettier": "3.6.2",
-    "typescript": "5.9.3",
     "tsx": "4.20.6",
+    "typescript": "5.9.3",
     "vitest": "4.1.11"
   }
 }

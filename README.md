@@ -4,13 +4,13 @@ ApplyPilot is a local-first job discovery, matching, document-preparation, assis
 
 ## Current status
 
-Phase 0/1, Phase 2, Phase 2.5 and the approved runtime-path fix PR #8 are merged. Phase 2.5A has demonstrated one real, owner-reviewed local UI import and private-profile evaluation; its activation/master-plan checkpoint awaits human review. Intake supports bounded paste/upload parsing, inert HTML, preview/edit/skip, explicit confirmation, SQLite identity/provenance and server-only private evaluation. Several requirements remain unextracted/unknown and fit weights are uncalibrated. No real private profile, vacancy or database is committed.
+Phase 0/1, Phase 2, Phase 2.5, Phase 2.5A, and the Personal Live Beta Core implementation are complete on the current feature branch. Manual-intake Beta is ready for local owner use pending final pull-request review: bounded paste/upload intake, immutable evidence and evaluation versions, conservative matching, corrections, private PDF/DOCX CV and optional cover-letter generation, digest-bound approvals, packet preparation, and durable application tracking are connected through the default UI. Unknown evidence remains unknown, fit is explainable rather than predictive, and the owner must review every generated artifact. No real private profile, vacancy, database, or generated document is committed.
 
 GitHub repository `adeel1608/applypilot` is PUBLIC by explicit owner authorisation. Candidate/runtime data remains LOCAL and ignored. npm `"private": true` remains unchanged to prevent accidental package publication.
 
-The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) defines R0–R11, [go-live gates](docs/GO_LIVE_CHECKLIST.md), [source strategy](docs/SOURCE_CAPABILITY_MATRIX.md), [threat model](docs/THREAT_MODEL_V1.md) and [local runbook](docs/RELEASE_RUNBOOK.md). These are proposals, not implemented capabilities. Current use is supervised local intake/review only; beta, full V1 and hosted production are not ready.
+The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) defines R0–R11, [go-live gates](docs/GO_LIVE_CHECKLIST.md), [source strategy](docs/SOURCE_CAPABILITY_MATRIX.md), [threat model](docs/THREAT_MODEL_V1.md), and [local runbook](docs/RELEASE_RUNBOOK.md). The Beta Core implements the manual local path and synthetic safety proofs. Source-enabled Beta remains waiting for an owner-approved private tenant and scoped read-only smoke. Personal Live V1 and hosted production are not ready.
 
-There are no live job-board connections, deployments, or application-submission capabilities. SEEK public discovery, public job details, URL fetching, and browser automation are disabled after technical/policy review. LinkedIn remains assisted/manual only.
+There are no enabled live job-board connections, deployments, real-target browser adapters, or application-submission capabilities. Default-disabled, bounded Greenhouse and Lever GET readers are implemented but cannot call a tenant without an ignored owner-approved allowlist. SEEK network modes remain disabled after technical/policy review, and LinkedIn remains assisted/manual only.
 
 ## Why ApplyPilot exists
 
@@ -42,7 +42,7 @@ npm run db:migrate -- --confirm
 npm run dev --workspace @applypilot/web -- --hostname 127.0.0.1
 ```
 
-Open `http://localhost:3000`. Use `/import` for local paste/upload intake. The first migration command previews the path; the confirmed command backs up an existing ignored database, applies the Phase 2.5 migration, and verifies integrity. The app does not auto-migrate at startup.
+Open `http://localhost:3000`. Use `/import` for local paste/upload intake, `/jobs` for the real queue and document workflow, `/applications` for packet/application tracking, and `/sources` for safe capability status. The first migration command previews the path; the confirmed command creates and verifies a consistent ignored backup, applies pending additive migrations, and verifies integrity and foreign keys. The app does not auto-migrate at startup.
 
 Only the fictional `data/profile.example.json` is committed and rendered as demo content. A local `data/profile.private.json` with the same schema is Git-ignored, loaded only on the server, and required to evaluate real imported jobs. Without a valid private profile, imports remain usable but explicitly not evaluated.
 
@@ -68,14 +68,14 @@ Generate the fictional ATS-friendly resume demonstration with:
 npm run generate:example-resume
 ```
 
-The generated PDF is a local ignored artifact under `output/pdf/`.
+The generated PDF is a local ignored artifact under `data/private/generated/`.
 
 ## Security model
 
 - Candidate claims must have verified truth-store provenance.
 - Unknown or ambiguous eligibility inputs require review.
 - Private profiles, databases, generated documents, browser state, credentials, and identity material are ignored by Git.
-- Future authenticated browser automation belongs in a local runner.
+- Real authenticated browser automation remains disabled and would belong in a separately approved local runner.
 - CAPTCHA, MFA, access controls, rate limits, bot detection, and website restrictions are stop conditions.
 - Final submission always requires explicit human confirmation.
 

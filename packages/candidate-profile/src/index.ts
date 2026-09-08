@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import { normalizeText, VerificationStatus } from "@applypilot/shared";
@@ -78,6 +80,18 @@ export const CandidateProfileSchema = z
         verification: VerificationStatusSchema,
       }),
     ),
+    projects: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          summary: z.string().min(1),
+          bullets: z.array(z.string().min(1)),
+          skills: z.array(z.string().min(1)).default([]),
+          verification: VerificationStatusSchema,
+        }),
+      )
+      .default([]),
     verifiedAchievements: z.array(VerifiedAchievementSchema),
     skills: z.array(
       z.object({
@@ -159,11 +173,24 @@ export const CandidateProfileSchema = z
           verification: VerificationStatusSchema,
         }),
       ),
+      dateWindows: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            startDate: z.iso.date(),
+            endDate: z.iso.date(),
+            available: z.boolean(),
+            verification: VerificationStatusSchema,
+          }),
+        )
+        .optional(),
     }),
     transport: z.object({
       vehicleAccess: profileFactSchema(z.boolean()),
       modes: z.array(z.enum(["WALK", "BICYCLE", "PUBLIC_TRANSPORT", "CAR", "OTHER"])),
       maximumCommuteKm: profileFactSchema(z.number().nonnegative()),
+      maximumCommuteMinutes: profileFactSchema(z.number().int().nonnegative()).optional(),
     }),
     preferences: z.object({
       preferredLocations: z.array(z.string().min(1)),
@@ -175,6 +202,13 @@ export const CandidateProfileSchema = z
       maximumHoursPerFortnight: profileFactSchema(z.number().positive()),
       earliestStartDate: profileFactSchema(z.iso.date()).optional(),
       salaryExpectation: profileFactSchema(z.string().min(1)).optional(),
+      signalVerification: z
+        .object({
+          preferredLocations: VerificationStatusSchema,
+          preferredWorkTypes: VerificationStatusSchema,
+          preferredCategories: VerificationStatusSchema,
+        })
+        .optional(),
     }),
     unsupportedExperience: z.array(z.string().min(1)),
     forbiddenClaims: z.array(z.string().min(1)),
@@ -214,6 +248,16 @@ export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
 
 export function parseCandidateProfile(input: unknown): CandidateProfile {
   return CandidateProfileSchema.parse(input);
+}
+
+/**
+ * Hashes the parsed, schema-ordered profile snapshot used by persistence and
+ * document-generation consistency checks. Unknown input keys are deliberately
+ * excluded by the schema boundary before hashing.
+ */
+export function candidateProfileContentHash(input: CandidateProfile): string {
+  const profile = CandidateProfileSchema.parse(input);
+  return createHash("sha256").update(JSON.stringify(profile)).digest("hex");
 }
 
 export function isVerified<T>(fact: ProfileFact<T> | undefined): fact is ProfileFact<T> {

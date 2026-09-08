@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./beta";
+
 export const JobSourceSchema = z.enum([
   "SEEK",
   "INDEED",
@@ -70,6 +72,7 @@ export const JobSchema = z.object({
   state: z.enum(["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"]).nullable(),
   country: z.string().min(1),
   estimatedCommuteKm: z.number().nonnegative().nullable(),
+  estimatedCommuteMinutes: z.number().int().nonnegative().nullable().optional(),
   employmentType: EmploymentTypeSchema,
   casual: z.boolean(),
   partTime: z.boolean(),
@@ -100,6 +103,8 @@ export const JobSchema = z.object({
   schedule: z.object({
     summary: z.string().min(1).nullable(),
     fixed: z.boolean().nullable(),
+    rosterType: z.enum(["FIXED", "VARIABLE", "FLEXIBLE", "UNKNOWN"]).optional(),
+    timezone: z.string().min(1).optional(),
     shifts: z.array(
       z.object({
         day: DaySchema,

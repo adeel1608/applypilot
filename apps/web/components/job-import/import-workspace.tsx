@@ -2,13 +2,7 @@
 
 import { useActionState, useState } from "react";
 
-import {
-  confirmImportAction,
-  prepareImportAction,
-  type ImportActionState,
-} from "@web/app/import/actions";
-
-const initialImportActionState: ImportActionState = { status: "IDLE" };
+import { confirmImportAction, prepareImportAction } from "@web/app/import/actions";
 
 const sources = [
   ["", "Auto-detect"],
@@ -22,20 +16,20 @@ const sources = [
   ["UNKNOWN", "Unknown"],
 ] as const;
 
-export function ImportWorkspace() {
+export function ImportWorkspace({ initialMutationNonce }: { initialMutationNonce: string }) {
   const [mode, setMode] = useState("PASTED_SINGLE");
-  const [prepareState, prepareAction, preparePending] = useActionState(
-    prepareImportAction,
-    initialImportActionState,
-  );
-  const [confirmState, confirmAction, confirmPending] = useActionState(
-    confirmImportAction,
-    initialImportActionState,
-  );
+  const [prepareState, prepareAction, preparePending] = useActionState(prepareImportAction, {
+    status: "IDLE",
+    mutationNonce: initialMutationNonce,
+  });
+  const [confirmState, confirmAction, confirmPending] = useActionState(confirmImportAction, {
+    status: "IDLE",
+  });
 
   return (
     <div className="page-stack">
       <form action={prepareAction} className="panel import-form">
+        <input type="hidden" name="mutationNonce" value={prepareState.mutationNonce ?? ""} />
         <div className="form-grid">
           <label>
             Import method
@@ -120,6 +114,11 @@ export function ImportWorkspace() {
 
       {prepareState.preview && (
         <form action={confirmAction} className="page-stack" aria-label="Import preview">
+          <input
+            type="hidden"
+            name="mutationNonce"
+            value={confirmState.mutationNonce ?? prepareState.preview.confirmMutationNonce}
+          />
           <input type="hidden" name="importId" value={prepareState.preview.importId} />
           <input type="hidden" name="previewToken" value={prepareState.preview.previewToken} />
           <section className="panel">

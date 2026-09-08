@@ -6,6 +6,8 @@ import { schema } from "./schema";
 export * from "./schema";
 export * from "./job-discovery-repository";
 export * from "./job-import-repository";
+export * from "./document-consistency";
+export * from "./beta-repository";
 
 export function openApplyPilotDatabase(path: string) {
   const sqlite = new BetterSqlite3(path);

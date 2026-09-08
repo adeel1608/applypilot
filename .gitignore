@@ -35,6 +35,7 @@ referees.private.*
 *identity-document*
 *tax-information*
 *bank-information*
+vacancy.txt
 
 # Local databases and journals
 *.db

@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 
 import { ImportWorkspace } from "@web/components/job-import/import-workspace";
+import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 
 export const metadata: Metadata = { title: "Import jobs" };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default function ImportJobsPage() {
+export default async function ImportJobsPage() {
+  const mutationNonce = await issueLocalMutationNonce("IMPORT_PREPARE", "/import");
   return (
     <div className="page-stack">
       <section className="page-heading">
@@ -26,7 +28,7 @@ export default function ImportJobsPage() {
           reprocessing. Phase 2.5 has no automatic cleanup, export, delete, or purge control.
         </p>
       </section>
-      <ImportWorkspace />
+      <ImportWorkspace initialMutationNonce={mutationNonce} />
     </div>
   );
 }

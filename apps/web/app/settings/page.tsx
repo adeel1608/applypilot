@@ -5,10 +5,12 @@ export const metadata: Metadata = { title: "Settings" };
 const safeguards = [
   ["Final submission", "Always requires human confirmation", "Locked"],
   ["LinkedIn discovery", "Assisted / manual only", "Locked"],
-  ["Browser sessions", "Future local runner only", "Planned"],
+  ["Browser sessions", "Process-local session and one-use mutation nonces", "Available"],
   ["AI provider", "None required", "Off"],
   ["SEEK adapter", "Fixture-only discovery; local user-supplied content parsing", "Available"],
   ["SEEK live modes", "Public discovery, details, URL fetch, and browser automation", "Disabled"],
+  ["Greenhouse / Lever", "Owner-started GET readers; private tenant allowlist required", "Waiting"],
+  ["Real application runner", "Target-specific review and approval required", "Disabled"],
 ] as const;
 
 export default function SettingsPage() {

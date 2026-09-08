@@ -3,8 +3,8 @@ import {
   verifiedQualificationNames,
   verifiedSkillNames,
 } from "@applypilot/candidate-profile";
-import type { Job } from "@applypilot/job-model";
-import { clamp, normalizeText } from "@applypilot/shared";
+import type { EvaluationCoverage, Job } from "@applypilot/job-model";
+import { clamp, normalizeText, VerificationStatus } from "@applypilot/shared";
 import type { EligibilityResult } from "@applypilot/eligibility-engine";
 
 export const FIT_SCORER_VERSION = "1.0.0";
@@ -21,6 +21,8 @@ export interface FitScoreResult {
   negative: string[];
   contributions: FitContribution[];
   engineVersion: string;
+  coverage: EvaluationCoverage;
+  recommended: boolean;
 }
 
 function matchesAny(values: readonly string[], target: string): boolean {
@@ -40,6 +42,13 @@ export function scoreJobFit(
   const add = (category: string, points: number, explanation: string) =>
     contributions.push({ category, points, explanation });
 
+  const locationPreferencesVerified =
+    profile.preferences.signalVerification?.preferredLocations === VerificationStatus.VERIFIED;
+  const workTypePreferencesVerified =
+    profile.preferences.signalVerification?.preferredWorkTypes === VerificationStatus.VERIFIED;
+  const categoryPreferencesVerified =
+    profile.preferences.signalVerification?.preferredCategories === VerificationStatus.VERIFIED;
+
   if (eligibility.status === "ELIGIBLE") {
     add("eligibility", 10, "No hard eligibility blockers");
   } else if (eligibility.status === "REVIEW_REQUIRED") {
@@ -48,10 +57,15 @@ export function scoreJobFit(
     add("eligibility", -35, "Verified eligibility blocker present");
   }
 
-  if (job.suburb && matchesAny(profile.preferences.preferredLocations, job.suburb)) {
+  if (
+    locationPreferencesVerified &&
+    job.suburb &&
+    matchesAny(profile.preferences.preferredLocations, job.suburb)
+  ) {
     add("location", 8, `${job.suburb} is a preferred location`);
   } else if (
     job.estimatedCommuteKm !== null &&
+    profile.transport.maximumCommuteKm.verification === VerificationStatus.VERIFIED &&
     job.estimatedCommuteKm <= profile.transport.maximumCommuteKm.value
   ) {
     add("commute", 4, `${job.estimatedCommuteKm} km commute is within the configured limit`);
@@ -60,11 +74,12 @@ export function scoreJobFit(
   }
 
   if (
+    workTypePreferencesVerified &&
     job.employmentType !== "UNKNOWN" &&
     profile.preferences.preferredWorkTypes.includes(job.employmentType)
   ) {
     add("employment_type", 8, `${job.employmentType.replaceAll("_", " ")} work is preferred`);
-  } else if (job.employmentType !== "UNKNOWN") {
+  } else if (workTypePreferencesVerified && job.employmentType !== "UNKNOWN") {
     add("employment_type", -4, `${job.employmentType.replaceAll("_", " ")} work is not preferred`);
   }
 
@@ -88,7 +103,9 @@ export function scoreJobFit(
 
   const evidence = [
     ...skills,
-    ...profile.employment.flatMap(({ title, responsibilities }) => [title, ...responsibilities]),
+    ...profile.employment
+      .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
+      .flatMap(({ title, responsibilities }) => [title, ...responsibilities]),
   ];
   const supportedExperience = job.experienceRequirements.filter((requirement) =>
     matchesAny(evidence, requirement.key),
@@ -125,9 +142,12 @@ export function scoreJobFit(
     add("training", 5, "Training is provided");
   }
 
-  if (matchesAny(profile.preferences.preferredCategories, job.category)) {
+  if (
+    categoryPreferencesVerified &&
+    matchesAny(profile.preferences.preferredCategories, job.category)
+  ) {
     add("category", 8, `${job.category} is a preferred category`);
-  } else {
+  } else if (categoryPreferencesVerified) {
     add("category", -3, `${job.category} is outside preferred categories`);
   }
 
@@ -147,6 +167,33 @@ export function scoreJobFit(
 
   const rawScore = 50 + contributions.reduce((sum, contribution) => sum + contribution.points, 0);
   const score = Math.round(clamp(rawScore, 0, 100));
+  const dimensions = [
+    [
+      "location",
+      Boolean(job.suburb || job.estimatedCommuteKm !== null) && locationPreferencesVerified,
+    ],
+    ["employment_type", job.employmentType !== "UNKNOWN" && workTypePreferencesVerified],
+    ["skills", job.requiredSkills.length > 0],
+    ["experience", job.experienceRequirements.length > 0],
+    ["education", job.educationRequirements.length > 0],
+    ["category", categoryPreferencesVerified],
+    ["schedule", job.schedule.shifts.length > 0 || job.schedule.rosterType === "FIXED"],
+    ["hours", job.hoursPerWeek !== null || job.hoursPerFortnight !== null],
+    ["work_rights", job.workRightsRequirement !== "UNKNOWN"],
+    ["vehicle", job.vehicleRequirement !== "UNKNOWN"],
+  ] as const;
+  const known = dimensions.filter(([, value]) => value).length;
+  const unknown = dimensions.length - known;
+  const percent = Math.round((known / dimensions.length) * 100);
+  const coverage: EvaluationCoverage = {
+    known,
+    unknown,
+    ambiguous: job.ambiguities.length,
+    notApplicable: 0,
+    percent,
+    confidence: percent >= 80 ? "HIGH" : percent >= 50 ? "MEDIUM" : "LOW",
+    missingDimensions: dimensions.filter(([, value]) => !value).map(([name]) => name),
+  };
 
   return {
     score,
@@ -158,5 +205,7 @@ export function scoreJobFit(
       .map(({ explanation }) => `- ${explanation}`),
     contributions,
     engineVersion: FIT_SCORER_VERSION,
+    coverage,
+    recommended: eligibility.status !== "INELIGIBLE" && score >= 70,
   };
 }

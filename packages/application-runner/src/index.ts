@@ -1,6 +1,8 @@
 import type { CandidateProfile } from "@applypilot/candidate-profile";
 import type { Job } from "@applypilot/job-model";
 
+export * from "./beta";
+
 export const ApplicationRunnerMode = {
   DISCOVERY_ONLY: "DISCOVERY_ONLY",
   ASSISTED_FILL: "ASSISTED_FILL",

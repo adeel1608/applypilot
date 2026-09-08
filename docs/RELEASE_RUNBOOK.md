@@ -1,6 +1,6 @@
 # Local release and recovery runbook
 
-Status: current safe commands plus proposed tooling contracts. Proposed commands do not exist yet. This documentation task implements no release script, scheduler, service, dependency or deployment.
+Status: executable local Beta Core operations. These commands do not enable live sources, a real application target, scheduling, hosting, or deployment.
 
 ## Current local commands
 
@@ -10,16 +10,20 @@ Use repository root, Node 24, reviewed lockfile and personal account `adeel1608`
 gh api user --jq ".login"
 git status --short --branch
 npm.cmd run profile:validate
+npm.cmd run doctor
+npm.cmd run preflight
 npm.cmd run db:migrate
 ```
 
-Migration above previews the exact path. Actual migration needs reviewed schema/backup and explicit confirmation; no startup migration. Never put private values in command arguments/output.
+Migration previews the exact path and pending versions. `npm.cmd run db:migrate -- --confirm` creates and verifies a consistent ignored backup before applying additive migrations, then verifies schema, integrity, and foreign keys. No startup migration occurs. Never put private values in command arguments/output.
 
 ```powershell
-npm.cmd run dev --workspace @applypilot/web -- --hostname 127.0.0.1
+npm.cmd run local:start
+# use the loopback URL reported by the command
+npm.cmd run local:stop
 ```
 
-Use `/profile`, `/import`, `/jobs` and detail for supervised local intake. Source URLs do not authorise fetching. Missing/invalid private profile never falls back to demo. No public bind/tunnel; local-first does not mean internet-safe. Stop only the owned server/browser session, never every Node/browser process; verify the owned port closes and DB handles release. Do not delete runtime files to reset state.
+Use `/profile`, `/import`, `/jobs` and detail, `/applications`, and `/sources` for supervised local intake. Source URLs do not authorise fetching. Missing/invalid private profile never falls back to demo. `local:start` binds only `127.0.0.1`, disables synthetic routes, does not migrate or call a source, and records ownership metadata below ignored `data/private/runtime`. `local:stop` terminates only the verified owned process. No public bind/tunnel; local-first does not mean internet-safe. Do not delete runtime files to reset state.
 
 ```powershell
 npm.cmd run format:check
@@ -29,12 +33,14 @@ npm.cmd test
 npm.cmd run test:integration
 npm.cmd run build
 npm.cmd run test:e2e
+npm.cmd run privacy:audit
+npm.cmd run release:check
 npm.cmd audit
 npm.cmd run audit:production
 git diff --check
 ```
 
-CI currently runs install, format, lint, typecheck, unit/integration, build and browser checks with read-only permissions. Local dependency/privacy/release evidence is additional; this runbook does not claim CI enforces it. Immutable Action SHA pinning is proposed in R11, not currently implemented.
+CI runs install, format, lint, typecheck, unit/integration, build, and browser checks with read-only permissions and immutable action revisions. Local private-profile/database smoke and local history/artifact/privacy evidence remain additional because CI never receives those private assets.
 
 ### Private-data isolation during local tests
 
@@ -42,9 +48,9 @@ E2E uses a fictional DB on port 3100 but its default profile provider still reso
 
 Real acceptance must not use the recording-enabled E2E config. Use a separate context with screenshot/video/trace capture off and no saved authentication state. Scan test/build artifacts for private content before publication. All original runtime paths must remain ignored/untracked afterward.
 
-## Proposed tool acceptance contracts
+## Implemented tool acceptance contracts
 
-| Proposed command               | Safe output / effects                                                         | Acceptance and failure behavior                                                                         |
+| Command                        | Safe output / effects                                                         | Acceptance and failure behavior                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `npm run doctor`               | Versions, root/path consistency, profile/DB/port/capability status; read-only | No config/profile/token values; wrong root/missing dependency/unsafe binding -> stable nonzero code     |
 | `npm run preflight`            | Mode checklist and policy expiry; read-only                                   | Missing gate blocks; never enables a provider implicitly                                                |
@@ -58,7 +64,11 @@ Real acceptance must not use the recording-enabled E2E config. Use a separate co
 | `npm run backup`               | Backup ID/time/schema/count/integrity                                         | Consistent protected snapshot; no overwrite; retention requires owner choice                            |
 | `npm run restore -- --preview` | Compatibility/destination status                                              | Separate restore verification first; replacement requires owner confirmation                            |
 
-Interfaces need Zod boundaries, safe enums/counts and predictable statuses: 0 pass, distinct nonzero warning/block/failure. Test missing/malformed/permission-denied/disk-full/interrupted conditions with fixtures. Final flags/dependencies require a train plan. No command may automatically merge PRs or submit applications.
+Interfaces use bounded schemas, safe enums/counts, and predictable statuses. Missing/malformed/corrupt/collision/interrupted recovery cases are covered with fictional fixtures. No command automatically merges pull requests or submits applications.
+
+### Approved private Beta smoke
+
+`npm.cmd run smoke:private-beta` is a mutating, local-only acceptance command. Run it only after a verified backup and migration, with the owned app stopped and the exact private profile/job already reviewed. It re-evaluates the existing job, generates confined create-new artifacts, prepares a review-required packet, and records timeline events. Its output contains safe counts/statuses only. Do not rerun it casually: each successful run deliberately creates new immutable evaluation, artifact, packet, and event records. It never calls a source or visits/submits an employer form.
 
 ## Backup, restore, migration and browser recovery
 

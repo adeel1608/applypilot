@@ -1,23 +1,63 @@
 import { expect, test } from "@playwright/test";
 
-test("dashboard shows deterministic fixture metrics and safety state", async ({ page }) => {
+test("dashboard separates private local state from governed source state", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Decision dashboard" })).toBeVisible();
-  await expect(page.getByText("Jobs discovered").locator("..").getByText("26")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "SEEK adapter status" })).toBeVisible();
-  await expect(
-    page.getByText("Live SEEK discovery and job-page retrieval are disabled"),
-  ).toBeVisible();
+  await expect(page.getByText("Private jobs", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "SOURCE READY AWAITING TENANT" })).toBeVisible();
+  await expect(page.getByText(/disabled without an approved private tenant/)).toBeVisible();
   await expect(page.getByText("Final submission always requires human confirmation")).toBeVisible();
 });
 
 test("jobs list links to an explained job decision", async ({ page }) => {
   await page.goto("/jobs");
-  await page.getByRole("link", { name: "Retail Sales Assistant" }).click();
+  await page.getByText(/Show isolated fictional demo jobs/).click();
+  const jobLink = page.getByRole("link", { name: "Retail Sales Assistant" });
+  await expect(jobLink).toHaveAttribute("href", "/jobs/job-retail-sales-assistant");
+  await page.goto("/jobs/job-retail-sales-assistant");
   await expect(page.getByRole("heading", { name: "Retail Sales Assistant" })).toBeVisible();
   await expect(page.getByText("NO HARD BLOCKERS")).toBeVisible();
   await expect(page.getByText("retail-customer-service")).toBeVisible();
   await expect(page.getByRole("button", { name: "Prepare application" })).toBeDisabled();
+});
+
+test("core local routes remain usable at a narrow viewport and expose labelled controls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  for (const path of ["/dashboard", "/jobs", "/sources", "/applications", "/import"]) {
+    await page.goto(path);
+    await expect(page.locator("main")).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, path).toBeLessThanOrEqual(1);
+  }
+  await expect(page.getByLabel("Import method")).toBeVisible();
+  await expect(page.getByLabel("Job content")).toBeVisible();
+});
+
+test("real queue filters remain keyboard-usable at 200 percent zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.goto("/jobs?eligibility=INELIGIBLE&unknownRequirements=YES&queue=ARCHIVE");
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = "200%";
+  });
+
+  await expect(page.getByRole("form", { name: "Real job queue filters" })).toBeVisible();
+  await expect(page.getByLabel("Eligibility")).toHaveValue("INELIGIBLE");
+  await expect(page.getByLabel("Unknown requirements")).toHaveValue("YES");
+  await expect(page.getByLabel("Queue state")).toHaveValue("ARCHIVE");
+  await expect(page.getByRole("heading", { name: "No jobs match these filters" })).toBeVisible();
+
+  await page.getByLabel("Eligibility").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Fit band")).toBeFocused();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("profile exposes explicit forbidden claims without private data", async ({ page }) => {

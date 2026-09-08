@@ -252,6 +252,11 @@
       "Administration",
       "Engineering and automation"
     ],
+    "signalVerification": {
+      "preferredLocations": "VERIFIED",
+      "preferredWorkTypes": "VERIFIED",
+      "preferredCategories": "VERIFIED"
+    },
     "maximumHoursPerWeek": {
       "value": 24,
       "verification": "VERIFIED",

@@ -4,7 +4,7 @@
 
 Current GitHub visibility is PUBLIC by explicit owner authorisation on 2026-09-07. Historical private-repository checkpoints do not change the current setting. Private profile, real input, SQLite/WAL/backups, personal documents and sessions remain local/ignored. Keep npm `"private": true` unchanged.
 
-The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes existing controls from missing release gates. Current supervised intake is not hosted-production readiness. Known gaps include local-origin/session hardening, all-field semantic claim validation, verified-only fit evidence, explicit audit provenance, preview retention and tested recovery. They must be addressed before their affected V1 capabilities are enabled; no future train is implemented by this review.
+The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes implemented Beta controls from remaining V1 gates. Manual-intake Beta now has loopback Host/Origin checks, an HttpOnly SameSite=Strict local session, expiring one-use action-bound nonces, verified-only evaluation/document evidence, immutable audit/version records, private artifact confinement, and tested backup/restore recovery. This does not establish hosted-production or real-target browser readiness.
 
 ApplyPilot treats candidate profiles, personal documents, application answers, user-supplied job content, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 2 commits only fictional source fixtures and makes no live job-board requests.
 
@@ -27,13 +27,13 @@ The `.gitignore` covers environment files, credentials, databases and journals, 
 
 ## Browser-session handling
 
-Authenticated Playwright state, cookies, browser profiles, MFA artifacts, and downloads belong only to the future local runner. They must never enter Git, CI, cloud logs, or a hosted dashboard database. Encrypt sensitive state at rest when persistent browser sessions are introduced.
+Authenticated Playwright state, cookies, browser profiles, MFA artifacts, and downloads belong only to a future approved local runner. The current executable runner uses fictional loopback fixtures only and persists no browser authentication. Such state must never enter Git, CI, cloud logs, or a hosted dashboard database. Encrypt sensitive state at rest if persistent browser sessions are introduced.
 
 ## Safe job-board automation
 
 Automation must respect applicable terms, access boundaries, and rate limits. CAPTCHA, MFA, bot detection, login challenges, rate limits, access-control responses, site restrictions, or unexpected form changes stop automation and create a human-action event. ApplyPilot must not evade, solve, suppress, or route around these protections.
 
-LinkedIn remains assisted/manual discovery until its policy and technical constraints are explicitly reviewed. The Phase 2 SEEK research gate permits only local fixture discovery and explicit user-supplied-content parsing. Public discovery, public details, URL fetch, and automated browser modes fail closed. See `docs/SEEK_ADAPTER.md`.
+LinkedIn remains assisted/manual discovery. The SEEK gate permits only local fixture discovery and explicit user-supplied-content parsing. Default-disabled Greenhouse and Lever GET readers require a narrowly scoped, ignored owner-approved capability and never receive candidate data. No private capability was configured and the completed Beta Core made zero real source calls. See `docs/SOURCE_CAPABILITY_MATRIX.md`.
 
 User-supplied content is parsed locally and never fetched from a supplied URL in Phase 2.5. Exact/dot-boundary host recognition classifies origin but never authorizes retrieval; the production registry has zero `FETCH_ALLOWED` entries.
 
@@ -47,7 +47,7 @@ Generated content uses only facts marked `VERIFIED`. Missing facts are omitted. 
 
 ## Human confirmation
 
-Final application submission always requires explicit human confirmation. Phase 2 contains no submit method and keeps preparation controls disabled. A future implementation must separate form filling, preview, confirmation, and the final submit action in both code and UI.
+Final application submission always requires explicit human confirmation. The real runner remains disabled and there is no real submit method. Synthetic tests separate mapping, frozen review, consent, and one final action; changed packets/forms/domains, stale or replayed consent, CAPTCHA, MFA, authentication, access denial, rate limits, unsupported controls, and lost responses all stop safely.
 
 ## GitHub expectations
 
