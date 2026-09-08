@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import { containsPrivateCanary } from "./lib/privacy-canary";
 import { repositoryRoot } from "./lib/runtime-safety";
 
 const root = repositoryRoot();
@@ -148,8 +149,9 @@ for (const directory of [
     artifactCount += 1;
     try {
       if (statSync(path).size > 20_000_000) continue;
-      const content = readFileSync(path).toString("utf8");
-      if ([...privateNeedles].some((needle) => content.includes(needle))) {
+      const bytes = readFileSync(path);
+      const content = bytes.toString("utf8");
+      if ([...privateNeedles].some((needle) => containsPrivateCanary(bytes, needle))) {
         findings.add(`artifact-private-canary:${relative(root, path)}`);
       }
       if (
