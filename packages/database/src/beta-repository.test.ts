@@ -285,8 +285,8 @@ describe("Beta repository", () => {
       eligibilityStatus: "ELIGIBLE",
       targetUrl: "http://127.0.0.1:4123/synthetic-application",
       targetHost: "127.0.0.1",
-      jobExpired: false,
-      duplicateDanger: false,
+      jobExpiryState: "ACTIVE",
+      duplicateState: "CLEAR",
       versionsCurrent: true,
       documents: [
         {
@@ -424,6 +424,29 @@ describe("Beta repository", () => {
     const changedVersion = repository.recordJobVersion({
       job: { ...job, description: `${job.description} Updated.` },
       sourceObservationId: "observation:1",
+      fieldEvidence: [
+        {
+          field: "title",
+          sourceObservationId: "observation:1",
+          sourcePath: "visibleText.title",
+          originalText: job.title,
+          normalizedValueJson: JSON.stringify(job.title),
+          certainty: "HIGH",
+          ruleId: "FIXTURE_SOURCE_TITLE",
+          extractorVersion: "fixture-extractor-v1",
+        },
+        {
+          field: "company",
+          sourceObservationId: "observation:1",
+          sourcePath: "visibleText.company",
+          originalText: job.company,
+          normalizedValueJson: JSON.stringify(job.company),
+          certainty: "HIGH",
+          ruleId: "FIXTURE_SOURCE_COMPANY",
+          extractorVersion: "fixture-extractor-v1",
+        },
+      ],
+      requirementEvidence,
     });
     expect(
       repository.invalidateStaleDependencies({
@@ -448,6 +471,26 @@ describe("Beta repository", () => {
     expect(
       sqlite.prepare("SELECT actor, changed_fields_json AS fields FROM job_corrections").get(),
     ).toEqual({ actor: "OWNER", fields: JSON.stringify(["title"]) });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT field_name AS field, source_observation_id AS sourceObservationId,
+                  rule_id AS ruleId
+           FROM job_field_evidence WHERE job_version_id = ? ORDER BY field_name`,
+        )
+        .all(corrected.id),
+    ).toEqual([
+      { field: "company", sourceObservationId: "observation:1", ruleId: "FIXTURE_SOURCE_COMPANY" },
+      { field: "title", sourceObservationId: null, ruleId: "OWNER_CORRECTED" },
+    ]);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT source_observation_id AS sourceObservationId, rule_id AS ruleId
+           FROM requirement_evidence WHERE job_version_id = ?`,
+        )
+        .all(corrected.id),
+    ).toEqual([{ sourceObservationId: "observation:1", ruleId: "REQ_REQUIRED_V2" }]);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

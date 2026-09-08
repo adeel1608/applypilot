@@ -7,6 +7,8 @@ import {
   PhaseOnePreparationRunner,
   SyntheticApplicationRunner,
   assessPacketReadiness,
+  deriveDuplicatePacketState,
+  deriveJobExpiryState,
   packetDigest,
   type ApplicationPacket,
 } from "./index";
@@ -21,8 +23,8 @@ function readyPacket(overrides: Partial<ApplicationPacket> = {}): ApplicationPac
     eligibilityStatus: "ELIGIBLE",
     targetUrl: "http://127.0.0.1:4123/synthetic-application",
     targetHost: "127.0.0.1",
-    jobExpired: false,
-    duplicateDanger: false,
+    jobExpiryState: "ACTIVE",
+    duplicateState: "CLEAR",
     versionsCurrent: true,
     documents: [
       {
@@ -85,6 +87,30 @@ describe("Phase 0/1 application runner", () => {
         "REQUIRED_DISCLOSURE_NOT_APPROVED:question:visa",
       ]),
     });
+  });
+
+  it.each([
+    [{ jobExpiryState: "EXPIRED" as const }, "JOB_EXPIRED"],
+    [{ jobExpiryState: "UNKNOWN" as const }, "JOB_EXPIRY_UNKNOWN"],
+    [{ duplicateState: "UNRESOLVED" as const }, "DUPLICATE_DANGER_UNRESOLVED"],
+    [{ duplicateState: "UNKNOWN" as const }, "DUPLICATE_STATE_UNKNOWN"],
+  ])("blocks unsafe conservative packet state %o", (overrides, blocker) => {
+    expect(assessPacketReadiness(readyPacket(overrides))).toMatchObject({
+      status: "REVIEW_REQUIRED",
+      blockers: expect.arrayContaining([blocker]),
+    });
+  });
+
+  it("derives expiry and duplicate states without treating unknown data as verified safe", () => {
+    const now = new Date("2026-09-08T00:00:00.000Z");
+    expect(deriveJobExpiryState(null, now)).toBe("UNKNOWN");
+    expect(deriveJobExpiryState("not-a-date", now)).toBe("UNKNOWN");
+    expect(deriveJobExpiryState("2026-09-07T00:00:00.000Z", now)).toBe("EXPIRED");
+    expect(deriveJobExpiryState("2026-09-09T00:00:00.000Z", now)).toBe("ACTIVE");
+    expect(deriveDuplicatePacketState([])).toBe("CLEAR");
+    expect(deriveDuplicatePacketState(["REJECTED"])).toBe("CLEAR");
+    expect(deriveDuplicatePacketState(["SUGGESTED"])).toBe("UNRESOLVED");
+    expect(deriveDuplicatePacketState(["AMBIGUOUS_FUTURE_STATE"])).toBe("UNKNOWN");
   });
 
   it("requires ordered checkpoints and a fresh, bound, single-use consent", () => {

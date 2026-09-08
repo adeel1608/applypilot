@@ -13,7 +13,7 @@ export const AnswerTruthStateSchema = z.enum([
 
 export const PacketDocumentSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["CV", "COVER_LETTER", "OTHER"]),
+  type: z.enum(["CV", "COVER_LETTER"]),
   fileName: z.string().min(1),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
   approved: z.boolean(),
@@ -42,8 +42,8 @@ export const ApplicationPacketSchema = z
     eligibilityStatus: z.enum(["ELIGIBLE", "INELIGIBLE", "REVIEW_REQUIRED"]),
     targetUrl: z.url().nullable(),
     targetHost: z.string().min(1).nullable(),
-    jobExpired: z.boolean(),
-    duplicateDanger: z.boolean(),
+    jobExpiryState: z.enum(["ACTIVE", "EXPIRED", "UNKNOWN"]),
+    duplicateState: z.enum(["CLEAR", "UNRESOLVED", "UNKNOWN"]),
     versionsCurrent: z.boolean(),
     documents: z.array(PacketDocumentSchema),
     answers: z.array(PacketAnswerSchema),
@@ -75,14 +75,36 @@ export interface PacketReadiness {
   warnings: string[];
 }
 
+export function deriveJobExpiryState(
+  expiresAt: string | null | undefined,
+  now: Date = new Date(),
+): ApplicationPacket["jobExpiryState"] {
+  if (!expiresAt) return "UNKNOWN";
+  const timestamp = Date.parse(expiresAt);
+  if (!Number.isFinite(timestamp)) return "UNKNOWN";
+  return timestamp <= now.getTime() ? "EXPIRED" : "ACTIVE";
+}
+
+export function deriveDuplicatePacketState(
+  clusterStates: readonly string[],
+): ApplicationPacket["duplicateState"] {
+  if (clusterStates.some((state) => state === "SUGGESTED")) return "UNRESOLVED";
+  if (clusterStates.every((state) => ["LINKED", "REJECTED", "SPLIT"].includes(state))) {
+    return "CLEAR";
+  }
+  return "UNKNOWN";
+}
+
 export function assessPacketReadiness(input: ApplicationPacket): PacketReadiness {
   const packet = ApplicationPacketSchema.parse(input);
   const blockers: string[] = [];
   const warnings: string[] = [];
   if (!packet.versionsCurrent) blockers.push("STALE_PACKET_INPUTS");
   if (packet.eligibilityStatus === "INELIGIBLE") blockers.push("JOB_INELIGIBLE");
-  if (packet.jobExpired) blockers.push("JOB_EXPIRED");
-  if (packet.duplicateDanger) blockers.push("DUPLICATE_DANGER_UNRESOLVED");
+  if (packet.jobExpiryState === "EXPIRED") blockers.push("JOB_EXPIRED");
+  if (packet.jobExpiryState === "UNKNOWN") blockers.push("JOB_EXPIRY_UNKNOWN");
+  if (packet.duplicateState === "UNRESOLVED") blockers.push("DUPLICATE_DANGER_UNRESOLVED");
+  if (packet.duplicateState === "UNKNOWN") blockers.push("DUPLICATE_STATE_UNKNOWN");
   if (!packet.targetUrl || !packet.targetHost) blockers.push("APPLICATION_DESTINATION_INVALID");
   if (!packet.documents.some(({ type, approved, stale }) => type === "CV" && approved && !stale)) {
     blockers.push("APPROVED_CURRENT_CV_REQUIRED");

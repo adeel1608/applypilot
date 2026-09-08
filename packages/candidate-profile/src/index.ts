@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import { normalizeText, VerificationStatus } from "@applypilot/shared";
@@ -246,6 +248,16 @@ export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
 
 export function parseCandidateProfile(input: unknown): CandidateProfile {
   return CandidateProfileSchema.parse(input);
+}
+
+/**
+ * Hashes the parsed, schema-ordered profile snapshot used by persistence and
+ * document-generation consistency checks. Unknown input keys are deliberately
+ * excluded by the schema boundary before hashing.
+ */
+export function candidateProfileContentHash(input: CandidateProfile): string {
+  const profile = CandidateProfileSchema.parse(input);
+  return createHash("sha256").update(JSON.stringify(profile)).digest("hex");
 }
 
 export function isVerified<T>(fact: ProfileFact<T> | undefined): fact is ProfileFact<T> {

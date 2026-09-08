@@ -7,7 +7,12 @@ import BetterSqlite3 from "better-sqlite3";
 import JSZip from "jszip";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-import { ApplicationPacketSchema, type ApplicationPacket } from "@applypilot/application-runner";
+import {
+  ApplicationPacketSchema,
+  deriveDuplicatePacketState,
+  deriveJobExpiryState,
+  type ApplicationPacket,
+} from "@applypilot/application-runner";
 import { BetaRepository, JobImportRepository } from "@applypilot/database";
 import {
   coverLetterEssentialContent,
@@ -18,6 +23,7 @@ import {
   renderCoverLetterPdf,
 } from "@applypilot/cover-letter-engine";
 import {
+  candidateProfileContentHash,
   CandidateProfileSchema,
   type CandidateProfileProvider,
 } from "@applypilot/candidate-profile";
@@ -101,23 +107,47 @@ async function main(): Promise<void> {
       normalizedJson: string;
     }>;
     if (jobs.length !== 1) throw new Error("PRESERVED_SINGLE_JOB_REQUIRED");
-    const priorMaterialCount = Number(
-      sqlite
-        .prepare(
-          `SELECT (SELECT count(*) FROM document_artifacts) +
-                  (SELECT count(*) FROM application_packets) +
-                  (SELECT count(*) FROM applications)`,
-        )
-        .pluck()
-        .get(),
+    const priorDocuments = Number(
+      sqlite.prepare("SELECT count(*) FROM document_artifacts").pluck().get(),
     );
-    if (priorMaterialCount !== 0) throw new Error("PRIVATE_SMOKE_ALREADY_MATERIALIZED");
-    const job = JobSchema.parse(JSON.parse(jobs[0]!.normalizedJson));
+    const priorPackets = Number(
+      sqlite.prepare("SELECT count(*) FROM application_packets").pluck().get(),
+    );
+    const jobId = jobs[0]!.id;
     const importer = new JobImportRepository(sqlite);
-    const evaluationState = await importer.reevaluateExistingJob(job.id, provider);
-    if (evaluationState !== "PRIVATE_LOCAL_PROFILE") {
-      throw new Error("PRIVATE_REEVALUATION_FAILED");
+    const reprocess = await importer.reprocessLegacyJob(jobId, provider);
+    if (reprocess.requirementEvidenceCount < 1) throw new Error("CURRENT_EVIDENCE_MISSING");
+    if (priorDocuments > 0) {
+      const staleDocuments = Number(
+        sqlite.prepare("SELECT count(*) FROM document_artifacts WHERE stale = 1").pluck().get(),
+      );
+      const invalidApprovals = Number(
+        sqlite
+          .prepare(
+            `SELECT count(*) FROM document_approvals a
+             JOIN document_artifacts d ON d.id = a.document_artifact_id
+             WHERE d.stale = 1 AND a.invalidated_at IS NOT NULL`,
+          )
+          .pluck()
+          .get(),
+      );
+      if (staleDocuments !== priorDocuments || invalidApprovals < 1) {
+        throw new Error("HISTORICAL_DOCUMENT_STATE_NOT_INVALIDATED");
+      }
     }
+    if (priorPackets > 0) {
+      const invalidPackets = Number(
+        sqlite
+          .prepare("SELECT count(*) FROM application_packets WHERE status = 'INVALIDATED'")
+          .pluck()
+          .get(),
+      );
+      if (invalidPackets !== priorPackets) throw new Error("HISTORICAL_PACKET_NOT_INVALIDATED");
+    }
+    const currentJobRow = sqlite
+      .prepare("SELECT normalized_json AS normalizedJson FROM jobs WHERE id = ?")
+      .get(jobId) as { normalizedJson: string };
+    const job = JobSchema.parse(JSON.parse(currentJobRow.normalizedJson));
     const state = sqlite
       .prepare(
         `SELECT
@@ -142,6 +172,34 @@ async function main(): Promise<void> {
       !state.coverageJson
     ) {
       throw new Error("BETA_EVALUATION_VERSION_MISSING");
+    }
+    if (state.jobVersionId !== reprocess.jobVersionId) {
+      throw new Error("REPROCESS_JOB_VERSION_MISMATCH");
+    }
+    if (state.evaluationVersionId !== reprocess.evaluationVersionId) {
+      throw new Error("REPROCESS_EVALUATION_VERSION_MISMATCH");
+    }
+    const profileState = sqlite
+      .prepare(
+        `SELECT p.active_version_id AS activeVersionId, v.content_hash AS contentHash
+         FROM candidate_profiles p JOIN candidate_profile_versions v ON v.id = p.active_version_id
+         WHERE p.id = ?`,
+      )
+      .get(profile.profileId) as { activeVersionId: string; contentHash: string } | undefined;
+    if (
+      !profileState ||
+      profileState.activeVersionId !== state.profileVersionId ||
+      profileState.contentHash !== candidateProfileContentHash(profile)
+    ) {
+      throw new Error("CURRENT_PROFILE_VERSION_MISMATCH");
+    }
+    const extractorVersions = sqlite
+      .prepare(
+        "SELECT DISTINCT extractor_version AS version FROM requirement_evidence WHERE job_version_id = ?",
+      )
+      .all(state.jobVersionId) as Array<{ version: string }>;
+    if (!extractorVersions.some(({ version }) => version === "2.0.0")) {
+      throw new Error("CURRENT_EXTRACTOR_VERSION_MISSING");
     }
     const beta = new BetaRepository(sqlite);
     beta.setQueueState({
@@ -318,6 +376,19 @@ async function main(): Promise<void> {
       });
       documentCount = 4;
     }
+    const expiresAt = sqlite
+      .prepare("SELECT expires_at FROM source_observations WHERE id = ?")
+      .pluck()
+      .get(reprocess.sourceObservationId) as string | null;
+    const jobExpiryState = deriveJobExpiryState(expiresAt);
+    const duplicateRows = sqlite
+      .prepare(
+        `SELECT DISTINCT c.state FROM duplicate_clusters c
+         LEFT JOIN duplicate_cluster_members m ON m.cluster_id = c.id
+         WHERE c.canonical_job_id = ? OR m.source_observation_id = ?`,
+      )
+      .all(job.id, reprocess.sourceObservationId) as Array<{ state: string }>;
+    const duplicateState = deriveDuplicatePacketState(duplicateRows.map(({ state }) => state));
     const packet = ApplicationPacketSchema.parse({
       id: randomUUID(),
       jobId: job.id,
@@ -327,8 +398,8 @@ async function main(): Promise<void> {
       eligibilityStatus: state.eligibilityStatus,
       targetUrl: null,
       targetHost: null,
-      jobExpired: false,
-      duplicateDanger: false,
+      jobExpiryState,
+      duplicateState,
       versionsCurrent: true,
       documents: packetDocuments,
       answers: [],
@@ -342,27 +413,9 @@ async function main(): Promise<void> {
       evaluationVersionId: state.evaluationVersionId,
       reasonCode: "OWNER_PRIVATE_PACKET_PREPARED",
     });
-    const applicationId = randomUUID();
-    const now = new Date().toISOString();
-    sqlite
-      .prepare(
-        `INSERT INTO applications
-          (id, job_id, profile_version_id, status, source, resume_document_id,
-           cover_letter_document_id, submitted_at, created_at, updated_at)
-         VALUES (?, ?, ?, 'DISCOVERED', ?, NULL, NULL, NULL, ?, ?)`,
-      )
-      .run(applicationId, job.id, state.profileVersionId, job.source, now, now);
-    for (const toStatus of ["DISCOVERED", "REVIEWING", "SHORTLISTED", "PREPARING"] as const) {
-      beta.appendApplicationEvent({
-        applicationId,
-        packetId: packet.id,
-        toStatus,
-        eventType: `OWNER_${toStatus}`,
-        actor: "LOCAL_USER",
-        idempotencyKey: `private-smoke:${applicationId}:${toStatus}`,
-        metadata: { packetVersion: packetResult.version },
-      });
-    }
+    const historicalEventCount = Number(
+      sqlite.prepare("SELECT count(*) FROM application_events_v2").pluck().get(),
+    );
     if (sqlite.pragma("integrity_check", { simple: true }) !== "ok") {
       throw new Error("POST_SMOKE_INTEGRITY_FAILED");
     }
@@ -370,7 +423,7 @@ async function main(): Promise<void> {
       throw new Error("POST_SMOKE_FOREIGN_KEY_FAILED");
     }
     console.log(
-      `PRIVATE_BETA_SMOKE_COMPLETE jobs=1 evaluation=PRIVATE_LOCAL_PROFILE queue=PREPARING documents=${documentCount} document_parity=PASS cover_letter=${letterDecision} packet=REVIEW_REQUIRED timeline_events=4 real_source_calls=0 real_application_actions=0 integrity=PASS foreign_key_issues=0`,
+      `PRIVATE_BETA_SMOKE_COMPLETE jobs=1 evaluation=PRIVATE_LOCAL_PROFILE reprocess=PASS historical_versions=PRESERVED current_extractor=2.0.0 queue=PREPARING documents=${documentCount} document_parity=PASS cover_letter=${letterDecision} packet=REVIEW_REQUIRED historical_events=${historicalEventCount} real_source_calls=0 real_application_actions=0 integrity=PASS foreign_key_issues=0`,
     );
   } finally {
     sqlite.close();

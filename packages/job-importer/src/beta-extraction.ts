@@ -71,7 +71,9 @@ function extractSalary(text: string): Job["salary"] {
   };
 }
 
-function locationParts(location: string | null): BetaExtractedFields["location"] {
+export function normalizeAustralianLocation(
+  location: string | null,
+): BetaExtractedFields["location"] {
   if (!location) return { suburb: null, postcode: null, state: null, country: "Unknown" };
   const postcode = location.match(/\b(\d{4})\b/)?.[1] ?? null;
   const abbreviation = location.match(/\b(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b/i)?.[1]?.toUpperCase();
@@ -130,7 +132,7 @@ export function extractBetaJobFields(input: {
     warnings.push("UNRESTRICTED_WORK_RIGHTS_EXPLICIT");
   }
   return {
-    location: locationParts(input.location),
+    location: normalizeAustralianLocation(input.location),
     salary: extractSalary(input.text),
     hoursPerWeek: extractRange(input.text, "week"),
     hoursPerFortnight: extractRange(input.text, "fortnight"),

@@ -68,7 +68,7 @@ const DocumentArtifactInputSchema = z.object({
   jobId: z.string().min(1),
   jobVersionId: z.string().min(1),
   profileVersionId: z.string().min(1),
-  type: z.enum(["CV", "COVER_LETTER", "OTHER"]),
+  type: z.enum(["CV", "COVER_LETTER"]),
   template: z.string().min(1),
   format: z.enum(["PDF", "DOCX"]),
   fileName: z.string().min(1),
@@ -377,9 +377,53 @@ export class BetaRepository {
           }
         | undefined;
       if (!previous) throw new Error("JOB_VERSION_NOT_FOUND");
+      const effectiveChangedFields = new Set(changedFields);
+      if (effectiveChangedFields.has("location")) {
+        for (const field of ["suburb", "state", "postcode", "country"]) {
+          effectiveChangedFields.add(field);
+        }
+      }
+      const priorFieldEvidence = this.sqlite
+        .prepare(
+          `SELECT field_name AS field, source_path AS sourcePath,
+                  source_observation_id AS sourceObservationId, original_text AS originalText,
+                  normalized_value_json AS normalizedValueJson, certainty, rule_id AS ruleId,
+                  extractor_version AS extractorVersion
+           FROM job_field_evidence WHERE job_version_id = ? ORDER BY rowid`,
+        )
+        .all(previous.id) as JobFieldEvidence[];
+      const priorRequirementEvidence = this.sqlite
+        .prepare(
+          `SELECT id, source_observation_id AS sourceObservationId, source_path AS sourcePath,
+                  start_offset AS start, end_offset AS end, original_text AS originalText,
+                  normalized_proposition AS normalizedProposition, modality, kind,
+                  condition_text AS condition, certainty, rule_id AS ruleId,
+                  extractor_version AS extractorVersion
+           FROM requirement_evidence WHERE job_version_id = ? ORDER BY rowid`,
+        )
+        .all(previous.id) as RequirementEvidence[];
+      const correctedEvidence = [...effectiveChangedFields].map((field): JobFieldEvidence => {
+        const value = (job as unknown as Record<string, unknown>)[field];
+        const normalizedValueJson = JSON.stringify(value ?? null);
+        return {
+          field,
+          sourceObservationId: null,
+          sourcePath: `owner_correction.${field}`,
+          originalText: typeof value === "string" && value ? value : normalizedValueJson,
+          normalizedValueJson,
+          certainty: "HIGH",
+          ruleId: "OWNER_CORRECTED",
+          extractorVersion: "owner-correction-v1",
+        };
+      });
       const recorded = this.recordJobVersion({
         job,
         sourceObservationId: previous.sourceObservationId,
+        fieldEvidence: [
+          ...priorFieldEvidence.filter(({ field }) => !effectiveChangedFields.has(field)),
+          ...correctedEvidence,
+        ],
+        requirementEvidence: priorRequirementEvidence,
       });
       if (!recorded.created) throw new Error("CORRECTION_HAS_NO_CHANGE");
       const now = this.now().toISOString();

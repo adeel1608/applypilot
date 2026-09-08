@@ -167,7 +167,10 @@ async function validateEndpoint(
   if (url.username || url.password) throw new PublicSourceError("URL_CREDENTIALS_FORBIDDEN");
   if (url.port && url.port !== "443") throw new PublicSourceError("NON_STANDARD_PORT_FORBIDDEN");
   if (url.hostname !== capability.allowedHost) throw new PublicSourceError("HOST_NOT_ALLOWLISTED");
-  if (!url.pathname.startsWith(capability.allowedPathPrefix)) {
+  const prefix = capability.allowedPathPrefix.endsWith("/")
+    ? capability.allowedPathPrefix.slice(0, -1)
+    : capability.allowedPathPrefix;
+  if (url.pathname !== prefix && !url.pathname.startsWith(`${prefix}/`)) {
     throw new PublicSourceError("PATH_NOT_ALLOWLISTED");
   }
   const addresses = await resolveHost(url.hostname);

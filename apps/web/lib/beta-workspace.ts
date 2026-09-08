@@ -4,7 +4,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ApplicationPacketSchema, type ApplicationPacket } from "@applypilot/application-runner";
+import {
+  ApplicationPacketSchema,
+  deriveDuplicatePacketState,
+  deriveJobExpiryState,
+  type ApplicationPacket,
+} from "@applypilot/application-runner";
+import type { CandidateProfile } from "@applypilot/candidate-profile";
 import {
   coverLetterFileName,
   coverLetterRequirementStatus,
@@ -15,6 +21,8 @@ import {
 } from "@applypilot/cover-letter-engine";
 import type { EligibilityReason } from "@applypilot/eligibility-engine";
 import type { FitContribution } from "@applypilot/fit-scorer";
+import { normalizeAustralianLocation } from "@applypilot/job-importer";
+import { assertCurrentDocumentGenerationTuple } from "@applypilot/database";
 import { legacyStatusToBeta } from "@applypilot/application-tracker";
 import {
   ApplicationStatusSchema,
@@ -27,6 +35,7 @@ import {
 } from "@applypilot/job-model";
 import {
   generateResumeDocument,
+  preparePrivateOutputTarget,
   renderResumeDocx,
   renderResumePdf,
   resumeFileName,
@@ -95,7 +104,7 @@ export interface BetaJobListItem {
 
 export interface BetaDocumentItem {
   id: string;
-  type: "CV" | "COVER_LETTER" | "OTHER";
+  type: "CV" | "COVER_LETTER";
   format: "PDF" | "DOCX";
   fileName: string;
   template: string;
@@ -146,7 +155,11 @@ export interface BetaJobDetail {
 }
 
 export interface BetaResumeEvidencePreview {
-  state: "READY" | "PRIVATE_PROFILE_REQUIRED";
+  state:
+    | "READY"
+    | "PRIVATE_PROFILE_REQUIRED"
+    | "PROFILE_VERSION_STALE_REEVALUATE_REQUIRED"
+    | "EVALUATION_STALE_REEVALUATE_REQUIRED";
   template: ResumeTemplateCategory;
   claims: Array<{ text: string; factReferences: string[] }>;
 }
@@ -369,6 +382,27 @@ export async function getBetaResumeEvidencePreview(
   if (resolution.state !== "PRIVATE_LOCAL_PROFILE" || !resolution.profile) {
     return { state: "PRIVATE_PROFILE_REQUIRED", template, claims: [] };
   }
+  const sqlite = betaSqlite();
+  if (!sqlite || !detail.jobVersionId || !detail.evaluationVersionId) {
+    return { state: "EVALUATION_STALE_REEVALUATE_REQUIRED", template, claims: [] };
+  }
+  try {
+    assertCurrentDocumentGenerationTuple({
+      sqlite,
+      profile: resolution.profile,
+      jobVersionId: detail.jobVersionId,
+      evaluationVersionId: detail.evaluationVersionId,
+    });
+  } catch (error) {
+    const state = error instanceof Error ? error.message : "";
+    if (
+      state === "PROFILE_VERSION_STALE_REEVALUATE_REQUIRED" ||
+      state === "EVALUATION_STALE_REEVALUATE_REQUIRED"
+    ) {
+      return { state, template, claims: [] };
+    }
+    throw error;
+  }
   const document = generateResumeDocument(resolution.profile, detail.job, template);
   const claims = [
     ...document.summary,
@@ -399,6 +433,40 @@ export async function reevaluateBetaJob(jobId: string): Promise<string> {
   return row.id;
 }
 
+interface CurrentDocumentContext {
+  detail: BetaJobDetail & { jobVersionId: string; evaluationVersionId: string };
+  profile: CandidateProfile;
+  profileVersionId: string;
+  privateRoot: string;
+}
+
+async function currentDocumentContext(jobId: string): Promise<CurrentDocumentContext> {
+  const sqlite = betaSqlite();
+  if (!sqlite) throw new Error("BETA_DATABASE_NOT_READY");
+  const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
+  if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
+  const detail = getBetaJob(jobId);
+  if (!detail?.jobVersionId || !detail.evaluationVersionId) {
+    throw new Error("EVALUATION_STALE_REEVALUATE_REQUIRED");
+  }
+  const tuple = assertCurrentDocumentGenerationTuple({
+    sqlite,
+    profile: resolution.profile,
+    jobVersionId: detail.jobVersionId,
+    evaluationVersionId: detail.evaluationVersionId,
+  });
+  return {
+    detail: {
+      ...detail,
+      jobVersionId: detail.jobVersionId,
+      evaluationVersionId: detail.evaluationVersionId,
+    },
+    profile: resolution.profile,
+    profileVersionId: tuple.profileVersionId,
+    privateRoot: join(resolveLocalDataDirectory(), "private"),
+  };
+}
+
 export async function generatePrivateCv(
   jobId: string,
   templateOverride?: ResumeTemplateCategory,
@@ -406,25 +474,21 @@ export async function generatePrivateCv(
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
   if (!sqlite || !beta) throw new Error("BETA_DATABASE_NOT_READY");
-  const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
-  if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
-  const detail = getBetaJob(jobId);
-  if (!detail?.jobVersionId) throw new Error("JOB_VERSION_NOT_FOUND");
-  const profileVersion = sqlite
-    .prepare("SELECT active_version_id AS id FROM candidate_profiles WHERE id = ?")
-    .get(resolution.profile.profileId) as { id: string | null } | undefined;
-  if (!profileVersion?.id) throw new Error("PROFILE_VERSION_NOT_FOUND");
+  const { detail, profile, profileVersionId, privateRoot } = await currentDocumentContext(jobId);
   if (templateOverride && !resumeTemplateCategories.includes(templateOverride)) {
     throw new Error("INVALID_RESUME_TEMPLATE");
   }
-  const document = generateResumeDocument(resolution.profile, detail.job, templateOverride);
   const artifactKey = randomUUID();
   const directory = join("documents", jobId.replace(/[^A-Za-z0-9._-]/g, "_"));
-  const displayName = resumeFileName(resolution.profile, detail.job.company);
+  const displayName = resumeFileName(profile, detail.job.company);
   const stem = displayName.replace(/\.pdf$/i, "");
   const pdfRelative = join(directory, `${artifactKey}.pdf`);
   const docxRelative = join(directory, `${artifactKey}.docx`);
-  const privateRoot = join(resolveLocalDataDirectory(), "private");
+  await Promise.all([
+    preparePrivateOutputTarget(pdfRelative, privateRoot),
+    preparePrivateOutputTarget(docxRelative, privateRoot),
+  ]);
+  const document = generateResumeDocument(profile, detail.job, templateOverride);
   const fittedDocument = await renderResumePdf(document, pdfRelative, privateRoot);
   await renderResumeDocx(fittedDocument, docxRelative, privateRoot);
   const [pdfBytes, docxBytes] = await Promise.all([
@@ -445,7 +509,7 @@ export async function generatePrivateCv(
   const common = {
     jobId,
     jobVersionId: detail.jobVersionId,
-    profileVersionId: profileVersion.id,
+    profileVersionId,
     type: "CV" as const,
     template: fittedDocument.template,
     claimEvidence: [...new Set(claimReferences)],
@@ -483,23 +547,19 @@ export async function generatePrivateCoverLetter(
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
   if (!sqlite || !beta) throw new Error("BETA_DATABASE_NOT_READY");
-  const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
-  if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
-  const detail = getBetaJob(jobId);
-  if (!detail?.jobVersionId) throw new Error("JOB_VERSION_NOT_FOUND");
-  const profileVersion = sqlite
-    .prepare("SELECT active_version_id AS id FROM candidate_profiles WHERE id = ?")
-    .get(resolution.profile.profileId) as { id: string | null } | undefined;
-  if (!profileVersion?.id) throw new Error("PROFILE_VERSION_NOT_FOUND");
+  const { detail, profile, profileVersionId, privateRoot } = await currentDocumentContext(jobId);
   if (toneOverride && !["DIRECT", "WARM", "FORMAL"].includes(toneOverride)) {
     throw new Error("INVALID_COVER_LETTER_TONE");
   }
-  const document = generateBasicCoverLetter(resolution.profile, detail.job, toneOverride);
   const artifactKey = randomUUID();
   const directory = join("documents", jobId.replace(/[^A-Za-z0-9._-]/g, "_"));
   const pdfRelative = join(directory, `${artifactKey}-letter.pdf`);
   const docxRelative = join(directory, `${artifactKey}-letter.docx`);
-  const privateRoot = join(resolveLocalDataDirectory(), "private");
+  await Promise.all([
+    preparePrivateOutputTarget(pdfRelative, privateRoot),
+    preparePrivateOutputTarget(docxRelative, privateRoot),
+  ]);
+  const document = generateBasicCoverLetter(profile, detail.job, toneOverride);
   await renderCoverLetterPdf(document, pdfRelative, privateRoot);
   await renderCoverLetterDocx(document, docxRelative, privateRoot);
   const [pdfBytes, docxBytes] = await Promise.all([
@@ -510,11 +570,11 @@ export async function generatePrivateCoverLetter(
   if (docxBytes.subarray(0, 2).toString("ascii") !== "PK") throw new Error("DOCX_INVALID");
   const pages = pdfBytes.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length ?? 0;
   if (pages !== 1) throw new Error("COVER_LETTER_PAGE_LIMIT_EXCEEDED");
-  const displayName = coverLetterFileName(resolution.profile, detail.job.company);
+  const displayName = coverLetterFileName(profile, detail.job.company);
   const common = {
     jobId,
     jobVersionId: detail.jobVersionId,
-    profileVersionId: profileVersion.id,
+    profileVersionId,
     type: "COVER_LETTER" as const,
     template: `letter-${document.tone.toLowerCase()}`,
     claimEvidence: [
@@ -579,11 +639,16 @@ export async function correctBetaJob(
     (field) => input[field].trim() !== detail.job[field],
   );
   if (!changedFields.length) throw new Error("CORRECTION_HAS_NO_CHANGE");
+  const correctedLocation = normalizeAustralianLocation(input.location.trim());
   const job = JobSchema.parse({
     ...detail.job,
     title: input.title.trim(),
     company: input.company.trim(),
     location: input.location.trim(),
+    suburb: correctedLocation.suburb,
+    state: correctedLocation.state,
+    postcode: correctedLocation.postcode,
+    country: correctedLocation.country,
     category: input.category.trim(),
     dateUpdated: new Date().toISOString(),
     eligibilityStatus: null,
@@ -615,6 +680,20 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
   const currentDocuments = detail.documents.filter(
     ({ stale, approved, format }) => !stale && approved && format === "PDF",
   );
+  const expiry = detail.sourceObservationId
+    ? (sqlite
+        .prepare("SELECT expires_at AS expiresAt FROM source_observations WHERE id = ?")
+        .get(detail.sourceObservationId) as { expiresAt: string | null } | undefined)
+    : undefined;
+  const jobExpiryState = deriveJobExpiryState(expiry?.expiresAt);
+  const duplicateRows = sqlite
+    .prepare(
+      `SELECT DISTINCT c.state FROM duplicate_clusters c
+       LEFT JOIN duplicate_cluster_members m ON m.cluster_id = c.id
+       WHERE c.canonical_job_id = ? OR m.source_observation_id = ?`,
+    )
+    .all(jobId, detail.sourceObservationId) as Array<{ state: string }>;
+  const duplicateState = deriveDuplicatePacketState(duplicateRows.map(({ state }) => state));
   const packet = ApplicationPacketSchema.parse({
     id: randomUUID(),
     jobId,
@@ -624,8 +703,8 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
     eligibilityStatus: detail.eligibilityStatus,
     targetUrl: null,
     targetHost: null,
-    jobExpired: false,
-    duplicateDanger: false,
+    jobExpiryState,
+    duplicateState,
     versionsCurrent: !detail.evaluationStale,
     documents: currentDocuments.map((document) => ({
       id: document.id,

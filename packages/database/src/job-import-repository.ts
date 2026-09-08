@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   enforceEvaluationProfile,
+  candidateProfileContentHash,
   type CandidateProfile,
   type CandidateProfileProvider,
   type CandidateProfileRuntimeState,
@@ -17,6 +18,7 @@ import {
   extractRequirementEvidence,
   JobFieldEditsSchema,
   ParsedJobFieldsSchema,
+  prepareJobImport,
   sha256,
   type DetectedJobSource,
   type ImportedJobDraft,
@@ -24,6 +26,8 @@ import {
   type PreparedJobImport,
 } from "@applypilot/job-importer";
 import { JobSchema, type Job } from "@applypilot/job-model";
+
+import { BetaRepository } from "./beta-repository";
 
 const tokenLifetimeMs = 30 * 60 * 1000;
 const selectionSchema = z.object({
@@ -59,6 +63,16 @@ export interface ConfirmImportResult {
     jobId: string;
     evaluationState: CandidateProfileRuntimeState | "EVALUATION_FAILED";
   }>;
+}
+
+export interface LegacyReprocessResult {
+  jobId: string;
+  sourceObservationId: string;
+  previousJobVersionId: string;
+  jobVersionId: string;
+  requirementEvidenceCount: number;
+  evaluationVersionId: string;
+  evaluationState: "PRIVATE_LOCAL_PROFILE";
 }
 
 type StoredRecord = {
@@ -233,10 +247,6 @@ function applyEdits(
   return ParsedJobFieldsSchema.parse({ ...original, ...edits });
 }
 
-function stableProfileHash(profile: CandidateProfile): string {
-  return createHash("sha256").update(JSON.stringify(profile)).digest("hex");
-}
-
 export class JobImportRepository {
   constructor(
     private readonly sqlite: BetterSqlite3.Database,
@@ -251,6 +261,169 @@ export class JobImportRepository {
     const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(id);
     if (!exists) throw new Error("JOB_NOT_FOUND");
     return this.evaluate(id, provider);
+  }
+
+  async reprocessLegacyJob(
+    jobId: string,
+    provider: CandidateProfileProvider,
+  ): Promise<LegacyReprocessResult> {
+    const id = z.string().min(1).parse(jobId);
+    if (!this.betaSchemaAvailable()) throw new Error("BETA_SCHEMA_REQUIRED");
+    const candidates = this.sqlite
+      .prepare(
+        `SELECT s.id AS sourceRecordId, s.raw_payload_json AS rawPayloadJson,
+                r.id AS recordId, r.batch_id AS batchId, r.detected_source AS detectedSource,
+                r.acquisition_method AS acquisitionMethod,
+                r.segment_content_hash AS segmentContentHash,
+                r.edited_fields_json AS editedFieldsJson,
+                b.input_type AS inputType, b.source_hint AS sourceHint,
+                b.source_url AS sourceUrl, b.original_filename AS originalFilename,
+                b.raw_content_text AS rawContentText, b.detected_jobs AS detectedJobs,
+                j.normalized_json AS normalizedJson
+         FROM jobs j
+         JOIN job_source_records s ON s.job_id = j.id
+         JOIN import_records r ON r.normalized_job_id = j.id
+         JOIN import_batches b ON b.id = r.batch_id
+         WHERE j.id = ? AND r.record_status IN ('IMPORTED','UPDATED','DUPLICATE')`,
+      )
+      .all(id) as Array<{
+      sourceRecordId: string;
+      rawPayloadJson: string;
+      recordId: string;
+      batchId: string;
+      detectedSource: DetectedJobSource;
+      acquisitionMethod: "USER_SUPPLIED_CONTENT" | "FILE_UPLOAD";
+      segmentContentHash: string;
+      editedFieldsJson: string | null;
+      inputType: "PASTED_SINGLE" | "PASTED_MULTI" | "PASTED_HTML" | "FILE_UPLOAD";
+      sourceHint: DetectedJobSource | null;
+      sourceUrl: string | null;
+      originalFilename: string | null;
+      rawContentText: string;
+      detectedJobs: number;
+      normalizedJson: string;
+    }>;
+    const exact = candidates.filter((candidate) => {
+      let rawPayload: unknown;
+      try {
+        rawPayload = JSON.parse(candidate.rawPayloadJson);
+      } catch {
+        return false;
+      }
+      const payload = z
+        .object({ importId: z.string(), recordId: z.string() })
+        .passthrough()
+        .safeParse(rawPayload);
+      return (
+        payload.success &&
+        payload.data.importId === candidate.batchId &&
+        payload.data.recordId === candidate.recordId
+      );
+    });
+    if (exact.length !== 1) throw new Error("LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT");
+    const provenance = exact[0]!;
+    const recordCount = Number(
+      this.sqlite
+        .prepare("SELECT COUNT(*) FROM import_records WHERE batch_id = ?")
+        .pluck()
+        .get(provenance.batchId),
+    );
+    if (provenance.detectedJobs !== 1 || recordCount !== 1) {
+      throw new Error("LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT");
+    }
+    const sourceObservations = this.sqlite
+      .prepare(
+        `SELECT id FROM source_observations
+         WHERE job_id = ? AND source_record_id = ? AND content_hash = ?
+         ORDER BY observed_at, rowid`,
+      )
+      .all(id, provenance.sourceRecordId, provenance.segmentContentHash) as Array<{ id: string }>;
+    if (sourceObservations.length !== 1) {
+      throw new Error("LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT");
+    }
+    const sourceObservationId = sourceObservations[0]!.id;
+    const prepared = prepareJobImport(
+      {
+        inputType: provenance.inputType,
+        acquisitionMethod: provenance.acquisitionMethod,
+        content: provenance.rawContentText,
+        sourceHint: provenance.sourceHint,
+        sourceUrl: provenance.sourceUrl,
+        originalFilename: provenance.originalFilename,
+      },
+      { now: this.now },
+    );
+    if (prepared.document.detectedJobs !== 1 || prepared.records.length !== 1) {
+      throw new Error("LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT");
+    }
+    const currentRecord = prepared.records[0]!;
+    const edits = JobFieldEditsSchema.parse(
+      provenance.editedFieldsJson ? JSON.parse(provenance.editedFieldsJson) : {},
+    );
+    const fields = applyEdits(currentRecord.fields, edits);
+    const previousJob = JobSchema.parse(JSON.parse(provenance.normalizedJson));
+    const previousVersion = this.sqlite
+      .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
+      .get(id) as { id: string } | undefined;
+    if (!previousVersion) throw new Error("JOB_VERSION_NOT_FOUND");
+    const now = this.now().toISOString();
+    const reprocessed = JobSchema.parse({
+      ...normalizeImportedJob(
+        fields,
+        provenance.detectedSource,
+        {
+          importId: provenance.batchId,
+          recordId: provenance.recordId,
+          parserVersion: prepared.document.parserVersion,
+          acquisitionMethod: provenance.acquisitionMethod,
+          contentHash: provenance.segmentContentHash,
+          now,
+          editedFields: Object.keys(edits),
+        },
+        id,
+      ),
+      dateDiscovered: previousJob.dateDiscovered,
+      dateUpdated: now,
+      applicationStatus: previousJob.applicationStatus,
+    });
+    const requirementEvidence = (
+      fields.beta?.requirementEvidence ??
+      extractRequirementEvidence(fields.description ?? "", {
+        sourceObservationId,
+        sourcePath: "description",
+      })
+    ).map((evidence) => ({ ...evidence, sourceObservationId }));
+    const beta = new BetaRepository(this.sqlite, this.now);
+    const recorded = this.sqlite.transaction(() => {
+      this.updateJob(reprocessed, now);
+      return beta.recordJobVersion({
+        job: reprocessed,
+        sourceObservationId,
+        requirementEvidence,
+      });
+    })();
+    if (!recorded.created) throw new Error("LEGACY_REPROCESS_DID_NOT_CREATE_VERSION");
+    const evaluationState = await this.evaluate(id, provider);
+    if (evaluationState !== "PRIVATE_LOCAL_PROFILE") {
+      throw new Error("PRIVATE_PROFILE_EVALUATION_FAILED");
+    }
+    const evaluation = this.sqlite
+      .prepare(
+        `SELECT id FROM evaluation_versions
+         WHERE job_id = ? AND job_version_id = ?
+         ORDER BY evaluated_at DESC, rowid DESC LIMIT 1`,
+      )
+      .get(id, recorded.id) as { id: string } | undefined;
+    if (!evaluation) throw new Error("BETA_VERSION_STATE_MISSING");
+    return {
+      jobId: id,
+      sourceObservationId,
+      previousJobVersionId: previousVersion.id,
+      jobVersionId: recorded.id,
+      requirementEvidenceCount: requirementEvidence.length,
+      evaluationVersionId: evaluation.id,
+      evaluationState,
+    };
   }
 
   stage(prepared: PreparedJobImport): StagedImportPreview {
@@ -831,13 +1004,23 @@ export class JobImportRepository {
   }
 
   private persistProfileVersion(profile: CandidateProfile, now: string): string {
-    const hash = stableProfileHash(profile);
+    const hash = candidateProfileContentHash(profile);
     const existing = this.sqlite
       .prepare(
         "SELECT id FROM candidate_profile_versions WHERE profile_id = ? AND content_hash = ? ORDER BY version DESC LIMIT 1",
       )
       .get(profile.profileId, hash) as { id: string } | undefined;
-    if (existing) return existing.id;
+    if (existing) {
+      this.sqlite
+        .prepare(
+          `INSERT INTO candidate_profiles (id, active_version_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+             active_version_id = excluded.active_version_id,
+             updated_at = excluded.updated_at`,
+        )
+        .run(profile.profileId, existing.id, now, now);
+      return existing.id;
+    }
     this.sqlite
       .prepare(
         `INSERT INTO candidate_profiles (id, active_version_id, created_at, updated_at)
@@ -993,6 +1176,7 @@ export class JobImportRepository {
       .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
       .get(job.id) as { id: string } | undefined;
     if (!jobVersion) return;
+    const evaluationId = randomUUID();
     this.sqlite
       .prepare(
         `INSERT INTO evaluation_versions
@@ -1003,7 +1187,7 @@ export class JobImportRepository {
          VALUES (?, ?, ?, ?, 'PRIVATE_LOCAL_PROFILE', ?, ?, ?, ?, ?, ?, ?, 'beta-core-1', 0, ?)`,
       )
       .run(
-        randomUUID(),
+        evaluationId,
         job.id,
         jobVersion.id,
         profileVersionId,
@@ -1016,6 +1200,12 @@ export class JobImportRepository {
         fit.engineVersion,
         now,
       );
+    new BetaRepository(this.sqlite, this.now).invalidateStaleDependencies({
+      jobId: job.id,
+      currentJobVersionId: jobVersion.id,
+      currentProfileVersionId: profileVersionId,
+      reasonCode: "CURRENT_EVALUATION_CHANGED",
+    });
   }
 
   private audit(

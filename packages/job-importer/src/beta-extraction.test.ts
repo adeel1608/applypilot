@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { extractBetaJobFields, extractRequirementEvidence } from "./index";
+import {
+  extractBetaJobFields,
+  extractRequirementEvidence,
+  normalizeAustralianLocation,
+} from "./index";
 
 describe("Beta job extraction", () => {
   it("preserves exact evidence spans and separates requirement modality", () => {
@@ -52,5 +56,22 @@ describe("Beta job extraction", () => {
       coverLetter: "NOT_REQUIRED",
     });
     expect(result.trainingProvided).toBeNull();
+  });
+
+  it("recalculates corrected Australian location structure without retaining old state", () => {
+    const corrected = normalizeAustralianLocation("Sydney NSW 2000");
+    expect(corrected).toEqual({
+      suburb: "Sydney",
+      postcode: "2000",
+      state: "NSW",
+      country: "Australia",
+    });
+    expect(JSON.stringify(corrected)).not.toContain("VIC");
+    expect(normalizeAustralianLocation("Remote")).toEqual({
+      suburb: null,
+      postcode: null,
+      state: null,
+      country: "Unknown",
+    });
   });
 });

@@ -228,6 +228,47 @@ describe("default-disabled public posting readers", () => {
     expect(deps.fetch).toHaveBeenCalledOnce();
   });
 
+  it("enforces Lever tenant path-segment boundaries on initial and redirected URLs", async () => {
+    const approved = capability("LEVER", { requestBudget: 2 });
+    await expect(
+      boundedPublicGet("https://api.lever.co/v0/postings/fictional", approved, {
+        now,
+        dependencies: dependencies([]),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      boundedPublicGet("https://api.lever.co/v0/postings/fictional/job-1", approved, {
+        now,
+        dependencies: dependencies({ id: "job-1" }),
+      }),
+    ).resolves.toEqual({ id: "job-1" });
+    const blockedInitial = dependencies([]);
+    await expect(
+      boundedPublicGet("https://api.lever.co/v0/postings/fictional-other", approved, {
+        now,
+        dependencies: blockedInitial,
+      }),
+    ).rejects.toThrow("PATH_NOT_ALLOWLISTED");
+    expect(blockedInitial.fetch).not.toHaveBeenCalled();
+    const redirectDependencies: PublicGetDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      fetch: vi.fn(
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: { location: "https://api.lever.co/v0/postings/fictional-other/job-1" },
+          }),
+      ),
+    };
+    await expect(
+      boundedPublicGet("https://api.lever.co/v0/postings/fictional", approved, {
+        now,
+        dependencies: redirectDependencies,
+      }),
+    ).rejects.toThrow("PATH_NOT_ALLOWLISTED");
+    expect(redirectDependencies.fetch).toHaveBeenCalledOnce();
+  });
+
   it("stops on rate limiting and enforces response and record caps", async () => {
     await expect(
       readLeverJobs(capability("LEVER"), { now, dependencies: dependencies({}, 429) }),

@@ -117,8 +117,8 @@ test("executes one consent-bound synthetic browser submission without retry", as
     eligibilityStatus: "ELIGIBLE",
     targetUrl: "http://127.0.0.1:3100/synthetic-application?case=document-upload",
     targetHost: "127.0.0.1",
-    jobExpired: false,
-    duplicateDanger: false,
+    jobExpiryState: "ACTIVE",
+    duplicateState: "CLEAR",
     versionsCurrent: true,
     documents: [
       {
