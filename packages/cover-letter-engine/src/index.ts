@@ -1,5 +1,15 @@
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import { Document, HeadingLevel, Packer, Paragraph, TextRun, convertInchesToTwip } from "docx";
+
 import { type CandidateProfile, verifiedCandidateName } from "@applypilot/candidate-profile";
 import type { Job } from "@applypilot/job-model";
+import {
+  assertPrivateDocumentOutputPath,
+  assertPrivatePdfOutputPath,
+  preparePrivateOutputTarget,
+} from "@applypilot/resume-engine";
 import { normalizeText, VerificationStatus } from "@applypilot/shared";
 
 export type CoverLetterRequirementStatus = "REQUIRED" | "OPTIONAL" | "NOT_REQUIRED" | "UNKNOWN";
@@ -123,4 +133,89 @@ export function coverLetterFileName(profile: CandidateProfile, company: string):
   const firstName = profile.identity.firstName.value.toLocaleUpperCase("en-AU");
   const safeCompany = company.replace(/[<>:"/\\|?*]/g, "").trim();
   return `${firstName} COVER LETTER (${safeCompany}).pdf`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+export function coverLetterEssentialContent(document: CoverLetterDocument): string[] {
+  return [
+    document.candidateName,
+    document.salutation,
+    ...document.paragraphs,
+    document.candidateName,
+  ];
+}
+
+export function renderCoverLetterHtml(document: CoverLetterDocument): string {
+  return `<!doctype html><html lang="en-AU"><head><meta charset="utf-8" />
+  <style>@page{size:A4;margin:22mm}body{font-family:"Times New Roman",serif;font-size:11pt;line-height:1.45;color:#000}h1{font-size:14pt;margin:0 0 12mm}p{margin:0 0 5mm}</style>
+  </head><body><h1>${escapeHtml(document.candidateName)}</h1><p>${escapeHtml(document.salutation)}</p>
+  ${document.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
+  <p>Yours sincerely,</p><p>${escapeHtml(document.candidateName)}</p></body></html>`;
+}
+
+export async function renderCoverLetterPdf(
+  document: CoverLetterDocument,
+  outputPath: string,
+  privateRoot: string,
+): Promise<void> {
+  const target = assertPrivatePdfOutputPath(outputPath, privateRoot);
+  await preparePrivateOutputTarget(target, privateRoot);
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(renderCoverLetterHtml(document), { waitUntil: "load" });
+    const bytes = await page.pdf({ format: "A4", preferCSSPageSize: true, tagged: true });
+    await writeFile(target, bytes, { flag: "wx" });
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function renderCoverLetterDocx(
+  document: CoverLetterDocument,
+  outputPath: string,
+  privateRoot: string,
+): Promise<void> {
+  const target = assertPrivateDocumentOutputPath(outputPath, privateRoot);
+  await preparePrivateOutputTarget(target, resolve(privateRoot));
+  const children = [
+    new Paragraph({
+      heading: HeadingLevel.TITLE,
+      children: [
+        new TextRun({ text: document.candidateName, bold: true, font: "Times New Roman" }),
+      ],
+    }),
+    new Paragraph({ text: document.salutation }),
+    ...document.paragraphs.map((text) => new Paragraph({ text, spacing: { after: 200 } })),
+    new Paragraph({ text: "Yours sincerely," }),
+    new Paragraph({ text: document.candidateName }),
+  ];
+  const file = new Document({
+    styles: { default: { document: { run: { font: "Times New Roman", size: 22 } } } },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: convertInchesToTwip(0.85),
+              right: convertInchesToTwip(0.85),
+              bottom: convertInchesToTwip(0.85),
+              left: convertInchesToTwip(0.85),
+            },
+          },
+        },
+        children,
+      },
+    ],
+  });
+  await writeFile(target, await Packer.toBuffer(file), { flag: "wx" });
 }

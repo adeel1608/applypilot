@@ -7,6 +7,7 @@ import {
   boundedPublicGet,
   type PublicGetDependencies,
   type PublicPosting,
+  type PublicPostingPage,
   type PublicPostingCapability,
 } from "../public-postings";
 
@@ -45,17 +46,48 @@ export async function readLeverJobs(
   capabilityInput: PublicPostingCapability,
   options: { now?: Date; dependencies?: PublicGetDependencies } = {},
 ): Promise<PublicPosting[]> {
+  const page = await readLeverJobsPage(capabilityInput, { ...options });
+  if (page.nextCursor) throw new PublicSourceError("RECORD_CAP_EXCEEDED");
+  return page.records;
+}
+
+export async function readLeverJobsPage(
+  capabilityInput: PublicPostingCapability,
+  options: {
+    now?: Date;
+    dependencies?: PublicGetDependencies;
+    cursor?: string | null;
+    pageSize?: number;
+  } = {},
+): Promise<PublicPostingPage> {
   const capability = PublicPostingCapabilitySchema.parse(capabilityInput);
   if (capability.source !== "LEVER") throw new PublicSourceError("SOURCE_MISMATCH");
   assertPublicSourceOperation(capability, "LIST_JOBS");
   const base = capability.region === "EU" ? "https://api.eu.lever.co" : "https://api.lever.co";
   const url = new URL(`/v0/postings/${encodeURIComponent(capability.tenant)}`, base);
+  const skip = options.cursor
+    ? z.coerce.number().int().nonnegative().max(capability.recordCap).parse(options.cursor)
+    : 0;
+  const pageSize = z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .parse(options.pageSize ?? Math.min(100, capability.recordCap));
+  if (skip + pageSize > capability.recordCap) throw new PublicSourceError("RECORD_CAP_EXCEEDED");
   url.searchParams.set("mode", "json");
+  url.searchParams.set("skip", String(skip));
+  url.searchParams.set("limit", String(pageSize));
   const response = LeverResponseSchema.parse(
     await boundedPublicGet(url.toString(), capability, { ...options, byteLimit: 2_000_000 }),
   );
-  if (response.length > capability.recordCap) throw new PublicSourceError("RECORD_CAP_EXCEEDED");
-  return response.map((job) => mapLeverJob(job, capability));
+  if (response.length > pageSize) throw new PublicSourceError("PAGE_SIZE_EXCEEDED");
+  const next = response.length === pageSize ? skip + response.length : null;
+  return {
+    records: response.map((job) => mapLeverJob(job, capability)),
+    nextCursor: next !== null && next < capability.recordCap ? String(next) : null,
+    requestCount: 1,
+  };
 }
 
 export async function readLeverJob(

@@ -12,6 +12,7 @@ const navigation = [
   ["Dashboard", "/dashboard"],
   ["Jobs", "/jobs"],
   ["Import", "/import"],
+  ["Sources", "/sources"],
   ["Applications", "/applications"],
   ["Profile", "/profile"],
   ["Settings", "/settings"],

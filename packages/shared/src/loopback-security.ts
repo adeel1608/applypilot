@@ -20,7 +20,10 @@ function parseLoopbackAuthority(authority: string): { hostname: string; port: st
   }
 }
 
-export function assertLoopbackMutationRequest(input: LoopbackMutationHeaders): void {
+export function assertLoopbackRequestHost(input: {
+  host: string | null;
+  forwardedHost?: string | null;
+}): { hostname: string; port: string } {
   if (
     input.forwardedHost &&
     input.forwardedHost.trim().toLowerCase() !== input.host?.trim().toLowerCase()
@@ -29,6 +32,11 @@ export function assertLoopbackMutationRequest(input: LoopbackMutationHeaders): v
   }
   const host = input.host ? parseLoopbackAuthority(input.host) : null;
   if (!host) throw new Error("LOCAL_REQUEST_REQUIRED");
+  return host;
+}
+
+export function assertLoopbackMutationRequest(input: LoopbackMutationHeaders): void {
+  const host = assertLoopbackRequestHost(input);
   if (!input.origin || input.origin === "null") throw new Error("MUTATION_ORIGIN_REQUIRED");
   let origin: URL;
   try {

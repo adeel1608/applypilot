@@ -83,7 +83,7 @@ CREATE TABLE `job_corrections` (
   `job_id` text NOT NULL,
   `from_job_version_id` text NOT NULL,
   `to_job_version_id` text NOT NULL,
-  `actor` text NOT NULL CHECK (`actor` IN ('LOCAL_USER','SYSTEM')),
+  `actor` text NOT NULL CHECK (`actor` IN ('OWNER','LOCAL_USER','SYSTEM')),
   `reason_code` text NOT NULL,
   `changed_fields_json` text NOT NULL,
   `before_digest` text NOT NULL,

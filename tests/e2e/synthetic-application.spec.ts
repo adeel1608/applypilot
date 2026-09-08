@@ -82,6 +82,9 @@ test("represents unknown, changed-action, document, redirect, and lost-response 
   );
   await page.goto("/synthetic-application?case=document-upload");
   await expect(page.getByLabel("Approved synthetic document")).toBeVisible();
+  await expect(page.locator('[data-final-review="fictional-frozen-packet"]')).toContainText(
+    "Exact approved fixture mapping",
+  );
   await page.goto("/synthetic-application?case=changed-page");
   await expect(page.locator('[data-synthetic-fixture="changed-page"]')).toHaveAttribute(
     "data-form-version",

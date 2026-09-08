@@ -125,6 +125,31 @@ export default async function SyntheticApplicationPage({
         ) : null}
         <button type="submit">Submit fictional fixture</button>
       </form>
+      {fixture === "document-upload" ? (
+        <section className="panel" data-final-review="fictional-frozen-packet">
+          <span className="section-kicker">Frozen synthetic final review</span>
+          <h2>Exact approved fixture mapping</h2>
+          <dl className="fact-list">
+            <div>
+              <dt>Applicant name</dt>
+              <dd>Approved fictional answer</dd>
+            </div>
+            <div>
+              <dt>Contact email</dt>
+              <dd>Approved fictional answer</dd>
+            </div>
+            <div>
+              <dt>Document</dt>
+              <dd>Approved synthetic digest required</dd>
+            </div>
+            <div>
+              <dt>Unresolved required fields</dt>
+              <dd>0</dd>
+            </div>
+          </dl>
+          <p>A changed packet, form, destination, document or consent causes zero final clicks.</p>
+        </section>
+      ) : null}
     </main>
   );
 }

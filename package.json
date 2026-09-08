@@ -37,6 +37,7 @@
     "local:stop": "tsx scripts/local-stop.ts",
     "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
+    "smoke:private-beta": "tsx scripts/private-beta-smoke.ts",
     "audit:production": "npm audit --omit=dev"
   },
   "dependencies": {
@@ -56,6 +57,7 @@
     "@types/react-dom": "19.2.2",
     "eslint": "9.39.1",
     "eslint-config-next": "16.3.4",
+    "pdfjs-dist": "6.3.289",
     "playwright": "1.63.0",
     "prettier": "3.6.2",
     "tsx": "4.20.6",

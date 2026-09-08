@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -8,9 +7,12 @@ import {
   evaluateJobUrlPolicy,
   prepareJobImport,
 } from "@applypilot/job-importer";
-import { assertLoopbackMutationRequest } from "@applypilot/shared";
 import { candidateProfileProvider } from "@web/lib/candidate-profile-provider";
 import { getJobImportRepository } from "@web/lib/local-database";
+import {
+  consumeLocalMutationNonce,
+  issueLocalMutationNonce,
+} from "@web/lib/local-mutation-security";
 
 export interface ImportPreviewRecordDto {
   recordId: string;
@@ -33,6 +35,7 @@ export interface ImportPreviewRecordDto {
 export interface ImportActionState {
   status: "IDLE" | "ERROR" | "URL_POLICY" | "PREVIEW" | "CONFIRMED";
   message?: string;
+  mutationNonce?: string;
   urlPolicy?: {
     decision: string;
     detectedSource: string;
@@ -41,6 +44,7 @@ export interface ImportActionState {
   preview?: {
     importId: string;
     previewToken: string;
+    confirmMutationNonce: string;
     expiresAt: string;
     detectedSource: string;
     acquisitionMethod: string;
@@ -54,15 +58,6 @@ export interface ImportActionState {
   };
 }
 
-async function assertLocalRequest(): Promise<void> {
-  const requestHeaders = await headers();
-  assertLoopbackMutationRequest({
-    host: requestHeaders.get("host"),
-    origin: requestHeaders.get("origin"),
-    forwardedHost: requestHeaders.get("x-forwarded-host"),
-  });
-}
-
 function safeMessage(error: unknown): string {
   if (error instanceof ImportValidationError) return `${error.code}: ${error.message}`;
   if (error instanceof Error) {
@@ -73,6 +68,13 @@ function safeMessage(error: unknown): string {
       FOREIGN_MUTATION_ORIGIN: "The import request came from a non-local origin.",
       MUTATION_ORIGIN_MISMATCH: "The import request origin did not match this local server.",
       FORWARDED_HOST_UNTRUSTED: "Forwarded-host import requests are disabled.",
+      LOCAL_SESSION_REQUIRED: "The local session expired. Reload this page before importing.",
+      MUTATION_NONCE_REQUIRED: "The local safety token was missing. Reload this page.",
+      MUTATION_NONCE_INVALID: "The local safety token was invalid. Reload this page.",
+      MUTATION_NONCE_EXPIRED: "The local safety token expired. Try again.",
+      MUTATION_NONCE_REPLAYED: "That import action was already used. Try again.",
+      MUTATION_NONCE_SESSION_MISMATCH: "The import token belongs to another local session.",
+      MUTATION_NONCE_ACTION_MISMATCH: "The import token was issued for another action.",
       MISSING_REQUIRED_IMPORT_FIELDS:
         "Complete the title, company, location, and description before importing.",
       REVIEW_ACKNOWLEDGEMENT_REQUIRED:
@@ -94,13 +96,15 @@ export async function prepareImportAction(
   formData: FormData,
 ): Promise<ImportActionState> {
   try {
-    await assertLocalRequest();
+    await consumeLocalMutationNonce("IMPORT_PREPARE", formData);
+    const nextMutationNonce = await issueLocalMutationNonce("IMPORT_PREPARE", "/import");
     const inputType = String(formData.get("inputType") ?? "PASTED_SINGLE");
     if (inputType === "URL") {
       const value = String(formData.get("url") ?? "");
       const policy = evaluateJobUrlPolicy(value);
       return {
         status: "URL_POLICY",
+        mutationNonce: nextMutationNonce,
         urlPolicy: {
           decision: policy.decision,
           detectedSource: policy.detectedSource,
@@ -118,6 +122,7 @@ export async function prepareImportAction(
     if (!repository) {
       return {
         status: "ERROR",
+        mutationNonce: nextMutationNonce,
         message: "The local import database is not ready. Run: npm run db:migrate -- --confirm",
       };
     }
@@ -129,7 +134,11 @@ export async function prepareImportAction(
     if (inputType === "FILE_UPLOAD") {
       const file = formData.get("file");
       if (!(file instanceof File) || file.size === 0) {
-        return { status: "ERROR", message: "Choose a supported UTF-8 file to import." };
+        return {
+          status: "ERROR",
+          message: "Choose a supported UTF-8 file to import.",
+          mutationNonce: nextMutationNonce,
+        };
       }
       content = new Uint8Array(await file.arrayBuffer());
       originalFilename = file.name;
@@ -151,10 +160,12 @@ export async function prepareImportAction(
     const staged = repository.stage(prepared);
     return {
       status: "PREVIEW",
+      mutationNonce: nextMutationNonce,
       message: `Review ${staged.records.length} detected job${staged.records.length === 1 ? "" : "s"} before confirming.`,
       preview: {
         importId: staged.importId,
         previewToken: staged.previewToken,
+        confirmMutationNonce: await issueLocalMutationNonce("IMPORT_CONFIRM", "/import"),
         expiresAt: staged.expiresAt,
         detectedSource: prepared.document.detectedSource,
         acquisitionMethod: prepared.document.acquisitionMethod,
@@ -178,7 +189,11 @@ export async function prepareImportAction(
       },
     };
   } catch (error) {
-    return { status: "ERROR", message: safeMessage(error) };
+    let mutationNonce: string | undefined;
+    try {
+      mutationNonce = await issueLocalMutationNonce("IMPORT_PREPARE", "/import");
+    } catch {}
+    return { status: "ERROR", message: safeMessage(error), mutationNonce };
   }
 }
 
@@ -187,7 +202,7 @@ export async function confirmImportAction(
   formData: FormData,
 ): Promise<ImportActionState> {
   try {
-    await assertLocalRequest();
+    await consumeLocalMutationNonce("IMPORT_CONFIRM", formData);
     const repository = getJobImportRepository();
     if (!repository) throw new Error("DATABASE_NOT_READY");
     const importId = String(formData.get("importId") ?? "");
@@ -226,6 +241,7 @@ export async function confirmImportAction(
     revalidatePath("/jobs");
     return {
       status: "CONFIRMED",
+      mutationNonce: await issueLocalMutationNonce("IMPORT_CONFIRM", "/import"),
       message: "Import confirmation completed.",
       result: {
         imported: result.imported,
@@ -235,6 +251,10 @@ export async function confirmImportAction(
       },
     };
   } catch (error) {
-    return { status: "ERROR", message: safeMessage(error) };
+    let mutationNonce: string | undefined;
+    try {
+      mutationNonce = await issueLocalMutationNonce("IMPORT_CONFIRM", "/import");
+    } catch {}
+    return { status: "ERROR", message: safeMessage(error), mutationNonce };
   }
 }

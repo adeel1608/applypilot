@@ -125,15 +125,22 @@ describe("Beta repository", () => {
       evaluationVersionId: evaluationId,
       reasonCode: "LOCAL_USER_SHORTLISTED",
     });
-    sqlite
-      .prepare(
-        `INSERT INTO document_artifacts
-          (id,job_id,job_version_id,profile_version_id,type,template,format,file_name,local_path,
-           content_digest,claim_evidence_json,layout_result_json,version,stale,created_at)
-         VALUES ('document:cv',?,?,?,'CV','CLASSIC','DOCX','safe-example.docx',
-           'data/private/generated/safe-example.docx',?,'[]','{}',1,0,?)`,
-      )
-      .run(job.id, version.id, "profile-version:1", "a".repeat(64), now);
+    expect(
+      repository.recordDocumentArtifact({
+        id: "document:cv",
+        jobId: job.id,
+        jobVersionId: version.id,
+        profileVersionId: "profile-version:1",
+        type: "CV",
+        template: "CLASSIC",
+        format: "DOCX",
+        fileName: "safe-example.docx",
+        localPath: "documents/fixture/safe-example.docx",
+        contentDigest: "a".repeat(64),
+        claimEvidence: ["fictional:skill"],
+        layoutResult: { structureValidated: true },
+      }),
+    ).toEqual({ id: "document:cv", version: 1 });
     const approvalId = repository.approveDocument({
       documentArtifactId: "document:cv",
       contentDigest: "a".repeat(64),
@@ -256,6 +263,34 @@ describe("Beta repository", () => {
     expect(storedConsent.tokenHash).toBe(consent.tokenHash);
     expect(JSON.stringify(storedConsent)).not.toContain(consent.token);
     expect(packetDigest(packet)).toHaveLength(64);
+    const capabilityId = repository.persistCapabilityConfig({
+      source: "LEVER",
+      tenant: "fictional",
+      region: "GLOBAL",
+      allowedHost: "api.lever.co",
+      allowedPathPrefix: "/v0/postings/fictional",
+      policyVersion: "fixture-policy-1",
+      approved: true,
+      expiresAt: "2026-10-01T00:00:00.000Z",
+      requestBudget: 2,
+      recordBudget: 20,
+    });
+    repository.recordDiscoveryRun({
+      capabilityConfigId: capabilityId,
+      status: "PARTIAL",
+      cursor: { version: 1, next: "2" },
+      requestCount: 1,
+      recordCount: 2,
+      safeErrorCode: null,
+      startedAt: now,
+      completedAt: "2026-09-07T04:00:02.000Z",
+    });
+    expect(
+      sqlite.prepare("SELECT status, cursor_json AS cursorJson FROM discovery_runs").get(),
+    ).toEqual({
+      status: "PARTIAL",
+      cursorJson: JSON.stringify({ version: 1, next: "2" }),
+    });
     expect(discoveredEvent.created).toBe(true);
     expect(repeatedEvent).toMatchObject({ created: false, eventId: discoveredEvent.eventId });
     expect(sqlite.prepare("SELECT count(*) AS count FROM application_events_v2").get()).toEqual({
@@ -279,6 +314,15 @@ describe("Beta repository", () => {
     expect(
       sqlite.prepare("SELECT status FROM application_packets WHERE id = 'packet:1'").get(),
     ).toEqual({ status: "INVALIDATED" });
+    const corrected = repository.recordOwnerCorrection({
+      job: { ...job, title: "Corrected Fictional Role", dateUpdated: now },
+      reasonCode: "OWNER_REVIEWED_FIELDS",
+      changedFields: ["title"],
+    });
+    expect(corrected.created).toBe(true);
+    expect(
+      sqlite.prepare("SELECT actor, changed_fields_json AS fields FROM job_corrections").get(),
+    ).toEqual({ actor: "OWNER", fields: JSON.stringify(["title"]) });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

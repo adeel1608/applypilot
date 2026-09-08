@@ -2,17 +2,20 @@ import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import JSZip from "jszip";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 
 import { fixtureJob, testProfile } from "../../../tests/fixture-data";
 import {
-  generateResumeDocument,
   assertPrivatePdfOutputPath,
+  generateResumeDocument,
   renderResumeDocx,
   renderResumeHtml,
   renderResumePdf,
-  resumeTemplateDesigns,
   resumeFileName,
+  resumeEssentialContent,
+  resumeTemplateDesigns,
   selectResumeTemplate,
   validateResumeTruth,
 } from "./index";
@@ -100,6 +103,35 @@ describe("resume engine", () => {
     }
   });
 
+  it("preserves every essential content item in both HTML and DOCX artifacts", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "applypilot-resume-parity-"));
+    const privateRoot = join(temporaryRoot, "private");
+    const outputPath = join("generated", "parity.docx");
+    const document = generateResumeDocument(testProfile, fixtureJob("job-robotics-internship"));
+    try {
+      await renderResumeDocx(document, outputPath, privateRoot);
+      const archive = await JSZip.loadAsync(await readFile(join(privateRoot, outputPath)));
+      const documentXml = await archive.file("word/document.xml")!.async("string");
+      const html = renderResumeHtml(document);
+      const normalize = (value: string) =>
+        value
+          .replace(/<[^>]+>/g, " ")
+          .replaceAll("&amp;", "&")
+          .replaceAll("&lt;", "<")
+          .replaceAll("&gt;", ">")
+          .replace(/\s+/g, " ")
+          .trim();
+      const htmlText = normalize(html);
+      const docxText = normalize(documentXml);
+      for (const item of resumeEssentialContent(document)) {
+        expect(htmlText).toContain(item);
+        expect(docxText).toContain(item);
+      }
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("confines PDF output and creates a new A4 PDF without overwrite", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "applypilot-resume-pdf-"));
     const privateRoot = join(temporaryRoot, "private");
@@ -110,13 +142,43 @@ describe("resume engine", () => {
       const bytes = await readFile(join(privateRoot, outputPath));
       expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
       expect(bytes.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(1);
+      const pdf = await getDocument({ data: new Uint8Array(bytes) }).promise;
+      const text = (
+        await Promise.all(
+          Array.from({ length: pdf.numPages }, async (_, index) => {
+            const page = await pdf.getPage(index + 1);
+            const content = await page.getTextContent();
+            return content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
+          }),
+        )
+      ).join(" ");
+      for (const item of resumeEssentialContent(document)) {
+        expect(text.toLocaleLowerCase("en-AU")).toContain(item.toLocaleLowerCase("en-AU"));
+      }
       await expect(renderResumePdf(document, outputPath, privateRoot)).rejects.toMatchObject({
         code: "EEXIST",
       });
     } finally {
       await rm(temporaryRoot, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
+
+  it("drops whole lower-priority evidence deterministically before page overflow", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "applypilot-resume-fit-"));
+    const privateRoot = join(temporaryRoot, "private");
+    const document = generateResumeDocument(testProfile, fixtureJob("job-retail-sales-assistant"));
+    const originalClaim = document.employment[0]!.claims[0]!;
+    document.employment[0]!.claims = Array.from({ length: 80 }, () => ({ ...originalClaim }));
+    try {
+      const fitted = await renderResumePdf(document, "generated/fitted.pdf", privateRoot);
+      expect(fitted.employment[0]!.claims.length).toBeLessThan(80);
+      const bytes = await readFile(join(privateRoot, "generated", "fitted.pdf"));
+      expect(bytes.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(1);
+      expect(fitted.skills.length).toBeGreaterThan(0);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  }, 20_000);
 
   it.each([
     "../outside.pdf",

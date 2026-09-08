@@ -481,6 +481,7 @@ p {
 }
 
 .table-wrap {
+  max-width: 100%;
   overflow-x: auto;
 }
 table {
@@ -803,6 +804,11 @@ td > span:not(.status, .action-label) {
 }
 
 @media (max-width: 680px) {
+  .page-stack,
+  .page-stack > *,
+  .panel {
+    min-width: 0;
+  }
   .topbar {
     position: static;
     align-items: flex-start;

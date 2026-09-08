@@ -14,6 +14,7 @@ import { scoreJobFit } from "@applypilot/fit-scorer";
 import {
   canonicalizeJobUrl,
   deriveJobIdentity,
+  extractRequirementEvidence,
   JobFieldEditsSchema,
   ParsedJobFieldsSchema,
   sha256,
@@ -242,6 +243,16 @@ export class JobImportRepository {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  async reevaluateExistingJob(
+    jobId: string,
+    provider: CandidateProfileProvider,
+  ): Promise<CandidateProfileRuntimeState | "EVALUATION_FAILED"> {
+    const id = z.string().min(1).parse(jobId);
+    const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(id);
+    if (!exists) throw new Error("JOB_NOT_FOUND");
+    return this.evaluate(id, provider);
+  }
+
   stage(prepared: PreparedJobImport): StagedImportPreview {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(this.now().getTime() + tokenLifetimeMs).toISOString();
@@ -445,8 +456,10 @@ export class JobImportRepository {
           duplicate?.jobId,
         );
         this.ensureSource(record.detectedSource, now);
+        let sourceRecordId: string;
         if (duplicate) {
           this.updateJob(job, now);
+          sourceRecordId = duplicate.sourceRecordId;
           this.sqlite
             .prepare(
               `UPDATE job_source_records SET external_id = ?, source_url = ?, raw_payload_json = ?,
@@ -467,6 +480,7 @@ export class JobImportRepository {
           counts.updated += 1;
         } else {
           this.insertJob(job, now);
+          sourceRecordId = randomUUID();
           this.sqlite
             .prepare(
               `INSERT INTO job_source_records
@@ -475,7 +489,7 @@ export class JobImportRepository {
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
             )
             .run(
-              randomUUID(),
+              sourceRecordId,
               job.id,
               sourceId(record.detectedSource),
               fields.externalId,
@@ -489,6 +503,19 @@ export class JobImportRepository {
             );
           counts.imported += 1;
         }
+        this.persistBetaObservationAndVersion({
+          job,
+          sourceRecordId,
+          source: record.detectedSource,
+          externalId: fields.externalId,
+          sourceUrl: fields.sourceUrl ? canonicalizeJobUrl(fields.sourceUrl) : null,
+          acquisitionMethod: record.acquisitionMethod,
+          contentHash: record.segmentContentHash,
+          importId,
+          recordId: record.id,
+          parserVersion: batch.parserVersion,
+          now,
+        });
         persistedJobIds.push(job.id);
         this.sqlite
           .prepare(
@@ -772,6 +799,7 @@ export class JobImportRepository {
             eligibility.engineVersion,
             now,
           );
+        this.persistBetaEvaluation(evaluatedJob, profileVersionId, eligibility, fit, now);
         this.sqlite
           .prepare(
             `INSERT INTO fit_scores
@@ -844,6 +872,150 @@ export class JobImportRepository {
       .prepare("UPDATE candidate_profiles SET active_version_id = ?, updated_at = ? WHERE id = ?")
       .run(id, now, profile.profileId);
     return id;
+  }
+
+  private betaSchemaAvailable(): boolean {
+    return Boolean(
+      this.sqlite
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_versions'")
+        .get(),
+    );
+  }
+
+  private persistBetaObservationAndVersion(input: {
+    job: Job;
+    sourceRecordId: string;
+    source: DetectedJobSource;
+    externalId: string | null;
+    sourceUrl: string | null;
+    acquisitionMethod: string;
+    contentHash: string;
+    importId: string;
+    recordId: string;
+    parserVersion: string;
+    now: string;
+  }): void {
+    if (!this.betaSchemaAvailable()) return;
+    const previous = this.sqlite
+      .prepare(
+        "SELECT id FROM source_observations WHERE job_id = ? ORDER BY observed_at DESC, rowid DESC LIMIT 1",
+      )
+      .get(input.job.id) as { id: string } | undefined;
+    const observationId = randomUUID();
+    this.sqlite
+      .prepare(
+        `INSERT INTO source_observations
+          (id, job_id, source_record_id, source, tenant, external_id, source_url,
+           acquisition_method, content_hash, raw_snapshot_reference, observed_at, posted_at,
+           expires_at, parser_version, policy_version, run_id, supersedes_observation_id)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?)`,
+      )
+      .run(
+        observationId,
+        input.job.id,
+        input.sourceRecordId,
+        input.source,
+        input.externalId,
+        input.sourceUrl,
+        input.acquisitionMethod,
+        input.contentHash,
+        `import_batches:${input.importId}#record:${input.recordId}`,
+        input.now,
+        input.job.datePosted,
+        input.parserVersion,
+        previous?.id ?? null,
+      );
+    const normalized = JSON.stringify(input.job);
+    const contentDigest = createHash("sha256").update(normalized).digest("hex");
+    const latest = this.sqlite
+      .prepare(
+        "SELECT version, content_digest AS contentDigest FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1",
+      )
+      .get(input.job.id) as { version: number; contentDigest: string | null } | undefined;
+    if (latest?.contentDigest === contentDigest) return;
+    const jobVersionId = randomUUID();
+    this.sqlite
+      .prepare(
+        `INSERT INTO job_versions
+          (id, job_id, version, normalized_json, content_digest, source_observation_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        jobVersionId,
+        input.job.id,
+        (latest?.version ?? 0) + 1,
+        normalized,
+        contentDigest,
+        observationId,
+        input.now,
+      );
+    const requirements = extractRequirementEvidence(input.job.description, {
+      sourceObservationId: observationId,
+      sourcePath: "description",
+    });
+    const insert = this.sqlite.prepare(
+      `INSERT INTO requirement_evidence
+        (id, job_version_id, source_observation_id, source_path, start_offset, end_offset,
+         original_text, normalized_proposition, modality, kind, condition_text, certainty,
+         rule_id, extractor_version, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const evidence of requirements) {
+      insert.run(
+        randomUUID(),
+        jobVersionId,
+        observationId,
+        evidence.sourcePath,
+        evidence.start,
+        evidence.end,
+        evidence.originalText,
+        evidence.normalizedProposition,
+        evidence.modality,
+        evidence.kind,
+        evidence.condition,
+        evidence.certainty,
+        evidence.ruleId,
+        evidence.extractorVersion,
+        input.now,
+      );
+    }
+  }
+
+  private persistBetaEvaluation(
+    job: Job,
+    profileVersionId: string,
+    eligibility: ReturnType<typeof evaluateEligibility>,
+    fit: ReturnType<typeof scoreJobFit>,
+    now: string,
+  ): void {
+    if (!this.betaSchemaAvailable()) return;
+    const jobVersion = this.sqlite
+      .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
+      .get(job.id) as { id: string } | undefined;
+    if (!jobVersion) return;
+    this.sqlite
+      .prepare(
+        `INSERT INTO evaluation_versions
+          (id, job_id, job_version_id, profile_version_id, evaluation_context,
+           eligibility_status, eligibility_reasons_json, fit_score, fit_contributions_json,
+           coverage_json, eligibility_engine_version, fit_engine_version, weight_version,
+           stale, evaluated_at)
+         VALUES (?, ?, ?, ?, 'PRIVATE_LOCAL_PROFILE', ?, ?, ?, ?, ?, ?, ?, 'beta-core-1', 0, ?)`,
+      )
+      .run(
+        randomUUID(),
+        job.id,
+        jobVersion.id,
+        profileVersionId,
+        eligibility.status,
+        JSON.stringify(eligibility.reasons),
+        fit.score,
+        JSON.stringify(fit.contributions),
+        JSON.stringify(fit.coverage),
+        eligibility.engineVersion,
+        fit.engineVersion,
+        now,
+      );
   }
 
   private audit(

@@ -35,7 +35,7 @@ Description: Help fictional visitors and maintain accurate local service records
   await page.getByRole("link", { name: title }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.getByText("Not evaluated", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Private candidate profile required/i)).toBeVisible();
+  await expect(page.getByText(/Evaluation required|Not evaluated/i).first()).toBeVisible();
 });
 
 test("supports multi-job, inert HTML, and file-upload previews", async ({ page }) => {
@@ -90,4 +90,15 @@ test("shows only the safe private-profile runtime state", async ({ page }) => {
   const source = await page.content();
   expect(source).not.toContain('"referees":');
   expect(source).not.toContain('"contact":');
+});
+
+test("establishes an HttpOnly same-site local session before rendering mutation forms", async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  await page.goto("/import");
+  const session = (await context.cookies()).find(({ name }) => name === "applypilot_local_session");
+  expect(session).toMatchObject({ httpOnly: true, sameSite: "Strict" });
+  await expect(page.locator('input[name="mutationNonce"]')).toHaveAttribute("value", /.+/);
 });

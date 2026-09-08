@@ -2,9 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import {
+  approveDocumentAction,
+  correctJobAction,
+  generateCoverLetterAction,
+  generateCvAction,
+  preparePacketAction,
+  reevaluateJobAction,
+  setQueueStateAction,
+} from "@web/app/jobs/actions";
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
+import { coverLetterRequirementStatus } from "@applypilot/cover-letter-engine";
+import { getBetaJob, type BetaJobDetail } from "@web/lib/beta-workspace";
 import { evaluatedJobs, formatDiscoveryDate, getEvaluatedJob, getImportedJob } from "@web/lib/data";
+import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +31,262 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const result = getEvaluatedJob(id);
-  return { title: result?.job.title ?? getImportedJob(id)?.title ?? "Job not found" };
+  return {
+    title:
+      result?.job.title ??
+      getBetaJob(id)?.job.title ??
+      getImportedJob(id)?.title ??
+      "Job not found",
+  };
+}
+
+async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
+  const path = `/jobs/${detail.job.id}`;
+  const [queueNonce, evaluateNonce, correctionNonce, generateNonce, coverLetterNonce, packetNonce] =
+    await Promise.all([
+      issueLocalMutationNonce("JOB_QUEUE", path),
+      issueLocalMutationNonce("JOB_REEVALUATE", path),
+      issueLocalMutationNonce("JOB_CORRECT", path),
+      issueLocalMutationNonce("DOCUMENT_GENERATE", path),
+      issueLocalMutationNonce("COVER_LETTER_GENERATE", path),
+      issueLocalMutationNonce("PACKET_PREPARE", path),
+    ]);
+  const approvalNonces = await Promise.all(
+    detail.documents.map(() => issueLocalMutationNonce("DOCUMENT_APPROVE", path)),
+  );
+  const { job } = detail;
+  return (
+    <div className="page-stack">
+      <Link className="back-link" href="/jobs">
+        ← Back to jobs
+      </Link>
+      <section className="job-hero">
+        <div>
+          <div className="eyebrow">Private local job · {job.category}</div>
+          <h1>{job.title}</h1>
+          <p>
+            {job.company} · {job.location} · {job.employmentType.replaceAll("_", " ")}
+          </p>
+          <div className="inline-pills">
+            {detail.eligibilityStatus ? (
+              <StatusPill status={detail.eligibilityStatus} />
+            ) : (
+              <span className="source-pill">Evaluation required</span>
+            )}
+            <span className="source-pill">Queue: {detail.queueState ?? "Not reviewed"}</span>
+            {detail.evaluationStale && <span className="source-pill">Stale evaluation</span>}
+          </div>
+        </div>
+        {detail.fitScore === null ? (
+          <span className="source-pill">Fit unavailable</span>
+        ) : (
+          <ScoreBadge score={detail.fitScore} />
+        )}
+      </section>
+
+      <section className="action-bar" aria-label="Local job actions">
+        <div>
+          <strong>Owner-controlled local workflow</strong>
+          <span>No source fetch, employer form, upload, or submission</span>
+        </div>
+        <form action={setQueueStateAction}>
+          <input type="hidden" name="mutationNonce" value={queueNonce} />
+          <input type="hidden" name="jobId" value={job.id} />
+          <button className="button button--quiet" name="queueState" value="SKIPPED">
+            Skip
+          </button>
+          <button className="button button--secondary" name="queueState" value="REVIEWING">
+            Review
+          </button>
+          <button className="button button--secondary" name="queueState" value="SHORTLISTED">
+            Shortlist
+          </button>
+        </form>
+      </section>
+
+      <section className="detail-grid">
+        <article className="panel">
+          <span className="section-kicker">Evaluation version</span>
+          <h2>{detail.eligibilityStatus?.replaceAll("_", " ") ?? "Not evaluated"}</h2>
+          {detail.coverage && (
+            <p>
+              Coverage {detail.coverage.percent}% · {detail.coverage.confidence.toLowerCase()}{" "}
+              confidence
+            </p>
+          )}
+          {detail.coverage?.missingDimensions.length ? (
+            <p>Missing or ambiguous: {detail.coverage.missingDimensions.join(", ")}</p>
+          ) : null}
+          <ul className="reason-list">
+            {detail.eligibilityReasons.map((reason) => (
+              <li key={`${reason.code}-${reason.message}`}>
+                <strong>{reason.code.replaceAll("_", " ")}</strong>
+                <span>{reason.message}</span>
+              </li>
+            ))}
+          </ul>
+          <form action={reevaluateJobAction}>
+            <input type="hidden" name="mutationNonce" value={evaluateNonce} />
+            <input type="hidden" name="jobId" value={job.id} />
+            <button className="button button--secondary">Re-evaluate current versions</button>
+          </form>
+        </article>
+        <article className="panel">
+          <span className="section-kicker">Fit explanation</span>
+          <h2>{detail.fitScore === null ? "Unavailable" : `${detail.fitScore} / 100`}</h2>
+          <ul className="plain-reasons">
+            {detail.fitContributions.map((contribution) => (
+              <li key={`${contribution.category}-${contribution.explanation}`}>
+                {contribution.points > 0 ? "+" : ""}
+                {contribution.points} · {contribution.explanation}
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
+
+      <section className="detail-grid">
+        <article className="panel">
+          <span className="section-kicker">Original source and normalized review</span>
+          <h2>Role evidence</h2>
+          <p>{job.description}</p>
+          {detail.requirements.length ? (
+            <dl className="fact-list">
+              {detail.requirements.map((requirement, index) => (
+                <div key={`${requirement.kind}-${index}`}>
+                  <dt>
+                    {requirement.kind.replaceAll("_", " ")} · {requirement.modality} ·{" "}
+                    {requirement.certainty}
+                  </dt>
+                  <dd>
+                    Source: {requirement.originalText}
+                    <br />
+                    Normalized: {requirement.normalizedProposition}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p>No typed requirement spans were retained for this legacy observation.</p>
+          )}
+        </article>
+        <article className="panel">
+          <span className="section-kicker">Owner correction overlay</span>
+          <h2>Correct selected fields</h2>
+          <p>The source observation remains immutable; a correction creates a new job version.</p>
+          <form action={correctJobAction} className="import-form">
+            <input type="hidden" name="mutationNonce" value={correctionNonce} />
+            <input type="hidden" name="jobId" value={job.id} />
+            <label>
+              Title
+              <input name="title" defaultValue={job.title} required maxLength={300} />
+            </label>
+            <label>
+              Company
+              <input name="company" defaultValue={job.company} required maxLength={300} />
+            </label>
+            <label>
+              Location
+              <input name="location" defaultValue={job.location} required maxLength={500} />
+            </label>
+            <label>
+              Category
+              <input name="category" defaultValue={job.category} required maxLength={300} />
+            </label>
+            <button className="button button--secondary">Save correction and re-evaluate</button>
+          </form>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Private document artifacts</span>
+            <h2>CV generation and approval</h2>
+          </div>
+          <span className="source-pill">
+            Cover letter: {coverLetterRequirementStatus(job).replaceAll("_", " ")}
+          </span>
+        </div>
+        <p>
+          Generation creates new versioned PDF and DOCX files below the ignored private document
+          root. Filenames and contents are never placed in Git.
+        </p>
+        <form action={generateCvAction}>
+          <input type="hidden" name="mutationNonce" value={generateNonce} />
+          <input type="hidden" name="jobId" value={job.id} />
+          <button className="button button--secondary">
+            {detail.documents.length ? "Regenerate private CV" : "Generate private CV"}
+          </button>
+        </form>
+        {coverLetterRequirementStatus(job) !== "NOT_REQUIRED" && (
+          <form action={generateCoverLetterAction}>
+            <input type="hidden" name="mutationNonce" value={coverLetterNonce} />
+            <input type="hidden" name="jobId" value={job.id} />
+            <button className="button button--secondary">
+              Generate private cover letter for owner review
+            </button>
+          </form>
+        )}
+        <div className="job-list">
+          {detail.documents.map((document, index) => (
+            <article className="job-row" key={document.id}>
+              <div className="job-row__main">
+                <h3>
+                  {document.type} {document.format} v{document.version}
+                </h3>
+                <p>
+                  {document.template} · {document.stale ? "stale" : "current"} ·{" "}
+                  {document.approved ? "approved" : "approval required"}
+                </p>
+              </div>
+              {!document.approved && !document.stale && (
+                <form action={approveDocumentAction}>
+                  <input type="hidden" name="mutationNonce" value={approvalNonces[index]} />
+                  <input type="hidden" name="jobId" value={job.id} />
+                  <input type="hidden" name="documentArtifactId" value={document.id} />
+                  <input type="hidden" name="contentDigest" value={document.contentDigest} />
+                  <button className="button button--secondary">Approve exact artifact</button>
+                </form>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
+        <span className="section-kicker">Application packet</span>
+        <h2>
+          {detail.packet
+            ? `${detail.packet.status} · version ${detail.packet.version}`
+            : "Not prepared"}
+        </h2>
+        {detail.packet?.blockers.length ? (
+          <ul>
+            {detail.packet.blockers.map((blocker) => (
+              <li key={blocker}>{blocker.replaceAll("_", " ")}</li>
+            ))}
+          </ul>
+        ) : null}
+        <p>
+          A real local packet deliberately has no approved application destination. Preparation
+          stops before any employer form and therefore remains review-required.
+        </p>
+        <form action={preparePacketAction}>
+          <input type="hidden" name="mutationNonce" value={packetNonce} />
+          <input type="hidden" name="jobId" value={job.id} />
+          <button className="button button--primary">Prepare local packet</button>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const result = getEvaluatedJob(id);
+  const beta = result ? null : getBetaJob(id);
+  if (beta) return <BetaJobWorkspace detail={beta} />;
   const imported = result ? undefined : getImportedJob(id);
   if (imported) {
     const provenance = imported.sourceMetadata.provenance as

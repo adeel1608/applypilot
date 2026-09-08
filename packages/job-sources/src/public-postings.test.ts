@@ -8,6 +8,7 @@ import {
   readGreenhouseJob,
   readGreenhouseJobs,
   readLeverJobs,
+  readLeverJobsPage,
   type PublicGetDependencies,
   type PublicPostingCapability,
 } from "./index";
@@ -155,6 +156,35 @@ describe("default-disabled public posting readers", () => {
       externalId: "lever-1",
       title: "Fictional Technical Role",
     });
+  });
+
+  it("uses bounded opaque Lever pagination without exceeding the approved record cap", async () => {
+    const payload = Array.from({ length: 2 }, (_, index) => ({
+      id: `lever-${index}`,
+      text: `Fictional Role ${index}`,
+      hostedUrl: `https://jobs.lever.co/fictional/lever-${index}`,
+      applyUrl: `https://jobs.lever.co/fictional/lever-${index}/apply`,
+      descriptionPlain: "Fictional role.",
+    }));
+    const deps = dependencies(payload);
+    const page = await readLeverJobsPage(capability("LEVER", { recordCap: 4 }), {
+      now,
+      dependencies: deps,
+      cursor: "0",
+      pageSize: 2,
+    });
+    expect(page).toMatchObject({ nextCursor: "2", requestCount: 1 });
+    const calledUrl = String(vi.mocked(deps.fetch).mock.calls[0]?.[0]);
+    expect(calledUrl).toContain("skip=0");
+    expect(calledUrl).toContain("limit=2");
+    await expect(
+      readLeverJobsPage(capability("LEVER", { recordCap: 4 }), {
+        now,
+        dependencies: deps,
+        cursor: "3",
+        pageSize: 2,
+      }),
+    ).rejects.toThrow("RECORD_CAP_EXCEEDED");
   });
 
   it("denies local, private, link-local, mapped, metadata, and documentation addresses", () => {

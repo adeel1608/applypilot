@@ -64,6 +64,12 @@ export interface PublicPosting {
   rawPayload: unknown;
 }
 
+export interface PublicPostingPage {
+  records: PublicPosting[];
+  nextCursor: string | null;
+  requestCount: number;
+}
+
 export type SourceReadiness =
   | { status: "SOURCE_READY_AWAITING_TENANT" }
   | { status: "SOURCE_DISABLED"; reason: "CAPABILITY_EXPIRED" | "CAPABILITY_NOT_APPROVED" }

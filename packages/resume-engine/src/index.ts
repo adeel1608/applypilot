@@ -531,6 +531,46 @@ export function renderResumeHtml(document: ResumeDocument): string {
 </html>`;
 }
 
+/** Ordered substantive text that every maintained renderer must preserve. */
+export function resumeEssentialContent(document: ResumeDocument): string[] {
+  const design = resumeTemplateDesigns[document.template];
+  const content: string[] = [
+    document.candidateName,
+    document.contactLine,
+    `Application: ${document.targetRole} - ${document.targetCompany}`,
+  ];
+  const sections: Record<ResumeTemplateDesign["sectionOrder"][number], string[]> = {
+    SUMMARY: [design.profileHeading, ...document.summary.map(({ text }) => text)],
+    SKILLS: [design.skillsHeading, ...document.skills.map(({ text }) => text)],
+    EXPERIENCE: [
+      design.experienceHeading,
+      ...document.employment.flatMap(({ heading, dates, claims }) => [
+        heading,
+        dates,
+        ...claims.map(({ text }) => text),
+      ]),
+    ],
+    PROJECTS: document.projects.length
+      ? [
+          design.projectsHeading,
+          ...document.projects.flatMap(({ heading, claims }) => [
+            heading,
+            ...claims.map(({ text }) => text),
+          ]),
+        ]
+      : [],
+    EDUCATION: [
+      design.educationHeading,
+      ...document.education.flatMap(({ heading, dates }) => [heading, dates]),
+    ],
+    ACHIEVEMENTS: document.achievements.length
+      ? ["Verified achievements", ...document.achievements.map(({ text }) => text)]
+      : [],
+  };
+  for (const section of design.sectionOrder) content.push(...sections[section]);
+  return content;
+}
+
 export function resumeFileName(profile: CandidateProfile, company: string): string {
   const firstName = profile.identity.firstName.value;
   return profile.documentFileNameTemplate
@@ -583,7 +623,10 @@ export function assertPrivatePdfOutputPath(outputPath: string, privateRoot: stri
   return assertPrivateOutputPath(outputPath, privateRoot, ".pdf");
 }
 
-async function preparePrivateOutputTarget(target: string, privateRoot: string): Promise<void> {
+export async function preparePrivateOutputTarget(
+  target: string,
+  privateRoot: string,
+): Promise<void> {
   const root = resolve(privateRoot);
   await mkdir(root, { recursive: true });
   await mkdir(dirname(target), { recursive: true });
@@ -599,24 +642,63 @@ export async function renderResumePdf(
   document: ResumeDocument,
   outputPath: string,
   privateRoot: string,
-): Promise<void> {
+): Promise<ResumeDocument> {
   const target = assertPrivatePdfOutputPath(outputPath, privateRoot);
   await preparePrivateOutputTarget(target, privateRoot);
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
-    await page.setContent(renderResumeHtml(document), { waitUntil: "load" });
-    const bytes = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-      tagged: true,
-    });
-    await writeFile(target, bytes, { flag: "wx" });
+    const fitted = structuredClone(document);
+    while (true) {
+      await page.setContent(renderResumeHtml(fitted), { waitUntil: "load" });
+      const bytes = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        preferCSSPageSize: true,
+        tagged: true,
+      });
+      const pages = bytes.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length ?? 0;
+      if (pages >= 1 && pages <= fitted.pageLimit) {
+        await writeFile(target, bytes, { flag: "wx" });
+        return fitted;
+      }
+      if (!removeLowestPriorityEvidence(fitted)) throw new Error("PDF_PAGE_LIMIT_EXCEEDED");
+    }
   } finally {
     await browser.close();
   }
+}
+
+function removeLowestPriorityEvidence(document: ResumeDocument): boolean {
+  if (document.achievements.length) {
+    document.achievements.pop();
+    return true;
+  }
+  const lastProject = document.projects.at(-1);
+  if (lastProject) {
+    if (lastProject.claims.length > 1) lastProject.claims.pop();
+    else document.projects.pop();
+    return true;
+  }
+  const lastRole = document.employment.at(-1);
+  if (lastRole) {
+    if (lastRole.claims.length > 1) lastRole.claims.pop();
+    else if (document.employment.length > 1) document.employment.pop();
+    else if (document.education.length > 1) document.education.pop();
+    else if (document.skills.length > 1) document.skills.pop();
+    else return false;
+    return true;
+  }
+  if (document.education.length > 1) {
+    document.education.pop();
+    return true;
+  }
+  if (document.skills.length > 1) {
+    document.skills.pop();
+    return true;
+  }
+  return false;
 }
 
 function docxSectionHeading(text: string, typeface: string): Paragraph {

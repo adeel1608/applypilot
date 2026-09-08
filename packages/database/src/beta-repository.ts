@@ -63,6 +63,23 @@ export interface RecordedJobVersion {
   created: boolean;
 }
 
+const DocumentArtifactInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  jobId: z.string().min(1),
+  jobVersionId: z.string().min(1),
+  profileVersionId: z.string().min(1),
+  type: z.enum(["CV", "COVER_LETTER", "OTHER"]),
+  template: z.string().min(1),
+  format: z.enum(["PDF", "DOCX"]),
+  fileName: z.string().min(1),
+  localPath: z.string().min(1),
+  contentDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  claimEvidence: z.array(z.string().min(1)),
+  layoutResult: z.record(z.string(), z.unknown()),
+});
+
+export type DocumentArtifactInput = z.input<typeof DocumentArtifactInputSchema>;
+
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -258,6 +275,224 @@ export class BetaRepository {
            updated_at = excluded.updated_at`,
       )
       .run(input.jobId, state, input.evaluationVersionId, reasonCode, now, now);
+  }
+
+  recordDocumentArtifact(input: DocumentArtifactInput): { id: string; version: number } {
+    const value = DocumentArtifactInputSchema.parse(input);
+    const id = value.id ?? this.id();
+    const versionRow = this.sqlite
+      .prepare(
+        `SELECT coalesce(max(version), 0) AS version FROM document_artifacts
+         WHERE job_id = ? AND type = ? AND format = ?`,
+      )
+      .get(value.jobId, value.type, value.format) as { version: number };
+    const version = versionRow.version + 1;
+    this.sqlite
+      .prepare(
+        `INSERT INTO document_artifacts
+          (id, job_id, job_version_id, profile_version_id, type, template, format,
+           file_name, local_path, content_digest, claim_evidence_json, layout_result_json,
+           version, stale, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      )
+      .run(
+        id,
+        value.jobId,
+        value.jobVersionId,
+        value.profileVersionId,
+        value.type,
+        value.template,
+        value.format,
+        value.fileName,
+        value.localPath,
+        value.contentDigest,
+        JSON.stringify(value.claimEvidence),
+        JSON.stringify(value.layoutResult),
+        version,
+        this.now().toISOString(),
+      );
+    return { id, version };
+  }
+
+  recordOwnerCorrection(input: {
+    job: Job;
+    reasonCode: string;
+    changedFields: string[];
+  }): RecordedJobVersion {
+    const job = JobSchema.parse(input.job);
+    const reasonCode = z.string().min(1).max(100).parse(input.reasonCode);
+    const changedFields = z.array(z.string().min(1).max(80)).min(1).parse(input.changedFields);
+    return this.sqlite.transaction(() => {
+      const previous = this.sqlite
+        .prepare(
+          `SELECT id, normalized_json AS normalizedJson, content_digest AS contentDigest,
+                  source_observation_id AS sourceObservationId
+           FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1`,
+        )
+        .get(job.id) as
+        | {
+            id: string;
+            normalizedJson: string;
+            contentDigest: string;
+            sourceObservationId: string | null;
+          }
+        | undefined;
+      if (!previous) throw new Error("JOB_VERSION_NOT_FOUND");
+      const recorded = this.recordJobVersion({
+        job,
+        sourceObservationId: previous.sourceObservationId,
+      });
+      if (!recorded.created) throw new Error("CORRECTION_HAS_NO_CHANGE");
+      const now = this.now().toISOString();
+      this.sqlite
+        .prepare(
+          `UPDATE jobs SET title = ?, company = ?, category = ?, location = ?, employment_type = ?,
+             normalized_json = ?, eligibility_status = NULL, fit_score = NULL, date_updated = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(
+          job.title,
+          job.company,
+          job.category,
+          job.location,
+          job.employmentType,
+          JSON.stringify(job),
+          now,
+          now,
+          job.id,
+        );
+      this.sqlite
+        .prepare(
+          `INSERT INTO job_corrections
+            (id, job_id, from_job_version_id, to_job_version_id, actor, reason_code,
+             changed_fields_json, before_digest, after_digest, created_at)
+           VALUES (?, ?, ?, ?, 'OWNER', ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          this.id(),
+          job.id,
+          previous.id,
+          recorded.id,
+          reasonCode,
+          JSON.stringify([...new Set(changedFields)].sort()),
+          previous.contentDigest,
+          recorded.contentDigest,
+          now,
+        );
+      const activeProfile = this.sqlite
+        .prepare(
+          "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
+        )
+        .get() as { id: string | null } | undefined;
+      if (activeProfile?.id) {
+        this.invalidateStaleDependencies({
+          jobId: job.id,
+          currentJobVersionId: recorded.id,
+          currentProfileVersionId: activeProfile.id,
+          reasonCode: "OWNER_JOB_CORRECTION",
+        });
+      }
+      return recorded;
+    })();
+  }
+
+  persistCapabilityConfig(input: {
+    source: "GREENHOUSE" | "LEVER";
+    tenant: string;
+    region: string | null;
+    allowedHost: string;
+    allowedPathPrefix: string;
+    policyVersion: string;
+    approved: boolean;
+    expiresAt: string;
+    requestBudget: number;
+    recordBudget: number;
+  }): string {
+    const value = z
+      .object({
+        source: z.enum(["GREENHOUSE", "LEVER"]),
+        tenant: z.string().min(1),
+        region: z.string().nullable(),
+        allowedHost: z.string().min(1),
+        allowedPathPrefix: z.string().startsWith("/"),
+        policyVersion: z.string().min(1),
+        approved: z.boolean(),
+        expiresAt: z.iso.datetime(),
+        requestBudget: z.number().int().min(1).max(30),
+        recordBudget: z.number().int().min(1).max(500),
+      })
+      .parse(input);
+    const existing = this.sqlite
+      .prepare("SELECT id FROM capability_configs WHERE source = ? AND tenant = ? AND region IS ?")
+      .get(value.source, value.tenant, value.region) as { id: string } | undefined;
+    if (existing) return existing.id;
+    const id = this.id();
+    this.sqlite
+      .prepare(
+        `INSERT INTO capability_configs
+          (id, source, tenant, region, allowed_host, allowed_path_prefix, policy_version,
+           approved, expires_at, request_budget, record_budget, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        value.source,
+        value.tenant,
+        value.region,
+        value.allowedHost,
+        value.allowedPathPrefix,
+        value.policyVersion,
+        value.approved ? 1 : 0,
+        value.expiresAt,
+        value.requestBudget,
+        value.recordBudget,
+        this.now().toISOString(),
+      );
+    return id;
+  }
+
+  recordDiscoveryRun(input: {
+    capabilityConfigId: string;
+    status: "RUNNING" | "COMPLETE" | "PARTIAL" | "FAILED" | "STOPPED";
+    cursor: unknown | null;
+    requestCount: number;
+    recordCount: number;
+    safeErrorCode: string | null;
+    startedAt: string;
+    completedAt: string | null;
+  }): string {
+    const value = z
+      .object({
+        capabilityConfigId: z.string().min(1),
+        status: z.enum(["RUNNING", "COMPLETE", "PARTIAL", "FAILED", "STOPPED"]),
+        cursor: z.unknown().nullable(),
+        requestCount: z.number().int().nonnegative().max(30),
+        recordCount: z.number().int().nonnegative().max(500),
+        safeErrorCode: z.string().min(1).max(100).nullable(),
+        startedAt: z.iso.datetime(),
+        completedAt: z.iso.datetime().nullable(),
+      })
+      .parse(input);
+    const id = this.id();
+    this.sqlite
+      .prepare(
+        `INSERT INTO discovery_runs
+          (id, capability_config_id, status, cursor_json, request_count, record_count,
+           safe_error_code, started_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        value.capabilityConfigId,
+        value.status,
+        value.cursor === null ? null : JSON.stringify(value.cursor),
+        value.requestCount,
+        value.recordCount,
+        value.safeErrorCode,
+        value.startedAt,
+        value.completedAt,
+      );
+    return id;
   }
 
   persistApplicationPacket(input: ApplicationPacket): {

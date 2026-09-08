@@ -23,7 +23,11 @@ const environment = {
 const sqlite = new BetterSqlite3(databasePath);
 try {
   sqlite.exec(
-    ["0000_applypilot_foundation.sql", "0001_real_world_job_intake.sql"]
+    [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+    ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
   );

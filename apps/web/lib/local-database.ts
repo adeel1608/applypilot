@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import type BetterSqlite3 from "better-sqlite3";
 
-import { JobImportRepository, openApplyPilotDatabase } from "@applypilot/database";
+import { BetaRepository, JobImportRepository, openApplyPilotDatabase } from "@applypilot/database";
 import { resolveLocalDataDirectory } from "./local-data-directory";
 
 type Connection = ReturnType<typeof openApplyPilotDatabase>;
@@ -25,6 +25,12 @@ function hasImportSchema(sqlite: BetterSqlite3.Database): boolean {
     sqlite
       .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='import_batches'")
       .get(),
+  );
+}
+
+export function hasBetaSchema(sqlite: BetterSqlite3.Database): boolean {
+  return Boolean(
+    sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_versions'").get(),
   );
 }
 
@@ -48,4 +54,9 @@ export function getLocalDatabase(): Connection | null {
 export function getJobImportRepository(): JobImportRepository | null {
   const local = getLocalDatabase();
   return local ? new JobImportRepository(local.sqlite) : null;
+}
+
+export function getBetaRepository(): BetaRepository | null {
+  const local = getLocalDatabase();
+  return local && hasBetaSchema(local.sqlite) ? new BetaRepository(local.sqlite) : null;
 }
