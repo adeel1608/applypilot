@@ -32,7 +32,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "preflight": "npm run doctor && npm run db:status && npm run privacy:audit && tsx scripts/preflight-summary.ts",
     "quality": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build",
-    "release:check": "npm run preflight && npm run quality && npm audit && npm run audit:production && tsx scripts/release-summary.ts",
+    "release:check": "npm run doctor && npm run db:status && tsx scripts/preflight-summary.ts && npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build && npm run test:e2e && npm run privacy:audit && npm audit && npm run audit:production && tsx scripts/release-summary.ts --quality-gates-complete",
     "local:start": "tsx scripts/local-start.ts",
     "local:stop": "tsx scripts/local-stop.ts",
     "profile:validate": "tsx scripts/validate-private-profile.ts",

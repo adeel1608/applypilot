@@ -7,6 +7,9 @@ import { loadPrivateSourceAllowlist } from "@applypilot/job-sources";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
+  if (!process.argv.includes("--quality-gates-complete")) {
+    throw new Error("RELEASE_QUALITY_GATES_NOT_CONFIRMED");
+  }
   const root = repositoryRoot();
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
