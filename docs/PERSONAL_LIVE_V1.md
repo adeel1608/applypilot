@@ -1,6 +1,6 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **MANUAL-INTAKE BETA CORE IMPLEMENTED; FINAL PR REVIEW PENDING.** Personal Live V1 remains **NOT READY**. See [PROJECT_PLAN](../PROJECT_PLAN.md) for exact implementation and validation evidence. No live source tenant, real browser target, scheduling, hosting, or submission is enabled.
+Status: **MANUAL-INTAKE PERSONAL BETA READY.** PR #10 was human-reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Source-enabled Personal Beta remains **WAITING_FOR_APPROVED_TENANT** and Personal Live V1 remains **NOT READY**. No live source tenant, real browser target, scheduling, hosting, or submission is enabled.
 
 ## Beta Core implementation snapshot — 2026-09-08
 
@@ -14,7 +14,7 @@ Personal Live V1 is a single-owner, local-first assistant that discovers jobs fr
 
 No paid API, AI provider, cloud dashboard or cloud browser is required. All candidate data, source snapshots, SQLite, generated documents, answers and browser sessions remain private local runtime assets. GitHub is PUBLIC; npm `private: true` remains a publication safeguard. Final submission requires an immediate deliberate owner action for one frozen application; never background or batch submission.
 
-The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. This PR contains activation evidence and the forward blueprint only. After review/merge, a new owner-authorised task may implement the selected train; changed scope/security assumptions require a revised plan first.
+The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. The current next-gate PR is documentation only: [R2 matching quality](R2_MATCHING_QUALITY_PLAN.md) and [R1 source-enabled Beta](R1_SOURCE_ENABLED_BETA_PLAN.md). After its review/merge, a new owner-authorised task may implement only the selected slice; changed scope/security assumptions require a revised plan first.
 
 ## Pre-Beta evidence and capability inventory
 
@@ -51,9 +51,9 @@ The exact real job-specific eligibility result, score and contributions remain p
 
 The UI required title entry from the source heading and source-URL copying. URL edits do not reclassify `UNKNOWN` origin; origin and `USER_SUPPLIED_CONTENT` acquisition must remain separate. Preview resets its original input form and shows only a 500-character excerpt; a full side-by-side source/normalized review is needed. Three abandoned preview records are retained locally; there is no preview-cleanup UX. Future cleanup needs explicit retention/confirmation, not direct deletion during activation.
 
-Private provenance was proved through schema validation, the provider's real-import enforcement, and in-memory equality of the eligibility/fit profile snapshot with the private file and inequality with the example. The UI labels this private-profile analysis but does not show a durable evaluation-state enum. `job-import-repository.ts` filters keys matching `profile`, removing intended `profileState` audit metadata. R2 must persist allowlisted provenance enums without exposing profile values.
+Private provenance was proved through schema validation, the provider's real-import enforcement, and current profile/version binding. Import audit now uses event-specific allowlists and preserves the safe `profileState` enum; broader discovery-audit regex redaction remains an R2C hardening item. Private values remain forbidden from public documentation and logs.
 
-Other code-backed gaps: the generic import normalizer leaves typed licences/education/experience/skills empty and work rights UNKNOWN; full state names do not normalize to abbreviations; salary text gets a YEAR default without a parsed period; cover-letter unknown is collapsed to false in generic normalized booleans; employment-type parsing searches all text and prioritises casual; empty structured requirements can be mistaken for no requirements. These need fictional regressions and reviewed fixes, not ad-specific scoring patches.
+Current code-backed gaps and already-fixed claims are classified with exact file/function evidence in the [R2 defect disposition](R2_MATCHING_QUALITY_PLAN.md#current-defect-disposition). Material remaining issues include canonical cover-letter UNKNOWN collapse, sparse requirement coverage, incomplete typed requirement/work-right extraction, broad employment scanning, remaining class outcome semantics, and the missing durable caller for cross-source dedup. Full Australian state aliases, explicit-period salary handling, verified-employment/preference fit filters, evidence-class labels, and import-audit `profileState` preservation are already fixed and must stay protected by regressions.
 
 ## Data and architecture contracts
 
@@ -292,4 +292,4 @@ The following common contract applies to **every** train: update the detailed im
 | 18, 19, 20          | R9 optional AI, R10 optional deployment, R11 security throughout          |
 | No single old phase | R8 measurable personal release candidate                                  |
 
-Next human decision: review the activation evidence, limitations, source order, local topology, release boundaries and all R0–R11 gates; merge this activation/master-plan PR only if accepted. Then authorise a narrow implementation task, preferably R2 normalization/matching safety repairs before scaling real intake, alongside a separately scoped R1 source plan where permission is established. Do not interpret blueprint acceptance as bulk permission to implement every train or submit applications.
+Next human decision: review the documentation-only R2/R1 next-gate PR. If it is accepted and merged, separately authorise **R2A evidence model and normalization** as the next implementation slice. R1 remains a separate train and cannot perform a real request until R1A/R1B are reviewed and the owner approves one exact tenant capability and R1C smoke. Do not interpret blueprint acceptance as permission to implement every train, activate a source, operate a form, upload, or submit.

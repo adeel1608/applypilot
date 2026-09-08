@@ -3,11 +3,11 @@
 Last updated: 2026-09-08
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/personal-live-beta-core`
+Working branch: `plan/r1-r2-next-gate`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: the [Personal Live V1](docs/PERSONAL_LIVE_V1.md) blueprint is the owner-approved design baseline. Phase 2.5A is `COMPLETE`; the Personal Live Beta Core is implemented on the branch above and is undergoing its final exact-head validation/PR gate. Manual-intake Beta and source-enabled Beta are classified separately: the local manual path is implemented, while source-enabled Beta still requires an owner-approved private tenant and scoped read-only smoke. Personal Live V1 and hosted production are not ready because no real application target/runner is approved. The R0-R11 release trains below supersede the sequence of the historical roadmap, not its evidence. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #10 was human-reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged to `main` as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Manual-intake Personal Beta is `READY`. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; the real runner remains `TARGET_APPROVAL_REQUIRED`. This branch is documentation-only and plans [R2 matching quality](docs/R2_MATCHING_QUALITY_PLAN.md) plus a separate [R1 source-enabled Beta](docs/R1_SOURCE_ENABLED_BETA_PLAN.md). It authorises no application-code implementation, migration, tenant/source request, employer-form visit, upload, submission, deployment, or PR merge. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -2507,3 +2507,95 @@ Validation on clean implementation head `41dd3e1ef8b044f876efa3a0628ba0ddaeb092e
 - Real employer form visits, uploads, submissions, application actions, and source calls: all 0.
 
 Remaining publication steps only: commit this result note, rerun final checks on the exact documentation head, push the same branch without force, update the existing PR #10 body with the actual 189/13/18 counts and new regressions, require exact-head GitHub Actions green, and stop for ChatGPT re-review without merging.
+
+## R2 matching quality + R1 source-enabled Beta plan gate — 2026-09-08
+
+Status: `PLAN_ONLY_AWAITING_HUMAN_REVIEW`. The historical sentence immediately above belongs to the pre-merge PR #10 result record; it is preserved as evidence and is no longer the current next action.
+
+### Current state and objective
+
+Baseline verification found clean `main` equal to `origin/main` at merge commit `4a0462d24b9a8db79ec49ff64242405d8f96f40d`; PR #10 is merged and its reviewed head remains `b7872fe5791f1baa88d9e95e2b7096926ea44813`. GitHub CLI is authenticated as `adeel1608`. The local doctor, database status, preflight, and privacy audit pass; schema is v2 with zero pending migrations, integrity PASS, zero foreign-key issues, no source capability, Manual-intake Personal Beta READY, source-enabled Beta WAITING_FOR_APPROVED_TENANT, and runner TARGET_APPROVAL_REQUIRED. The planning branch was created directly from that baseline. No private smoke, source call, application action, or repository setting change is part of this gate.
+
+The objective is to replace broad roadmap prose with implementation-ready designs for two deliberately separate trains:
+
+1. [R2 matching quality](docs/R2_MATCHING_QUALITY_PLAN.md): typed field/evidence states and modalities; Australian geography, employment/hours/schedule, salary unknown-period, document tri-state, typed requirement/work-right structure; legal/employer/preference semantics; verified-only scoring; calibration; durable cross-source duplicate review; queue freshness; corrections; typed audit; additive persistence; and evidence-first UI.
+2. [R1 source-enabled Beta](docs/R1_SOURCE_ENABLED_BETA_PLAN.md): exact owner-approved capability records; current Greenhouse/Lever evidence; candidate-blind source boundaries; SSRF/DNS/redirect/budget/retry/cancel/crash/log/tenant controls; one selected family; and a future separately authorised one-tenant smoke.
+
+### Assumptions, requirements, and non-goals
+
+- The merged Manual-intake Personal Beta remains the release baseline. R2 improves confidence/structure but does not retroactively revoke the narrow owner-reviewed manual release.
+- Unknown remains unknown; source-stated is not automatically verified truth; owner correction does not erase source history; a derived value cannot increase certainty or modality.
+- Only current verified candidate facts may add fit points. A score never clears blocker/review/stale/conflict/coverage state and is never a hiring probability.
+- Source and candidate pipelines remain separated: candidate data, preferences, documents, answers, sessions, and credentials are absent from discovery requests.
+- No tenant is guessed or enumerated. Public vendor documentation is not blanket employer/use authority. One exact private capability requires separate owner/policy approval and expires/revokes fail closed.
+- All schema evolution is additive after reviewed SQL and a verified ignored backup. Applied migration 0002 is immutable; private database migration is not authorised by this planning task.
+- This task does not implement R1/R2 code, activate any tenant, make a live source request, visit an employer form, upload, submit, deploy, rewrite history, or merge its PR.
+
+### Architecture and data flow
+
+R2 preserves domain purity and immutable versioning:
+
+`local/source observation -> Zod boundary -> field + requirement evidence state/modality -> canonical job version -> classed eligibility + coverage -> verified-only score -> duplicate review/current queue decision -> owner correction/re-evaluation -> later document/packet consumer`
+
+R1 remains a candidate-blind upstream producer:
+
+`ignored exact owner capability -> expiry/revocation/operation preflight -> pinned bounded HTTPS GET -> Zod source DTO -> transactional run/page/observation -> R2 normalization -> owner review queue`
+
+Every downstream material decision binds job/profile/rule/weight/evidence/duplicate versions. Changes mark evaluations, queue decisions, artifacts, and packets stale rather than overwriting history. Audit accepts only event-specific opaque IDs/enums/versions/codes/counts/timestamps; free-form source/profile/document/network values are rejected.
+
+### Proposed implementation file scope
+
+- R2A: `packages/job-model`, `packages/job-importer`, source mappers, database schema/repositories and the next unused additive migration, normalization fixtures/docs, evidence UI.
+- R2B: `packages/eligibility-engine`, `packages/fit-scorer`, evaluation repository/service, fixtures, eligibility/fit UI/docs.
+- R2C: `packages/job-normalizer`, duplicate/queue/correction/audit repositories and actions, `/jobs` UI, integration/browser tests.
+- R2D: fictional golden fixtures, private aggregate calibration harness, dashboard/detail uncertainty UX, accessibility/browser/release docs.
+- R1A: `packages/job-sources` shared boundary/private allowlist, capability/run persistence, source status UI, synthetic network/security tests.
+- R1B: one selected reader (recommended Lever), structured source schema/mapping, observation persistence, fictional contracts.
+- R1C: normally safe evidence documentation after one separately authorised private smoke; capability/raw data remains ignored and uncommitted.
+
+The [R2 defect table](docs/R2_MATCHING_QUALITY_PLAN.md#current-defect-disposition) records `FIX_IN_R2 | ALREADY_FIXED | DEFER` with file/function evidence. The two non-blocking PR #10 carryovers remain assigned outside R2: before packet preparation, re-resolve the current private profile/apply the document-style current tuple gate under R4/R11; replace the cosmetic `Â·` separator under R8 UI hardening.
+
+### Dependencies, risks, security, and privacy
+
+R2A depends only on the merged manual Beta and reviewed backup/migration design. R2B depends on R2A. R2C depends on R2A/R2B version bindings. R2D depends on R2A–R2C. R1A is reviewed independently but R1B normalization depends on R2A; R1C depends on reviewed/merged R1A/R1B, R2A, a new exact owner capability approval, policy review, and adequate recovery time.
+
+Principal risks are false certainty, requirement-modality loss, class conflation, ranking bias, false duplicate merge, stale queue/preparation state, correction/audit provenance loss, private calibration leakage, arbitrary network destinations, DNS rebinding, unbounded responses/retries, cursor/crash duplication, tenant crossover, and accidental write/application behavior. The exact asset/threat/impact/control/test/residual-risk/stop-condition matrix is in [THREAT_MODEL_V1](docs/THREAT_MODEL_V1.md#r1r2-next-gate-threat-register--2026-09-08). Any private-data finding, unpinned destination, unclear source authority, unsafe migration mapping, automatic ambiguous merge, positive unverified score, or real action path is a stop condition.
+
+### Testing strategy and acceptance
+
+Each implementation slice has its own dependencies, files, schema/data changes, tests, privacy/rollback, human gate, and acceptance criteria in the focused plans. Across the trains, required gates include:
+
+- field/modality/span and sparse-coverage fixtures; full AU location, salary/doc tri-state, structured requirements/work-right, employment/schedule regressions;
+- complete legal/employer/preference outcomes, current verified-only score ablation, determinism/bounds/monotonicity, blocker/no-recommendation, and fictional golden rankings;
+- cross-tenant/repost/conflict/link/split, queue staleness, typed correction, audit allowlist, crash/idempotency integration cases;
+- additive migration preview/backfill/count/FK/integrity/backup/restore tests with legacy ambiguity mapped to UNKNOWN;
+- R1 exact URL/host/path/query/operation/expiry/revocation, IPv4/IPv6/rebinding/pinning, redirects, content type/size/body timeout/cancel, retry/rate/cursor/concurrency/crash/log/private-canary tests using injected transports only;
+- browser evidence/uncertainty/dedup/queue/accessibility/responsive/error states; and
+- format, lint, strict typecheck, unit, integration, production build, E2E, full/production dependency audit, diff/privacy/history/build audit, and exact-head CI.
+
+Acceptance requires the focused plans to be internally consistent, current status docs to distinguish READY/WAITING/NOT_READY correctly, all named defects/carryovers to have ownership, and this documentation-only PR to be green and left unmerged for review. It does not require or permit application-code behavior to change.
+
+### Rollback and exact implementation sequence
+
+Planning rollback is a normal revert of this documentation commit; it changes no runtime/private data. Future code rollback disables the affected parser/rule/scorer/source capability and pins retained prior versions. Migrations never delete legacy rows; restore occurs only from an owner-approved verified backup. Source rollback revokes/disables one capability while retaining safe observations. A submitted application history is never rewritten.
+
+Exact forward sequence after this plan is separately reviewed and merged:
+
+1. Authorise and implement **R2A evidence model and normalization only** on a new feature branch.
+2. Review the additive schema/migration and fictional evidence fixtures; run complete gates; leave its implementation PR unmerged.
+3. After R2A human review/merge, separately plan/authorise R2B, then R2C, then R2D.
+4. R1A may proceed only under separate implementation authority and with zero real calls. R1B recommends Lever and consumes R2A evidence.
+5. R1C begins only after a fresh explicit one-tenant approval. Its first smoke is one Lever LIST request, `skip=0`, `limit=25`, at most 2 MB, zero redirects/retries/details, followed by local integrity/privacy/idempotency checks and default disablement.
+6. A separate post-smoke human decision is required to declare source-enabled Personal Beta ready. No R1 result authorises a real runner or application action.
+
+Recommended next implementation slice: **R2A — evidence model and normalization**. This plan PR must remain open and unmerged for human review.
+
+### Planning implementation and local validation record
+
+- Changed scope is documentation only: `PROJECT_PLAN.md`, `README.md`, and files under `docs/`. No application code, dependency, workflow, migration, private runtime record, repository setting, or source capability changed.
+- Current-status documentation now records PR #10 merged, merge `4a0462d24b9a8db79ec49ff64242405d8f96f40d`, Manual-intake Personal Beta READY, source-enabled Personal Beta WAITING_FOR_APPROVED_TENANT, Personal Live V1 NOT_READY, and runner TARGET_APPROVAL_REQUIRED. Historical checkpoint sections remain historical.
+- R2 audit records 21 matching defects: 16 `FIX_IN_R2`, 5 `ALREADY_FIXED`, plus two separate PR #10 carryovers deferred to R4/R11 and R8 UI hardening. The corrected audit separates already-gated location/work-type/category preferences from the R2B-owned unverified commute-negative branch and records that `REVIEW_REQUIRED` can currently reach `recommended=true`. R2A–R2D are independently reviewable slices; R2A is the only recommended next implementation choice.
+- R1 compares current official Greenhouse and Lever documentation without a listing request. Lever is recommended for a future first family because one `skip`/`limit` page and plaintext/structured fields permit tighter bounds; no tenant is selected. R1A–R1C remain separately gated.
+- `npm.cmd run release:check`: PASS on the complete staged planning content before this result-only note. Doctor/database/preflight passed; formatting, lint, typecheck, 189 unit tests across 31 files, 13 integration tests across 3 files, production build with 31 page units, and 18 serialized fictional E2E tests passed. Privacy audit passed across 219 tracked/index files, 463 history paths, 464 history blobs, 687 build/test artifacts, and 11 selected private canaries. Full and production dependency audits reported zero vulnerabilities. Release classification remained `MANUAL_INTAKE_BETA_READY`; capability count remained 0.
+- The result-only note is followed by formatting, lint/typecheck, staged diff/privacy/history checks, commit/push, and exact-head GitHub Actions. CI is the final complete rerun on the committed head.
+- Real source calls, employer form visits, external uploads, submissions, real application actions, private document regeneration, private packet creation, and destructive/private smoke operations during this planning gate: all `0`.
