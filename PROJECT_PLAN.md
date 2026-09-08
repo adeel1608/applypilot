@@ -2367,7 +2367,7 @@ Local validation completed before publication:
 - `npm.cmd run format:check`: `PASS`.
 - `npm.cmd run lint`: `PASS`, zero warnings.
 - `npm.cmd run typecheck`: `PASS`.
-- `npm.cmd test`: an initial complete run exposed two Chromium PDF tests using Vitest's 5-second default; explicit 20-second browser-render budgets were added. Final result: `PASS`, 172 tests across 27 files.
+- `npm.cmd test`: an initial complete run exposed two Chromium PDF tests using Vitest's 5-second default; explicit 20-second browser-render budgets were added. A later composite release run likewise exposed one synchronous `git check-ignore` case exceeding that default under full-suite contention; its subprocess matrix received the same explicit bounded budget. Focused behavior never failed, and the complete suite is rerun at the final head. Latest completed result before the release rerun: `PASS`, 172 tests across 27 files.
 - `npm.cmd run test:integration`: `PASS`, 9 tests across 3 files.
 - `npm.cmd run build`: `PASS`, Next.js production build compiled/typechecked and generated 31 page units; private routes remain dynamic.
 - `npm.cmd run test:e2e`: the first 10-worker run reproduced an intermittent Next development JSON/compilation failure against the suite's one shared fictional SQLite/server. The suite was correctly serialized to match that shared-state contract. Final result: `PASS`, 16 tests with one worker.
