@@ -1,6 +1,8 @@
 # Personal Live V1 threat model
 
-Status: proposed controls awaiting human review, 2026-09-07. This is a code/design review and scoped privacy audit, not penetration-test certification. V1 is single-owner and loopback-only; hosted exposure is not approved. Proposed controls below are not claims of implemented protection.
+Status: Beta Core controls implemented and tested on 2026-09-08; remaining Personal Live V1 controls await separate source/target approval and review. This is not penetration-test certification. The product is single-owner and loopback-only; hosted exposure and real-target automation are not approved.
+
+Implemented Beta mitigations include loopback Host/Origin validation, an HttpOnly SameSite=Strict local session, expiring one-use action/session-bound nonces, private output realpath/create-new confinement, semantic verified-claim validation, measured PDF fitting and PDF/DOCX parity, exact capability-gated source readers, immutable version/audit records, consistent verified SQLite backup/restore, synthetic stop/replay/frozen-review coverage, and repeatable tracked/all-ref/build-artifact/private-canary auditing. These controls support manual-intake Beta only; they do not activate a source or real runner.
 
 Public assets: source, fictional fixtures, safe documentation and CI. Private local assets: profile/version snapshots, SQLite/WAL/backups, real vacancies/URLs, answers/notes, CVs/letters, browser sessions and receipts. External boundaries: source APIs/pages, employer forms and optional future providers. Candidate data must not cross a boundary because an ad contains a URL or instruction.
 

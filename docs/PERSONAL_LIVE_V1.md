@@ -1,6 +1,12 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **AWAITING_HUMAN_REVIEW — design only**. Baseline: 2026-09-07, approved runtime fix merged at `4920b593aad90cc734570a3aae1d562d09d480e7`. See [PROJECT_PLAN](../PROJECT_PLAN.md) for exact activation and validation evidence. This plan does not enable discovery, document delivery, browser filling, scheduling, hosting, or submission.
+Status: **MANUAL-INTAKE BETA CORE IMPLEMENTED; FINAL PR REVIEW PENDING.** Personal Live V1 remains **NOT READY**. See [PROJECT_PLAN](../PROJECT_PLAN.md) for exact implementation and validation evidence. No live source tenant, real browser target, scheduling, hosting, or submission is enabled.
+
+## Beta Core implementation snapshot — 2026-09-08
+
+The local manual path now covers immutable job/evidence/evaluation versions, conservative corrections and matching, private PDF/DOCX CV and optional cover-letter artifacts, digest-bound approvals, packet readiness, application timeline events, loopback session/nonce controls, consistent backup/restore, and synthetic-only runner stop/final-review proofs. The approved private local smoke passed after migration with two document artifacts, content parity, a review-required packet, clean database integrity/foreign keys, zero source calls, and zero application actions. Private values and paths were not published.
+
+Source-enabled Beta is separate and remains `WAITING_FOR_APPROVED_TENANT`: Greenhouse and Lever GET readers are implemented and fail closed without an ignored, exact owner-approved capability. Personal Live V1 remains blocked on a legitimate approved source and a separately reviewed real target/runner. The synthetic runner is not authority to operate an employer form.
 
 ## Product definition and release boundary
 
@@ -10,9 +16,9 @@ No paid API, AI provider, cloud dashboard or cloud browser is required. All cand
 
 The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. This PR contains activation evidence and the forward blueprint only. After review/merge, a new owner-authorised task may implement the selected train; changed scope/security assumptions require a revised plan first.
 
-## Current evidence and capability inventory
+## Pre-Beta evidence and capability inventory
 
-Inspected 13 package directories including shared/database, eight routes, two migrations, source adapters, CI, scripts and tests. Existing module presence is not an end-to-end capability claim. Real activation used the actual loopback UI with one canonical job, one completed import, three retained unconfirmed previews, private-profile evaluation, and no application/document action. No real source fetch occurred. Full text survived, but several structured fields remained unknown. Tests and privacy results are recorded separately in the project plan.
+This table records the baseline that motivated the R0–R11 trains; it is historical rather than current Beta status. Current implementation and private acceptance evidence are recorded above and in the project plan. Remaining unknowns and unsupported automation boundaries continue to fail closed.
 
 | Capability                    | State   | Evidence / minimum remaining work                                                                                                                        |
 | ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |

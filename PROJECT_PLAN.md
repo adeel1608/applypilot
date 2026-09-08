@@ -1,13 +1,13 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
 Working branch: `feat/personal-live-beta-core`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: the [Personal Live V1](docs/PERSONAL_LIVE_V1.md) blueprint is the owner-approved design baseline. Phase 2.5A is `COMPLETE`, supervised Local Live Alpha is available, and Personal Live Beta Core is `IN_PROGRESS` on the branch above. Personal Live V1 and hosted production are not ready. The R0-R11 release trains below supersede the sequence of the historical roadmap, not its evidence. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: the [Personal Live V1](docs/PERSONAL_LIVE_V1.md) blueprint is the owner-approved design baseline. Phase 2.5A is `COMPLETE`; the Personal Live Beta Core is implemented on the branch above and is undergoing its final exact-head validation/PR gate. Manual-intake Beta and source-enabled Beta are classified separately: the local manual path is implemented, while source-enabled Beta still requires an owner-approved private tenant and scoped read-only smoke. Personal Live V1 and hosted production are not ready because no real application target/runner is approved. The R0-R11 release trains below supersede the sequence of the historical roadmap, not its evidence. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -1840,7 +1840,7 @@ Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `np
 
 # Phase 2.5A Execution
 
-- Status: `IN_PROGRESS`.
+- Status: `COMPLETE`.
 - Started: 2026-09-06.
 - Execution branch: `feat/phase-2-5a-local-activation`.
 - Approved bugfix merge: PR #7 merged normally as `6f42b8f1edd5813d34c398aad56248555fae044d` at `2026-09-06T07:09:44Z`. Fresh local `main` matched `origin/main` at that SHA with a clean worktree; the merged bugfix branch was deleted locally/remotely before this branch was created and pushed.
@@ -2035,7 +2035,7 @@ The first production build succeeded but warned that dynamic filesystem paths co
 
 # Personal Live Beta Core implementation blueprint
 
-- Status: `IN_PROGRESS`.
+- Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`.
 - Approved scope: the owner's combined Beta Core implementation task, stages 0-64, without automatic merge of the final implementation pull request.
 - Implementation branch: `feat/personal-live-beta-core`.
 - Fresh base: PR #9 was reverified at its approved head with a clean merge state, successful required checks, no review threads, and a private-data-safe diff. It merged normally on 2026-09-07 as `471ab1055743249ff51a46d7187e541d0b5008af`. Local `main` then matched `origin/main`; this branch was created from that exact merge.
@@ -2339,3 +2339,49 @@ Remaining highest-priority work:
 5. Complete runner checkpoint/event persistence, final-review disclosure display, remaining control mapping/reconciliation, accessibility/responsive/empty/error-state coverage, and the remaining high-risk golden cases.
 6. Only after every remaining synthetic/document/security gate passes and a fresh adequate recovery window exists: stop the owned app, preview and create a verified real backup, migrate the preserved database additively to schema 2, run integrity/FK/mapping/isolation checks, and perform the approved local-only re-evaluation/document/packet/tracking smoke. Never visit or submit an employer form.
 7. Finish reality/privacy/history documentation and exact-head CI, then open one final implementation PR only when the manual-intake Beta Core is coherent; leave it unmerged.
+
+## Personal Live Beta Core completion record — 2026-09-08
+
+Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`. This continuation started from `9953f2872be544921b76f38c7a3831ac6efc9b50` on `feat/personal-live-beta-core`. It completes the remaining approved Beta Core scope without enabling a live source, real runner target, deployment, or submission. The final implementation pull request is the human/ChatGPT review boundary and must remain unmerged.
+
+Completed implementation:
+
+- Connected the default private-local job queue, job evidence/coverage/evaluation detail, owner correction overlays, version invalidation, shortlist/review/skip/preparing controls, private document generation/approval, packet preparation, application timeline, dashboard, and source-capability status. Fictional demonstrations remain explicitly collapsed/isolated and never use the private profile.
+- Added immutable source observations, job/evaluation versions, requirement evidence, corrections, artifacts/approvals, packets, discovery metadata, runner checkpoints, consents, and append-only application events across the repository/service boundary. New and re-evaluated real imports use the Beta version model while historical records remain retained.
+- Enforced process-local HttpOnly SameSite=Strict sessions and expiring, one-use, action/session-bound nonces on local mutations in addition to exact loopback Host/Origin/port and forwarded-host rejection. Responses that create the session are private/no-store. Replay, expiry, action mismatch, session mismatch, foreign origin, cross-port, and rebinding-style host cases fail closed.
+- Completed bounded Greenhouse/Lever GET readers, including Lever paging/cursor termination and safe capability/run persistence. No ignored allowlist was present, no tenant was guessed, and the effective state remains `SOURCE_READY_AWAITING_TENANT` with zero real source requests.
+- Completed private PDF/DOCX CV and cover-letter rendering, essential-content extraction/parity fixtures, create-new path confinement, measured page limits, and deterministic whole-evidence trimming without reducing the 10 pt floor. `pdfjs-dist@6.3.289` is exact-pinned as a development-only Apache-2.0 text/page inspection dependency; the lockfile, full graph, and production graph report zero known vulnerabilities.
+- Completed the synthetic-only runner disclosure and browser matrix for mapping, supported/unsupported controls, unknown required answers, approved document digests, CAPTCHA, MFA, authentication, access denial, rate limits, changed pages/actions/destinations/packets/profiles/documents, expiring/replayed consent, one valid fixture click, and terminal lost-response `OUTCOME_UNKNOWN` with no retry. The real runner remains `TARGET_APPROVAL_REQUIRED`.
+- Completed repeatable database-safe migration, private smoke, privacy, and publication tooling. Migration uses the verified consistent backup path; privacy auditing covers staged/tracked content, ignored-boundary probes, all refs/history blobs, build/test artifacts, selected private canaries, and CI artifact-upload policy without printing matching values.
+
+Real database and private acceptance:
+
+- The owned application was stopped before database work. The preserved schema-v1 database had integrity `PASS`, zero foreign-key issues, one canonical real job, and no Beta material. A consistent schema-v1 backup was created and verified, and its restore preview passed before migration.
+- Two initial private smoke attempts stopped safely: the first exposed an overly literal DOCX parity comparator, and the second exposed an over-page resume. Generated files from those attempts were moved without inspection into ignored private quarantine. The verified original backup was restored; restore collision guards also retained every recovery/staging file rather than overwriting it. The parity comparator and deterministic PDF fitter were corrected and passed fictional regressions.
+- The database was then restored to the verified pre-migration baseline, backed up again, and migrated additively to schema v2. Final state is 573440 bytes, schema v2, zero pending migrations, integrity `PASS`, and zero foreign-key issues. Original, recovery, and migration backups remain ignored/private and retained.
+- The single authoritative private smoke re-evaluated exactly one preserved job with `PRIVATE_LOCAL_PROFILE`, advanced its queue locally to `PREPARING`, generated and approved one PDF plus one DOCX CV with essential-content parity, left cover-letter requirement `UNKNOWN` without generating one, created one `REVIEW_REQUIRED` packet with unresolved destination/questions intact, and recorded four lifecycle events. The final default UI read-only smoke passed four private routes without screenshots/traces or printed values. Real source calls: `0`. Real application actions: `0`. Employer forms visited/uploads/submissions: `0`.
+- A post-browser privacy scan found selected private canary bytes in an ignored Next development compiler cache originating from the approved private UI process. The exact generated cache was moved without inspection into ignored private quarantine. The repeated audit passed. No private value, document, database, backup, vacancy, allowlist, browser state, credential, or quarantine material is tracked or included in the public diff.
+
+Local validation completed before publication:
+
+- `npm.cmd run format:check`: `PASS`.
+- `npm.cmd run lint`: `PASS`, zero warnings.
+- `npm.cmd run typecheck`: `PASS`.
+- `npm.cmd test`: an initial complete run exposed two Chromium PDF tests using Vitest's 5-second default; explicit 20-second browser-render budgets were added. Final result: `PASS`, 172 tests across 27 files.
+- `npm.cmd run test:integration`: `PASS`, 9 tests across 3 files.
+- `npm.cmd run build`: `PASS`, Next.js production build compiled/typechecked and generated 31 page units; private routes remain dynamic.
+- `npm.cmd run test:e2e`: the first 10-worker run reproduced an intermittent Next development JSON/compilation failure against the suite's one shared fictional SQLite/server. The suite was correctly serialized to match that shared-state contract. Final result: `PASS`, 16 tests with one worker.
+- `npm.cmd run preflight`: `PASS`; profile `VALID`, database schema v2/integrity `PASS`/zero FK issues, private output and loopback boundaries `PASS`, backup ready, manual-intake Beta `READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, real runner `TARGET_APPROVAL_REQUIRED`.
+- `npm.cmd run privacy:audit`: pre-staging result `PASS`, 196 tracked files, 354 historical paths, 355 historical blobs, 944 build/test artifacts, and 11 selected private canaries checked. After staging every new public file, the repeated result was `PASS` across 204 tracked/index files with the same history/artifact/canary coverage.
+- `npm.cmd audit` and `npm.cmd run audit:production`: `PASS`, zero vulnerabilities in both full and production graphs.
+- `npm.cmd run local:start` / `npm.cmd run local:stop`: `PASS`; the owned server bound only `127.0.0.1:3000`, and the verified owned process stopped normally.
+- `git diff --check` and staged `git diff --cached --check`: `PASS`. `git fsck --full` completed successfully; it reported only benign unreachable objects and no corruption.
+- Concern commit `843a293` contains the Beta Core implementation/tests/tooling. The documentation/completion commit, composite release check at a clean head, push, PR creation, and exact-head CI are the remaining publication gates and are recorded in the final external handoff. No further real database or private smoke mutation is required.
+
+Release classification and continuation:
+
+- Manual-intake Beta: `READY` after the staged/final local gates and exact-head CI pass. It remains owner-controlled and every artifact/application decision requires review.
+- Source-enabled Beta: `WAITING_FOR_APPROVED_TENANT`. A separately approved private capability and one scoped read-only smoke are required; no current tenant is enabled.
+- Personal Live V1: `NOT_READY`. A legitimate approved source and separately planned/reviewed real application target/runner remain mandatory. Synthetic runner evidence is not real-operation authority.
+- Hosted production: `NOT_READY` and unnecessary for this local Beta.
+- Next action after exact-head CI: direct ChatGPT/human review of the single final implementation PR. Do not merge, deploy, activate a source/target, run another private smoke, or submit an application under this task.
