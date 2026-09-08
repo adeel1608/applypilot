@@ -278,7 +278,7 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
                 ))}
               </ul>
             ) : (
-              <p>A valid private profile is required to preview selected evidence.</p>
+              <p>{evidencePreview.state.replaceAll("_", " ")}.</p>
             )}
             <p>
               Preview template: {evidencePreview.template}. The selected generation override is
@@ -300,7 +300,7 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               ))}
             </select>
           </label>
-          <button className="button button--secondary">
+          <button className="button button--secondary" disabled={evidencePreview.state !== "READY"}>
             {detail.documents.length ? "Regenerate private CV" : "Generate private CV"}
           </button>
         </form>
@@ -318,7 +318,10 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
                 ))}
               </select>
             </label>
-            <button className="button button--secondary">
+            <button
+              className="button button--secondary"
+              disabled={evidencePreview.state !== "READY"}
+            >
               Generate private cover letter for owner review
             </button>
           </form>
@@ -338,6 +341,27 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
                   Renderer {document.rendererVersion ?? "unrecorded"} · claims{" "}
                   {document.claimRuleVersion ?? "unrecorded"}
                 </p>
+                {!document.stale && (
+                  <p>
+                    {document.format === "PDF" && (
+                      <>
+                        <a
+                          href={`/documents/${encodeURIComponent(document.id)}?disposition=inline`}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Open PDF preview
+                        </a>{" "}
+                        Â·{" "}
+                      </>
+                    )}
+                    <a
+                      href={`/documents/${encodeURIComponent(document.id)}?disposition=attachment`}
+                    >
+                      Download {document.format}
+                    </a>
+                  </p>
+                )}
               </div>
               {!document.approved && !document.stale && (
                 <form action={approveDocumentAction}>
