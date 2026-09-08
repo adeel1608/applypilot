@@ -36,6 +36,17 @@ Description: Help fictional visitors and maintain accurate local service records
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.getByText("Not evaluated", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Evaluation required|Not evaluated/i).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review later" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Shortlist" })).toBeVisible();
+  await expect(page.getByLabel("CV template override")).toBeVisible();
+  await expect(page.getByLabel("Cover-letter tone")).toBeVisible();
+  await expect(page.getByText("Verified evidence preview")).toBeVisible();
+  await expect(page.getByText("Unsupported or unknown gaps")).toBeVisible();
+  await expect(
+    page.getByText("No source fetch, employer form, upload, or submission"),
+  ).toBeVisible();
 });
 
 test("supports multi-job, inert HTML, and file-upload previews", async ({ page }) => {

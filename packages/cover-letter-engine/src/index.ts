@@ -13,6 +13,8 @@ import {
 import { normalizeText, VerificationStatus } from "@applypilot/shared";
 
 export type CoverLetterRequirementStatus = "REQUIRED" | "OPTIONAL" | "NOT_REQUIRED" | "UNKNOWN";
+export type CoverLetterTone = CandidateProfile["candidatePreferences"]["coverLetterTone"];
+export const coverLetterTones: CoverLetterTone[] = ["DIRECT", "WARM", "FORMAL"];
 
 export interface CoverLetterClaim {
   text: string;
@@ -73,7 +75,11 @@ export function validateCoverLetterTruth(
   return { valid: errors.length === 0, errors };
 }
 
-export function generateBasicCoverLetter(profile: CandidateProfile, job: Job): CoverLetterDocument {
+export function generateBasicCoverLetter(
+  profile: CandidateProfile,
+  job: Job,
+  toneOverride?: CoverLetterTone,
+): CoverLetterDocument {
   const candidateName = verifiedCandidateName(profile);
   if (!candidateName) {
     throw new Error("A verified candidate name is required to generate a cover letter");
@@ -93,7 +99,10 @@ export function generateBasicCoverLetter(profile: CandidateProfile, job: Job): C
     ? claims.map(({ text }) => text).join(" ")
     : "I would welcome the opportunity to discuss which verified parts of my background are relevant.";
 
-  const tone = profile.candidatePreferences.coverLetterTone;
+  if (toneOverride && !coverLetterTones.includes(toneOverride)) {
+    throw new Error("INVALID_COVER_LETTER_TONE");
+  }
+  const tone = toneOverride ?? profile.candidatePreferences.coverLetterTone;
   const opening = {
     DIRECT: `I am applying for the ${job.title} position with ${job.company}.`,
     WARM: `I am pleased to apply for the ${job.title} position with ${job.company}.`,

@@ -27,6 +27,10 @@ export const ResumeTemplateCategory = {
 export type ResumeTemplateCategory =
   (typeof ResumeTemplateCategory)[keyof typeof ResumeTemplateCategory];
 
+export const resumeTemplateCategories = Object.values(
+  ResumeTemplateCategory,
+) as ResumeTemplateCategory[];
+
 export interface FactBoundClaim {
   text: string;
   factReferences: string[];
@@ -341,13 +345,20 @@ export function validateResumeTruth(
   return { valid: errors.length === 0, errors };
 }
 
-export function generateResumeDocument(profile: CandidateProfile, job: Job): ResumeDocument {
+export function generateResumeDocument(
+  profile: CandidateProfile,
+  job: Job,
+  templateOverride?: ResumeTemplateCategory,
+): ResumeDocument {
   const candidateName = verifiedCandidateName(profile);
   if (!candidateName || !isVerified(profile.contact.email) || !isVerified(profile.contact.phone)) {
     throw new Error("Verified candidate name, email and phone are required to generate a resume");
   }
 
-  const template = selectResumeTemplate(job);
+  if (templateOverride && !resumeTemplateCategories.includes(templateOverride)) {
+    throw new Error("INVALID_RESUME_TEMPLATE");
+  }
+  const template = templateOverride ?? selectResumeTemplate(job);
   const design = resumeTemplateDesigns[template];
   const jobSignals = [job.title, job.category, ...job.requiredSkills, ...job.requirements]
     .map(normalizeText)

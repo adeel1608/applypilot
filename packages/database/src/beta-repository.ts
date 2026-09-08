@@ -280,38 +280,77 @@ export class BetaRepository {
   recordDocumentArtifact(input: DocumentArtifactInput): { id: string; version: number } {
     const value = DocumentArtifactInputSchema.parse(input);
     const id = value.id ?? this.id();
-    const versionRow = this.sqlite
-      .prepare(
-        `SELECT coalesce(max(version), 0) AS version FROM document_artifacts
-         WHERE job_id = ? AND type = ? AND format = ?`,
-      )
-      .get(value.jobId, value.type, value.format) as { version: number };
-    const version = versionRow.version + 1;
-    this.sqlite
-      .prepare(
-        `INSERT INTO document_artifacts
-          (id, job_id, job_version_id, profile_version_id, type, template, format,
-           file_name, local_path, content_digest, claim_evidence_json, layout_result_json,
-           version, stale, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-      )
-      .run(
-        id,
-        value.jobId,
-        value.jobVersionId,
-        value.profileVersionId,
-        value.type,
-        value.template,
-        value.format,
-        value.fileName,
-        value.localPath,
-        value.contentDigest,
-        JSON.stringify(value.claimEvidence),
-        JSON.stringify(value.layoutResult),
-        version,
-        this.now().toISOString(),
-      );
-    return { id, version };
+    return this.sqlite.transaction(() => {
+      const versionRow = this.sqlite
+        .prepare(
+          `SELECT coalesce(max(version), 0) AS version FROM document_artifacts
+           WHERE job_id = ? AND type = ? AND format = ?`,
+        )
+        .get(value.jobId, value.type, value.format) as { version: number };
+      const version = versionRow.version + 1;
+      const now = this.now().toISOString();
+      const superseded = this.sqlite
+        .prepare(
+          `SELECT id FROM document_artifacts
+           WHERE job_id = ? AND type = ? AND format = ? AND stale = 0`,
+        )
+        .all(value.jobId, value.type, value.format) as Array<{ id: string }>;
+      if (superseded.length) {
+        const ids = superseded.map(({ id: artifactId }) => artifactId);
+        const placeholders = ids.map(() => "?").join(",");
+        this.sqlite
+          .prepare(`UPDATE document_artifacts SET stale = 1 WHERE id IN (${placeholders})`)
+          .run(...ids);
+        this.sqlite
+          .prepare(
+            `UPDATE document_approvals SET invalidated_at = ?, invalidation_reason = 'DOCUMENT_SUPERSEDED'
+             WHERE document_artifact_id IN (${placeholders}) AND invalidated_at IS NULL`,
+          )
+          .run(now, ...ids);
+        this.sqlite
+          .prepare(
+            `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+             WHERE status <> 'INVALIDATED' AND id IN (
+               SELECT packet_id FROM application_packet_documents
+               WHERE document_artifact_id IN (${placeholders})
+             )`,
+          )
+          .run(
+            JSON.stringify({
+              status: "REVIEW_REQUIRED",
+              blockers: ["DOCUMENT_SUPERSEDED"],
+              warnings: [],
+            }),
+            now,
+            ...ids,
+          );
+      }
+      this.sqlite
+        .prepare(
+          `INSERT INTO document_artifacts
+            (id, job_id, job_version_id, profile_version_id, type, template, format,
+             file_name, local_path, content_digest, claim_evidence_json, layout_result_json,
+             version, stale, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+        )
+        .run(
+          id,
+          value.jobId,
+          value.jobVersionId,
+          value.profileVersionId,
+          value.type,
+          value.template,
+          value.format,
+          value.fileName,
+          value.localPath,
+          value.contentDigest,
+          JSON.stringify(value.claimEvidence),
+          JSON.stringify(value.layoutResult),
+          version,
+          now,
+        );
+      return { id, version };
+    })();
   }
 
   recordOwnerCorrection(input: {

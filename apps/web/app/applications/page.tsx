@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { recordManualOutcomeAction } from "@web/app/applications/actions";
 import { listBetaApplications } from "@web/lib/beta-workspace";
+import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
 
-export default function ApplicationsPage() {
+export default async function ApplicationsPage() {
   const applications = listBetaApplications();
+  const outcomeNonces = await Promise.all(
+    applications.map(() => issueLocalMutationNonce("APPLICATION_OUTCOME", "/applications")),
+  );
   return (
     <div className="page-stack">
       <section className="page-heading">
@@ -30,7 +35,7 @@ export default function ApplicationsPage() {
           </Link>
         </section>
       ) : (
-        applications.map((application) => (
+        applications.map((application, applicationIndex) => (
           <article className="panel" key={application.id}>
             <div className="panel-heading">
               <div>
@@ -54,6 +59,49 @@ export default function ApplicationsPage() {
                 </ul>
               </div>
             ) : null}
+            <div className="detail-grid">
+              <div>
+                <h3>Selected documents</h3>
+                {application.selectedDocuments.length ? (
+                  <ul>
+                    {application.selectedDocuments.map((document) => (
+                      <li key={`${document.type}-${document.format}-${document.version}`}>
+                        {document.type.replaceAll("_", " ")} {document.format} v{document.version} ·{" "}
+                        {document.stale
+                          ? "stale"
+                          : document.approved
+                            ? "approved"
+                            : "approval required"}
+                        {document.required ? " · required" : " · optional"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No current document selected.</p>
+                )}
+                <p>Cover letter: {application.coverLetterState.replaceAll("_", " ")}</p>
+              </div>
+              <div>
+                <h3>Answers and disclosure</h3>
+                <p>Unknown required answers: {application.unknownAnswerCount}</p>
+                <p>
+                  Approved to disclose: {application.approvedDisclosureCount} of{" "}
+                  {application.questionCount}
+                </p>
+                <p>
+                  A verified fact is not disclosed unless its current answer version is separately
+                  approved.
+                </p>
+              </div>
+              <div>
+                <h3>Runner and next action</h3>
+                <p>Runner: {application.runnerState.replaceAll("_", " ")}</p>
+                <p>Next: {application.nextAction}</p>
+                {application.runnerStopReason && (
+                  <p>Recovery: owner review is required; there is no automatic resume.</p>
+                )}
+              </div>
+            </div>
             <h3>Append-only timeline</h3>
             <ol>
               {application.timeline.map((event, index) => (
@@ -68,6 +116,32 @@ export default function ApplicationsPage() {
                 </li>
               ))}
             </ol>
+            {application.manualOutcomes.length ? (
+              <form action={recordManualOutcomeAction} className="import-form">
+                <input type="hidden" name="mutationNonce" value={outcomeNonces[applicationIndex]} />
+                <input type="hidden" name="applicationId" value={application.id} />
+                <label>
+                  Observed manual outcome
+                  <select name="outcome" required defaultValue="">
+                    <option value="" disabled>
+                      Select an allowed transition
+                    </option>
+                    {application.manualOutcomes.map((outcome) => (
+                      <option key={outcome} value={outcome}>
+                        {outcome.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox-line">
+                  <input type="checkbox" name="ownerConfirmed" value="yes" required />I am recording
+                  an outcome I observed manually. This does not submit an application.
+                </label>
+                <button className="button button--secondary">Record owner-observed outcome</button>
+              </form>
+            ) : (
+              <p>No valid manual outcome transition is available from this lifecycle state.</p>
+            )}
           </article>
         ))
       )}

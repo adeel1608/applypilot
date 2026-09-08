@@ -11,12 +11,17 @@ import {
   generateBasicCoverLetter,
   renderCoverLetterDocx,
   renderCoverLetterPdf,
+  type CoverLetterTone,
 } from "@applypilot/cover-letter-engine";
 import type { EligibilityReason } from "@applypilot/eligibility-engine";
 import type { FitContribution } from "@applypilot/fit-scorer";
+import { legacyStatusToBeta } from "@applypilot/application-tracker";
 import {
+  ApplicationStatusSchema,
+  BetaApplicationStatusSchema,
   EvaluationCoverageSchema,
   JobSchema,
+  type BetaApplicationStatus,
   type EvaluationCoverage,
   type Job,
 } from "@applypilot/job-model";
@@ -25,8 +30,17 @@ import {
   renderResumeDocx,
   renderResumePdf,
   resumeFileName,
+  resumeTemplateCategories,
+  resumeTemplateDesigns,
+  selectResumeTemplate,
+  type ResumeTemplateCategory,
 } from "@applypilot/resume-engine";
 import { candidateProfileProvider } from "@web/lib/candidate-profile-provider";
+import {
+  ManualApplicationOutcomes,
+  manualApplicationOutcomesForStatus,
+  type ManualApplicationOutcome,
+} from "@web/lib/application-outcomes";
 import {
   getBetaRepository,
   getJobImportRepository,
@@ -43,6 +57,10 @@ interface JobListRow {
   source: string;
   dateDiscovered: string;
   employmentType: string;
+  category: string;
+  state: string | null;
+  expiresAt: string | null;
+  unknownRequirementCount: number;
   jobVersionId: string | null;
   evaluationVersionId: string | null;
   eligibilityStatus: string | null;
@@ -61,6 +79,10 @@ export interface BetaJobListItem {
   source: string;
   dateDiscovered: string;
   employmentType: string;
+  category: string;
+  state: string | null;
+  expiresAt: string | null;
+  unknownRequirementCount: number;
   jobVersionId: string | null;
   evaluationVersionId: string | null;
   eligibilityStatus: "ELIGIBLE" | "INELIGIBLE" | "REVIEW_REQUIRED" | null;
@@ -81,6 +103,10 @@ export interface BetaDocumentItem {
   version: number;
   stale: boolean;
   approved: boolean;
+  status: "DRAFT" | "REVIEW_REQUIRED" | "APPROVED" | "SUPERSEDED" | "INVALIDATED";
+  claimEvidenceCount: number;
+  rendererVersion: string | null;
+  claimRuleVersion: string | null;
   createdAt: string;
 }
 
@@ -96,6 +122,11 @@ export interface BetaJobDetail {
   coverage: EvaluationCoverage | null;
   evaluationStale: boolean;
   queueState: BetaJobListItem["queueState"];
+  queueReason: string | null;
+  duplicateState: string | null;
+  recommendedTemplate: ResumeTemplateCategory;
+  templateStrategy: string;
+  templateEvidencePriorities: string[];
   requirements: Array<{
     kind: string;
     modality: string;
@@ -112,6 +143,12 @@ export interface BetaJobDetail {
     warnings: string[];
     createdAt: string;
   };
+}
+
+export interface BetaResumeEvidencePreview {
+  state: "READY" | "PRIVATE_PROFILE_REQUIRED";
+  template: ResumeTemplateCategory;
+  claims: Array<{ text: string; factReferences: string[] }>;
 }
 
 function parseJson<T>(text: string | null, fallback: T): T {
@@ -133,13 +170,20 @@ export function listBetaJobs(): BetaJobListItem[] {
   if (!sqlite) return [];
   const rows = sqlite
     .prepare(
-      `SELECT j.id, j.title, j.company, j.location, j.employment_type AS employmentType,
+      `SELECT j.id, j.title, j.company, j.location, j.category,
+         j.employment_type AS employmentType,
          json_extract(j.normalized_json, '$.source') AS source,
+         json_extract(j.normalized_json, '$.state') AS state,
          j.date_discovered AS dateDiscovered,
          v.id AS jobVersionId, e.id AS evaluationVersionId,
          e.eligibility_status AS eligibilityStatus, e.fit_score AS fitScore,
          e.coverage_json AS coverageJson, e.stale AS evaluationStale,
-         q.state AS queueState, q.reason_code AS queueReason
+         q.state AS queueState, q.reason_code AS queueReason,
+         (SELECT o.expires_at FROM source_observations o
+            WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt,
+         (SELECT count(*) FROM requirement_evidence r
+            WHERE r.job_version_id = v.id AND
+              (r.modality = 'UNKNOWN' OR r.certainty <> 'HIGH')) AS unknownRequirementCount
        FROM jobs j
        LEFT JOIN job_versions v ON v.id = (
          SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
@@ -166,7 +210,8 @@ function listDocuments(sqlite: NonNullable<ReturnType<typeof betaSqlite>>, jobId
   const rows = sqlite
     .prepare(
       `SELECT d.id, d.type, d.format, d.file_name AS fileName, d.template,
-         d.content_digest AS contentDigest, d.version, d.stale, d.created_at AS createdAt,
+         d.content_digest AS contentDigest, d.claim_evidence_json AS claimEvidenceJson,
+         d.layout_result_json AS layoutResultJson, d.version, d.stale, d.created_at AS createdAt,
          EXISTS(SELECT 1 FROM document_approvals a WHERE a.document_artifact_id = d.id
            AND a.content_digest = d.content_digest AND a.invalidated_at IS NULL) AS approved
        FROM document_artifacts d WHERE d.job_id = ? ORDER BY d.created_at DESC, d.format`,
@@ -181,12 +226,38 @@ function listDocuments(sqlite: NonNullable<ReturnType<typeof betaSqlite>>, jobId
     version: number;
     stale: number;
     approved: number;
+    claimEvidenceJson: string;
+    layoutResultJson: string;
     createdAt: string;
   }>;
+  const latestByTypeFormat = new Map<string, number>();
+  for (const row of rows) {
+    const key = `${row.type}:${row.format}`;
+    latestByTypeFormat.set(key, Math.max(latestByTypeFormat.get(key) ?? 0, row.version));
+  }
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    type: row.type,
+    format: row.format,
+    fileName: row.fileName,
+    template: row.template,
+    contentDigest: row.contentDigest,
+    version: row.version,
     stale: Boolean(row.stale),
     approved: Boolean(row.approved),
+    status: row.stale
+      ? row.version < (latestByTypeFormat.get(`${row.type}:${row.format}`) ?? row.version)
+        ? ("SUPERSEDED" as const)
+        : ("INVALIDATED" as const)
+      : row.approved
+        ? ("APPROVED" as const)
+        : ("REVIEW_REQUIRED" as const),
+    claimEvidenceCount: parseJson<unknown[]>(row.claimEvidenceJson, []).length,
+    rendererVersion:
+      parseJson<{ rendererVersion?: string }>(row.layoutResultJson, {}).rendererVersion ?? null,
+    claimRuleVersion:
+      parseJson<{ claimRuleVersion?: string }>(row.layoutResultJson, {}).claimRuleVersion ?? null,
+    createdAt: row.createdAt,
   }));
 }
 
@@ -199,7 +270,12 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
          v.source_observation_id AS sourceObservationId, e.id AS evaluationVersionId,
          e.eligibility_status AS eligibilityStatus, e.eligibility_reasons_json AS reasonsJson,
          e.fit_score AS fitScore, e.fit_contributions_json AS contributionsJson,
-         e.coverage_json AS coverageJson, e.stale AS evaluationStale, q.state AS queueState
+         e.coverage_json AS coverageJson, e.stale AS evaluationStale, q.state AS queueState,
+         q.reason_code AS queueReason,
+         (SELECT c.state FROM duplicate_clusters c
+            LEFT JOIN duplicate_cluster_members m ON m.cluster_id = c.id
+            WHERE c.canonical_job_id = j.id OR m.source_observation_id = v.source_observation_id
+            ORDER BY c.updated_at DESC LIMIT 1) AS duplicateState
        FROM jobs j
        LEFT JOIN job_versions v ON v.id = (
          SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
@@ -220,9 +296,14 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         coverageJson: string | null;
         evaluationStale: number | null;
         queueState: BetaJobListItem["queueState"];
+        queueReason: string | null;
+        duplicateState: string | null;
       }
     | undefined;
   if (!row) return null;
+  const parsedJob = JobSchema.parse(JSON.parse(row.normalizedJson));
+  const recommendedTemplate = selectResumeTemplate(parsedJob);
+  const recommendedDesign = resumeTemplateDesigns[recommendedTemplate];
   const requirementRows = row.jobVersionId
     ? (sqlite
         .prepare(
@@ -244,7 +325,7 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     ? parseJson<{ blockers?: string[]; warnings?: string[] }>(packetRow.readinessJson, {})
     : null;
   return {
-    job: JobSchema.parse(JSON.parse(row.normalizedJson)),
+    job: parsedJob,
     jobVersionId: row.jobVersionId,
     sourceObservationId: row.sourceObservationId,
     evaluationVersionId: row.evaluationVersionId,
@@ -257,6 +338,11 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
       : null,
     evaluationStale: Boolean(row.evaluationStale),
     queueState: row.queueState,
+    queueReason: row.queueReason,
+    duplicateState: row.duplicateState,
+    recommendedTemplate,
+    templateStrategy: recommendedDesign.summaryStrategy,
+    templateEvidencePriorities: recommendedDesign.evidencePriorities,
     requirements: requirementRows,
     documents: listDocuments(sqlite, jobId),
     packet: packetRow
@@ -270,6 +356,28 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         }
       : null,
   };
+}
+
+export async function getBetaResumeEvidencePreview(
+  jobId: string,
+  template: ResumeTemplateCategory,
+): Promise<BetaResumeEvidencePreview> {
+  const detail = getBetaJob(jobId);
+  if (!detail) throw new Error("JOB_NOT_FOUND");
+  if (!resumeTemplateCategories.includes(template)) throw new Error("INVALID_RESUME_TEMPLATE");
+  const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
+  if (resolution.state !== "PRIVATE_LOCAL_PROFILE" || !resolution.profile) {
+    return { state: "PRIVATE_PROFILE_REQUIRED", template, claims: [] };
+  }
+  const document = generateResumeDocument(resolution.profile, detail.job, template);
+  const claims = [
+    ...document.summary,
+    ...document.skills,
+    ...document.employment.flatMap(({ claims: employmentClaims }) => employmentClaims),
+    ...document.projects.flatMap(({ claims: projectClaims }) => projectClaims),
+    ...document.achievements,
+  ];
+  return { state: "READY", template, claims: claims.slice(0, 8) };
 }
 
 export async function reevaluateBetaJob(jobId: string): Promise<string> {
@@ -291,7 +399,10 @@ export async function reevaluateBetaJob(jobId: string): Promise<string> {
   return row.id;
 }
 
-export async function generatePrivateCv(jobId: string): Promise<{ pdfId: string; docxId: string }> {
+export async function generatePrivateCv(
+  jobId: string,
+  templateOverride?: ResumeTemplateCategory,
+): Promise<{ pdfId: string; docxId: string }> {
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
   if (!sqlite || !beta) throw new Error("BETA_DATABASE_NOT_READY");
@@ -303,7 +414,10 @@ export async function generatePrivateCv(jobId: string): Promise<{ pdfId: string;
     .prepare("SELECT active_version_id AS id FROM candidate_profiles WHERE id = ?")
     .get(resolution.profile.profileId) as { id: string | null } | undefined;
   if (!profileVersion?.id) throw new Error("PROFILE_VERSION_NOT_FOUND");
-  const document = generateResumeDocument(resolution.profile, detail.job);
+  if (templateOverride && !resumeTemplateCategories.includes(templateOverride)) {
+    throw new Error("INVALID_RESUME_TEMPLATE");
+  }
+  const document = generateResumeDocument(resolution.profile, detail.job, templateOverride);
   const artifactKey = randomUUID();
   const directory = join("documents", jobId.replace(/[^A-Za-z0-9._-]/g, "_"));
   const displayName = resumeFileName(resolution.profile, detail.job.company);
@@ -364,6 +478,7 @@ export async function generatePrivateCv(jobId: string): Promise<{ pdfId: string;
 
 export async function generatePrivateCoverLetter(
   jobId: string,
+  toneOverride?: CoverLetterTone,
 ): Promise<{ pdfId: string; docxId: string }> {
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
@@ -376,7 +491,10 @@ export async function generatePrivateCoverLetter(
     .prepare("SELECT active_version_id AS id FROM candidate_profiles WHERE id = ?")
     .get(resolution.profile.profileId) as { id: string | null } | undefined;
   if (!profileVersion?.id) throw new Error("PROFILE_VERSION_NOT_FOUND");
-  const document = generateBasicCoverLetter(resolution.profile, detail.job);
+  if (toneOverride && !["DIRECT", "WARM", "FORMAL"].includes(toneOverride)) {
+    throw new Error("INVALID_COVER_LETTER_TONE");
+  }
+  const document = generateBasicCoverLetter(resolution.profile, detail.job, toneOverride);
   const artifactKey = randomUUID();
   const directory = join("documents", jobId.replace(/[^A-Za-z0-9._-]/g, "_"));
   const pdfRelative = join(directory, `${artifactKey}-letter.pdf`);
@@ -437,6 +555,7 @@ export function approvePrivateDocument(documentArtifactId: string, contentDigest
 export function setBetaQueueState(
   jobId: string,
   state: "REVIEWING" | "SHORTLISTED" | "SKIPPED" | "PREPARING",
+  reasonCode: string = `OWNER_${state}`,
 ): void {
   const detail = getBetaJob(jobId);
   const beta = getBetaRepository();
@@ -445,7 +564,7 @@ export function setBetaQueueState(
     jobId,
     state,
     evaluationVersionId: detail.evaluationVersionId,
-    reasonCode: `OWNER_${state}`,
+    reasonCode,
   });
 }
 
@@ -563,11 +682,34 @@ export interface BetaApplicationListItem {
   jobId: string;
   title: string;
   company: string;
-  status: string;
+  status: BetaApplicationStatus;
+  packetId: string | null;
   packetStatus: string | null;
   packetVersion: number | null;
   blockers: string[];
+  selectedDocuments: Array<{
+    type: "CV" | "COVER_LETTER";
+    format: "PDF" | "DOCX";
+    version: number;
+    required: boolean;
+    approved: boolean;
+    stale: boolean;
+  }>;
+  coverLetterState: "APPROVED" | "REQUIRED_MISSING" | "NOT_INCLUDED" | "UNKNOWN";
+  unknownAnswerCount: number;
+  approvedDisclosureCount: number;
+  questionCount: number;
+  runnerState: string;
+  runnerStopReason: string | null;
+  nextAction: string;
+  manualOutcomes: ManualApplicationOutcome[];
   timeline: Array<{ toStatus: string; eventType: string; occurredAt: string }>;
+}
+
+function betaApplicationStatus(value: string): BetaApplicationStatus {
+  const beta = BetaApplicationStatusSchema.safeParse(value);
+  if (beta.success) return beta.data;
+  return legacyStatusToBeta(ApplicationStatusSchema.parse(value));
 }
 
 export function listBetaApplications(): BetaApplicationListItem[] {
@@ -575,8 +717,9 @@ export function listBetaApplications(): BetaApplicationListItem[] {
   if (!sqlite) return [];
   const rows = sqlite
     .prepare(
-      `SELECT a.id, a.job_id AS jobId, j.title, j.company, a.status,
-         p.status AS packetStatus, p.version AS packetVersion, p.readiness_json AS readinessJson
+      `SELECT a.id, a.job_id AS jobId, j.title, j.company, j.normalized_json AS normalizedJson,
+         a.status, p.id AS packetId, p.status AS packetStatus, p.version AS packetVersion,
+         p.readiness_json AS readinessJson
        FROM applications a JOIN jobs j ON j.id = a.job_id
        LEFT JOIN application_packets p ON p.id = (
          SELECT id FROM application_packets WHERE job_id = a.job_id ORDER BY version DESC LIMIT 1)
@@ -588,20 +731,153 @@ export function listBetaApplications(): BetaApplicationListItem[] {
     title: string;
     company: string;
     status: string;
+    normalizedJson: string;
+    packetId: string | null;
     packetStatus: string | null;
     packetVersion: number | null;
     readinessJson: string | null;
   }>;
-  return rows.map((row) => ({
-    ...row,
-    blockers: parseJson<{ blockers?: string[] }>(row.readinessJson, {}).blockers ?? [],
-    timeline: sqlite
-      .prepare(
-        `SELECT to_status AS toStatus, event_type AS eventType, occurred_at AS occurredAt
+  return rows.map((row) => {
+    const status = betaApplicationStatus(row.status);
+    const blockers = parseJson<{ blockers?: string[] }>(row.readinessJson, {}).blockers ?? [];
+    const selectedDocuments = row.packetId
+      ? (
+          sqlite
+            .prepare(
+              `SELECT d.type, d.format, d.version, d.stale, pd.required,
+               EXISTS(SELECT 1 FROM document_approvals a
+                 WHERE a.document_artifact_id = d.id AND a.content_digest = d.content_digest
+                   AND a.invalidated_at IS NULL) AS approved
+             FROM application_packet_documents pd
+             JOIN document_artifacts d ON d.id = pd.document_artifact_id
+             WHERE pd.packet_id = ? ORDER BY d.type, d.format`,
+            )
+            .all(row.packetId) as Array<{
+            type: "CV" | "COVER_LETTER";
+            format: "PDF" | "DOCX";
+            version: number;
+            stale: number;
+            required: number;
+            approved: number;
+          }>
+        ).map((document) => ({
+          ...document,
+          stale: Boolean(document.stale),
+          required: Boolean(document.required),
+          approved: Boolean(document.approved),
+        }))
+      : [];
+    const answers = row.packetId
+      ? (sqlite
+          .prepare(
+            `SELECT count(*) AS questionCount,
+               coalesce(sum(CASE WHEN q.required = 1 AND
+                 coalesce(a.certainty, 'UNKNOWN') = 'UNKNOWN' THEN 1 ELSE 0 END), 0)
+                 AS unknownAnswerCount,
+               coalesce(sum(CASE WHEN a.disclosure_state = 'APPROVED' THEN 1 ELSE 0 END), 0)
+                 AS approvedDisclosureCount
+             FROM application_questions q
+             LEFT JOIN application_answer_versions a ON a.id = (
+               SELECT id FROM application_answer_versions WHERE question_id = q.id
+               ORDER BY version DESC LIMIT 1)
+             WHERE q.packet_id = ?`,
+          )
+          .get(row.packetId) as {
+          questionCount: number;
+          unknownAnswerCount: number;
+          approvedDisclosureCount: number;
+        })
+      : { questionCount: 0, unknownAnswerCount: 0, approvedDisclosureCount: 0 };
+    const runner = row.packetId
+      ? (sqlite
+          .prepare(
+            `SELECT state, stop_reason AS stopReason FROM application_runs
+             WHERE packet_id = ? ORDER BY updated_at DESC, rowid DESC LIMIT 1`,
+          )
+          .get(row.packetId) as { state: string; stopReason: string | null } | undefined)
+      : undefined;
+    const job = JobSchema.parse(JSON.parse(row.normalizedJson));
+    const letterRequirement = coverLetterRequirementStatus(job);
+    const approvedLetter = selectedDocuments.some(
+      ({ type, approved, stale }) => type === "COVER_LETTER" && approved && !stale,
+    );
+    const coverLetterState = approvedLetter
+      ? ("APPROVED" as const)
+      : letterRequirement === "REQUIRED"
+        ? ("REQUIRED_MISSING" as const)
+        : letterRequirement === "UNKNOWN"
+          ? ("UNKNOWN" as const)
+          : ("NOT_INCLUDED" as const);
+    const manualOutcomes = manualApplicationOutcomesForStatus(status);
+    const nextAction = !row.packetId
+      ? "Prepare a packet"
+      : blockers.length
+        ? "Resolve packet blockers"
+        : runner?.stopReason
+          ? runner.stopReason.replaceAll("_", " ")
+          : "Real target approval required";
+    return {
+      id: row.id,
+      jobId: row.jobId,
+      title: row.title,
+      company: row.company,
+      status,
+      packetId: row.packetId,
+      packetStatus: row.packetStatus,
+      packetVersion: row.packetVersion,
+      blockers,
+      selectedDocuments,
+      coverLetterState,
+      unknownAnswerCount: answers.unknownAnswerCount,
+      approvedDisclosureCount: answers.approvedDisclosureCount,
+      questionCount: answers.questionCount,
+      runnerState: runner?.state ?? "TARGET_APPROVAL_REQUIRED",
+      runnerStopReason: runner?.stopReason ?? "TARGET_APPROVAL_REQUIRED",
+      nextAction,
+      manualOutcomes,
+      timeline: sqlite
+        .prepare(
+          `SELECT to_status AS toStatus, event_type AS eventType, occurred_at AS occurredAt
          FROM application_events_v2 WHERE application_id = ? ORDER BY occurred_at, rowid`,
-      )
-      .all(row.id) as BetaApplicationListItem["timeline"],
-  }));
+        )
+        .all(row.id) as BetaApplicationListItem["timeline"],
+    };
+  });
+}
+
+export function recordManualApplicationOutcome(
+  applicationId: string,
+  outcome: ManualApplicationOutcome,
+): void {
+  const sqlite = betaSqlite();
+  const beta = getBetaRepository();
+  if (!sqlite || !beta) throw new Error("BETA_DATABASE_NOT_READY");
+  if (!ManualApplicationOutcomes.includes(outcome)) throw new Error("INVALID_APPLICATION_OUTCOME");
+  const application = sqlite
+    .prepare(
+      `SELECT a.status, p.id AS packetId FROM applications a
+       LEFT JOIN application_packets p ON p.id = (
+         SELECT id FROM application_packets WHERE job_id = a.job_id ORDER BY version DESC LIMIT 1)
+       WHERE a.id = ?`,
+    )
+    .get(applicationId) as { status: string; packetId: string | null } | undefined;
+  if (!application) throw new Error("APPLICATION_NOT_FOUND");
+  const current = betaApplicationStatus(application.status);
+  if (!manualApplicationOutcomesForStatus(current).includes(outcome)) {
+    throw new Error("APPLICATION_OUTCOME_TRANSITION_NOT_ALLOWED");
+  }
+  beta.appendApplicationEvent({
+    applicationId,
+    packetId: application.packetId,
+    toStatus: outcome,
+    eventType: `OWNER_RECORDED_${outcome}`,
+    actor: "LOCAL_USER",
+    idempotencyKey: `owner-outcome:${applicationId}:${outcome}:${randomUUID()}`,
+    metadata: {
+      reasonCode: `OWNER_OBSERVED_${outcome}`,
+      outcomeSource: "LOCAL_USER",
+    },
+  });
 }
 
 export function getSourceCapabilitySummary(): {

@@ -13,8 +13,13 @@ import {
 } from "@web/app/jobs/actions";
 import { ScoreBadge } from "@web/components/score-badge";
 import { StatusPill } from "@web/components/status-pill";
-import { coverLetterRequirementStatus } from "@applypilot/cover-letter-engine";
-import { getBetaJob, type BetaJobDetail } from "@web/lib/beta-workspace";
+import { coverLetterRequirementStatus, coverLetterTones } from "@applypilot/cover-letter-engine";
+import { resumeTemplateCategories, resumeTemplateDesigns } from "@applypilot/resume-engine";
+import {
+  getBetaJob,
+  getBetaResumeEvidencePreview,
+  type BetaJobDetail,
+} from "@web/lib/beta-workspace";
 import { evaluatedJobs, formatDiscoveryDate, getEvaluatedJob, getImportedJob } from "@web/lib/data";
 import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 
@@ -55,6 +60,13 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
     detail.documents.map(() => issueLocalMutationNonce("DOCUMENT_APPROVE", path)),
   );
   const { job } = detail;
+  const currentCvTemplate = detail.documents.find(
+    ({ type, stale }) => type === "CV" && !stale,
+  )?.template;
+  const previewTemplate =
+    resumeTemplateCategories.find((template) => template === currentCvTemplate) ??
+    detail.recommendedTemplate;
+  const evidencePreview = await getBetaResumeEvidencePreview(job.id, previewTemplate);
   return (
     <div className="page-stack">
       <Link className="back-link" href="/jobs">
@@ -92,13 +104,16 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
         <form action={setQueueStateAction}>
           <input type="hidden" name="mutationNonce" value={queueNonce} />
           <input type="hidden" name="jobId" value={job.id} />
-          <button className="button button--quiet" name="queueState" value="SKIPPED">
+          <button className="button button--quiet" name="queueState" value="SKIP">
             Skip
           </button>
-          <button className="button button--secondary" name="queueState" value="REVIEWING">
-            Review
+          <button className="button button--quiet" name="queueState" value="ARCHIVE">
+            Archive
           </button>
-          <button className="button button--secondary" name="queueState" value="SHORTLISTED">
+          <button className="button button--secondary" name="queueState" value="REVIEW_LATER">
+            Review later
+          </button>
+          <button className="button button--secondary" name="queueState" value="SHORTLIST">
             Shortlist
           </button>
         </form>
@@ -142,6 +157,30 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               </li>
             ))}
           </ul>
+          <dl className="fact-list compact-facts">
+            <div>
+              <dt>Job version</dt>
+              <dd>{detail.jobVersionId ?? "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Evaluation version</dt>
+              <dd>{detail.evaluationVersionId ?? "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Duplicate review</dt>
+              <dd>{detail.duplicateState?.replaceAll("_", " ") ?? "No cluster suggested"}</dd>
+            </div>
+            <div>
+              <dt>Next action</dt>
+              <dd>
+                {detail.evaluationStale
+                  ? "Re-evaluate current versions"
+                  : detail.queueReason === "OWNER_ARCHIVED"
+                    ? "Archived; restore by choosing review later"
+                    : "Owner review and document preparation"}
+              </dd>
+            </div>
+          </dl>
         </article>
       </section>
 
@@ -212,17 +251,73 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
           Generation creates new versioned PDF and DOCX files below the ignored private document
           root. Filenames and contents are never placed in Git.
         </p>
-        <form action={generateCvAction}>
+        <div className="detail-grid">
+          <div>
+            <h3>Recommended template</h3>
+            <p>
+              {detail.recommendedTemplate} · {detail.templateStrategy.toLowerCase()} strategy
+            </p>
+            <p>Evidence priorities: {detail.templateEvidencePriorities.join(", ") || "general"}.</p>
+          </div>
+          <div>
+            <h3>Unsupported or unknown gaps</h3>
+            <p>
+              {detail.coverage?.missingDimensions.length
+                ? detail.coverage.missingDimensions.join(", ")
+                : "No coverage gaps recorded for the current evaluation."}
+            </p>
+          </div>
+          <div>
+            <h3>Verified evidence preview</h3>
+            {evidencePreview.state === "READY" ? (
+              <ul>
+                {evidencePreview.claims.map((claim) => (
+                  <li key={`${claim.text}-${claim.factReferences.join("-")}`}>
+                    {claim.text} <small>({claim.factReferences.join(", ")})</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>A valid private profile is required to preview selected evidence.</p>
+            )}
+            <p>
+              Preview template: {evidencePreview.template}. The selected generation override is
+              validated again before a new immutable artifact is written.
+            </p>
+          </div>
+        </div>
+        <form action={generateCvAction} className="import-form">
           <input type="hidden" name="mutationNonce" value={generateNonce} />
           <input type="hidden" name="jobId" value={job.id} />
+          <label>
+            CV template override
+            <select name="template" defaultValue={detail.recommendedTemplate}>
+              {resumeTemplateCategories.map((template) => (
+                <option key={template} value={template}>
+                  {template.replaceAll("-", " ")} ·{" "}
+                  {resumeTemplateDesigns[template].summaryStrategy.toLowerCase()}
+                </option>
+              ))}
+            </select>
+          </label>
           <button className="button button--secondary">
             {detail.documents.length ? "Regenerate private CV" : "Generate private CV"}
           </button>
         </form>
         {coverLetterRequirementStatus(job) !== "NOT_REQUIRED" && (
-          <form action={generateCoverLetterAction}>
+          <form action={generateCoverLetterAction} className="import-form">
             <input type="hidden" name="mutationNonce" value={coverLetterNonce} />
             <input type="hidden" name="jobId" value={job.id} />
+            <label>
+              Cover-letter tone
+              <select name="tone" defaultValue="DIRECT">
+                {coverLetterTones.map((tone) => (
+                  <option key={tone} value={tone}>
+                    {tone.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="button button--secondary">
               Generate private cover letter for owner review
             </button>
@@ -236,8 +331,12 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
                   {document.type} {document.format} v{document.version}
                 </h3>
                 <p>
-                  {document.template} · {document.stale ? "stale" : "current"} ·{" "}
-                  {document.approved ? "approved" : "approval required"}
+                  {document.template} · {document.status.replaceAll("_", " ")} · evidence refs{" "}
+                  {document.claimEvidenceCount}
+                </p>
+                <p>
+                  Renderer {document.rendererVersion ?? "unrecorded"} · claims{" "}
+                  {document.claimRuleVersion ?? "unrecorded"}
                 </p>
               </div>
               {!document.approved && !document.stale && (

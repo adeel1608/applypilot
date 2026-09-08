@@ -13,6 +13,8 @@ import {
   setBetaQueueState,
 } from "@web/lib/beta-workspace";
 import { consumeLocalMutationNonce } from "@web/lib/local-mutation-security";
+import { coverLetterTones, type CoverLetterTone } from "@applypilot/cover-letter-engine";
+import { resumeTemplateCategories, type ResumeTemplateCategory } from "@applypilot/resume-engine";
 
 function jobId(formData: FormData): string {
   const value = String(formData.get("jobId") ?? "");
@@ -31,11 +33,19 @@ function finish(id: string): never {
 export async function setQueueStateAction(formData: FormData) {
   await consumeLocalMutationNonce("JOB_QUEUE", formData);
   const id = jobId(formData);
-  const state = String(formData.get("queueState") ?? "");
-  if (!["REVIEWING", "SHORTLISTED", "SKIPPED", "PREPARING"].includes(state)) {
+  const ownerState = String(formData.get("queueState") ?? "");
+  const mapping = {
+    REVIEW_LATER: { state: "REVIEWING", reason: "OWNER_REVIEW_LATER" },
+    SHORTLIST: { state: "SHORTLISTED", reason: "OWNER_SHORTLISTED" },
+    SKIP: { state: "SKIPPED", reason: "OWNER_SKIPPED" },
+    ARCHIVE: { state: "SKIPPED", reason: "OWNER_ARCHIVED" },
+    PREPARING: { state: "PREPARING", reason: "OWNER_PREPARING" },
+  } as const;
+  const selection = mapping[ownerState as keyof typeof mapping];
+  if (!selection) {
     throw new Error("INVALID_QUEUE_STATE");
   }
-  setBetaQueueState(id, state as "REVIEWING" | "SHORTLISTED" | "SKIPPED" | "PREPARING");
+  setBetaQueueState(id, selection.state, selection.reason);
   finish(id);
 }
 
@@ -61,14 +71,22 @@ export async function correctJobAction(formData: FormData) {
 export async function generateCvAction(formData: FormData) {
   await consumeLocalMutationNonce("DOCUMENT_GENERATE", formData);
   const id = jobId(formData);
-  await generatePrivateCv(id);
+  const template = String(formData.get("template") ?? "");
+  if (!resumeTemplateCategories.includes(template as ResumeTemplateCategory)) {
+    throw new Error("INVALID_RESUME_TEMPLATE");
+  }
+  await generatePrivateCv(id, template as ResumeTemplateCategory);
   finish(id);
 }
 
 export async function generateCoverLetterAction(formData: FormData) {
   await consumeLocalMutationNonce("COVER_LETTER_GENERATE", formData);
   const id = jobId(formData);
-  await generatePrivateCoverLetter(id);
+  const tone = String(formData.get("tone") ?? "");
+  if (!coverLetterTones.includes(tone as CoverLetterTone)) {
+    throw new Error("INVALID_COVER_LETTER_TONE");
+  }
+  await generatePrivateCoverLetter(id, tone as CoverLetterTone);
   finish(id);
 }
 

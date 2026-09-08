@@ -53,6 +53,10 @@ describe("cover-letter foundation", () => {
     expect(
       letter.claims.every(({ profileFactReferences }) => profileFactReferences.length > 0),
     ).toBe(true);
+    expect(generateBasicCoverLetter(testProfile, job, "FORMAL").tone).toBe("FORMAL");
+    expect(() => generateBasicCoverLetter(testProfile, job, "UNREVIEWED" as "FORMAL")).toThrow(
+      "INVALID_COVER_LETTER_TONE",
+    );
   });
 
   it("rejects arbitrary prose attached to a verified skill ID", () => {

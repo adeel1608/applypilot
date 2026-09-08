@@ -31,6 +31,16 @@ describe("resume engine", () => {
     expect(selectResumeTemplate(fixtureJob("job-junior-receptionist"))).toBe("admin-reception");
   });
 
+  it("accepts only an explicit supported template override", () => {
+    const job = fixtureJob("job-retail-sales-assistant");
+    expect(generateResumeDocument(testProfile, job, "technical-casual").template).toBe(
+      "technical-casual",
+    );
+    expect(() =>
+      generateResumeDocument(testProfile, job, "unreviewed-template" as "technical-casual"),
+    ).toThrow("INVALID_RESUME_TEMPLATE");
+  });
+
   it("generates only provenance-bound verified claims", () => {
     const document = generateResumeDocument(testProfile, fixtureJob("job-retail-sales-assistant"));
     expect(validateResumeTruth(document, testProfile)).toEqual({ valid: true, errors: [] });

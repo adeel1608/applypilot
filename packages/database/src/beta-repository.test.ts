@@ -25,6 +25,131 @@ function migratedDatabase(): BetterSqlite3.Database {
 }
 
 describe("Beta repository", () => {
+  it("supersedes prior artifact approvals without overwriting either version", () => {
+    const sqlite = migratedDatabase();
+    const job = fixtureJob("job-retail-sales-assistant");
+    const now = "2026-09-07T04:00:00.000Z";
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+          (id,title,company,category,location,employment_type,normalized_json,application_status,
+           date_discovered,created_at,updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, ?)`,
+      )
+      .run(
+        job.id,
+        job.title,
+        job.company,
+        job.category,
+        job.location,
+        job.employmentType,
+        JSON.stringify(job),
+        now,
+        now,
+        now,
+      );
+    sqlite
+      .prepare(
+        "INSERT INTO candidate_profiles (id,active_version_id,created_at,updated_at) VALUES ('profile:1','profile-version:1',?,?)",
+      )
+      .run(now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO candidate_profile_versions
+          (id,profile_id,version,schema_version,snapshot_json,content_hash,created_at)
+         VALUES ('profile-version:1','profile:1',1,1,'{}',?,?)`,
+      )
+      .run("c".repeat(64), now);
+    sqlite
+      .prepare(
+        `INSERT INTO job_versions
+          (id,job_id,version,normalized_json,content_digest,source_observation_id,created_at)
+         VALUES ('job-version:1',?,1,?, ?,NULL,?)`,
+      )
+      .run(job.id, JSON.stringify(job), "d".repeat(64), now);
+    let sequence = 0;
+    const repository = new BetaRepository(
+      sqlite,
+      () => new Date(now),
+      () => `supersede:${++sequence}`,
+    );
+    const artifact = (id: string, digest: string) => ({
+      id,
+      jobId: job.id,
+      jobVersionId: "job-version:1",
+      profileVersionId: "profile-version:1",
+      type: "CV" as const,
+      template: "casual-general",
+      format: "PDF" as const,
+      fileName: `${id}.pdf`,
+      localPath: `documents/${id}.pdf`,
+      contentDigest: digest,
+      claimEvidence: ["fictional:skill"],
+      layoutResult: { pageCount: 1 },
+    });
+    expect(repository.recordDocumentArtifact(artifact("document:1", "a".repeat(64)))).toEqual({
+      id: "document:1",
+      version: 1,
+    });
+    repository.approveDocument({
+      documentArtifactId: "document:1",
+      contentDigest: "a".repeat(64),
+    });
+    sqlite
+      .prepare(
+        `INSERT INTO application_packets
+          (id,job_id,job_version_id,profile_version_id,evaluation_version_id,target_url,target_host,
+           status,readiness_json,version,created_at,updated_at)
+         VALUES ('packet:superseded',?,'job-version:1','profile-version:1',NULL,NULL,NULL,
+           'READY_TO_APPLY','{"status":"READY_TO_APPLY","blockers":[],"warnings":[]}',1,?,?)`,
+      )
+      .run(job.id, now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO application_packet_documents (packet_id,document_artifact_id,required)
+         VALUES ('packet:superseded','document:1',1)`,
+      )
+      .run();
+    expect(repository.recordDocumentArtifact(artifact("document:2", "b".repeat(64)))).toEqual({
+      id: "document:2",
+      version: 2,
+    });
+    expect(
+      sqlite.prepare("SELECT id, version, stale FROM document_artifacts ORDER BY version").all(),
+    ).toEqual([
+      { id: "document:1", version: 1, stale: 1 },
+      { id: "document:2", version: 2, stale: 0 },
+    ]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT invalidation_reason AS reason FROM document_approvals WHERE document_artifact_id = 'document:1'",
+        )
+        .get(),
+    ).toEqual({ reason: "DOCUMENT_SUPERSEDED" });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT status,readiness_json AS readinessJson FROM application_packets WHERE id = 'packet:superseded'",
+        )
+        .get(),
+    ).toEqual({
+      status: "INVALIDATED",
+      readinessJson: JSON.stringify({
+        status: "REVIEW_REQUIRED",
+        blockers: ["DOCUMENT_SUPERSEDED"],
+        warnings: [],
+      }),
+    });
+    expect(() =>
+      repository.approveDocument({
+        documentArtifactId: "document:1",
+        contentDigest: "a".repeat(64),
+      }),
+    ).toThrow("STALE_DOCUMENT_CANNOT_BE_APPROVED");
+    sqlite.close();
+  });
+
   it("persists immutable observations, job versions, evidence, evaluations, and queue state", () => {
     const sqlite = migratedDatabase();
     const job = fixtureJob("job-retail-sales-assistant");
