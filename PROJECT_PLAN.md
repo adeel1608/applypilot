@@ -2412,3 +2412,64 @@ Status: `COMPLETE_AWAITING_EXACT_HEAD_CI`. The existing PR #10 remains open and 
 - The privacy scanner detected selected private canary bytes in ignored E2E development compiler cache files. Each exact generated cache directory was moved without inspection into ignored private quarantine; the final post-browser audit passed across tracked/history/build/test surfaces and 11 private canaries. No private profile, database, vacancy, document, cache, credential, or quarantine material is tracked or staged.
 - The authoritative private database remains schema v2, 573440 bytes, with zero pending migrations, integrity `PASS`, and zero foreign-key issues. The prior single private smoke remains authoritative and was not repeated. Real source calls remain `0`; real application actions remain `0`; employer forms visited/uploads/submissions remain `0`.
 - Remaining publication step: commit and push this coherent closure on `feat/personal-live-beta-core`, verify PR #10 points to the exact new head with successful GitHub Actions, and stop for ChatGPT review without merging.
+
+## PR #10 human-review remediation blueprint — 2026-09-08
+
+Status: `IN_PROGRESS_REVIEW_FIXES`. Direct ChatGPT review requested changes at reviewed head `7af56299117d70f8c7a7b37602aa260b6b52cea3`. The clean working branch is still `feat/personal-live-beta-core`; GitHub CLI is authenticated as `adeel1608`; PR #10 is open, unmerged, and points to the reviewed head. This is a bounded correction pass on the same branch and PR, not a new feature train.
+
+### Current state and objective
+
+The approved Beta architecture, additive schema v2, private migration, private local smoke, source-disablement, and real-runner boundary remain intact. Review identified correctness gaps in legacy vacancy reprocessing, profile snapshot activation/binding, stale generation, correction evidence/location versioning, packet expiry/duplicate safety, v2 import integration coverage, Lever path confinement, the document-type contract, local document inspection, and the local release script. The objective is to fix only those findings, prove them with fictional/synthetic regressions, then take one fresh verified backup and perform one offline reprocess/document/packet refresh of the existing private vacancy. No migration file will change.
+
+### Assumptions and requirements
+
+- The one canonical private legacy workflow can be reconstructed only through its stored import/source IDs and confirmed stored material. If source batch/record identity or segment boundaries are absent, inconsistent, or ambiguous, reprocessing stops with `LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT`; title/company matching is forbidden.
+- Original import material, source observations, job versions, evaluations, documents, approvals, packets, and events are immutable history. Reprocessing/correction creates new versions and invalidates dependants; it does not rewrite or delete history.
+- One canonical stable profile serialization/hash helper is shared by persistence and generation binding. Reusing an existing A snapshot after A -> B -> A must reactivate A's exact stored version.
+- Document generation is an explicit consumer of the current job/profile/evaluation tuple. It fails with stable re-evaluation-required codes on any hash, active-version, job-version, or staleness mismatch and never re-evaluates implicitly.
+- Correction copies unchanged source field/requirement evidence with original provenance, adds owner evidence only for corrected fields, and reuses the deterministic conservative Australian location parser. No distance is derived.
+- Packet readiness derives expiry and duplicate-review safety from persisted current evidence. Expired and unresolved duplicate states block; unknown expiry remains explicitly unknown/review-required rather than active.
+- Runtime document types align to schema v2 (`CV | COVER_LETTER`); `OTHER` has no current use and is removed without migration.
+- The document route accepts only an artifact ID plus an allowlisted disposition mode. It verifies exact loopback Host/request boundary and the current HttpOnly session, performs the database lookup, confines the recorded private-relative path through realpath, verifies bytes against the stored digest, returns draft PDFs for inline review and PDF/DOCX downloads with no-store/nosniff/sanitized headers, and rejects stale/missing/unsafe artifacts. No public/static copy or arbitrary browser path exists.
+- Greenhouse semantics remain unchanged. Lever tenant URLs and every redirect require an exact path-segment boundary. No tenant is enabled, enumerated, or contacted.
+- The real application runner remains `TARGET_APPROVAL_REQUIRED`; external form visits, uploads, and submissions remain disabled.
+
+### Architecture, data flow, and proposed file scope
+
+- Candidate profile: add a stable canonical content-hash helper in `@applypilot/candidate-profile`; make `JobImportRepository.persistProfileVersion` reactivate an existing identical version and expose/read the exact binding needed by services. Add A -> B -> A and stale-dependency regressions.
+- Import/reprocess: extend the existing importer/repository boundary with a GENERAL offline legacy reprocess method. Resolve canonical job -> exact `job_source_records`/import record/batch -> stored confirmed content and recorded segment identity; run the current parser/extractor; persist a new immutable observation/version/evidence/evaluation through the same v2 path. Add a schema-v2 integration suite using the actual `JobImportRepository` for new/repeat/changed imports and profile modes.
+- Beta repository/workspace: carry field and requirement evidence forward during owner correction, add corrected-field evidence, normalize changed location structure, centralize current evaluation/profile checks for generation, invalidate profile-dependent documents/approvals/packets on version changes, and derive packet expiry/duplicate state.
+- Runner contract: change the in-memory packet expiry representation to `ACTIVE | EXPIRED | UNKNOWN` and add `JOB_EXPIRY_UNKNOWN` readiness handling if this remains migration-free; remove `OTHER` from packet/document runtime schemas.
+- Sources: replace prefix string matching in the shared public-posting boundary with exact segment-boundary validation used for initial and redirect URLs; add sibling-prefix tests.
+- Web: add `apps/web/app/documents/[artifactId]/route.ts` and a server-only artifact resolver/response helper, extend the current document list with safe preview/download links, and add fictional route/browser tests. Applicable local Next.js 16 route-handler, dynamic-route, cookies, and headers guidance must be read before implementation.
+- Operations: flatten `release:check` so E2E executes before the post-browser privacy audit and release summary. Keep individual scripts and CI checks. Update the existing private smoke to use the new reprocess path and current generation binding; it remains offline and outputs safe counts/status only.
+- Documentation: record implementation/results here and update the existing PR #10 body with exact final counts after all checks.
+
+No new production dependency or migration is planned. Expected files are confined to the packages/services/routes/scripts/tests directly implicated above. A genuine need for schema 0003, `OTHER`, ambiguous real source reconstruction, or additional source/runner authority is a stop condition requiring a new reviewed design rather than scope expansion.
+
+### Security, privacy, and failure risks
+
+Primary risks are reconstructing the wrong stored segment, strengthening an unknown expiry/duplicate state, mixing profile file bytes with the wrong database version, serving a path outside private storage, digest/time-of-check drift, redirect prefix collision, accidentally rewriting applied migration 0002, or compiling private values into test/build artifacts. Controls are exact stored identifiers and hashes, Zod boundaries, SQLite transactions/prepared statements, immutable version rows, fail-closed stable codes, create-new files, realpath confinement, post-open digest verification, loopback/session enforcement, no-store/nosniff headers, fictional browser data, and post-browser canary scanning. Tests and tooling must never print private values. No real screenshot, video, trace, source request, or employer interaction is permitted.
+
+### Testing and acceptance strategy
+
+- Unit/repository: stable profile hashing/reactivation A -> B -> A; stale profile/evaluation generation refusal; approval/packet invalidation; evidence carry-forward and owner evidence; Melbourne VIC -> Sydney NSW structure; packet ACTIVE/EXPIRED/UNKNOWN and duplicate resolved/unresolved/unknown; runtime type alignment; Lever exact/sibling/redirect path boundaries; document route ID/path/session/digest/content-type/disposition safety.
+- Integration: actual migrations 0000/0001/0002 plus actual import repository flow for new user content, unchanged repeat, explicitly changed update, observation/version/evidence/evaluation linkage, private profile provenance, demo non-evaluation, missing-profile no-fallback, and offline legacy reprocess history preservation.
+- Browser: fictional draft PDF inline/open/download and PDF/DOCX downloads through the local artifact-ID route; no arbitrary path; current UI controls remain responsive and submission-disabled. No real artifact is captured.
+- Full gates: format, lint, typecheck, unit, integration, build, E2E, audits, post-browser privacy, doctor, database status, quality, preflight, flattened release check, diff check, strict fsck, owned local start/stop/closed port, and exact-head GitHub CI.
+- Private closure only after synthetic gates: stop owned app, create/verify a fresh consistent backup without deleting older backups, perform exactly one stored-ID offline legacy reprocess, verify old/new versions/evidence/current extractor/current profile binding/integrity/FKs with safe counts, generate/verify/approve new PDF+DOCX, preserve actual cover-letter state, prepare one new review-required packet without fake submission, and repeat the full private publication audit.
+
+Acceptance requires every enumerated human-review finding to pass, schema v2 with zero pending migrations/integrity PASS/zero FK issues, real source calls and employer/application actions all zero, no private material in Git/build/test/CI inputs, PR #10 updated to and green at the new exact head, and PR #10 left open/unmerged. Rollback is by focused commit revert plus restoration from the newly verified backup if the private reprocess fails; never delete history or down-migrate.
+
+### Exact implementation order
+
+1. Commit this remediation blueprint before application changes.
+2. Implement stable profile hashing/reactivation and current tuple validation with fictional repository tests.
+3. Implement offline stored-ID legacy reprocessing and the full schema-v2 import/reprocess integration matrix.
+4. Fix correction evidence/location carry-forward and packet expiry/duplicate truth, with regressions.
+5. Align document types and harden Lever path-segment validation/redirect tests.
+6. Implement the local artifact-ID serving route and fictional unit/browser tests after reading bundled Next.js guidance.
+7. Make `release:check` include E2E followed by privacy, and update operational tests/scripts without weakening CI.
+8. Run every synthetic/full local gate. Stop and fix all failures before private work.
+9. Create and verify a fresh private backup; perform one offline real vacancy reprocess and one current document/packet refresh; verify safe counts/integrity/FKs and zero external actions.
+10. Run the final privacy/publication matrix, commit by concern, push the same branch, update PR #10's body to actual results, wait for exact-head CI, and stop unmerged for ChatGPT re-review.
