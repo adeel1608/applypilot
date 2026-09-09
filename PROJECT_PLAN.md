@@ -1,13 +1,13 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/r2a-evidence-normalization`
+Working branch: `feat/r2-matching-quality`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: PR #11 was corrected, exact-head CI passed, and it merged as `78dc90e133f9ce39e8a651e4f975e698543b891c`. The current `feat/r2a-evidence-normalization` branch implements R2A and is awaiting its final unmerged implementation PR review. Manual-intake Personal Beta remains `READY`; R2B, R2C, and R2D remain `NOT_IMPLEMENTED`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #12 passed final human review at exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa` and merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. The current `feat/r2-matching-quality` branch starts from that clean merged main and is authorised to implement R2B, R2C, and R2D as one coherent train. R2A is `READY`; Manual-intake Personal Beta remains `READY`; R2B, R2C, and R2D are `IN_PROGRESS`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -2771,3 +2771,69 @@ Current release state remains deliberately bounded:
 - R2D: `NOT_IMPLEMENTED`.
 - Source-enabled Personal Beta: `WAITING_FOR_APPROVED_TENANT`; capability count 0.
 - Personal Live V1: `NOT_READY`; real runner `TARGET_APPROVAL_REQUIRED`.
+
+# R2B + R2C + R2D matching quality implementation - 2026-09-09
+
+Status: `IN_PROGRESS`. PR #12 was reverified open, unmerged, mergeable, and clean at the human-approved exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa`; both exact-head GitHub Actions quality checks were successful. Its body was updated with the final 3.1.0 metadata without changing the Git head. PR #12 then merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. Local `main` was fast-forwarded and verified equal to `origin/main`; `feat/r2-matching-quality` was created from that exact merge.
+
+## Current state, objective, and assumptions
+
+R2A 3.1.0 and immutable migration 0003 are merged and privately verified. The compatibility eligibility and fit engines remain version 1.0.0 and consume optimistic legacy `Job` projections rather than current R2A evidence. The current scorer can subtract commute points when the candidate maximum is unverified and can recommend `REVIEW_REQUIRED` work. Existing duplicate comparison is pure and conservative but is not durably connected to owner decisions. The Beta repository has mutable queue projection plus basic duplicate/correction/version tables, but lacks immutable R2 decision snapshots, current evidence/evaluation bindings, durable candidate-pair decisions, calibration metadata, and correction-aware parser replay.
+
+The objective is to complete R2B eligibility and verified-only scoring, R2C duplicate/correction/queue/audit lifecycle, and R2D fictional calibration framework plus evidence-first UX in one reviewable train. The implementation must remain deterministic, local-first, candidate-truth-bound, and source-neutral. It must preserve every source observation and historical evaluation, keep ambiguous evidence reviewable, label ranking `UNCALIBRATED` until the private threshold is genuinely met, and leave the final implementation PR open and unmerged.
+
+Assumptions: migration 0003 and all earlier migrations are immutable; the next schema version is 4 and any required change is additive migration 0004; the existing private database is schema v3 and will not be touched until all synthetic gates pass; the current private source material and owner corrections remain local/ignored; no source tenant is approved; no employer target or real runner is approved; and no network, external upload, form visit, or submission is permitted. A parser upgrade after an owner correction must reconstruct from immutable source and replay only provenance-valid current correction operations.
+
+## Requirements, architecture, and data flow
+
+- Add closed R2 evaluation schemas with explicit `LEGAL_LIMIT | EMPLOYER_REQUIREMENT | CANDIDATE_PREFERENCE` reason classes, evidence state/modality/coverage inputs, candidate verification state, and job/profile/evaluation/scorer/weight versions. Material unknown, unresolved conditional, conflict, stale binding, or insufficient coverage yields `REVIEW_REQUIRED`; only a verified deterministic mandatory mismatch can yield employer/legal `INELIGIBLE`.
+- Preserve valid versus unrestricted Australian work rights, weekly versus fortnightly hours, time versus distance commute, licence versus vehicle versus commute, explicit schedule/availability semantics, jurisdiction/expiry uncertainty, and conditional certification state. These dimensions never substitute for one another and the UI states this is not legal advice.
+- Replace score inputs with allowlisted current evidence references. Only current `VERIFIED` candidate facts and current usable `SOURCE_STATED | OWNER_CORRECTED | DERIVED` job evidence may add points. Every contribution stores code, signed points, candidate reference, job evidence reference, evidence class, scorer/weight versions, and safe explanation. Unverified maximum commute contributes zero positive and zero negative points.
+- Recommendation is a separate gate requiring current `ELIGIBLE` evaluation, exact current job/R2/profile/evaluation bindings, no material conflict/conditional/unknown blocker, approved extraction coverage, and score threshold. `REVIEW_REQUIRED` and `INELIGIBLE` are never recommended.
+- Add durable ordered observation-pair candidates and immutable owner decisions for `SUGGESTED | LINKED | REJECTED | SPLIT`, with `DISTINCT` as the no-active-cluster projection. Strong source/tenant/external identity remains idempotent; cross-source link suggestions require canonical application target or requisition identity plus corroboration. Similar prose/title/company alone never links.
+- Add immutable queue decision versions for `REVIEWING | SHORTLISTED | SKIPPED | PREPARING`, each bound to current job, R2 evidence, profile, eligibility, fit, duplicate, and coverage versions plus actor/reason/time. Any changed binding marks the current projection stale and prevents preparation.
+- Complete owner-correction replay as an ordered typed overlay. Correction operations retain actor/reason/changed fields/source-version applicability. Parser reprocess performs `immutable source + applicable current correction chain + current parser`, carries unaffected current source evidence, emits `OWNER_CORRECTED` evidence, retains history, and is a semantic no-op when source/parser/correction state is unchanged. A materially changed source with an unproven correction target stops for applicability review rather than copying a stale value.
+- Replace remaining R2 audit metadata filtering with closed event-specific Zod schemas. Only opaque IDs, enums, versions, reason codes, counts, booleans, and timestamps are allowed; unknown/nested/free-form/private values are rejected.
+- Add a versioned fictional golden corpus across hospitality, retail, administration/reception, warehouse, engineering, robotics, automation, embedded, internship, regulated/licensed, remote, and multi-location cases. Add deterministic ranking, ablation, monotonicity, bounds, and top-k framework metrics. Private row-level labels/results remain ignored and local; public metadata contains only safe aggregate counts.
+- Update `/jobs`, `/jobs/[id]`, and `/dashboard` to expose eligibility class, current/stale bindings, evidence class, blockers/unknowns/conditions/conflicts, coverage, contribution breakdown, calibration, duplicate state, queue freshness, and correction provenance without raw dumps or unnecessary candidate values. Owner link/reject/split, queue, and correction actions remain nonce/session/origin protected.
+
+Data flow:
+
+`immutable observation + current valid correction overlay -> current R2A normalization/version -> R2 evidence eligibility gate -> verified-only versioned fit contributions -> recommendation gate -> duplicate resolution + queue freshness snapshots -> evidence-first owner UI -> downstream document/packet invalidation when any binding changes`
+
+## Proposed files, schema, and dependencies
+
+- Add domain contracts/tests under `packages/eligibility-engine` and `packages/fit-scorer`; retain backward-compatible wrappers only where existing fixture/demo callers require them.
+- Extend `packages/job-normalizer/src/cross-source-dedup.ts` with versioned persistence-ready signals and conservative pair ordering.
+- Add immutable migration `packages/database/drizzle/0004_r2_matching_quality.sql`; extend `packages/database/src/schema.ts`, `beta-repository.ts`, `r2a-repository.ts`, `job-import-repository.ts`, `job-discovery-repository.ts`, and focused tests with evaluation bindings, duplicate candidates/decisions, queue snapshots, calibration aggregates, typed audit, and correction replay.
+- Add fictional `fixtures/r2/manifest.ts` and matching unit/integration tests. Private calibration storage, if present, stays under ignored `data/private/` and never enters Git.
+- Extend `apps/web/lib/beta-workspace.ts`, job/dashboard actions/pages, and shared styles/components after reading the applicable installed Next.js 16 instructions and `apps/web/AGENTS.md` in full.
+- Update database status/migration/preflight/release/private-smoke scripts to schema v4 only if migration 0004 is added; add an explicit R2 private re-evaluation command with exact confirmation and backup, or extend the existing supported private command without creating a second unsafe path.
+- Update R2, eligibility, fit, normalization, threat-model, checklist, README/architecture/security, and this living plan with verified behavior only.
+- Add no AI, network, geocoder, analytics, source, browser-target, or runtime dependency. Use existing Zod, SQLite/Drizzle, Vitest, Next.js, and Playwright facilities.
+
+## Risks, privacy/security, and rollback
+
+Primary risks are false legal/employer certainty, positive points from unverified data, recommendation bypass, unit conflation, false duplicate links, stale queue preparation, stale correction replay, partial transactions, private calibration leakage, broad audit serialization, migration corruption, and misleading UI. Controls are closed schemas, exact current-version bindings, deterministic reason codes, evidence allowlists, atomic append-only writes, conservative review states, pair/applicability provenance, fail-closed typed audit, fictional corpus tests, private-canary audits, and a synthetic-first migration/restore gate.
+
+Candidate/job source values, source excerpts, private labels, documents, paths, answers, cookies, sessions, credentials, URLs with userinfo/query values, and free-form correction reasons never enter Git/CI/audit metadata. Real profile, vacancy, database, backups, artifacts, packet, calibration labels, and quarantine remain ignored/untracked and are not printed. Network request count, employer-form visit count, external upload count, and submission count remain zero.
+
+Rollback before private work is normal commit revert or closing the unmerged branch/PR. New behavior can be disabled by selecting the retained prior engine/weight versions while preserving all observations, evaluations, duplicate decisions, queue decisions, corrections, and audit history. After private migration, recovery uses only the newly verified ignored backup under an explicit reviewed restore confirmation. Never edit migrations 0000-0003, down-migrate destructively, delete local history, or rewrite shared Git history.
+
+## Testing, acceptance criteria, and exact implementation sequence
+
+Synthetic acceptance includes the full class/status/evidence-state/modality matrix; work-right and hour-unit cases; licence/vehicle/commute separation; fixed/flexible/rotating/overnight/weekday/weekend/time/unknown schedules; verified/unverified/stale/conflicting candidate ablation; commute neutrality; recommendation gates; contribution reproducibility; duplicate identity/ambiguity/link/reject/split/replay/history cases; queue binding/staleness/preparation refusal; correction/source/parser applicability and idempotency; audit extra-key/private-canary rejection; schema fresh/v3-upgrade/rollback/restore/history tests; the full fictional golden corpus; ranking/ablation/monotonicity/determinism/bounds/top-k checks; and accessible narrow/zoom/keyboard/long/empty/error/conflict/stale browser states.
+
+R2B/C/D are complete only when all named behavior is implemented, migration 0004 (if needed) preserves history and passes integrity/FKs, the ignored real database is freshly backed up and safely upgraded, one local current private R2 evaluation is appended without tuning, historical evaluations remain queryable, downstream stale state is truthful, every final command passes, one PR named `feat: complete R2 matching quality` has exact-head green CI, and that PR remains open and unmerged. Calibration remains `UNCALIBRATED` unless 30 independently owner-reviewed private jobs across at least four role families and all relevant statuses actually exist.
+
+Exact sequence:
+
+1. Commit this implementation-start blueprint before application code.
+2. Define and test R2B eligibility/scoring contracts and compatibility adapters; implement verified-only scoring and the recommendation gate.
+3. Add migration 0004 plus synthetic fresh/v3-upgrade/history/backup/restore tests, then implement atomic R2 evaluation persistence.
+4. Implement durable duplicate candidates/owner decisions, queue snapshots/staleness, typed correction replay, and closed audit schemas with repository/integration tests.
+5. Build the fictional golden corpus and calibration framework; pass ranking, ablation, monotonicity, determinism, bounds, and top-k tests while reporting `UNCALIBRATED`.
+6. Read the applicable web instructions, implement R2 UI/actions/accessibility, and add fictional browser coverage.
+7. Run the entire synthetic gate: format, lint, typecheck, unit, integration, build, E2E, privacy, full/production audits, migration/restore, golden/ablation/determinism/staleness/duplicate/correction tests, diff check, and strict fsck. Fix every failure before private work.
+8. Stop owned writers; verify private profile/database ignore state, schema/integrity/FKs, and zero network/action authority; create and verify a fresh ignored backup; preview/confirm only migration 0004; append one current local R2 evaluation using current R2A evidence; verify historical preservation and downstream staleness without printing private values.
+9. Update reality documentation and exact safe aggregates; run the complete final command matrix on the committed head; inspect status/diff/privacy/migration hashes; push `feat/r2-matching-quality`; open one unmerged implementation PR; wait for both exact-head CI contexts and fix any failure on the same branch.
