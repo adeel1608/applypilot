@@ -40,6 +40,8 @@ const nullableHttpsUrl = z
 export const ParsedJobFieldsSchema = z.object({
   externalId: z.string().min(1).max(2048).nullable(),
   sourceUrl: nullableHttpsUrl,
+  applicationUrl: nullableHttpsUrl.default(null),
+  requisitionId: nullableField.default(null),
   title: nullableField,
   company: nullableField,
   location: nullableField,
@@ -147,6 +149,8 @@ export const JobFieldEditsSchema = z
   .object({
     externalId: nullableField.optional(),
     sourceUrl: nullableHttpsUrl.optional(),
+    applicationUrl: nullableHttpsUrl.optional(),
+    requisitionId: nullableField.optional(),
     title: nullableField.optional(),
     company: nullableField.optional(),
     location: nullableField.optional(),

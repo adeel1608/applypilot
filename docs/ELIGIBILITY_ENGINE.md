@@ -1,6 +1,6 @@
 # Eligibility Engine
 
-Status: deterministic Beta rules are implemented; the class/state-complete R2 contract is planned in [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: deterministic Beta compatibility rules and R2 eligibility engine 2.0.0 are implemented. R2 consumes current R2A 3.1.0 evidence and is pending review in the unmerged matching-quality implementation PR. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Contract
 
@@ -22,7 +22,7 @@ Every reason contains a stable code, severity, human message, job fields, profil
 
 A missing mandatory licence/qualification is a blocker only when negative truth explicitly says it is not held. Otherwise it is unconfirmed and needs review. This implements “unknown is not true” without incorrectly declaring every incomplete profile ineligible.
 
-R2B makes class semantics strict: verified legal/employer-required conflicts may block; material unknown/conditional/conflicting evidence requires review; employer preferences do not block; candidate preferences cannot label the candidate legally or employer-ineligible. An explicit owner hard constraint receives its own `OWNER_CONSTRAINT_MISMATCH` meaning. A fit score never overrides blocker, review, stale, conflict, or low-coverage state.
+R2B makes class semantics strict: verified legal/employer-required conflicts may block; material unknown/conditional/conflicting evidence requires review; employer preferences do not block; candidate preferences cannot label the candidate legally or employer-ineligible. A fit score never overrides blocker, review, stale, conflict, or low-coverage state. Work-right results are explicitly not legal advice.
 
 ## Testing matrix
 

@@ -10,6 +10,7 @@ import { normalizeText, VerificationStatus } from "@applypilot/shared";
 import type { EvaluationEvidenceClass } from "./types";
 
 export * from "./types";
+export * from "./r2";
 
 export const ELIGIBILITY_ENGINE_VERSION = "1.0.0";
 

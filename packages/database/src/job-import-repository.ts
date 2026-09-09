@@ -35,6 +35,7 @@ import {
 
 import { BetaRepository } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
+import { R2Repository } from "./r2-repository";
 
 const tokenLifetimeMs = 30 * 60 * 1000;
 const selectionSchema = z.object({
@@ -221,6 +222,8 @@ function normalizeImportedJob(
         manuallyEditedFields: provenance.editedFields,
       },
       coverLetterRequired: fields.coverLetterRequired,
+      applicationUrl: fields.applicationUrl,
+      requisitionId: fields.requisitionId,
       requirementEvidence: fields.beta?.requirementEvidence ?? [],
       extractionCoverage: fields.beta?.extractionCoverage ?? null,
       documentRequirementStates: fields.beta?.documentRequirements ?? {
@@ -428,17 +431,32 @@ export class JobImportRepository {
       })
     ).map((evidence) => ({ ...evidence, sourceObservationId }));
     if (!fields.beta?.r2a) throw new Error("R2A_NORMALIZATION_MISSING");
-    const r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
+    let r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
+    let currentJob = reprocessed;
+    const r2 = new R2Repository(this.sqlite, this.now);
+    if (r2.available()) {
+      const replay = r2.replayCorrectionOverlay({
+        jobId: id,
+        sourceObservationId,
+        job: reprocessed,
+        normalization: r2aNormalization,
+      });
+      if (replay.state === "REVIEW_REQUIRED") {
+        throw new Error("R2_CORRECTION_APPLICABILITY_REVIEW_REQUIRED");
+      }
+      currentJob = replay.job;
+      r2aNormalization = replay.normalization;
+    }
     const beta = new BetaRepository(this.sqlite, this.now);
     if (!provider) {
       const transition = this.sqlite.transaction(() => {
         const recorded = beta.recordJobVersion({
-          job: reprocessed,
+          job: currentJob,
           sourceObservationId,
           requirementEvidence,
           r2aNormalization,
         });
-        if (recorded.created) this.updateJob(reprocessed, now);
+        if (recorded.created) this.updateJob(currentJob, now);
         const activeProfile = this.sqlite
           .prepare(
             "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
@@ -473,9 +491,9 @@ export class JobImportRepository {
       };
     }
     const recorded = this.sqlite.transaction(() => {
-      this.updateJob(reprocessed, now);
+      this.updateJob(currentJob, now);
       return beta.recordJobVersion({
-        job: reprocessed,
+        job: currentJob,
         sourceObservationId,
         requirementEvidence,
         r2aNormalization,
@@ -1191,6 +1209,75 @@ export class JobImportRepository {
         input.parserVersion,
         previous?.id ?? null,
       );
+    const r2 = new R2Repository(this.sqlite, this.now);
+    if (r2.available()) {
+      const applicationUrl =
+        typeof input.job.sourceMetadata.applicationUrl === "string" &&
+        input.job.sourceMetadata.applicationUrl
+          ? input.job.sourceMetadata.applicationUrl
+          : null;
+      const requisitionId =
+        typeof input.job.sourceMetadata.requisitionId === "string" &&
+        input.job.sourceMetadata.requisitionId
+          ? input.job.sourceMetadata.requisitionId
+          : null;
+      const candidates = this.sqlite
+        .prepare(
+          `SELECT o.id AS observationId, o.source, o.tenant, o.external_id AS externalId,
+             j.normalized_json AS normalizedJson
+           FROM source_observations o JOIN jobs j ON j.id = o.job_id
+           WHERE o.id <> ? ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 200`,
+        )
+        .all(observationId) as Array<{
+        observationId: string;
+        source: string;
+        tenant: string | null;
+        externalId: string | null;
+        normalizedJson: string;
+      }>;
+      for (const candidate of candidates) {
+        const other = JobSchema.parse(JSON.parse(candidate.normalizedJson));
+        const otherRequisition =
+          typeof other.sourceMetadata.requisitionId === "string" &&
+          other.sourceMetadata.requisitionId
+            ? other.sourceMetadata.requisitionId
+            : null;
+        r2.suggestDuplicate(
+          {
+            observationId,
+            source: input.source,
+            tenant: null,
+            externalId: input.externalId,
+            applicationUrl,
+            requisitionId,
+            company: input.job.company,
+            title: input.job.title,
+            location: input.job.location,
+            employmentType: input.job.employmentType,
+            datePosted: input.job.datePosted,
+            description: input.job.description,
+          },
+          {
+            observationId: candidate.observationId,
+            source: candidate.source,
+            tenant: candidate.tenant,
+            externalId: candidate.externalId,
+            applicationUrl:
+              typeof other.sourceMetadata.applicationUrl === "string" &&
+              other.sourceMetadata.applicationUrl
+                ? other.sourceMetadata.applicationUrl
+                : null,
+            requisitionId: otherRequisition,
+            company: other.company,
+            title: other.title,
+            location: other.location,
+            employmentType: other.employmentType,
+            datePosted: other.datePosted,
+            description: other.description,
+          },
+        );
+      }
+    }
     const requirements = (
       input.requirementEvidence.length > 0
         ? input.requirementEvidence
@@ -1199,11 +1286,26 @@ export class JobImportRepository {
             sourcePath: "description",
           })
     ).map((item) => ({ ...item, sourceObservationId: observationId }));
-    const r2aNormalization = input.r2aNormalization
+    let r2aNormalization = input.r2aNormalization
       ? bindR2ANormalizationObservation(input.r2aNormalization, observationId)
       : undefined;
+    let currentJob = input.job;
+    if (r2.available() && r2aNormalization) {
+      const replay = r2.replayCorrectionOverlay({
+        jobId: input.job.id,
+        sourceObservationId: observationId,
+        job: input.job,
+        normalization: r2aNormalization,
+      });
+      if (replay.state === "REVIEW_REQUIRED") {
+        throw new Error("R2_CORRECTION_APPLICABILITY_REVIEW_REQUIRED");
+      }
+      currentJob = replay.job;
+      r2aNormalization = replay.normalization;
+      if (currentJob !== input.job) this.updateJob(currentJob, input.now);
+    }
     new BetaRepository(this.sqlite, this.now).recordJobVersion({
-      job: input.job,
+      job: currentJob,
       sourceObservationId: observationId,
       requirementEvidence: requirements,
       r2aNormalization,

@@ -82,18 +82,34 @@ describe("JobDiscoveryRepository", () => {
     expect(sqlite.prepare("SELECT COUNT(*) FROM audit_events").pluck().get()).toBe(3);
   });
 
-  it("redacts sensitive metadata keys from audit records", async () => {
-    await repository.recordEvent({
-      eventType: "discovery.run.started",
-      runId: "3b57ce65-85fb-4265-9296-b55043c17891",
-      occurredAt: fixedNow().toISOString(),
-      metadata: { mode: "FIXTURE_ONLY", rawContent: "must-not-persist", tokenValue: "nope" },
-    });
-    const metadata = sqlite
-      .prepare("SELECT redacted_metadata_json FROM audit_events")
-      .pluck()
-      .get() as string;
-    expect(JSON.parse(metadata)).toEqual({ mode: "FIXTURE_ONLY" });
+  it("rejects non-allowlisted audit metadata instead of attempting broad redaction", async () => {
+    await expect(
+      repository.recordEvent({
+        eventType: "discovery.run.started",
+        runId: "3b57ce65-85fb-4265-9296-b55043c17891",
+        occurredAt: fixedNow().toISOString(),
+        metadata: {
+          mode: "FIXTURE_ONLY",
+          resumed: false,
+          queryHash: "a".repeat(64),
+          privateCanary: "candidate-private-canary",
+        },
+      }),
+    ).rejects.toThrow();
+    expect(sqlite.prepare("SELECT count(*) FROM audit_events").pluck().get()).toBe(0);
+
+    await expect(
+      repository.recordEvent({
+        eventType: "discovery.security_stopped",
+        runId: "3b57ce65-85fb-4265-9296-b55043c17891",
+        occurredAt: fixedNow().toISOString(),
+        metadata: {
+          code: "AUTH_REQUIRED",
+          diagnosticCode: "AUTH_WALL",
+          sourceReference: "https://user:password@example.test/path?token=private",
+        },
+      }),
+    ).rejects.toThrow();
   });
 
   it("rolls back job writes when checkpoint validation fails", async () => {

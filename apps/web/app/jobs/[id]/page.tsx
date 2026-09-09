@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   approveDocumentAction,
   correctJobAction,
+  decideDuplicateAction,
   generateCoverLetterAction,
   generateCvAction,
   preparePacketAction,
@@ -59,6 +60,9 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
   const approvalNonces = await Promise.all(
     detail.documents.map(() => issueLocalMutationNonce("DOCUMENT_APPROVE", path)),
   );
+  const duplicateNonces = await Promise.all(
+    detail.duplicateCandidates.map(() => issueLocalMutationNonce("DUPLICATE_DECIDE", path)),
+  );
   const { job } = detail;
   const currentCvTemplate = detail.documents.find(
     ({ type, stale }) => type === "CV" && !stale,
@@ -86,7 +90,13 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               <span className="source-pill">Evaluation required</span>
             )}
             <span className="source-pill">Queue: {detail.queueState ?? "Not reviewed"}</span>
+            {detail.queueFreshness && (
+              <span className="source-pill">Queue freshness: {detail.queueFreshness}</span>
+            )}
             {detail.evaluationStale && <span className="source-pill">Stale evaluation</span>}
+            {detail.calibrationState && (
+              <span className="source-pill">Scoring: {detail.calibrationState}</span>
+            )}
           </div>
         </div>
         {detail.fitScore === null ? (
@@ -119,24 +129,117 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
         </form>
       </section>
 
+      <section className="panel" aria-labelledby="duplicate-review-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Durable duplicate review</span>
+            <h2 id="duplicate-review-heading">Owner link, reject, or split</h2>
+          </div>
+          <span className="source-pill">{detail.duplicateCandidates.length} candidates</span>
+        </div>
+        <p>
+          Every source observation remains immutable. Similar text never auto-links a job, and each
+          owner decision is versioned and reversible.
+        </p>
+        {detail.duplicateCandidates.length ? (
+          <div className="job-list">
+            {detail.duplicateCandidates.map((candidate, index) => (
+              <article className="job-row job-row--wrap" key={candidate.id}>
+                <div className="job-row__main evidence-safe-wrap">
+                  <h3>{candidate.state.replaceAll("_", " ")}</h3>
+                  <p>
+                    Observations {candidate.leftObservationId} and {candidate.rightObservationId}
+                  </p>
+                  <p>Matched: {candidate.matchedSignals.join(", ") || "none"}</p>
+                  <p>Conflicting: {candidate.conflictingSignals.join(", ") || "none"}</p>
+                  {candidate.decisionReason && (
+                    <p>Latest reason: {candidate.decisionReason.replaceAll("_", " ")}</p>
+                  )}
+                </div>
+                <form
+                  action={decideDuplicateAction}
+                  aria-label={`Decide duplicate ${candidate.id}`}
+                >
+                  <input type="hidden" name="mutationNonce" value={duplicateNonces[index]} />
+                  <input type="hidden" name="jobId" value={job.id} />
+                  <input type="hidden" name="candidateId" value={candidate.id} />
+                  {candidate.state === "SUGGESTED" && (
+                    <>
+                      <button
+                        className="button button--secondary"
+                        name="duplicateDecision"
+                        value="LINKED"
+                      >
+                        Link
+                      </button>
+                      <button
+                        className="button button--quiet"
+                        name="duplicateDecision"
+                        value="REJECTED"
+                      >
+                        Keep distinct
+                      </button>
+                    </>
+                  )}
+                  {candidate.state === "LINKED" && (
+                    <button
+                      className="button button--secondary"
+                      name="duplicateDecision"
+                      value="SPLIT"
+                    >
+                      Split safely
+                    </button>
+                  )}
+                  {(candidate.state === "REJECTED" || candidate.state === "SPLIT") && (
+                    <button
+                      className="button button--secondary"
+                      name="duplicateDecision"
+                      value="LINKED"
+                    >
+                      Link after review
+                    </button>
+                  )}
+                </form>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p>No cross-source duplicate candidate is awaiting review.</p>
+        )}
+      </section>
+
       <section className="detail-grid">
         <article className="panel">
           <span className="section-kicker">Evaluation version</span>
           <h2>{detail.eligibilityStatus?.replaceAll("_", " ") ?? "Not evaluated"}</h2>
-          {detail.coverage && (
+          {detail.coveragePercent !== null && (
             <p>
-              Coverage {detail.coverage.percent}% · {detail.coverage.confidence.toLowerCase()}{" "}
-              confidence
+              Current extraction coverage {detail.coveragePercent}% · recommendation{" "}
+              {detail.recommended ? "available" : "blocked"}
             </p>
           )}
           {detail.coverage?.missingDimensions.length ? (
             <p>Missing or ambiguous: {detail.coverage.missingDimensions.join(", ")}</p>
           ) : null}
+          <p>
+            Material unresolved: {detail.unresolvedUnknownCount} unknown ·{" "}
+            {detail.unresolvedConditionCount} conditional · {detail.unresolvedConflictCount}{" "}
+            conflicting.
+          </p>
           <ul className="reason-list">
             {detail.eligibilityReasons.map((reason) => (
-              <li key={`${reason.code}-${reason.message}`}>
+              <li
+                key={`${reason.code}-${
+                  "message" in reason ? reason.message : reason.safeExplanation
+                }`}
+              >
                 <strong>{reason.code.replaceAll("_", " ")}</strong>
-                <span>{reason.message}</span>
+                <span>
+                  {"evidenceClass" in reason && reason.evidenceClass
+                    ? `${reason.evidenceClass.replaceAll("_", " ")} · `
+                    : ""}
+                  {"message" in reason ? reason.message : reason.safeExplanation}
+                </span>
               </li>
             ))}
           </ul>
@@ -151,9 +254,21 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
           <h2>{detail.fitScore === null ? "Unavailable" : `${detail.fitScore} / 100`}</h2>
           <ul className="plain-reasons">
             {detail.fitContributions.map((contribution) => (
-              <li key={`${contribution.category}-${contribution.explanation}`}>
+              <li
+                key={`${"code" in contribution ? contribution.code : contribution.category}-${
+                  "safeExplanation" in contribution
+                    ? contribution.safeExplanation
+                    : contribution.explanation
+                }`}
+              >
                 {contribution.points > 0 ? "+" : ""}
-                {contribution.points} · {contribution.explanation}
+                {contribution.points} ·{" "}
+                {"safeExplanation" in contribution
+                  ? contribution.safeExplanation
+                  : contribution.explanation}
+                {"evidenceClass" in contribution
+                  ? ` · ${contribution.evidenceClass.replaceAll("_", " ")}`
+                  : ""}
               </li>
             ))}
           </ul>
@@ -168,7 +283,11 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
             </div>
             <div>
               <dt>Duplicate review</dt>
-              <dd>{detail.duplicateState?.replaceAll("_", " ") ?? "No cluster suggested"}</dd>
+              <dd>
+                {detail.duplicateState === "REJECTED"
+                  ? "Distinct (owner rejected link)"
+                  : (detail.duplicateState?.replaceAll("_", " ") ?? "No candidate suggested")}
+              </dd>
             </div>
             <div>
               <dt>Next action</dt>
@@ -232,8 +351,221 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               Category
               <input name="category" defaultValue={job.category} required maxLength={300} />
             </label>
+            <label>
+              Employment type
+              <select name="employmentType" defaultValue={job.employmentType}>
+                {["CASUAL", "PART_TIME", "FULL_TIME", "CONTRACT", "INTERNSHIP", "UNKNOWN"].map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {value.replaceAll("_", " ")}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <fieldset>
+              <legend>Salary</legend>
+              <label>
+                Minimum
+                <input
+                  name="salaryMinimum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.salary?.minimum ?? ""}
+                />
+              </label>
+              <label>
+                Maximum
+                <input
+                  name="salaryMaximum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.salary?.maximum ?? ""}
+                />
+              </label>
+              <label>
+                Currency
+                <input
+                  name="salaryCurrency"
+                  pattern="[A-Za-z]{3}"
+                  maxLength={3}
+                  defaultValue={job.salary?.currency ?? "AUD"}
+                />
+              </label>
+              <label>
+                Period
+                <select name="salaryPeriod" defaultValue={job.salary?.period ?? "YEAR"}>
+                  {["HOUR", "WEEK", "FORTNIGHT", "MONTH", "YEAR"].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
+            <fieldset>
+              <legend>Hours (units remain separate)</legend>
+              <label>
+                Weekly minimum
+                <input
+                  name="hoursPerWeekMinimum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.hoursPerWeek?.minimum ?? ""}
+                />
+              </label>
+              <label>
+                Weekly maximum
+                <input
+                  name="hoursPerWeekMaximum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.hoursPerWeek?.maximum ?? ""}
+                />
+              </label>
+              <label>
+                Fortnightly minimum
+                <input
+                  name="hoursPerFortnightMinimum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.hoursPerFortnight?.minimum ?? ""}
+                />
+              </label>
+              <label>
+                Fortnightly maximum
+                <input
+                  name="hoursPerFortnightMaximum"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={job.hoursPerFortnight?.maximum ?? ""}
+                />
+              </label>
+            </fieldset>
+            <fieldset>
+              <legend>Schedule</legend>
+              <label>
+                Roster type
+                <select name="rosterType" defaultValue={job.schedule.rosterType ?? "UNKNOWN"}>
+                  {["FIXED", "VARIABLE", "FLEXIBLE", "UNKNOWN"].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Explicit day
+                <select name="scheduleDay" defaultValue={job.schedule.shifts[0]?.day ?? ""}>
+                  <option value="">Not specified</option>
+                  {[
+                    "MONDAY",
+                    "TUESDAY",
+                    "WEDNESDAY",
+                    "THURSDAY",
+                    "FRIDAY",
+                    "SATURDAY",
+                    "SUNDAY",
+                  ].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Start time
+                <input
+                  name="scheduleStart"
+                  type="time"
+                  defaultValue={job.schedule.shifts[0]?.startTime ?? ""}
+                />
+              </label>
+              <label>
+                End time
+                <input
+                  name="scheduleEnd"
+                  type="time"
+                  defaultValue={job.schedule.shifts[0]?.endTime ?? ""}
+                />
+              </label>
+            </fieldset>
+            <label>
+              Work-right requirement
+              <select name="workRightsRequirement" defaultValue={job.workRightsRequirement}>
+                {["VALID_AUSTRALIA", "UNRESTRICTED_AUSTRALIA", "NOT_SPECIFIED", "UNKNOWN"].map(
+                  (value) => (
+                    <option key={value}>{value.replaceAll("_", " ")}</option>
+                  ),
+                )}
+              </select>
+            </label>
+            <label>
+              Vehicle requirement
+              <select name="vehicleRequirement" defaultValue={job.vehicleRequirement}>
+                {["REQUIRED", "NOT_REQUIRED", "UNKNOWN"].map((value) => (
+                  <option key={value}>{value.replaceAll("_", " ")}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Cover letter
+              <select
+                name="coverLetterState"
+                defaultValue={
+                  job.documentRequirements.coverLetterRequired ? "REQUIRED" : "NOT_REQUIRED"
+                }
+              >
+                <option value="REQUIRED">Required</option>
+                <option value="NOT_REQUIRED">Not required</option>
+              </select>
+            </label>
+            <label>
+              Required employer statements (one per line)
+              <textarea
+                name="requirementsText"
+                rows={4}
+                defaultValue={job.requirements.join("\n")}
+                maxLength={10000}
+              />
+            </label>
+            <label>
+              Preferred employer statements (one per line)
+              <textarea
+                name="preferredRequirementsText"
+                rows={3}
+                defaultValue={job.preferredRequirements.join("\n")}
+                maxLength={10000}
+              />
+            </label>
+            <label>
+              Required skills (one per line)
+              <textarea
+                name="requiredSkillsText"
+                rows={3}
+                defaultValue={job.requiredSkills.join("\n")}
+                maxLength={10000}
+              />
+            </label>
+            <p>
+              Saving creates an immutable version, records typed owner-corrected evidence, and
+              invalidates affected evaluations, documents, packets, and queue readiness.
+            </p>
             <button className="button button--secondary">Save correction and re-evaluate</button>
           </form>
+          <h3>Correction provenance</h3>
+          {detail.corrections.length ? (
+            <ul className="plain-reasons evidence-safe-wrap">
+              {detail.corrections.map((correction) => (
+                <li key={correction.id}>
+                  {correction.actor} · {correction.reasonCode.replaceAll("_", " ")} ·{" "}
+                  {correction.changedFields.join(", ")} · {correction.createdAt}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No owner correction has been recorded.</p>
+          )}
         </article>
       </section>
 
@@ -252,8 +584,8 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
           </span>
         </div>
         <p>
-          This evidence contract is separate from the existing fit and eligibility engine. It does
-          not make R2B rule outcomes or candidate eligibility claims.
+          R2B consumes only the current version of this contract. Unknown, conditional, and
+          conflicting material evidence cannot become a positive match or recommendation.
         </p>
         <dl className="fact-list compact-facts">
           {detail.jobVersions.map((version) => (
@@ -472,7 +804,7 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
                         >
                           Open PDF preview
                         </a>{" "}
-                        Â·{" "}
+                        ·{" "}
                       </>
                     )}
                     <a

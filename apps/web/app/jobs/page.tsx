@@ -181,6 +181,8 @@ export default async function JobsPage({
                 <th>Type</th>
                 <th>Eligibility</th>
                 <th>Fit</th>
+                <th>Evidence health</th>
+                <th>Duplicate</th>
                 <th>Queue</th>
               </tr>
             </thead>
@@ -215,7 +217,27 @@ export default async function JobsPage({
                     )}
                   </td>
                   <td>
+                    <span className="action-label">
+                      {job.coveragePercent === null
+                        ? "Coverage unavailable"
+                        : `${job.coveragePercent}% coverage`}
+                    </span>
+                    <span>
+                      {job.unknownRequirementCount} unknown · {job.unresolvedConditionCount}{" "}
+                      conditional · {job.unresolvedConflictCount} conflicting
+                    </span>
+                    {job.calibrationState && <span>{job.calibrationState}</span>}
+                  </td>
+                  <td>
+                    <span className="action-label">
+                      {job.duplicateState === "REJECTED"
+                        ? "DISTINCT"
+                        : (job.duplicateState?.replaceAll("_", " ") ?? "CLEAR")}
+                    </span>
+                  </td>
+                  <td>
                     <span className="action-label">{ownerQueueLabel(job)}</span>
+                    {job.queueFreshness && <span>{job.queueFreshness}</span>}
                   </td>
                 </tr>
               ))}
@@ -248,6 +270,8 @@ export default async function JobsPage({
                       <ScoreBadge score={job.fitScore} compact />
                     )}
                   </td>
+                  <td>Unavailable</td>
+                  <td>Unknown</td>
                   <td>
                     <span className="action-label">Migrate to Beta</span>
                   </td>

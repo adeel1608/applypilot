@@ -1,6 +1,14 @@
 # R2 matching quality implementation blueprint
 
-Status: `R2A_IMPLEMENTED_AWAITING_HUMAN_REVIEW`; R2B, R2C, and R2D remain `NOT_IMPLEMENTED`.
+Status: `R2A_READY`; `R2B_READY`; `R2C_READY`; `R2D_SOFTWARE_READY`; calibration remains `UNCALIBRATED` pending the approved private sample threshold. The implementation is on `feat/r2-matching-quality` pending exact-head CI and human review of one unmerged PR.
+
+## R2B + R2C + R2D implementation result - 2026-09-09
+
+PR #12 merged at `3789b7001ae95a14965a70e630b9085910e159e8`, preserving immutable R2A migration 0003 and parser/evidence contract 3.1.0. R2B eligibility engine 2.0.0 now classifies legal limits, employer requirements, and candidate preferences independently; preserves valid versus unrestricted rights and weekly versus fortnightly units; handles explicit fixed, flexible, rotating, on-call, overnight, weekday, and weekend schedules conservatively; and routes material unknown, conditional, conflicting, stale, or sparse evidence to review. R2 scorer 2.0.0 / weights `r2-weights-1` permits positive points only from current verified candidate facts and current usable job evidence. Unverified commute limits contribute zero in either direction, time and distance stay separate, and recommendation requires every current eligibility/evidence/coverage/score gate.
+
+Additive migration `0004_r2_matching_quality.sql` persists immutable R2 evaluations, conservative cross-source duplicate candidates and owner decisions, version-bound queue decisions/freshness, typed correction applicability bindings, calibration aggregates, and closed typed audit events. Source reprocessing now reconstructs from immutable input and replays only provenance-valid owner corrections; a material source change requires applicability review. Owner link/reject/split actions preserve every observation, and changed evaluation/correction/duplicate inputs stale readiness and invalidate affected document/packet state.
+
+The public fictional corpus covers 12 role families and every requested eligibility, evidence-health, duplicate, and ordinal class. Determinism, bounds, monotonicity, ablation, top-k, migration/backup/restore/history, duplicate, correction-replay, staleness, audit-canary, responsive, zoom, keyboard, empty, conflict, stale, and error paths passed. The ignored real database was backed up at schema v3, migrated to schema v4 with integrity/FKs clean, backed up again before mutation, and received one current local R2 evaluation while preserving two legacy evaluations and all historical rows. Safe aggregates: one current R2 evaluation; `REVIEW_REQUIRED`; not recommended; 71% coverage; 3 material unknowns; 3 material conditions; 0 conflicts; calibration `UNCALIBRATED` with 0 private reviewed labels across 0 role families/statuses. Four historical documents are stale and two packets invalidated. No private value was published and real source calls, employer-form visits, uploads, and submissions remained zero.
 
 ## R2A implementation result - 2026-09-09
 

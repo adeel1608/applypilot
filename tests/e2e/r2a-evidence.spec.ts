@@ -9,7 +9,7 @@ test("shows the fictional R2A evidence contract separately from evaluation", asy
   await expect(layer.getByText(/Evidence 3\.1\.0.*normalization 3\.1\.0/)).toBeVisible();
   await expect(layer.getByText(/GEOGRAPHY: PARTIAL/)).toBeVisible();
   await expect(layer.getByText(/WORK RIGHTS: PARTIAL/)).toBeVisible();
-  await expect(layer.getByText(/does not make R2B rule outcomes/)).toBeVisible();
+  await expect(layer.getByText(/R2B consumes only the current version/)).toBeVisible();
   await expect(layer.getByText(/Valid Australian work rights required/)).toBeVisible();
 });
 

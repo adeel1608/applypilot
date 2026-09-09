@@ -4,7 +4,7 @@
 
 Current GitHub visibility is PUBLIC by explicit owner authorisation on 2026-09-07. Historical private-repository checkpoints do not change the current setting. Private profile, real input, SQLite/WAL/backups, personal documents and sessions remain local/ignored. Keep npm `"private": true` unchanged.
 
-The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes implemented Beta controls from remaining V1 gates. Manual-intake Beta now has loopback Host/Origin checks, an HttpOnly SameSite=Strict local session, expiring one-use action-bound nonces, verified-only evaluation/document evidence, immutable audit/version records, private artifact confinement, and tested backup/restore recovery. This does not establish hosted-production or real-target browser readiness.
+The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes implemented Beta controls from remaining V1 gates. Manual-intake Beta now has loopback Host/Origin checks, an HttpOnly SameSite=Strict local session, expiring one-use action-bound nonces, verified-only R2 evaluation/document evidence, event-specific allowlisted audit metadata, immutable evaluation/duplicate/queue/correction history, private artifact confinement, and tested backup/restore recovery. This does not establish hosted-production or real-target browser readiness.
 
 ApplyPilot treats candidate profiles, personal documents, application answers, user-supplied job content, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 2 commits only fictional source fixtures and makes no live job-board requests.
 

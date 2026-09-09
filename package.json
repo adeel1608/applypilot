@@ -39,6 +39,7 @@
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "smoke:private-beta": "tsx scripts/private-beta-smoke.ts",
     "r2a:reprocess-private": "tsx scripts/r2a-reprocess-private.ts",
+    "r2:evaluate-private": "tsx scripts/r2-evaluate-private.ts",
     "audit:production": "npm audit --omit=dev"
   },
   "dependencies": {

@@ -249,6 +249,8 @@ describe("real-world job importer", () => {
         {
           externalId: null,
           sourceUrl: null,
+          applicationUrl: null,
+          requisitionId: null,
           title: "Role",
           company: "Company",
           location: "Sydney",

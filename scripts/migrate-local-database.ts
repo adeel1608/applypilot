@@ -121,13 +121,21 @@ async function main(): Promise<void> {
         ),
       );
     }
-    if (version < CURRENT_DATABASE_SCHEMA_VERSION) {
+    if (version < 3) {
       sqlite.exec(
         readFileSync(
           new URL(
             "../packages/database/drizzle/0003_r2a_evidence_normalization.sql",
             import.meta.url,
           ),
+          "utf8",
+        ),
+      );
+    }
+    if (version < CURRENT_DATABASE_SCHEMA_VERSION) {
+      sqlite.exec(
+        readFileSync(
+          new URL("../packages/database/drizzle/0004_r2_matching_quality.sql", import.meta.url),
           "utf8",
         ),
       );

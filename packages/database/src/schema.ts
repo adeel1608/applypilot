@@ -542,6 +542,135 @@ export const jobQueueEntries = sqliteTable("job_queue_entries", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const r2EvaluationVersions = sqliteTable("r2_evaluation_versions", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "restrict" }),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id, { onDelete: "restrict" }),
+  evidenceContractVersion: text("evidence_contract_version").notNull(),
+  normalizationVersion: text("normalization_version").notNull(),
+  coverageVersion: text("coverage_version").notNull(),
+  eligibilityStatus: text("eligibility_status").notNull(),
+  eligibilityReasonsJson: text("eligibility_reasons_json").notNull(),
+  fitScore: integer("fit_score").notNull(),
+  fitContributionsJson: text("fit_contributions_json").notNull(),
+  eligibilityEngineVersion: text("eligibility_engine_version").notNull(),
+  fitScorerVersion: text("fit_scorer_version").notNull(),
+  weightVersion: text("weight_version").notNull(),
+  calibrationState: text("calibration_state").notNull(),
+  recommended: integer("recommended", { mode: "boolean" }).notNull(),
+  coveragePercent: integer("coverage_percent").notNull(),
+  unresolvedUnknownCount: integer("unresolved_unknown_count").notNull(),
+  unresolvedConditionCount: integer("unresolved_condition_count").notNull(),
+  unresolvedConflictCount: integer("unresolved_conflict_count").notNull(),
+  stale: integer("stale", { mode: "boolean" }).notNull().default(false),
+  evaluatedAt: text("evaluated_at").notNull(),
+});
+
+export const r2DuplicateCandidates = sqliteTable("r2_duplicate_candidates", {
+  id: text("id").primaryKey(),
+  leftObservationId: text("left_observation_id")
+    .notNull()
+    .references(() => sourceObservations.id, { onDelete: "restrict" }),
+  rightObservationId: text("right_observation_id")
+    .notNull()
+    .references(() => sourceObservations.id, { onDelete: "restrict" }),
+  detectorVersion: text("detector_version").notNull(),
+  state: text("state").notNull(),
+  matchedSignalsJson: text("matched_signals_json").notNull(),
+  conflictingSignalsJson: text("conflicting_signals_json").notNull(),
+  evidenceDigest: text("evidence_digest").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const r2DuplicateDecisionVersions = sqliteTable("r2_duplicate_decision_versions", {
+  id: text("id").primaryKey(),
+  candidateId: text("candidate_id")
+    .notNull()
+    .references(() => r2DuplicateCandidates.id, { onDelete: "restrict" }),
+  version: integer("version").notNull(),
+  decision: text("decision").notNull(),
+  actor: text("actor").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  evidenceVersion: text("evidence_version").notNull(),
+  supersedesDecisionId: text("supersedes_decision_id"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const r2QueueDecisionVersions = sqliteTable("r2_queue_decision_versions", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "restrict" }),
+  version: integer("version").notNull(),
+  state: text("state").notNull(),
+  freshness: text("freshness").notNull(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id, { onDelete: "restrict" }),
+  r2EvaluationId: text("r2_evaluation_id")
+    .notNull()
+    .references(() => r2EvaluationVersions.id, { onDelete: "restrict" }),
+  evidenceContractVersion: text("evidence_contract_version").notNull(),
+  duplicateResolutionVersion: text("duplicate_resolution_version").notNull(),
+  coverageVersion: text("coverage_version").notNull(),
+  actor: text("actor").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  supersedesDecisionId: text("supersedes_decision_id"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const r2CorrectionOverlayBindings = sqliteTable("r2_correction_overlay_bindings", {
+  id: text("id").primaryKey(),
+  correctionId: text("correction_id")
+    .notNull()
+    .references(() => jobCorrections.id, { onDelete: "restrict" }),
+  targetKind: text("target_kind").notNull(),
+  targetKey: text("target_key").notNull(),
+  sourceObservationId: text("source_observation_id")
+    .notNull()
+    .references(() => sourceObservations.id, { onDelete: "restrict" }),
+  sourceValueDigest: text("source_value_digest").notNull(),
+  correctedValueJson: text("corrected_value_json").notNull(),
+  applicabilityRuleVersion: text("applicability_rule_version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const r2CalibrationRuns = sqliteTable("r2_calibration_runs", {
+  id: text("id").primaryKey(),
+  scorerVersion: text("scorer_version").notNull(),
+  weightVersion: text("weight_version").notNull(),
+  corpusVersion: text("corpus_version").notNull(),
+  fictionalCaseCount: integer("fictional_case_count").notNull(),
+  privateReviewedCount: integer("private_reviewed_count").notNull(),
+  roleFamilyCount: integer("role_family_count").notNull(),
+  statusCount: integer("status_count").notNull(),
+  ordinalAgreementBasisPoints: integer("ordinal_agreement_basis_points").notNull(),
+  topK: integer("top_k").notNull(),
+  topKUtilityBasisPoints: integer("top_k_utility_basis_points").notNull(),
+  state: text("state").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const r2AuditEvents = sqliteTable("r2_audit_events", {
+  id: text("id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  safeMetadataJson: text("safe_metadata_json").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+});
+
 export const documentArtifacts = sqliteTable("document_artifacts", {
   id: text("id").primaryKey(),
   jobId: text("job_id")
@@ -752,6 +881,13 @@ export const schema = {
   calibrationLabels,
   calibrationPairs,
   jobQueueEntries,
+  r2EvaluationVersions,
+  r2DuplicateCandidates,
+  r2DuplicateDecisionVersions,
+  r2QueueDecisionVersions,
+  r2CorrectionOverlayBindings,
+  r2CalibrationRuns,
+  r2AuditEvents,
   documentArtifacts,
   documentApprovals,
   applicationPackets,

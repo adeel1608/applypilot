@@ -33,7 +33,9 @@ export function assertPrivateDatabaseGitIsolation(databasePath: string, root: st
 
 export function assertPrivateR2ADatabasePreflight(sqlite: BetterSqlite3.Database): string {
   const schemaVersion = Number(sqlite.pragma("user_version", { simple: true }));
-  if (schemaVersion !== CURRENT_DATABASE_SCHEMA_VERSION) throw new Error("R2A_SCHEMA_V3_REQUIRED");
+  if (schemaVersion !== CURRENT_DATABASE_SCHEMA_VERSION) {
+    throw new Error("R2A_CURRENT_SCHEMA_REQUIRED");
+  }
   if (sqlite.pragma("integrity_check", { simple: true }) !== "ok") {
     throw new Error("DATABASE_INTEGRITY_FAILED");
   }

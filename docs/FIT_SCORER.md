@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the merged deterministic score is an uncalibrated owner-review aid. The verified-only R2 contract is planned in [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented. R2 remains an `UNCALIBRATED` owner-review ordering aid pending the approved private threshold and review of the unmerged matching-quality PR. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Eligibility answers whether a known hard condition prevents proceeding. Fit scor
 
 ## Deterministic model
 
-`scoreJobFit(job, profile, eligibility)` starts from a neutral baseline and applies bounded contributions for eligibility, preferred location or commute, preferred employment type, verified skill matches, missing skill evidence, experience evidence, education alignment, training, category preference, customer-service relevance, and technical relevance. The merged implementation already filters employment to verified entries and verification-gates preferred location, work-type, category, and the positive within-limit commute branch. Its commute fallback can still subtract points when `maximumCommuteKm` is `USER_CONFIRMATION_REQUIRED` or `UNKNOWN`, and `REVIEW_REQUIRED` can still become recommended at the score threshold; R2B owns both corrections.
+`scoreJobFit(job, profile, eligibility)` remains the compatibility path. `scoreR2JobFit` uses only current evidence-linked inputs: stale candidate bindings and unknown, conditional, conflicting, or unusable job evidence add no contribution. Unverified commute preferences produce no positive or negative points, and R2 recommendation cannot bypass review or ineligibility.
 
 The result contains:
 

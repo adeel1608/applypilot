@@ -6,7 +6,7 @@ ApplyPilot is local-first, deterministic by default, provenance-aware, and human
 
 ## System context
 
-The supported real-data path now covers local import, immutable source/job/evaluation evidence, private-profile eligibility/fit, owner correction, private PDF/DOCX document generation, digest-bound document approval, packet preparation, and durable application tracking. The executable browser runner remains synthetic-test-only; there is no approved real target or submission implementation. The shared server-only root-data resolver makes workspace starts resolve the same ignored root profile/database as validation and migration scripts.
+The supported real-data path now covers local import, immutable R2A source evidence, R2B eligibility and verified-only fit, durable duplicate/queue decisions, provenance-valid owner-correction replay, private PDF/DOCX document generation, digest-bound document approval, packet preparation, and durable application tracking. The executable browser runner remains synthetic-test-only; there is no approved real target or submission implementation. The shared server-only root-data resolver makes workspace starts resolve the same ignored root profile/database as validation and migration scripts.
 
 The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) remains the forward design baseline: immutable source observations -> typed requirement evidence -> conservative canonical identity -> versioned evaluation -> fact-bound local artifacts/packet -> isolated local runner -> fresh owner final gate -> durable outcome events. The Beta Core implements through local packet/tracking plus a synthetic runner proof. See the [source capability matrix](docs/SOURCE_CAPABILITY_MATRIX.md) and [threat model](docs/THREAT_MODEL_V1.md).
 
@@ -63,7 +63,7 @@ Job source fixture / local user content / future adapter
 
 `packages/database` is deliberately separate because persistence is shared by the dashboard, future local runner, migrations, tests, and analytics. Drizzle defines an SQLite schema. Raw payload and explanation structures are serialized as JSON text, while query-critical identifiers/statuses remain first-class columns.
 
-The foundation migration is `packages/database/drizzle/0000_applypilot_foundation.sql`. Phase 2.5 adds `0001_real_world_job_intake.sql`; the additive Beta Core migration is `0002_personal_live_beta_core.sql`, covering immutable observations/versions/evidence, corrections, artifacts/approvals, packets/answers, runs/checkpoints/consent, capability/run metadata, and application events. Migrations are explicit, consistently backed up, restored/rehearsed, and integrity/foreign-key checked; the server never auto-migrates a real database. Runtime databases remain ignored.
+The foundation migration is `0000_applypilot_foundation.sql`; Phase 2.5 adds 0001, Beta Core adds 0002, R2A adds immutable 0003, and R2 matching quality adds additive 0004. Migration 0004 contains immutable R2 evaluation, duplicate-decision, queue-freshness, correction-binding, calibration-aggregate, and typed-audit tables. Migrations are explicit, consistently backed up, restored/rehearsed, and integrity/foreign-key checked; the server never auto-migrates a real database. Runtime databases remain ignored.
 
 ## Trust boundaries
 

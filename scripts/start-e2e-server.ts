@@ -36,6 +36,7 @@ try {
       "0001_real_world_job_intake.sql",
       "0002_personal_live_beta_core.sql",
       "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
@@ -171,6 +172,76 @@ Documents
           WHERE job_version_id = 'job-version:e2e-invalid')`,
     )
     .run("f".repeat(64));
+  sqlite
+    .prepare(
+      `INSERT INTO r2_evaluation_versions
+        (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
+         normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
+         fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
+         weight_version,calibration_state,recommended,coverage_percent,unresolved_unknown_count,
+         unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
+       VALUES ('evaluation:r2:e2e','job-e2e-document','job-version:e2e','profile-version:e2e',
+         '3.1.0','3.1.0','3.1.0:3.1.0','REVIEW_REQUIRED',?,34,?,'2.0.0','2.0.0',
+         'r2-weights-1','UNCALIBRATED',0,71,1,1,0,0,?)`,
+    )
+    .run(
+      JSON.stringify([
+        {
+          code: "R2_MATERIAL_WORK_RIGHTS_UNKNOWN",
+          severity: "REVIEW",
+          evidenceClass: "LEGAL_LIMIT",
+          jobEvidenceReferences: [],
+          candidateFactReferences: [],
+          safeExplanation: "Fictional work-right evidence requires owner review.",
+        },
+      ]),
+      JSON.stringify([
+        {
+          code: "R2_REQUIRED_SKILL_VERIFIED_MATCH",
+          points: 7,
+          candidateFactReferences: ["skills.fictional"],
+          jobEvidenceReferences: ["evidence:fictional"],
+          evidenceClass: "EMPLOYER_REQUIREMENT",
+          scorerVersion: "2.0.0",
+          weightVersion: "r2-weights-1",
+          safeExplanation: "A fictional verified skill matches current usable evidence.",
+        },
+      ]),
+      now,
+    );
+  sqlite
+    .prepare(
+      `INSERT INTO r2_queue_decision_versions
+        (id,job_id,version,state,freshness,job_version_id,profile_version_id,r2_evaluation_id,
+         evidence_contract_version,duplicate_resolution_version,coverage_version,actor,
+         reason_code,supersedes_decision_id,created_at)
+       VALUES ('queue:r2:e2e','job-e2e-document',1,'SHORTLISTED','CURRENT','job-version:e2e',
+         'profile-version:e2e','evaluation:r2:e2e','3.1.0','r2-duplicate-1','3.1.0:3.1.0',
+         'OWNER','OWNER_SHORTLISTED',NULL,?)`,
+    )
+    .run(now);
+  sqlite
+    .prepare(
+      `INSERT INTO job_queue_entries
+        (job_id,state,evaluation_version_id,reason_code,created_at,updated_at)
+       VALUES ('job-e2e-document','SHORTLISTED',NULL,'OWNER_SHORTLISTED',?,?)`,
+    )
+    .run(now, now);
+  sqlite
+    .prepare(
+      `INSERT INTO r2_duplicate_candidates
+        (id,left_observation_id,right_observation_id,detector_version,state,
+         matched_signals_json,conflicting_signals_json,evidence_digest,created_at,updated_at)
+       VALUES ('duplicate:r2:e2e','observation:e2e','observation:e2e-invalid','r2-duplicate-1',
+         'SUGGESTED',?, ?, ?, ?, ?)`,
+    )
+    .run(
+      JSON.stringify(["applicationUrl", "company", "title"]),
+      JSON.stringify(["location"]),
+      "e".repeat(64),
+      now,
+      now,
+    );
   const insertArtifact = sqlite.prepare(
     `INSERT INTO document_artifacts
       (id,job_id,job_version_id,profile_version_id,type,template,format,file_name,local_path,
