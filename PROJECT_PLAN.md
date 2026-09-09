@@ -2675,6 +2675,10 @@ The real ignored local database was verified at schema v2 with exactly one pendi
 
 The existing single stored vacancy was then reprocessed offline from its immutable stored source with the general R2A parser. It retained the source observation and all historical evaluation/document/packet/application rows, created job version 3 with 5 field evidence rows, 7 requirement evidence rows, all 17 coverage rows, 7 unknown coverage families, and 0 conflicts. The prior evaluation, 2 documents, and 1 packet were made stale/invalidated. No R2B rule ran, no private document was regenerated, and real source calls, employer-form visits, uploads, submissions, and other real application actions remained `0`.
 
+The first post-migration `npm.cmd run preflight` correctly exposed release-tool version drift: `preflight-summary.ts` still rejected every schema above v2 even though migration/status/release tooling had moved to v3. The implementation now centralizes current schema version/readiness in `scripts/lib/database-schema.ts`, applies it consistently across migration, status, preflight, release, private-smoke, and R2A reprocess entry points, and includes regression cases for current, older, and future schemas. The repaired preflight reports schema v3, zero pending migrations, `MANUAL_INTAKE_BETA state=READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, and `PASS` with no blockers.
+
+Final branch validation uses 217 passing unit tests across 34 files, 14 passing integration tests across 3 files, 19 passing serialized fictional E2E tests, and a production build with 31 page units. Formatting, lint, strict typecheck, composite quality/preflight/release checks, full and production dependency audits, privacy audit, database status, diff check, and Git object validation are the required final exact-head gates; their final committed-head and GitHub Actions results are recorded in the implementation PR handoff.
+
 Current train status:
 
 - R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; implementation PR must remain open and unmerged for human review.
