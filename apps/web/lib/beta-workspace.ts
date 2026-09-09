@@ -22,7 +22,7 @@ import {
 import type { EligibilityReason } from "@applypilot/eligibility-engine";
 import type { FitContribution } from "@applypilot/fit-scorer";
 import { normalizeAustralianLocation } from "@applypilot/job-importer";
-import { assertCurrentDocumentGenerationTuple } from "@applypilot/database";
+import { R2ARepository, assertCurrentDocumentGenerationTuple } from "@applypilot/database";
 import { legacyStatusToBeta } from "@applypilot/application-tracker";
 import {
   ApplicationStatusSchema,
@@ -143,6 +143,48 @@ export interface BetaJobDetail {
     originalText: string;
     normalizedProposition: string;
   }>;
+  jobVersions: Array<{
+    id: string;
+    version: number;
+    createdAt: string;
+    r2aCoverageCount: number;
+    r2aState: "AVAILABLE" | "LEGACY_NOT_AVAILABLE";
+  }>;
+  r2aState: "AVAILABLE" | "LEGACY_NOT_AVAILABLE" | "INVALID";
+  r2a: null | {
+    parserVersion: string;
+    evidenceContractVersion: string;
+    normalizationVersion: string;
+    fields: Array<{
+      id: string;
+      family: string;
+      canonicalField: string;
+      state: string;
+      modality: string | null;
+      excerpt: string;
+      start: number;
+      end: number;
+      normalizedKind: string;
+    }>;
+    requirements: Array<{
+      id: string;
+      family: string;
+      canonicalKind: string;
+      state: string;
+      modality: string;
+      excerpt: string;
+      start: number;
+      end: number;
+      normalizedKind: string;
+    }>;
+    coverage: Array<{
+      family: string;
+      state: string;
+      evidenceCount: number;
+      unparsedSpanCount: number;
+    }>;
+    conflicts: Array<{ id: string; canonicalField: string; evidenceCount: number }>;
+  };
   documents: BetaDocumentItem[];
   packet: null | {
     id: string;
@@ -326,6 +368,29 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         )
         .all(row.jobVersionId) as BetaJobDetail["requirements"])
     : [];
+  const jobVersions = sqlite
+    .prepare(
+      `SELECT v.id, v.version, v.created_at AS createdAt,
+         (SELECT count(*) FROM job_normalization_coverage c WHERE c.job_version_id = v.id)
+           AS r2aCoverageCount,
+         CASE WHEN EXISTS(
+           SELECT 1 FROM job_field_evidence_v2 f
+           WHERE f.job_version_id = v.id AND f.rule_id <> 'R2A_LEGACY_FIELD_UNKNOWN'
+         ) OR EXISTS(
+           SELECT 1 FROM requirement_evidence_v2 r
+           WHERE r.job_version_id = v.id AND r.rule_id <> 'R2A_LEGACY_REQUIREMENT_UNKNOWN'
+         ) THEN 'AVAILABLE' ELSE 'LEGACY_NOT_AVAILABLE' END AS r2aState
+       FROM job_versions v WHERE v.job_id = ? ORDER BY v.version DESC`,
+    )
+    .all(jobId) as BetaJobDetail["jobVersions"];
+  let r2aRead: ReturnType<R2ARepository["getNormalizationResult"]> = {
+    state: "LEGACY_NOT_AVAILABLE",
+    normalization: null,
+  };
+  if (row.jobVersionId) {
+    r2aRead = new R2ARepository(sqlite).getNormalizationResult(row.jobVersionId);
+  }
+  const r2aNormalization = r2aRead.normalization;
   const packetRow = sqlite
     .prepare(
       `SELECT id, version, status, readiness_json AS readinessJson, created_at AS createdAt
@@ -357,6 +422,48 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     templateStrategy: recommendedDesign.summaryStrategy,
     templateEvidencePriorities: recommendedDesign.evidencePriorities,
     requirements: requirementRows,
+    jobVersions,
+    r2aState: r2aRead.state,
+    r2a: r2aNormalization
+      ? {
+          parserVersion: r2aNormalization.parserVersion,
+          evidenceContractVersion: r2aNormalization.evidenceContractVersion,
+          normalizationVersion: r2aNormalization.normalizationVersion,
+          fields: r2aNormalization.fieldEvidence.map((item) => ({
+            id: item.id,
+            family: item.family,
+            canonicalField: item.canonicalField,
+            state: item.state,
+            modality: item.modality,
+            excerpt: item.source.excerpt,
+            start: item.source.start,
+            end: item.source.end,
+            normalizedKind: item.normalizedValue.kind,
+          })),
+          requirements: r2aNormalization.requirementEvidence.map((item) => ({
+            id: item.id,
+            family: item.family,
+            canonicalKind: item.canonicalKind,
+            state: item.state,
+            modality: item.modality,
+            excerpt: item.source.excerpt,
+            start: item.source.start,
+            end: item.source.end,
+            normalizedKind: item.normalizedValue.kind,
+          })),
+          coverage: r2aNormalization.coverage.map((item) => ({
+            family: item.family,
+            state: item.state,
+            evidenceCount: item.evidenceIds.length,
+            unparsedSpanCount: item.unparsedSpans.length,
+          })),
+          conflicts: r2aNormalization.conflicts.map((item) => ({
+            id: item.id,
+            canonicalField: item.canonicalField,
+            evidenceCount: item.evidenceIds.length,
+          })),
+        }
+      : null,
     documents: listDocuments(sqlite, jobId),
     packet: packetRow
       ? {

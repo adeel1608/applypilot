@@ -23,12 +23,18 @@ import {
   JobQueueStateSchema,
   JobSchema,
   RequirementEvidenceSchema,
+  R2ANormalizationSchema,
   SourceObservationSchema,
   type Job,
   type JobFieldEvidence,
   type RequirementEvidence,
+  type R2ANormalization,
+  type R2JobFieldEvidence,
+  type R2NormalizedValue,
   type SourceObservation,
 } from "@applypilot/job-model";
+
+import { R2ARepository, r2aSemanticDigest } from "./r2a-repository";
 
 const EvaluationVersionInputSchema = z.object({
   id: z.string().min(1).optional(),
@@ -54,6 +60,7 @@ export interface JobVersionInput {
   sourceObservationId: string | null;
   fieldEvidence?: JobFieldEvidence[];
   requirementEvidence?: RequirementEvidence[];
+  r2aNormalization?: R2ANormalization;
 }
 
 export interface RecordedJobVersion {
@@ -82,6 +89,112 @@ export type DocumentArtifactInput = z.input<typeof DocumentArtifactInputSchema>;
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function ownerCorrectionR2Value(field: string, job: Job): R2NormalizedValue {
+  if (field === "employmentType") {
+    return { kind: "EMPLOYMENT_TYPE", value: job.employmentType };
+  }
+  if (field === "location") {
+    return {
+      kind: "LOCATION",
+      value: {
+        rawLabel: job.location,
+        locality: job.suburb,
+        suburb: job.suburb,
+        stateOrTerritory: job.state,
+        postcode: job.postcode,
+        countryCode: job.country.toUpperCase() === "AUSTRALIA" ? "AU" : "UNKNOWN",
+        workplaceType: "UNKNOWN",
+        remoteScope: "UNKNOWN",
+      },
+    };
+  }
+  return { kind: "TEXT", value: String((job as unknown as Record<string, unknown>)[field]) };
+}
+
+function ownerCorrectedR2Normalization(input: {
+  prior: R2ANormalization;
+  job: Job;
+  changedFields: Set<string>;
+  correctionId: string;
+}): R2ANormalization {
+  const effective = new Map<
+    string,
+    { canonicalField: string; family: R2JobFieldEvidence["family"] }
+  >();
+  for (const field of input.changedFields) {
+    if (["suburb", "state", "postcode", "country"].includes(field)) {
+      effective.set("location", { canonicalField: "location.alternative", family: "GEOGRAPHY" });
+    } else if (field === "location") {
+      effective.set(field, { canonicalField: "location.alternative", family: "GEOGRAPHY" });
+    } else if (field === "employmentType") {
+      effective.set(field, { canonicalField: "employment.type", family: "EMPLOYMENT" });
+    } else if (["title", "company", "category"].includes(field)) {
+      effective.set(field, { canonicalField: field, family: "IDENTITY" });
+    }
+  }
+  if (effective.size === 0) return input.prior;
+  const affectedCanonical = new Set(
+    [...effective.values()].map(({ canonicalField }) => canonicalField),
+  );
+  const removedIds = new Set(
+    input.prior.fieldEvidence
+      .filter(({ canonicalField }) => affectedCanonical.has(canonicalField))
+      .map(({ id }) => id),
+  );
+  const removedConflictIds = new Set(
+    input.prior.conflicts
+      .filter(({ evidenceIds }) => evidenceIds.some((id) => removedIds.has(id)))
+      .map(({ id }) => id),
+  );
+  const carried = input.prior.fieldEvidence
+    .filter(({ id }) => !removedIds.has(id))
+    .map((item) =>
+      item.conflictSetId && removedConflictIds.has(item.conflictSetId)
+        ? { ...item, state: "SOURCE_STATED" as const, conflictSetId: null }
+        : item,
+    );
+  const emptyHash = digest("");
+  const corrected = [...effective].map(
+    ([field, descriptor]): R2JobFieldEvidence => ({
+      id: digest(`${input.correctionId}\n${descriptor.canonicalField}`).slice(0, 32),
+      sourceObservationId: input.prior.sourceObservationId,
+      jobVersionId: null,
+      family: descriptor.family,
+      canonicalField: descriptor.canonicalField,
+      state: "OWNER_CORRECTED",
+      modality: null,
+      source: {
+        sourcePath: `ownerCorrection.${field}`,
+        start: 0,
+        end: 0,
+        sourceLength: input.prior.sourceLength,
+        excerpt: "",
+        excerptHash: emptyHash,
+      },
+      normalizedValue: ownerCorrectionR2Value(field, input.job),
+      extractorVersion: input.prior.parserVersion,
+      ruleId: "R2A_OWNER_CORRECTED",
+      derivationInputIds: [],
+      ownerCorrectionId: input.correctionId,
+      conflictSetId: null,
+    }),
+  );
+  const fieldEvidence = [...carried, ...corrected];
+  const coverage = input.prior.coverage.map((item) => {
+    const additions = corrected.filter(({ family }) => family === item.family).map(({ id }) => id);
+    return {
+      ...item,
+      evidenceIds: [...item.evidenceIds.filter((id) => !removedIds.has(id)), ...additions],
+    };
+  });
+  return R2ANormalizationSchema.parse({
+    ...input.prior,
+    fieldEvidence,
+    conflicts: input.prior.conflicts.filter(({ id }) => !removedConflictIds.has(id)),
+    coverage,
+  });
 }
 
 export class BetaRepository {
@@ -132,7 +245,23 @@ export class BetaRepository {
   recordJobVersion(input: JobVersionInput): RecordedJobVersion {
     const job = JobSchema.parse(input.job);
     const normalizedJson = JSON.stringify(job);
-    const contentDigest = digest(normalizedJson);
+    const r2aRepository = new R2ARepository(this.sqlite, this.now);
+    const r2aNormalization =
+      input.r2aNormalization && r2aRepository.available()
+        ? R2ANormalizationSchema.parse(input.r2aNormalization)
+        : null;
+    if (
+      r2aNormalization &&
+      (!input.sourceObservationId ||
+        r2aNormalization.sourceObservationId !== input.sourceObservationId)
+    ) {
+      throw new Error("R2A_OBSERVATION_VERSION_MISMATCH");
+    }
+    const contentDigest = digest(
+      r2aNormalization
+        ? `${normalizedJson}\nR2A:${r2aSemanticDigest(r2aNormalization)}`
+        : normalizedJson,
+    );
     const fieldEvidence = (input.fieldEvidence ?? []).map((item) =>
       JobFieldEvidenceSchema.parse(item),
     );
@@ -217,6 +346,9 @@ export class BetaRepository {
           evidence.extractorVersion,
           createdAt,
         );
+      }
+      if (r2aNormalization) {
+        r2aRepository.recordNormalization(jobVersionId, r2aNormalization);
       }
       return { id: jobVersionId, version, contentDigest, created: true };
     })();
@@ -362,6 +494,7 @@ export class BetaRepository {
     const reasonCode = z.string().min(1).max(100).parse(input.reasonCode);
     const changedFields = z.array(z.string().min(1).max(80)).min(1).parse(input.changedFields);
     return this.sqlite.transaction(() => {
+      const correctionId = this.id();
       const previous = this.sqlite
         .prepare(
           `SELECT id, normalized_json AS normalizedJson, content_digest AS contentDigest,
@@ -416,6 +549,18 @@ export class BetaRepository {
           extractorVersion: "owner-correction-v1",
         };
       });
+      const r2aRepository = new R2ARepository(this.sqlite, this.now);
+      const priorR2A = r2aRepository.available()
+        ? r2aRepository.getNormalization(previous.id)
+        : null;
+      const r2aNormalization = priorR2A
+        ? ownerCorrectedR2Normalization({
+            prior: priorR2A,
+            job,
+            changedFields: effectiveChangedFields,
+            correctionId,
+          })
+        : undefined;
       const recorded = this.recordJobVersion({
         job,
         sourceObservationId: previous.sourceObservationId,
@@ -424,6 +569,7 @@ export class BetaRepository {
           ...correctedEvidence,
         ],
         requirementEvidence: priorRequirementEvidence,
+        r2aNormalization,
       });
       if (!recorded.created) throw new Error("CORRECTION_HAS_NO_CHANGE");
       const now = this.now().toISOString();
@@ -452,7 +598,7 @@ export class BetaRepository {
            VALUES (?, ?, ?, ?, 'OWNER', ?, ?, ?, ?, ?)`,
         )
         .run(
-          this.id(),
+          correctionId,
           job.id,
           previous.id,
           recorded.id,

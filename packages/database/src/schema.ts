@@ -366,6 +366,86 @@ export const requirementEvidence = sqliteTable("requirement_evidence", {
   createdAt: text("created_at").notNull(),
 });
 
+export const jobFieldEvidenceV2 = sqliteTable("job_field_evidence_v2", {
+  id: text("id").primaryKey(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  sourceObservationId: text("source_observation_id").references(() => sourceObservations.id, {
+    onDelete: "restrict",
+  }),
+  family: text("family").notNull(),
+  canonicalField: text("canonical_field").notNull(),
+  evidenceState: text("evidence_state").notNull(),
+  modality: text("modality"),
+  sourcePath: text("source_path").notNull(),
+  startOffset: integer("start_offset").notNull(),
+  endOffset: integer("end_offset").notNull(),
+  sourceLength: integer("source_length").notNull(),
+  excerpt: text("excerpt").notNull(),
+  excerptHash: text("excerpt_hash").notNull(),
+  normalizedValueJson: text("normalized_value_json").notNull(),
+  extractorVersion: text("extractor_version").notNull(),
+  ruleId: text("rule_id").notNull(),
+  ownerCorrectionId: text("owner_correction_id"),
+  conflictSetId: text("conflict_set_id"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const requirementEvidenceV2 = sqliteTable("requirement_evidence_v2", {
+  id: text("id").primaryKey(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  sourceObservationId: text("source_observation_id").references(() => sourceObservations.id, {
+    onDelete: "restrict",
+  }),
+  family: text("family").notNull(),
+  canonicalKind: text("canonical_kind").notNull(),
+  evidenceState: text("evidence_state").notNull(),
+  modality: text("modality").notNull(),
+  conditionText: text("condition_text"),
+  sourcePath: text("source_path").notNull(),
+  startOffset: integer("start_offset").notNull(),
+  endOffset: integer("end_offset").notNull(),
+  sourceLength: integer("source_length").notNull(),
+  excerpt: text("excerpt").notNull(),
+  excerptHash: text("excerpt_hash").notNull(),
+  normalizedValueJson: text("normalized_value_json").notNull(),
+  extractorVersion: text("extractor_version").notNull(),
+  ruleId: text("rule_id").notNull(),
+  ownerCorrectionId: text("owner_correction_id"),
+  conflictSetId: text("conflict_set_id"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const evidenceDerivations = sqliteTable("evidence_derivations", {
+  id: text("id").primaryKey(),
+  derivedFieldEvidenceId: text("derived_field_evidence_id")
+    .notNull()
+    .references(() => jobFieldEvidenceV2.id, { onDelete: "restrict" }),
+  inputFieldEvidenceId: text("input_field_evidence_id")
+    .notNull()
+    .references(() => jobFieldEvidenceV2.id, { onDelete: "restrict" }),
+  ruleId: text("rule_id").notNull(),
+  ruleVersion: text("rule_version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const jobNormalizationCoverage = sqliteTable("job_normalization_coverage", {
+  id: text("id").primaryKey(),
+  jobVersionId: text("job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  family: text("family").notNull(),
+  coverageState: text("coverage_state").notNull(),
+  evidenceCount: integer("evidence_count").notNull(),
+  evidenceIdsJson: text("evidence_ids_json").notNull(),
+  unparsedSpansJson: text("unparsed_spans_json").notNull(),
+  parserVersion: text("parser_version").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const jobCorrections = sqliteTable("job_corrections", {
   id: text("id").primaryKey(),
   jobId: text("job_id")
@@ -661,6 +741,10 @@ export const schema = {
   jobVersions,
   jobFieldEvidence,
   requirementEvidence,
+  jobFieldEvidenceV2,
+  requirementEvidenceV2,
+  evidenceDerivations,
+  jobNormalizationCoverage,
   jobCorrections,
   duplicateClusters,
   duplicateClusterMembers,

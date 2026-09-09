@@ -36,6 +36,7 @@ import {
   resumeFileName,
 } from "@applypilot/resume-engine";
 import { normalizeText } from "@applypilot/shared";
+import { CURRENT_DATABASE_SCHEMA_VERSION } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
 
 function digest(bytes: Uint8Array): string {
@@ -91,7 +92,9 @@ async function main(): Promise<void> {
   const sqlite = new BetterSqlite3(databasePath, { fileMustExist: true });
   sqlite.pragma("foreign_keys = ON");
   try {
-    if (Number(sqlite.pragma("user_version", { simple: true })) !== 2) {
+    if (
+      Number(sqlite.pragma("user_version", { simple: true })) !== CURRENT_DATABASE_SCHEMA_VERSION
+    ) {
       throw new Error("BETA_SCHEMA_REQUIRED");
     }
     if (sqlite.pragma("integrity_check", { simple: true }) !== "ok") {

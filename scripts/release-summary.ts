@@ -4,6 +4,7 @@ import BetterSqlite3 from "better-sqlite3";
 
 import { loadPrivateSourceAllowlist } from "@applypilot/job-sources";
 
+import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
@@ -35,9 +36,10 @@ async function main(): Promise<void> {
     schemaVersion = 0;
   }
   const source = await loadPrivateSourceAllowlist(root);
+  const schemaStatus = databaseSchemaStatus(schemaVersion);
   const manualBetaBlockers = [
-    ...(schemaVersion < 2 ? ["PENDING_DATABASE_MIGRATION"] : []),
-    ...(schemaVersion > 2 ? ["DATABASE_SCHEMA_UNSUPPORTED"] : []),
+    ...(schemaStatus.pendingMigrations > 0 ? ["PENDING_DATABASE_MIGRATION"] : []),
+    ...(schemaStatus.unsupported ? ["DATABASE_SCHEMA_UNSUPPORTED"] : []),
     ...(databaseIntegrity !== "PASS" ? ["DATABASE_INTEGRITY_FAILED"] : []),
     ...(foreignKeyIssues > 0 ? ["DATABASE_FOREIGN_KEY_ISSUES"] : []),
   ];
@@ -46,7 +48,7 @@ async function main(): Promise<void> {
   console.log("RELEASE_PRIVACY status=PASS");
   console.log("RELEASE_QUALITY status=PASS");
   console.log(
-    `RELEASE_DATABASE schema_version=${schemaVersion} pending_migrations=${Math.max(0, 2 - schemaVersion)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
+    `RELEASE_DATABASE schema_version=${schemaVersion} pending_migrations=${schemaStatus.pendingMigrations} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
   );
   console.log(
     `RELEASE_SOURCE state=${source.status} capability_count=${source.capabilities.length}`,

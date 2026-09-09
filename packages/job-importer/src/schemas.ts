@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { IMPORT_LIMITS } from "./limits";
 import { detectedJobSources } from "./types";
-import { RequirementEvidenceSchema } from "@applypilot/job-model";
+import { R2ANormalizationSchema, RequirementEvidenceSchema } from "@applypilot/job-model";
 
 export const DetectedJobSourceSchema = z.enum(detectedJobSources);
 export const AcquisitionMethodSchema = z.enum([
@@ -128,6 +128,7 @@ export const ParsedJobFieldsSchema = z.object({
         percent: z.number().min(0).max(100),
         confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
       }),
+      r2a: R2ANormalizationSchema,
       warnings: z.array(z.string().min(1)),
     })
     .optional(),

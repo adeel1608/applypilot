@@ -3,11 +3,11 @@
 Last updated: 2026-09-08
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `plan/r1-r2-next-gate`
+Working branch: `feat/r2a-evidence-normalization`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: PR #10 was human-reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged to `main` as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Manual-intake Personal Beta is `READY`. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; the real runner remains `TARGET_APPROVAL_REQUIRED`. This branch is documentation-only and plans [R2 matching quality](docs/R2_MATCHING_QUALITY_PLAN.md) plus a separate [R1 source-enabled Beta](docs/R1_SOURCE_ENABLED_BETA_PLAN.md). It authorises no application-code implementation, migration, tenant/source request, employer-form visit, upload, submission, deployment, or PR merge. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #11 was corrected, exact-head CI passed, and it merged as `78dc90e133f9ce39e8a651e4f975e698543b891c`. The current `feat/r2a-evidence-normalization` branch implements R2A and is awaiting its final unmerged implementation PR review. Manual-intake Personal Beta remains `READY`; R2B, R2C, and R2D remain `NOT_IMPLEMENTED`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -2588,7 +2588,7 @@ Exact forward sequence after this plan is separately reviewed and merged:
 5. R1C begins only after a fresh explicit one-tenant approval. Its first smoke is one Lever LIST request, `skip=0`, `limit=25`, at most 2 MB, zero redirects/retries/details, followed by local integrity/privacy/idempotency checks and default disablement.
 6. A separate post-smoke human decision is required to declare source-enabled Personal Beta ready. No R1 result authorises a real runner or application action.
 
-Recommended next implementation slice: **R2A — evidence model and normalization**. This plan PR must remain open and unmerged for human review.
+Historical plan decision: **R2A — evidence model and normalization** was selected as the next implementation slice. Its implementation result and current unmerged-review gate are recorded below.
 
 ### Planning implementation and local validation record
 
@@ -2599,3 +2599,175 @@ Recommended next implementation slice: **R2A — evidence model and normalizatio
 - `npm.cmd run release:check`: PASS on the complete staged planning content before this result-only note. Doctor/database/preflight passed; formatting, lint, typecheck, 189 unit tests across 31 files, 13 integration tests across 3 files, production build with 31 page units, and 18 serialized fictional E2E tests passed. Privacy audit passed across 219 tracked/index files, 463 history paths, 464 history blobs, 687 build/test artifacts, and 11 selected private canaries. Full and production dependency audits reported zero vulnerabilities. Release classification remained `MANUAL_INTAKE_BETA_READY`; capability count remained 0.
 - The result-only note is followed by formatting, lint/typecheck, staged diff/privacy/history checks, commit/push, and exact-head GitHub Actions. CI is the final complete rerun on the committed head.
 - Real source calls, employer form visits, external uploads, submissions, real application actions, private document regeneration, private packet creation, and destructive/private smoke operations during this planning gate: all `0`.
+
+# R2A evidence model and normalization implementation — 2026-09-09
+
+Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`. Human-approved plan PR #11 was corrected only for the reviewed commute-preference and `REVIEW_REQUIRED` recommendation audit findings, passed local and exact-head CI, and merged normally as `78dc90e133f9ce39e8a651e4f975e698543b891c`. This implementation branch, `feat/r2a-evidence-normalization`, was created from that clean merged main. R2B, R2C, R2D, R1 activation, real source requests, real browser targets, external uploads, and submissions remain unauthorised and unimplemented.
+
+## Current state and objective
+
+Schema v2 already retains immutable source observations, job versions, basic field/requirement evidence, owner corrections, evaluation versions, documents, packets, and application history. The current parser is still narrow: ordinary unpunctuated headings are weak, employment type can fall back to whole-ad keywords, schedule is normally empty, location is a single optimistic projection, salary disappears when its period is unknown, document requirements are partly projected to booleans, typed capabilities are incomplete, and empty recognized arrays can overstate coverage.
+
+R2A will add a complete versioned truth/evidence layer from an immutable source observation through typed field/requirement evidence and field-family coverage to a new normalized job version. It must preserve source wording and bounded provenance without making R2B eligibility or scoring decisions. Existing schema-v2 data and every historical evaluation/artifact/packet/application row remain readable and retained.
+
+## Requirements and architecture
+
+- Add independent evidence state `SOURCE_STATED | OWNER_CORRECTED | DERIVED | UNKNOWN | CONDITIONAL | CONFLICTING` and requirement modality `REQUIRED | PREFERRED | CONDITIONAL | NEGATED | UNKNOWN`; parser confidence never changes either axis.
+- Every material record carries stable evidence ID, observation/version linkage, canonical field/kind, bounded source path/span, normalized typed value, extractor/rule version, derivation/correction/conflict linkage, and a bounded local excerpt/digest. Text spans must satisfy `0 <= start <= end <= immutable source length` and never cross source versions.
+- Add field-family coverage `COMPLETE | PARTIAL | UNKNOWN` for identity, geography, employment, hours, schedule, compensation, dates, skills, experience, education, licences, certifications, work rights, vehicle, physical requirements, training, and documents. Empty arrays do not imply complete; material unparsed spans remain explicit.
+- Add deterministic ordinary-heading grammar and structured-first parsing. Structured and prose conflicts retain both values in a linked conflict set. No source-specific rule is tailored to the existing private vacancy.
+- Add typed Australian location alternatives, scoped employment evidence, unit-preserving hours, schedule/roster, typed salary including unknown period, tri-state document requirements, structured experience/education/licence/certification/work-right/vehicle/physical/training evidence, and negation/conditional grammar. Commute minutes and kilometres remain separate; no legal or candidate rule runs in R2A.
+- Owner correction remains an immutable overlay: source observations never change, unaffected evidence carries forward, corrected evidence is `OWNER_CORRECTED`, and downstream data is invalidated by the existing version contract.
+- All job content remains inert data. R2A performs no URL dereference, tool/AI invocation, policy change, network call, or candidate-data logging.
+
+The implementation uses a new `@applypilot/job-model` R2A evidence contract and a pure `@applypilot/job-importer` normalization/extraction pipeline. Existing `Job` remains the compatibility projection consumed by the current R2B-era engines. A schema-v3 repository persists R2A evidence against immutable `source_observations` and `job_versions`, while the current evaluation/documents/packet become stale through the existing dependency invalidation service when a new job version is created.
+
+Data flow:
+
+`stored/user source bytes -> immutable source observation -> structured-first section/span parser -> typed field evidence + requirement evidence + coverage -> compatibility Job projection -> immutable job version -> additive R2A evidence persistence -> existing downstream rows stale`
+
+## Proposed files, schema, and dependencies
+
+- Create `packages/job-model/src/r2a.ts` for all closed R2A schemas/types and export it from the package.
+- Create `packages/job-importer/src/r2a-normalization.ts` plus fictional golden tests/fixtures; update the existing parser/extractor only to call this shared pipeline and preserve legacy DTO compatibility.
+- Add migration `packages/database/drizzle/0003_r2a_evidence_normalization.sql`; never modify 0000/0001/0002.
+- Add `job_field_evidence_v2`, `requirement_evidence_v2`, `evidence_derivations`, and `job_normalization_coverage` with explicit FKs, CHECK constraints, indexes, immutable row identities, conservative `UNKNOWN` legacy backfill, and no destructive down migration. Do not create R2B/R2C tables.
+- Extend database schema exports/repositories with a transactional R2A version writer/reader and synthetic schema-v2 upgrade/restore/idempotency tests.
+- Update job detail server UI to show safe bounded state/modality/coverage/conflict/parser/version information without candidate values or R2B conclusions. Read the installed Next.js 16 route/server guidance before editing.
+- Update normalization, threat, checklist, and project reality documentation after results are known.
+- Add no runtime dependency. Continue using Zod, SQLite, Vitest, Playwright, and existing backup/restore tooling.
+
+## Risks, privacy, and rollback
+
+Primary risks are span/version mismatch, structured/prose certainty inflation, false conflict resolution, legacy guessing, destructive migration, accidental private excerpt publication, and stale downstream material appearing current. Controls are strict Zod refinement, immutable observation/version FKs, closed enums/CHECKs, stable deterministic IDs, conservative `UNKNOWN` backfill, synthetic upgrade/restore rehearsal, safe aggregate-only logs, and post-reprocess privacy scanning.
+
+Rollback is a normal unmerged-branch/code revert while schema-v3 tables remain dormant, or restoration of the verified pre-migration private backup after an accepted recovery decision. No down migration deletes R2A or legacy rows. The real database is touched only after every synthetic quality/migration gate passes, owned writers are stopped, a fresh verified ignored backup and preview succeed, and enough recovery time remains. Any mapping, integrity, FK, isolation, or privacy failure stops work without direct SQL repair.
+
+## Testing strategy and acceptance criteria
+
+Fictional golden coverage must include hospitality, retail, admin/reception, warehouse, engineering, robotics, automation, embedded, internship, health/licensed, remote, and multi-location roles. It must exercise required/preferred/conditional/negated/unknown/conflicting language; no experience; vehicle versus licence; Australian versus foreign licence; valid versus unrestricted rights; sponsorship; hourly/annual/unknown-period salary; weekly/fortnightly hours; overnight/fixed/flexible roster; tri-state documents; selection criteria; and multi-state locations.
+
+Synthetic acceptance requires schema-v2 population, backup, migration preview/apply, conservative backfill, row/link/FK/integrity preservation, R2A reprocess, idempotency, and restore rehearsal. Complete gates before private work are format, lint, typecheck, unit, integration, build, E2E, privacy, both dependency audits, migration/backup/restore, diff check, and strict fsck.
+
+Private acceptance then requires a fresh verified backup, additive schema-v3 migration with zero pending migrations/integrity/FK issues, and one offline reprocess of the existing stored vacancy from its current immutable local source. The old observation, job version, evaluation, documents, packet, and application history remain; one new R2A version/evidence set is current; affected downstream rows are visibly stale; no real document regeneration is required. Only aggregate evidence/coverage/conflict/unknown counts may be recorded. Final privacy checks cover Git/index/history, `.next`, maps/static output, Playwright artifacts, logs, CI, database/backups/documents/packet/quarantine/session material.
+
+R2A is complete only when all material field families have explicit state/provenance and truthful coverage, all required grammar/typing/conflict/owner-correction/legacy regressions pass, synthetic and private migration/reprocess gates pass, documentation reflects reality, and one implementation PR has exact-head green CI and remains unmerged for ChatGPT review.
+
+## Exact implementation steps
+
+1. Implement/export the R2A schemas, bounded span/refinement, typed material-field contracts, coverage, conflicts, derivations, and tests.
+2. Implement deterministic sections, structured priority, typed normalizers, compatibility projection, and the fictional golden corpus.
+3. Add reviewed additive migration 0003 and repository write/read/backfill behavior with transaction, FK, integrity, idempotency, and restore tests.
+4. Integrate imports/offline reprocessing and owner-correction carry-forward without running R2B rules; invalidate downstream consumers on the new version.
+5. Read installed Next.js guidance, expose bounded R2A evidence/coverage UI, and add fictional unit/browser tests.
+6. Run the complete synthetic quality/migration/privacy/recovery gates. Fix every failure before private work.
+7. Stop writers, verify the real schema-v2 DB and private profile, create and verify a fresh ignored backup, preview/apply migration 0003, and verify mapping/integrity/FKs.
+8. Offline-reprocess the existing stored vacancy through the general supported service, preserve history, and verify aggregate R2A state/coverage/conflict/unknown counts plus downstream staleness. Make zero network/application/document actions.
+9. Run final exact-head release/privacy/database/diff/fsck gates, update reality docs/results, commit by concern, push this branch, open one R2A PR, wait for exact-head CI, and stop with the PR unmerged.
+
+## R2A implementation and verification result
+
+R2A is `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED` on this branch. The implementation adds parser, evidence-contract, and normalization version `3.0.0`; migration `0003_r2a_evidence_normalization.sql`; the additive `job_field_evidence_v2`, `requirement_evidence_v2`, `evidence_derivations`, and `job_normalization_coverage` tables; immutable/idempotent repository persistence; owner-correction carry-forward; structured-first and ordinary-heading normalization; safe job-detail evidence UI; and a 12-role-family fictional corpus.
+
+Pre-private synthetic verification passed formatting, lint, typecheck, 215 unit tests across 33 files, 14 integration tests across 3 files, the Next.js production build, 19 serialized fictional E2E tests, the schema-v2 backup/migration/backfill/idempotency/restore rehearsal, privacy audit, full and production dependency audits, `git diff --check`, and `git fsck --strict`. Migration 0003 preserved legacy rows and conservatively mapped unmapped historical meaning to `UNKNOWN`.
+
+The real ignored local database was verified at schema v2 with exactly one pending migration, integrity `PASS`, zero FK issues, and a valid ignored private profile. ApplyPilot writers were already stopped. Fresh verified schema-v2 backups were created before the preview and confirmed migration; migration 0003 completed at schema v3 with zero pending migrations, integrity `PASS`, and zero FK issues. The database retained 1 job and 2 historical job versions before reprocess; conservative backfill produced 6 requirement evidence rows and 34 coverage rows across those versions.
+
+The existing single stored vacancy was then reprocessed offline from its immutable stored source with the general R2A parser. It retained the source observation and all historical evaluation/document/packet/application rows, created job version 3 with 5 field evidence rows, 7 requirement evidence rows, all 17 coverage rows, 7 unknown coverage families, and 0 conflicts. The prior evaluation, 2 documents, and 1 packet were made stale/invalidated. No R2B rule ran, no private document was regenerated, and real source calls, employer-form visits, uploads, submissions, and other real application actions remained `0`.
+
+The first post-migration `npm.cmd run preflight` correctly exposed release-tool version drift: `preflight-summary.ts` still rejected every schema above v2 even though migration/status/release tooling had moved to v3. The implementation now centralizes current schema version/readiness in `scripts/lib/database-schema.ts`, applies it consistently across migration, status, preflight, release, private-smoke, and R2A reprocess entry points, and includes regression cases for current, older, and future schemas. The repaired preflight reports schema v3, zero pending migrations, `MANUAL_INTAKE_BETA state=READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, and `PASS` with no blockers.
+
+Final branch validation uses 217 passing unit tests across 34 files, 14 passing integration tests across 3 files, 19 passing serialized fictional E2E tests, and a production build with 31 page units. Formatting, lint, strict typecheck, composite quality/preflight/release checks, full and production dependency audits, privacy audit, database status, diff check, and Git object validation are the required final exact-head gates; their final committed-head and GitHub Actions results are recorded in the implementation PR handoff.
+
+Current train status:
+
+- R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; implementation PR must remain open and unmerged for human review.
+- R2B: `NOT_IMPLEMENTED`.
+- R2C: `NOT_IMPLEMENTED`.
+- R2D: `NOT_IMPLEMENTED`.
+- R1 source-enabled Beta: `WAITING_FOR_APPROVED_TENANT`; capability count remains 0 and no real source was activated.
+
+Non-blocking future hardening retained from the PR #10 review:
+
+- Before local packet preparation, optionally re-resolve the current private profile file and apply the same current-profile/evaluation consistency gate used for document generation.
+- Replace the cosmetic document-link separator with an encoding-safe separator and add a rendered-text regression.
+
+# PR #12 consolidated R2A hardening pass — 2026-09-09
+
+Status: `HARDENING_COMPLETE_AWAITING_EXACT_HEAD_CI_AND_HUMAN_REVIEW`. Starting branch/head are `feat/r2a-evidence-normalization` at `c4046238196f0b9a2d4580e3e3c3804c230d8268`; PR #12 remains open and unmerged. Migration `0003_r2a_evidence_normalization.sql` is immutable applied history and retains reviewed Git object hash `bc71996fb2d84e7c890b8d6d5c5ba9174cdf9e2d`. No additive 0004 was required.
+
+## Current state, objective, and assumptions
+
+The current 3.0.0 parser couples conditional requirement modality to `CONDITIONAL` evidence state, permits domain-valid requirement links the database cannot store, verifies pointer bounds/excerpts but not SHA-256 hashes, detects only a small set of field conflicts and no proposition-scoped requirement conflicts, and may overstate coverage. Structured parsing expects display strings to be contiguous in serialized input, does not fully traverse nested/multi-location JobPosting data or inert structured descriptions, and has location/salary/document/schedule/date/work-right edge cases. The read path can throw on synthetic legacy 0003 pointers and the UI collapses invalid R2A into ordinary absence. Offline reprocess writes a job/version before downstream invalidation in a separate transaction, requires a new version even when semantics are unchanged, and its real-data command lacks explicit confirmation/bound backup creation. The migration command does not stop future schemas before backup/application work.
+
+The objective is the smallest truthful R2A 3.1.0 contract: evidence state and modality are independent; requirements are never `DERIVED` in this release; derived fields reference field evidence only; conflicts contain at least two same-proposition records; every current-domain-valid object persists/reloads; every exact excerpt/hash/source length is verified at server boundaries; structured components retain exact source provenance; date precision/timezone truth is explicit and backward-readable; coverage is conservative; reprocess plus staleness is atomic and semantically idempotent; legacy 0003 placeholders are readable without fabricated spans; and invalid current evidence is visible as a safe owner warning.
+
+Assumptions are: the immutable stored source observation remains the authority; JSON/JSON-LD is inert text and no URL is dereferenced; the real database remains schema v3 unless a proven shape blocker requires reviewed additive 0004; historical 3.0.0 rows retain their recorded versions; the corrected 3.1.0 parser may legitimately create one new immutable version; a repeated 3.1.0 run on identical stored source/owner state must not churn versions; R2B/R2C/R2D and all source/runner capabilities remain out of scope.
+
+## Requirements and architecture
+
+- Narrow `R2RequirementEvidence` states to persistable non-derived semantics, require owner/conflict links, require a retained condition for conditional modality, and forbid positive normalized requirements under negated modality. Keep `R2JobFieldEvidence` derivations field-only and validate input existence/kind/state at the top-level boundary.
+- Add stable requirement proposition identity derived conservatively from normalized subject/kind/class/jurisdiction/document kind/work-right proposition. Detect only same-proposition contradictory modality/value pairs; unrelated requirements sharing a broad kind never conflict. Expand field conflict grouping across all material same-field values while preserving explicit location alternatives as alternatives rather than conflicts.
+- Verify SHA-256 excerpts alongside exact slice and source length in Node extraction/persistence. Domain schemas continue validating shape without importing Node crypto into client bundles; import/repository boundaries perform cryptographic verification.
+- Replace reconstructed structured spans with a JSON token/path locator that points to exact component string tokens. Traverse JobPosting `jobLocation.address` objects/arrays and common identity/employment/salary/date/skills/qualification/requirements fields. Extract structured HTML descriptions through the existing inert sanitization/text boundary while mapping each extracted text span back to exact source bytes or a conservative component evidence/derived field graph.
+- Make coverage bounded and conservative: `COMPLETE` requires a recognized family-owned section/structured property whose material spans were all treated; otherwise evidence yields `PARTIAL`, no evidence yields `UNKNOWN`, and unknown headings/unclassified material spans remain reviewable across relevant families.
+- Harden AU locality/state/postcode parsing, location alternatives, salary shorthand/ranges/period uncertainty, document-local clauses, credible clock grammar, explicit date precision/timezone, and multi-proposition work-right extraction without candidate inference.
+- Add an explicit R2A read result `AVAILABLE | LEGACY_NOT_AVAILABLE | INVALID`; tolerate only recognized 0003 legacy UNKNOWN placeholders as unavailable compatibility data, never as exact provenance. The current UI shows `R2A_EVIDENCE_INVALID_REVIEW_REQUIRED` for invalid current rows without exception/private content.
+- Wrap canonical update, job-version/R2A persistence, and downstream stale/invalidation updates in one SQLite transaction. Treat unchanged 3.1.0 semantic content as an idempotent no-op. Use SQLite abort triggers in tests to inject evidence/evaluation/document/packet failures and prove total rollback.
+- Require an exact confirmation token for `r2a:reprocess-private`; before mutation verify schema/integrity/FKs, ignored/untracked path, one supported stored provenance, and create/verify a fresh ignored backup. Migration confirmation refuses schema newer than the supported version before backup or mutation.
+
+Data flow:
+
+`immutable source bytes -> inert structured/text token spans -> 3.1.0 field + requirement evidence -> hash/slice/length verification -> conservative conflict + coverage graph -> one atomic canonical/version/evidence/staleness transaction -> explicit AVAILABLE/LEGACY_NOT_AVAILABLE/INVALID read state -> safe owner UI`
+
+## Proposed files and dependencies
+
+- Update `packages/job-model/src/r2a.ts` and focused schema tests for the narrowed state/modality/derivation/conflict/date contracts and 3.1.0 constants.
+- Refactor `packages/job-importer/src/r2a-normalization.ts`, its tests, and `fixtures/r2a/manifest.ts` for structured token provenance, inert description parsing, conservative coverage/conflicts, and the complete adversarial grammar corpus.
+- Update `packages/database/src/r2a-repository.ts`, `beta-repository.ts`, `job-import-repository.ts`, and database/integration tests for exact hash/source verification, legacy compatibility results, atomic reprocess, rollback injection, and semantic idempotency.
+- Harden `scripts/r2a-reprocess-private.ts`, `scripts/migrate-local-database.ts`, shared safe database helpers, and tests for confirmation/bound backup and future-schema refusal.
+- Update `apps/web/lib/beta-workspace.ts`, the job detail page, and fictional E2E tests for explicit availability/legacy/invalid display states.
+- Update `PROJECT_PLAN.md`, `docs/R2_MATCHING_QUALITY_PLAN.md`, `docs/JOB_NORMALIZATION.md`, `docs/THREAT_MODEL_V1.md`, and `docs/GO_LIVE_CHECKLIST.md` with final verified reality only.
+- Add no network, AI, browser-target, scoring, or runtime dependency. Prefer existing Node crypto, Zod, SQLite transactions/savepoints, HTML sanitization, backup helpers, Vitest, and Playwright.
+
+## Risks, security/privacy, and rollback
+
+Primary risks are strengthening conditional/negated text, false same-kind conflicts, fabricated structured spans, accidental COMPLETE coverage, corrupt legacy-row crashes, partial current-version activation, future-schema mutation, private-data leakage during revalidation, and repeat-version churn. Controls are closed refinements, exact proposition keys, token-level source locations, conservative UNKNOWN/PARTIAL fallback, cryptographic boundary checks, explicit read states, one outer transaction, failure-trigger tests, pre-mutation confirmation/backup/schema checks, aggregate-only logs, and full tracked/history/build/test privacy scans.
+
+All job/HTML/JSON content remains inert. There will be zero source calls, employer-form visits, uploads, submissions, or real runner actions. No exception/private excerpt is rendered in invalid UI. Real profile/vacancy/database/backups/artifacts remain ignored/untracked and their content is never printed. Migration 0003 is protected by pre/post Git hash checks. Rollback before private work is normal code/test revert on the unmerged branch; after private reprocess, recovery uses only the newly verified ignored backup under explicit owner recovery authority. No down migration or direct row repair is allowed.
+
+## Testing, acceptance, and exact sequence
+
+Synthetic acceptance covers every requested independence combination; requirement link/negation/conflict refinements; field-only derivation persistence/round-trip and cross-kind rejection; tampered hash; same-subject requirement conflicts versus unrelated kinds; broad field conflicts versus alternatives; unknown/generic heading coverage; nested/multi-location JSON-LD and inert HTML description; AU location, salary, document, clock, date precision/timezone, and multi-work-right regressions; legacy multi-row 0003 read; atomic evidence/evaluation/document/packet rollback; same-version idempotency; confirmation/backup; future-schema refusal; and AVAILABLE/LEGACY_NOT_AVAILABLE/INVALID UI. Existing fictional corpus remains and no automated fixture uses the private vacancy.
+
+Before private mutation run format, lint, typecheck, unit, integration, build, E2E, privacy, full/production dependency audits, migration/legacy/backup/restore/atomic tests, diff check, and strict fsck. Then stop owned writers, verify profile/schema/integrity/FKs/ignore state and exact supported provenance, create/verify a fresh backup, run one explicitly confirmed offline 3.1.0 reprocess, verify the historical 3.0.0 version remains, the new version/current evidence is correct, dependent rows are stale/invalidated atomically, repeated semantic execution is a no-op, and calls/visits/uploads/submissions remain zero. Finish with the entire named exact-head local gate, privacy audit, immutable-0003 check, coherent commits, same-branch push, PR #12 exact-head push/PR CI, and an unmerged handoff.
+
+Exact implementation order:
+
+1. Lock migration 0003 hash and implement/test the narrowed 3.1.0 domain invariants and date compatibility.
+2. Implement exact pointer hashing, structured token/description extraction, conservative coverage, conflict proposition keys, and all grammar/location/salary/document/schedule/work-right fixtures.
+3. Implement repository legacy/read-state compatibility, domain/persistence parity, atomic reprocess, idempotency, and failure injection.
+4. Harden real reprocess confirmation/backup and future-schema migration refusal; add synthetic command/helper coverage.
+5. Implement explicit safe UI states and E2E regressions.
+6. Run all synthetic gates and fix every failure before any real DB touch.
+7. Perform exactly one backed-up/confirmed offline private 3.1.0 reprocess and safe aggregate verification; do not regenerate documents or repeat mutation when already current.
+8. Update reality docs, run every final gate on the committed head, push only `feat/r2a-evidence-normalization`, wait for both exact-head CI contexts on PR #12, and stop unmerged.
+
+## Consolidated hardening implementation and verification result
+
+R2A parser, evidence-contract, and normalization version `3.1.0` now enforce independent evidence state/modality, persistable requirement invariants, field-only derivations, proposition-scoped requirement conflicts, broad conservative field conflicts, SHA-256 excerpt validation, bounded conservative coverage, nested/array JSON-LD component provenance, inert structured-description extraction, explicit date precision/timezone state, and hardened location/salary/document/schedule/work-right parsing. Historical 3.0.0 DATE JSON remains readable. Recognized 0003 UNKNOWN placeholders return `LEGACY_NOT_AVAILABLE`; corrupt current rows return `INVALID` and the owner UI shows only `R2A_EVIDENCE_INVALID_REVIEW_REQUIRED`.
+
+R2A reprocess now records the canonical job, immutable version/evidence, and all downstream invalidation in one outer SQLite transaction. Synthetic abort triggers at evidence insert, evaluation staleness, document invalidation, and packet invalidation each proved total rollback with unchanged prior job/version/evaluation/document/approval/packet state plus clean integrity/FKs. Identical 3.1.0 reprocess is a semantic no-op. The private command requires exact token `REPROCESS_R2A_PRIVATE`, confirms ignored/untracked schema-v3 one-job supported provenance with clean integrity/FKs, and creates/verifies a fresh backup before mutation. Confirmed migration refuses a future schema before backup or application writes.
+
+Pre-private synthetic verification passed formatting, lint, typecheck, 244 unit tests across 35 files, 19 integration tests across 3 files, a 31-page-unit production build, 20 serialized fictional E2E tests, migration/legacy/backup/restore/idempotency/atomic rollback cases, privacy audit, full and production dependency audits with zero vulnerabilities, `git diff --check`, and `git fsck --strict`. The E2E suite includes an intentionally corrupt fictional normalization and proves the explicit safe invalid-data warning.
+
+ApplyPilot writers were already stopped. The ignored private profile validated generically and the real database was schema v3 with zero pending migrations, integrity `PASS`, and zero FK issues. Confirmed offline reprocess created and verified ignored backup `backup-2026-09-09T08-05-00.355Z-b9be68b7`, then created exactly one immutable current version: versions 1–3 retain 3.0.0 and version 4 records 3.1.0 with 5 field evidence rows, 7 requirement evidence rows, 17 coverage rows, 5 UNKNOWN families, and 0 conflicts. Historical observations and downstream rows were preserved; affected rows were already stale/invalidated, so additional stale evaluation/document/packet counts were all 0. Real source calls, employer-form visits, uploads, submissions, document generation, packet preparation, and all other real application actions were 0.
+
+Current release state remains deliberately bounded:
+
+- R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; PR #12 exact-head CI and final human delta review remain required before merge.
+- R2B: `NOT_IMPLEMENTED`.
+- R2C: `NOT_IMPLEMENTED`.
+- R2D: `NOT_IMPLEMENTED`.
+- Source-enabled Personal Beta: `WAITING_FOR_APPROVED_TENANT`; capability count 0.
+- Personal Live V1: `NOT_READY`; real runner `TARGET_APPROVAL_REQUIRED`.

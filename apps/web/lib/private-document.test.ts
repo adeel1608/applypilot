@@ -18,6 +18,7 @@ function database(): BetterSqlite3.Database {
     "0000_applypilot_foundation.sql",
     "0001_real_world_job_intake.sql",
     "0002_personal_live_beta_core.sql",
+    "0003_r2a_evidence_normalization.sql",
   ]) {
     sqlite.exec(
       readFileSync(new URL(`../../../packages/database/drizzle/${name}`, import.meta.url), "utf8"),

@@ -10,6 +10,7 @@ import {
   configuredLocalPort,
   localRuntimePaths,
 } from "./lib/local-process";
+import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
 import { validatePrivateProfileAtPath } from "./validate-private-profile";
 
@@ -35,14 +36,16 @@ async function main(): Promise<void> {
       database.close();
     }
   }
+  const schemaStatus = databaseSchemaStatus(databaseSchema);
   const runtime = localRuntimePaths(root);
   const failures: string[] = [];
   const manualBetaBlockers: string[] = [];
   if (profile.state === "INVALID") failures.push("PRIVATE_PROFILE_INVALID");
   if (profile.state !== "VALID") manualBetaBlockers.push("PRIVATE_PROFILE_NOT_READY");
   if (!databasePresent) manualBetaBlockers.push("DATABASE_MISSING");
-  if (databasePresent && databaseSchema < 2) manualBetaBlockers.push("PENDING_DATABASE_MIGRATION");
-  if (databaseSchema > 2) failures.push("DATABASE_SCHEMA_UNSUPPORTED");
+  if (databasePresent && schemaStatus.pendingMigrations > 0)
+    manualBetaBlockers.push("PENDING_DATABASE_MIGRATION");
+  if (schemaStatus.unsupported) failures.push("DATABASE_SCHEMA_UNSUPPORTED");
   if (databasePresent && databaseIntegrity !== "PASS") failures.push("DATABASE_INTEGRITY_FAILED");
   if (foreignKeyIssues > 0) failures.push("DATABASE_FOREIGN_KEY_ISSUES");
   assertConfiguredLocalHost();
@@ -52,7 +55,7 @@ async function main(): Promise<void> {
   }
   console.log(`PREFLIGHT_PROFILE state=${profile.state}`);
   console.log(
-    `PREFLIGHT_DATABASE state=${databasePresent ? "PRESENT" : "ABSENT"} schema_version=${databaseSchema} pending_migrations=${Math.max(0, 2 - databaseSchema)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
+    `PREFLIGHT_DATABASE state=${databasePresent ? "PRESENT" : "ABSENT"} schema_version=${databaseSchema} pending_migrations=${schemaStatus.pendingMigrations} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
   );
   console.log("PREFLIGHT_LOOPBACK host=127.0.0.1 status=PASS");
   console.log("PREFLIGHT_OUTPUT_ROOT status=PASS");

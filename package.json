@@ -38,6 +38,7 @@
     "profile:validate": "tsx scripts/validate-private-profile.ts",
     "generate:example-resume": "tsx scripts/generate-example-resume.ts",
     "smoke:private-beta": "tsx scripts/private-beta-smoke.ts",
+    "r2a:reprocess-private": "tsx scripts/r2a-reprocess-private.ts",
     "audit:production": "npm audit --omit=dev"
   },
   "dependencies": {

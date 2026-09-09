@@ -35,6 +35,10 @@ describe("database foundation", () => {
         "finalActionConsents",
         "capabilityConfigs",
         "discoveryRuns",
+        "jobFieldEvidenceV2",
+        "requirementEvidenceV2",
+        "evidenceDerivations",
+        "jobNormalizationCoverage",
       ]),
     );
   });
@@ -92,6 +96,7 @@ describe("database foundation", () => {
       "0000_applypilot_foundation.sql",
       "0001_real_world_job_intake.sql",
       "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -108,6 +113,10 @@ describe("database foundation", () => {
         "application_packets",
         "application_runs",
         "capability_configs",
+        "job_field_evidence_v2",
+        "requirement_evidence_v2",
+        "evidence_derivations",
+        "job_normalization_coverage",
       ]),
     );
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
