@@ -2,6 +2,7 @@ import BetterSqlite3 from "better-sqlite3";
 
 import { JobImportRepository } from "@applypilot/database";
 
+import { CURRENT_DATABASE_SCHEMA_VERSION } from "./lib/database-schema";
 import { localDatabasePath } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
@@ -9,7 +10,9 @@ async function main(): Promise<void> {
   const sqlite = new BetterSqlite3(databasePath, { fileMustExist: true });
   sqlite.pragma("foreign_keys = ON");
   try {
-    if (Number(sqlite.pragma("user_version", { simple: true })) !== 3) {
+    if (
+      Number(sqlite.pragma("user_version", { simple: true })) !== CURRENT_DATABASE_SCHEMA_VERSION
+    ) {
       throw new Error("R2A_SCHEMA_V3_REQUIRED");
     }
     if (sqlite.pragma("integrity_check", { simple: true }) !== "ok") {

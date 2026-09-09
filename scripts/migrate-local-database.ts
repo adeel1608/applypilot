@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 
 import { createDatabaseBackup } from "./lib/database-maintenance";
+import { CURRENT_DATABASE_SCHEMA_VERSION, databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
@@ -22,7 +23,7 @@ async function main(): Promise<void> {
       }
     }
     console.log(
-      `MIGRATION_PREVIEW current_schema=${version} target_schema=3 pending=${Math.max(0, 3 - version)}`,
+      `MIGRATION_PREVIEW current_schema=${version} target_schema=${CURRENT_DATABASE_SCHEMA_VERSION} pending=${databaseSchemaStatus(version).pendingMigrations}`,
     );
     console.log("No changes made. Re-run with --confirm to create a verified backup and migrate.");
     return;

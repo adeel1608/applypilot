@@ -1,0 +1,13 @@
+export const CURRENT_DATABASE_SCHEMA_VERSION = 3;
+
+export interface DatabaseSchemaStatus {
+  pendingMigrations: number;
+  unsupported: boolean;
+}
+
+export function databaseSchemaStatus(schemaVersion: number): DatabaseSchemaStatus {
+  return {
+    pendingMigrations: Math.max(0, CURRENT_DATABASE_SCHEMA_VERSION - schemaVersion),
+    unsupported: schemaVersion > CURRENT_DATABASE_SCHEMA_VERSION,
+  };
+}
