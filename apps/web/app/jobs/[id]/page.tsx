@@ -244,7 +244,11 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
             <h2>Evidence, conflicts, and coverage</h2>
           </div>
           <span className="source-pill">
-            {detail.r2a ? `Parser ${detail.r2a.parserVersion}` : "R2A unavailable"}
+            {detail.r2aState === "AVAILABLE"
+              ? `Parser ${detail.r2a?.parserVersion}`
+              : detail.r2aState === "INVALID"
+                ? "R2A invalid"
+                : "Legacy evidence unavailable"}
           </span>
         </div>
         <p>
@@ -257,7 +261,7 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               <dt>Job version {version.version}</dt>
               <dd>
                 {version.id} ·{" "}
-                {version.r2aCoverageCount === 17 ? "R2A evidence" : "legacy evidence"}
+                {version.r2aState === "AVAILABLE" ? "R2A evidence" : "legacy evidence unavailable"}
               </dd>
             </div>
           ))}
@@ -346,6 +350,8 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
               <p>No current typed requirement evidence.</p>
             )}
           </>
+        ) : detail.r2aState === "INVALID" ? (
+          <p role="alert">R2A_EVIDENCE_INVALID_REVIEW_REQUIRED</p>
         ) : (
           <p>The current job version predates verified R2A evidence or schema migration.</p>
         )}

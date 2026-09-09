@@ -79,12 +79,32 @@ function populateSchemaV2(databasePath: string): void {
       .run(version.id, version.observationId, JSON.stringify("PART_TIME"), now);
     sqlite
       .prepare(
+        `INSERT INTO job_field_evidence
+          (id,job_version_id,field_name,source_observation_id,source_path,original_text,
+           normalized_value_json,certainty,rule_id,extractor_version,created_at)
+         VALUES ('legacy-field-2',?,'location',?,'description','Fictional Place',?,
+           'LOW','LEGACY_FIELD','2.0.0',?)`,
+      )
+      .run(version.id, version.observationId, JSON.stringify("Fictional Place"), now);
+    sqlite
+      .prepare(
         `INSERT INTO requirement_evidence
           (id,job_version_id,source_observation_id,source_path,start_offset,end_offset,
            original_text,normalized_proposition,modality,kind,condition_text,certainty,
            rule_id,extractor_version,created_at)
          VALUES ('legacyRequirement',?,?,'description',0,19,'experience preferred',
            'experience preferred','PREFERRED','EXPERIENCE',NULL,'MEDIUM',
+           'LEGACY_REQUIREMENT','2.0.0',?)`,
+      )
+      .run(version.id, version.observationId, now);
+    sqlite
+      .prepare(
+        `INSERT INTO requirement_evidence
+          (id,job_version_id,source_observation_id,source_path,start_offset,end_offset,
+           original_text,normalized_proposition,modality,kind,condition_text,certainty,
+           rule_id,extractor_version,created_at)
+         VALUES ('legacyRequirement2',?,?,'description',21,33,'RSA required',
+           'RSA required','REQUIRED','CERTIFICATION',NULL,'HIGH',
            'LEGACY_REQUIREMENT','2.0.0',?)`,
       )
       .run(version.id, version.observationId, now);
@@ -131,24 +151,41 @@ describe("R2A additive migration and repository", () => {
         Number(sqlite.prepare("SELECT count(*) FROM job_normalization_coverage").pluck().get()),
       ).toBe(17);
       expect(Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get())).toBe(1);
+      const legacyVersionId = sqlite
+        .prepare("SELECT id FROM job_versions ORDER BY version LIMIT 1")
+        .pluck()
+        .get() as string;
+      expect(new R2ARepository(sqlite).getNormalizationResult(legacyVersionId)).toEqual({
+        state: "LEGACY_NOT_AVAILABLE",
+        normalization: null,
+      });
 
       const observationId = sqlite
         .prepare("SELECT id FROM source_observations LIMIT 1")
         .pluck()
         .get() as string;
-      const source = `Title: Fictional R2A Analyst
-Company: Example Test Works
-Location: Parramatta NSW 2150
-Employment type: Full-time
-Requirements
-- Two years experience preferred
-- Valid Australian work rights required
-- Cover letter not required
-Hours
-- 38 hours per week`;
+      const structured = {
+        title: "Fictional R2A Analyst",
+        hiringOrganization: { name: "Example Test Works" },
+        jobLocation: {
+          address: {
+            addressLocality: "Parramatta",
+            addressRegion: "NSW",
+            postalCode: "2150",
+            addressCountry: "AU",
+          },
+        },
+        requirements: [
+          "Two years experience preferred",
+          "Valid Australian work rights required",
+          "Cover letter not required",
+        ],
+      };
+      const source = JSON.stringify(structured);
       const normalization = normalizeR2AJobEvidence({
         sourceText: source,
         sourceObservationId: observationId,
+        structured,
       });
       const baseJob = fixtureJob("job-retail-sales-assistant");
       const repository = new BetaRepository(
@@ -170,7 +207,15 @@ Hours
         r2aSemanticDigest(normalization),
       );
       expect(r2a.recordNormalization(recorded.id, normalization).created).toBe(false);
-      expect(r2a.getNormalization(recorded.id)?.parserVersion).toBe("3.0.0");
+      const reloaded = r2a.getNormalization(recorded.id)!;
+      expect(reloaded.parserVersion).toBe("3.1.0");
+      const derived = reloaded.fieldEvidence.find(({ state }) => state === "DERIVED");
+      expect(derived?.derivationInputIds.length).toBeGreaterThan(1);
+      expect(
+        derived?.derivationInputIds.every((id) =>
+          reloaded.fieldEvidence.some((evidence) => evidence.id === id),
+        ),
+      ).toBe(true);
       const corrected = new BetaRepository(sqlite, () => new Date(now)).recordOwnerCorrection({
         job: { ...baseJob, title: "Corrected Fictional R2A Analyst", dateUpdated: now },
         reasonCode: "OWNER_REVIEWED_FIELDS",
@@ -187,6 +232,15 @@ Hours
       });
       expect(sqlite.prepare("SELECT count(*) FROM job_corrections").pluck().get()).toBe(1);
       expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+      sqlite
+        .prepare(
+          "UPDATE job_field_evidence_v2 SET excerpt_hash = ? WHERE job_version_id = ? AND rowid = (SELECT min(rowid) FROM job_field_evidence_v2 WHERE job_version_id = ?)",
+        )
+        .run("f".repeat(64), recorded.id, recorded.id);
+      expect(r2a.getNormalizationResult(recorded.id)).toEqual({
+        state: "INVALID",
+        normalization: null,
+      });
     } finally {
       sqlite.close();
     }
@@ -199,7 +253,7 @@ Hours
       now: new Date("2026-09-09T00:01:00.000Z"),
     });
     expect(restored.restored.schemaVersion).toBe(2);
-    expect(inspectDatabase(databasePath).tableCounts.requirement_evidence).toBe(1);
+    expect(inspectDatabase(databasePath).tableCounts.requirement_evidence).toBe(2);
   });
 
   it("rejects evidence linked to a different immutable observation", () => {

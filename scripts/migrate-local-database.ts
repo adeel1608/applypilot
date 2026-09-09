@@ -5,7 +5,11 @@ import { dirname, join } from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 
 import { createDatabaseBackup } from "./lib/database-maintenance";
-import { CURRENT_DATABASE_SCHEMA_VERSION, databaseSchemaStatus } from "./lib/database-schema";
+import {
+  CURRENT_DATABASE_SCHEMA_VERSION,
+  assertMigrationSchemaSupported,
+  databaseSchemaStatus,
+} from "./lib/database-schema";
 import { localDatabasePath } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
@@ -31,6 +35,14 @@ async function main(): Promise<void> {
 
   mkdirSync(dirname(databasePath), { recursive: true });
   const existed = existsSync(databasePath);
+  if (existed) {
+    const existing = new BetterSqlite3(databasePath, { readonly: true, fileMustExist: true });
+    try {
+      assertMigrationSchemaSupported(Number(existing.pragma("user_version", { simple: true })));
+    } finally {
+      existing.close();
+    }
+  }
   if (existed) {
     const manifest = await createDatabaseBackup({
       databasePath,

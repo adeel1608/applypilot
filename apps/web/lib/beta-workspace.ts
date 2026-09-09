@@ -148,7 +148,9 @@ export interface BetaJobDetail {
     version: number;
     createdAt: string;
     r2aCoverageCount: number;
+    r2aState: "AVAILABLE" | "LEGACY_NOT_AVAILABLE";
   }>;
+  r2aState: "AVAILABLE" | "LEGACY_NOT_AVAILABLE" | "INVALID";
   r2a: null | {
     parserVersion: string;
     evidenceContractVersion: string;
@@ -370,18 +372,25 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     .prepare(
       `SELECT v.id, v.version, v.created_at AS createdAt,
          (SELECT count(*) FROM job_normalization_coverage c WHERE c.job_version_id = v.id)
-           AS r2aCoverageCount
+           AS r2aCoverageCount,
+         CASE WHEN EXISTS(
+           SELECT 1 FROM job_field_evidence_v2 f
+           WHERE f.job_version_id = v.id AND f.rule_id <> 'R2A_LEGACY_FIELD_UNKNOWN'
+         ) OR EXISTS(
+           SELECT 1 FROM requirement_evidence_v2 r
+           WHERE r.job_version_id = v.id AND r.rule_id <> 'R2A_LEGACY_REQUIREMENT_UNKNOWN'
+         ) THEN 'AVAILABLE' ELSE 'LEGACY_NOT_AVAILABLE' END AS r2aState
        FROM job_versions v WHERE v.job_id = ? ORDER BY v.version DESC`,
     )
     .all(jobId) as BetaJobDetail["jobVersions"];
-  let r2aNormalization: ReturnType<R2ARepository["getNormalization"]> = null;
+  let r2aRead: ReturnType<R2ARepository["getNormalizationResult"]> = {
+    state: "LEGACY_NOT_AVAILABLE",
+    normalization: null,
+  };
   if (row.jobVersionId) {
-    try {
-      r2aNormalization = new R2ARepository(sqlite).getNormalization(row.jobVersionId);
-    } catch {
-      r2aNormalization = null;
-    }
+    r2aRead = new R2ARepository(sqlite).getNormalizationResult(row.jobVersionId);
   }
+  const r2aNormalization = r2aRead.normalization;
   const packetRow = sqlite
     .prepare(
       `SELECT id, version, status, readiness_json AS readinessJson, created_at AS createdAt
@@ -414,6 +423,7 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     templateEvidencePriorities: recommendedDesign.evidencePriorities,
     requirements: requirementRows,
     jobVersions,
+    r2aState: r2aRead.state,
     r2a: r2aNormalization
       ? {
           parserVersion: r2aNormalization.parserVersion,

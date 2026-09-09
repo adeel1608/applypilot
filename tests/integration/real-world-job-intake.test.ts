@@ -63,6 +63,85 @@ function selection(recordId: string) {
   ];
 }
 
+async function seedR2AReprocessScenario(
+  sqlite: BetterSqlite3.Database,
+  repository: JobImportRepository,
+) {
+  const provider: CandidateProfileProvider = {
+    resolve: async () => ({ state: "PRIVATE_LOCAL_PROFILE", profile: testProfile }),
+  };
+  const staged = repository.stage(prepared());
+  const confirmed = await repository.confirm(
+    staged.importId,
+    staged.previewToken,
+    selection(staged.records[0]!.recordId),
+    provider,
+  );
+  const jobId = confirmed.jobs[0]!.jobId;
+  const state = sqlite
+    .prepare(
+      `SELECT v.id AS jobVersionId, e.id AS evaluationVersionId,
+              e.profile_version_id AS profileVersionId,
+              e.eligibility_status AS eligibilityStatus
+       FROM job_versions v JOIN evaluation_versions e ON e.job_version_id = v.id
+       WHERE v.job_id = ? ORDER BY v.version DESC LIMIT 1`,
+    )
+    .get(jobId) as {
+    jobVersionId: string;
+    evaluationVersionId: string;
+    profileVersionId: string;
+    eligibilityStatus: "ELIGIBLE" | "INELIGIBLE" | "REVIEW_REQUIRED";
+  };
+  const beta = new BetaRepository(sqlite, fixedNow);
+  beta.recordDocumentArtifact({
+    id: "document:r2a-atomic",
+    jobId,
+    jobVersionId: state.jobVersionId,
+    profileVersionId: state.profileVersionId,
+    type: "CV",
+    template: "CLASSIC",
+    format: "DOCX",
+    fileName: "fictional-r2a.docx",
+    localPath: "documents/fictional-r2a.docx",
+    contentDigest: "a".repeat(64),
+    claimEvidence: ["fictional:skill"],
+    layoutResult: { structureValidated: true },
+  });
+  beta.approveDocument({
+    documentArtifactId: "document:r2a-atomic",
+    contentDigest: "a".repeat(64),
+  });
+  beta.persistApplicationPacket(
+    ApplicationPacketSchema.parse({
+      id: "packet:r2a-atomic",
+      jobId,
+      jobVersionId: state.jobVersionId,
+      profileVersionId: state.profileVersionId,
+      evaluationVersionId: state.evaluationVersionId,
+      eligibilityStatus: state.eligibilityStatus,
+      targetUrl: "http://127.0.0.1:4123/synthetic-application",
+      targetHost: "127.0.0.1",
+      jobExpiryState: "ACTIVE",
+      duplicateState: "CLEAR",
+      versionsCurrent: true,
+      documents: [
+        {
+          id: "document:r2a-atomic",
+          type: "CV",
+          fileName: "fictional-r2a.docx",
+          digest: "a".repeat(64),
+          approved: true,
+          stale: false,
+          required: true,
+        },
+      ],
+      answers: [],
+    }),
+  );
+  sqlite.exec(r2aMigration);
+  return { jobId, ...state };
+}
+
 describe("real-world job intake persistence and profile gate", () => {
   let sqlite: BetterSqlite3.Database;
   let repository: JobImportRepository;
@@ -340,6 +419,79 @@ describe("real-world job intake persistence and profile gate", () => {
         .get(result.jobVersionId),
     ).toBe(17);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+  });
+
+  it("does not churn an identical current R2A normalization", async () => {
+    const { jobId } = await seedR2AReprocessScenario(sqlite, repository);
+    const first = await repository.reprocessLegacyJobR2A(jobId);
+    const versionCount = Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get());
+    const second = await repository.reprocessLegacyJobR2A(jobId);
+    expect(first.created).toBe(true);
+    expect(second).toMatchObject({
+      created: false,
+      jobVersionId: first.jobVersionId,
+      staleEvaluations: 0,
+      staleDocuments: 0,
+      invalidatedPackets: 0,
+    });
+    expect(Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get())).toBe(
+      versionCount,
+    );
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+  });
+
+  it.each([
+    ["evidence persistence", "BEFORE INSERT ON job_field_evidence_v2"],
+    ["evaluation staleness", "BEFORE UPDATE OF stale ON evaluation_versions WHEN NEW.stale = 1"],
+    ["document invalidation", "BEFORE UPDATE OF stale ON document_artifacts WHEN NEW.stale = 1"],
+    [
+      "packet invalidation",
+      "BEFORE UPDATE OF status ON application_packets WHEN NEW.status = 'INVALIDATED'",
+    ],
+  ] as const)("rolls back the whole R2A transition on %s failure", async (_label, trigger) => {
+    const { jobId, jobVersionId } = await seedR2AReprocessScenario(sqlite, repository);
+    const beforeJob = sqlite
+      .prepare(
+        "SELECT normalized_json AS normalizedJson, updated_at AS updatedAt FROM jobs WHERE id = ?",
+      )
+      .get(jobId);
+    const beforeVersionCount = Number(
+      sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get(),
+    );
+    sqlite.exec(
+      `CREATE TEMP TRIGGER injected_r2a_failure ${trigger}
+       BEGIN SELECT RAISE(ABORT, 'INJECTED_R2A_FAILURE'); END`,
+    );
+
+    await expect(repository.reprocessLegacyJobR2A(jobId)).rejects.toThrow("INJECTED_R2A_FAILURE");
+
+    expect(
+      sqlite
+        .prepare(
+          "SELECT normalized_json AS normalizedJson, updated_at AS updatedAt FROM jobs WHERE id = ?",
+        )
+        .get(jobId),
+    ).toEqual(beforeJob);
+    expect(Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get())).toBe(
+      beforeVersionCount,
+    );
+    expect(
+      sqlite
+        .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
+        .pluck()
+        .get(jobId),
+    ).toBe(jobVersionId);
+    expect(sqlite.prepare("SELECT stale FROM evaluation_versions").pluck().get()).toBe(0);
+    expect(sqlite.prepare("SELECT stale FROM document_artifacts").pluck().get()).toBe(0);
+    expect(
+      sqlite.prepare("SELECT invalidated_at FROM document_approvals").pluck().get(),
+    ).toBeNull();
+    expect(sqlite.prepare("SELECT status FROM application_packets").pluck().get()).toBe(
+      "READY_TO_APPLY",
+    );
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
   });
 
   it("refuses to guess legacy boundaries for a stored multi-job batch", async () => {

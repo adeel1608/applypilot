@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { RequirementKindSchema, RequirementModalitySchema } from "./beta";
 
-export const R2A_PARSER_VERSION = "3.0.0";
-export const R2A_EVIDENCE_CONTRACT_VERSION = "3.0.0";
-export const R2A_NORMALIZATION_VERSION = "3.0.0";
+export const R2A_PARSER_VERSION = "3.1.0";
+export const R2A_EVIDENCE_CONTRACT_VERSION = "3.1.0";
+export const R2A_NORMALIZATION_VERSION = "3.1.0";
 
 export const JobEvidenceStateSchema = z.enum([
   "SOURCE_STATED",
@@ -201,6 +201,46 @@ export const TrainingValueSchema = z.object({
   state: z.enum(["PROVIDED", "NOT_PROVIDED", "REQUIRED", "AVAILABLE", "UNKNOWN"]),
   name: z.string().min(1).max(500).nullable(),
 });
+export const DatePrecisionSchema = z.enum(["DATE_ONLY", "DATE_TIME", "UNKNOWN"]);
+export const DateTimezoneStateSchema = z.enum(["KNOWN", "UNKNOWN"]);
+export const DateValueSchema = z.union([
+  // Historical 3.0.0 rows stored a nullable UTC timestamp directly. Keep them readable.
+  z.iso.datetime(),
+  z.null(),
+  z
+    .object({
+      value: z.string().min(1).max(100).nullable(),
+      precision: DatePrecisionSchema,
+      timezone: DateTimezoneStateSchema,
+      offset: z
+        .string()
+        .regex(/^(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)$/)
+        .nullable(),
+    })
+    .superRefine((value, context) => {
+      const validDateOnly = value.value ? /^\d{4}-\d{2}-\d{2}$/.test(value.value) : false;
+      const hasDateTime = value.value?.includes("T") ?? false;
+      const consistent =
+        (value.precision === "UNKNOWN" &&
+          value.value === null &&
+          value.timezone === "UNKNOWN" &&
+          value.offset === null) ||
+        (value.precision === "DATE_ONLY" &&
+          validDateOnly &&
+          value.timezone === "UNKNOWN" &&
+          value.offset === null) ||
+        (value.precision === "DATE_TIME" &&
+          hasDateTime &&
+          ((value.timezone === "KNOWN" && value.offset !== null) ||
+            (value.timezone === "UNKNOWN" && value.offset === null)));
+      if (!consistent) {
+        context.addIssue({
+          code: "custom",
+          message: "date precision, timezone, offset, and value must be internally consistent",
+        });
+      }
+    }),
+]);
 
 export const R2NormalizedValueSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("TEXT"), value: z.string().min(1).max(4096) }),
@@ -217,7 +257,7 @@ export const R2NormalizedValueSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("VEHICLE_TRAVEL"), value: VehicleTravelValueSchema }),
   z.object({ kind: z.literal("PHYSICAL"), value: z.string().min(1).max(4096) }),
   z.object({ kind: z.literal("TRAINING"), value: TrainingValueSchema }),
-  z.object({ kind: z.literal("DATE"), value: z.iso.datetime().nullable() }),
+  z.object({ kind: z.literal("DATE"), value: DateValueSchema }),
   z.object({ kind: z.literal("UNKNOWN"), value: z.null() }),
 ]);
 
@@ -264,25 +304,135 @@ export const R2JobFieldEvidenceSchema = z
       });
     }
   });
-export const R2RequirementEvidenceSchema = z.object({
-  id: z.string().min(1),
-  sourceObservationId: z.string().min(1),
-  jobVersionId: z.string().min(1).nullable().default(null),
-  family: JobFieldFamilySchema,
-  canonicalKind: RequirementKindSchema,
-  state: JobEvidenceStateSchema,
-  modality: RequirementModalitySchema,
-  condition: z.string().min(1).max(1000).nullable(),
-  source: SourceEvidencePointerSchema,
-  normalizedValue: R2NormalizedValueSchema,
-  extractorVersion: z.string().min(1),
-  ruleId: z.string().min(1),
-  ...EvidenceLinksSchema.shape,
-});
+export const R2RequirementEvidenceSchema = z
+  .object({
+    id: z.string().min(1),
+    sourceObservationId: z.string().min(1),
+    jobVersionId: z.string().min(1).nullable().default(null),
+    family: JobFieldFamilySchema,
+    canonicalKind: RequirementKindSchema,
+    state: JobEvidenceStateSchema,
+    modality: RequirementModalitySchema,
+    condition: z.string().min(1).max(1000).nullable(),
+    source: SourceEvidencePointerSchema,
+    normalizedValue: R2NormalizedValueSchema,
+    extractorVersion: z.string().min(1),
+    ruleId: z.string().min(1),
+    ...EvidenceLinksSchema.shape,
+  })
+  .superRefine((value, context) => {
+    if (value.state === "DERIVED") {
+      context.addIssue({
+        code: "custom",
+        path: ["state"],
+        message: "derived requirement evidence is not supported by the R2A persistence contract",
+      });
+    }
+    if (value.derivationInputIds.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["derivationInputIds"],
+        message: "requirement evidence cannot carry derivation inputs in R2A",
+      });
+    }
+    if (value.state === "OWNER_CORRECTED" && !value.ownerCorrectionId) {
+      context.addIssue({
+        code: "custom",
+        path: ["ownerCorrectionId"],
+        message: "owner-corrected requirement evidence requires a correction link",
+      });
+    }
+    if (value.state === "CONFLICTING" && !value.conflictSetId) {
+      context.addIssue({
+        code: "custom",
+        path: ["conflictSetId"],
+        message: "conflicting requirement evidence requires a conflict-set link",
+      });
+    }
+    if (value.modality === "CONDITIONAL" && !value.condition) {
+      context.addIssue({
+        code: "custom",
+        path: ["condition"],
+        message: "conditional requirement modality requires retained condition evidence",
+      });
+    }
+    if (
+      value.modality === "NEGATED" &&
+      value.normalizedValue.kind === "DOCUMENT" &&
+      value.normalizedValue.value.state !== "NOT_REQUIRED"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["normalizedValue"],
+        message: "negated document evidence cannot normalize to a positive requirement",
+      });
+    }
+  });
+
+function canonicalPropositionToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(
+      /\b(?:must|required|essential|mandatory|preferred|preferably|desirable|optional|not|no|may|depending|where applicable|is|be|have|hold|current|valid)\b/g,
+      " ",
+    )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function r2RequirementPropositionKey(
+  evidence: z.infer<typeof R2RequirementEvidenceSchema>,
+): string {
+  const value = evidence.normalizedValue;
+  let subject = evidence.canonicalKind.toLowerCase();
+  if (value.kind === "DOCUMENT") subject = value.value.documentKind.toLowerCase();
+  else if (value.kind === "LICENCE_CERTIFICATION") {
+    subject = [
+      value.value.type,
+      canonicalPropositionToken(value.value.name),
+      value.value.class ?? "",
+      value.value.jurisdiction ?? "",
+    ]
+      .filter(Boolean)
+      .join(":")
+      .toLowerCase();
+  } else if (value.kind === "WORK_RIGHTS") {
+    subject = value.value.kind.startsWith("SPONSORSHIP_")
+      ? "sponsorship"
+      : value.value.kind.toLowerCase();
+  } else if (value.kind === "EXPERIENCE") subject = canonicalPropositionToken(value.value.domain);
+  else if (value.kind === "EDUCATION") {
+    subject = canonicalPropositionToken(
+      [value.value.level, value.value.field, value.value.equivalence].filter(Boolean).join(" "),
+    );
+  } else if (value.kind === "VEHICLE_TRAVEL") subject = value.value.kind.toLowerCase();
+  else if (value.kind === "TEXT") subject = canonicalPropositionToken(value.value);
+  else if (value.kind === "PHYSICAL") subject = canonicalPropositionToken(value.value);
+  return `${evidence.canonicalKind}:${subject || "unknown"}`;
+}
+
+export function r2RequirementPolarity(
+  evidence: z.infer<typeof R2RequirementEvidenceSchema>,
+): "POSITIVE" | "NEGATED" | "UNKNOWN" {
+  if (evidence.modality === "NEGATED") return "NEGATED";
+  if (evidence.normalizedValue.kind === "DOCUMENT") {
+    if (evidence.normalizedValue.value.state === "NOT_REQUIRED") return "NEGATED";
+    if (evidence.normalizedValue.value.state === "REQUIRED") return "POSITIVE";
+  }
+  if (evidence.normalizedValue.kind === "WORK_RIGHTS") {
+    if (evidence.normalizedValue.value.kind === "SPONSORSHIP_NOT_AVAILABLE") return "NEGATED";
+    if (evidence.normalizedValue.value.kind === "SPONSORSHIP_AVAILABLE") return "POSITIVE";
+  }
+  return ["REQUIRED", "PREFERRED", "CONDITIONAL"].includes(evidence.modality)
+    ? "POSITIVE"
+    : "UNKNOWN";
+}
+
 export const R2ConflictSetSchema = z.object({
   id: z.string().min(1),
   canonicalField: z.string().min(1),
-  evidenceIds: z.array(z.string().min(1)).min(1),
+  evidenceIds: z.array(z.string().min(1)).min(2),
 });
 export const FieldFamilyCoverageSchema = z.object({
   family: JobFieldFamilySchema,
@@ -305,6 +455,7 @@ export const R2ANormalizationSchema = z
   })
   .superRefine((value, context) => {
     const evidence = [...value.fieldEvidence, ...value.requirementEvidence];
+    const fieldEvidenceIds = new Set(value.fieldEvidence.map(({ id }) => id));
     const evidenceIds = new Set<string>();
     for (const [index, item] of evidence.entries()) {
       if (evidenceIds.has(item.id)) {
@@ -379,6 +530,17 @@ export const R2ANormalizationSchema = z
         });
       }
       conflictIds.add(conflict.id);
+      const uniqueMemberIds = new Set(conflict.evidenceIds);
+      if (uniqueMemberIds.size !== conflict.evidenceIds.length) {
+        context.addIssue({
+          code: "custom",
+          path: ["conflicts"],
+          message: "conflict sets cannot contain duplicate evidence members",
+        });
+      }
+      const members = conflict.evidenceIds
+        .map((evidenceId) => evidence.find(({ id }) => id === evidenceId))
+        .filter((item): item is (typeof evidence)[number] => Boolean(item));
       for (const evidenceId of conflict.evidenceIds) {
         const item = evidence.find(({ id }) => id === evidenceId);
         if (!item || item.state !== "CONFLICTING" || item.conflictSetId !== conflict.id) {
@@ -389,9 +551,62 @@ export const R2ANormalizationSchema = z
           });
         }
       }
+      const fieldMembers = members.filter((item) => "canonicalField" in item);
+      const requirementMembers = members.filter((item) => "canonicalKind" in item);
+      if (fieldMembers.length === members.length) {
+        const canonicalFields = new Set(fieldMembers.map(({ canonicalField }) => canonicalField));
+        const normalizedValues = new Set(
+          fieldMembers.map(({ normalizedValue }) => JSON.stringify(normalizedValue)),
+        );
+        const isRegionConsistencyConflict =
+          conflict.canonicalField === "location.region" &&
+          canonicalFields.size === 2 &&
+          canonicalFields.has("location.state") &&
+          canonicalFields.has("location.postcode");
+        if (
+          !isRegionConsistencyConflict &&
+          (canonicalFields.size !== 1 ||
+            !canonicalFields.has(conflict.canonicalField) ||
+            normalizedValues.size < 2)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["conflicts"],
+            message: "field conflict sets require distinct values for one canonical field",
+          });
+        }
+      } else if (requirementMembers.length === members.length) {
+        const propositionKeys = new Set(requirementMembers.map(r2RequirementPropositionKey));
+        const polarities = new Set(requirementMembers.map(r2RequirementPolarity));
+        const propositionKey = [...propositionKeys][0];
+        if (
+          propositionKeys.size !== 1 ||
+          !polarities.has("NEGATED") ||
+          !polarities.has("POSITIVE") ||
+          conflict.canonicalField !== `requirement:${propositionKey}`
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["conflicts"],
+            message: "requirement conflict sets require opposite claims for one proposition",
+          });
+        }
+      } else {
+        context.addIssue({
+          code: "custom",
+          path: ["conflicts"],
+          message: "conflict sets cannot mix field and requirement evidence",
+        });
+      }
     }
     for (const item of evidence) {
-      if (item.conflictSetId && !conflictIds.has(item.conflictSetId)) {
+      if (
+        item.conflictSetId &&
+        (!conflictIds.has(item.conflictSetId) ||
+          !value.conflicts
+            .find(({ id }) => id === item.conflictSetId)
+            ?.evidenceIds.includes(item.id))
+      ) {
         context.addIssue({
           code: "custom",
           path: ["conflicts"],
@@ -401,11 +616,11 @@ export const R2ANormalizationSchema = z
     }
     for (const item of value.fieldEvidence) {
       for (const inputId of item.derivationInputIds) {
-        if (!evidenceIds.has(inputId)) {
+        if (!fieldEvidenceIds.has(inputId) || inputId === item.id) {
           context.addIssue({
             code: "custom",
             path: ["fieldEvidence"],
-            message: "derived evidence references an unknown input",
+            message: "derived field evidence must reference another field evidence record",
           });
         }
       }

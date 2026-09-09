@@ -9,6 +9,8 @@ import {
   R2JobFieldEvidenceSchema,
   R2RequirementEvidenceSchema,
   assertR2ASourcePointers,
+  r2RequirementPolarity,
+  r2RequirementPropositionKey,
   type JobFieldFamily,
   type R2ANormalization,
   type R2JobFieldEvidence,
@@ -18,6 +20,8 @@ import {
   type RequirementModality,
   type SourceEvidencePointer,
 } from "@applypilot/job-model";
+
+import { extractInertHtmlText } from "./sanitize";
 
 type Span = { text: string; start: number; end: number; sourcePath: string };
 type Section = { family: JobFieldFamily | null; heading: string; items: Span[] };
@@ -140,6 +144,25 @@ function textSpan(source: string, value: string, sourcePath: string): Span | nul
     : null;
 }
 
+function clauseSpans(span: Span): Span[] {
+  if (span.sourcePath.startsWith("structured.")) return [span];
+  const results: Span[] = [];
+  const pattern = /[^;.]+[;.]?/g;
+  for (const match of span.text.matchAll(pattern)) {
+    const raw = match[0];
+    const trimmed = raw.replace(/[;.]\s*$/, "").trim();
+    if (!trimmed) continue;
+    const relative = (match.index ?? 0) + raw.indexOf(trimmed);
+    results.push({
+      text: trimmed,
+      start: span.start + relative,
+      end: span.start + relative + trimmed.length,
+      sourcePath: span.sourcePath,
+    });
+  }
+  return results.length ? results : [span];
+}
+
 function structuredText(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
   if (typeof value === "number") return String(value);
@@ -156,6 +179,116 @@ function nestedStructured(value: unknown, keys: string[]): string | null {
   return null;
 }
 
+function indexStructuredSpans(
+  source: string,
+  structured: Record<string, unknown>,
+): Map<string, Span> {
+  const spans = new Map<string, Span>();
+  if (JSON.stringify(structured) !== source) return spans;
+  const walk = (value: unknown, path: string, start: number): number => {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) return start;
+    const end = start + encoded.length;
+    if (encoded.length <= 1000) {
+      spans.set(path, {
+        text: typeof value === "string" ? value : encoded,
+        start,
+        end,
+        sourcePath: path,
+      });
+    }
+    if (Array.isArray(value)) {
+      let cursor = start + 1;
+      value.forEach((item, index) => {
+        if (index > 0) cursor += 1;
+        cursor = walk(item, `${path}[${index}]`, cursor);
+      });
+    } else if (value && typeof value === "object") {
+      let cursor = start + 1;
+      Object.entries(value as Record<string, unknown>).forEach(([key, item], index) => {
+        if (item === undefined) return;
+        if (index > 0) cursor += 1;
+        cursor += JSON.stringify(key).length + 1;
+        cursor = walk(item, `${path}.${key}`, cursor);
+      });
+    }
+    return end;
+  };
+  walk(JSON.parse(source) as Record<string, unknown>, "structured", 0);
+  return spans;
+}
+
+function materialFamilies(text: string): JobFieldFamily[] {
+  const rules: Array<[JobFieldFamily, RegExp]> = [
+    ["GEOGRAPHY", /\b(?:location|postcode|suburb|state|remote|hybrid|on-site)\b/i],
+    [
+      "EMPLOYMENT",
+      /\b(?:employment type|work type|job type|full[ -]?time|part[ -]?time|casual|contract|internship)\b/i,
+    ],
+    ["HOURS", /\bhours?\b/i],
+    ["SCHEDULE", /\b(?:shift|roster|weekday|weekend|overnight|am|pm|\d{1,2}:\d{2})\b/i],
+    ["COMPENSATION", /\b(?:salary|remuneration|AUD|super|bonus)\b|\$/i],
+    ["DATES", /\b(?:date|posted|closing|close|valid through|start)\b/i],
+    ["EXPERIENCE", /\bexperience\b/i],
+    ["EDUCATION", /\b(?:degree|diploma|qualification|education|studying)\b/i],
+    ["LICENCES", /\blicen[cs]e\b/i],
+    ["CERTIFICATIONS", /\b(?:RSA|first aid|certification|certificate|WWCC)\b/i],
+    ["WORK_RIGHTS", /\b(?:work rights?|visa|sponsorship)\b/i],
+    ["VEHICLE", /\b(?:vehicle|driver|travel|commute)\b/i],
+    ["PHYSICAL_REQUIREMENTS", /\b(?:lift|standing|physical|age)\b/i],
+    ["TRAINING", /\btraining\b/i],
+    ["DOCUMENTS", /\b(?:CV|resume|cover letter|portfolio|transcript|selection criteria)\b/i],
+    ["SKILLS", /\b(?:skill|proficien|knowledge|ability)\b/i],
+  ];
+  return rules.filter(([, pattern]) => pattern.test(text)).map(([family]) => family);
+}
+
+type StructuredLocation = {
+  label: string;
+  path: string;
+  components: Array<{ canonicalField: string; value: string; path: string }>;
+};
+
+function collectStructuredLocations(value: unknown, path: string): StructuredLocation[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => collectStructuredLocations(item, `${path}[${index}]`));
+  }
+  const direct = structuredText(value);
+  if (direct) return [{ label: direct, path, components: [] }];
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  if (structuredText(record.text)) {
+    return [{ label: structuredText(record.text)!, path: `${path}.text`, components: [] }];
+  }
+  const addressValue =
+    record.address && typeof record.address === "object" ? record.address : record;
+  const address = addressValue as Record<string, unknown>;
+  const descriptors = [
+    ["location.locality", "addressLocality"],
+    ["location.state", "addressRegion"],
+    ["location.postcode", "postalCode"],
+    ["location.country", "addressCountry"],
+  ] as const;
+  const components = descriptors.flatMap(([canonicalField, key]) => {
+    const nested =
+      key === "addressCountry" && address[key] && typeof address[key] === "object"
+        ? nestedStructured(address[key], ["name", "identifier"])
+        : structuredText(address[key]);
+    return nested
+      ? [
+          {
+            canonicalField,
+            value: nested,
+            path: `${path}${addressValue === record ? "" : ".address"}.${key}${typeof address[key] === "object" ? ".name" : ""}`,
+          },
+        ]
+      : [];
+  });
+  return components.length
+    ? [{ label: components.map(({ value: item }) => item).join(" "), path, components }]
+    : [];
+}
+
 function stableId(...values: string[]): string {
   return digest(values.join("\n")).slice(0, 32);
 }
@@ -168,6 +301,8 @@ function fieldEvidence(input: {
   span: Span;
   normalizedValue: R2NormalizedValue;
   modality?: RequirementModality | null;
+  state?: "SOURCE_STATED" | "DERIVED";
+  derivationInputIds?: string[];
   ruleId: string;
 }): R2JobFieldEvidence {
   return R2JobFieldEvidenceSchema.parse({
@@ -182,13 +317,13 @@ function fieldEvidence(input: {
     jobVersionId: null,
     family: input.family,
     canonicalField: input.canonicalField,
-    state: "SOURCE_STATED",
+    state: input.state ?? "SOURCE_STATED",
     modality: input.modality ?? null,
     source: pointer(input.source, input.span),
     normalizedValue: input.normalizedValue,
     extractorVersion: R2A_PARSER_VERSION,
     ruleId: input.ruleId,
-    derivationInputIds: [],
+    derivationInputIds: input.derivationInputIds ?? [],
     ownerCorrectionId: null,
     conflictSetId: null,
   });
@@ -330,10 +465,14 @@ function educationValue(text: string): R2NormalizedValue {
 }
 
 function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2NormalizedValue {
+  const explicitName =
+    text.match(
+      /\b(?:RSA|responsible service of alcohol|first aid|food safety|WWCC|working with children check|police check|white card|forklift licence|driver'?s? licence|class\s+(?:C|LR|MR|HR|HC|MC) licence)\b/i,
+    )?.[0] ?? text;
   return {
     kind: "LICENCE_CERTIFICATION",
     value: {
-      name: text,
+      name: explicitName,
       type,
       class: text.match(/\b(?:class\s+)?(C|LR|MR|HR|HC|MC)\b/i)?.[1]?.toUpperCase() ?? null,
       jurisdiction:
@@ -352,8 +491,8 @@ function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2Normal
   };
 }
 
-function workRightsValue(text: string): R2NormalizedValue {
-  let kind:
+function workRightsValues(text: string): R2NormalizedValue[] {
+  type WorkRightKind =
     | "VALID_AUSTRALIAN_WORK_RIGHTS"
     | "UNRESTRICTED_WORK_RIGHTS"
     | "SPONSORSHIP_AVAILABLE"
@@ -361,70 +500,125 @@ function workRightsValue(text: string): R2NormalizedValue {
     | "VISA_REQUIREMENT"
     | "HOURS_CONDITION"
     | "EXPIRY_CONDITION"
-    | "UNKNOWN" = "UNKNOWN";
-  if (/\bunrestricted (?:Australian )?work rights\b/i.test(text)) kind = "UNRESTRICTED_WORK_RIGHTS";
-  else if (/\bvalid Australian work rights\b/i.test(text)) kind = "VALID_AUSTRALIAN_WORK_RIGHTS";
-  else if (/\b(?:sponsorship (?:is )?available|visa sponsorship offered)\b/i.test(text))
-    kind = "SPONSORSHIP_AVAILABLE";
-  else if (/\b(?:no|not)\s+(?:visa )?sponsorship|sponsorship (?:is )?not available\b/i.test(text))
-    kind = "SPONSORSHIP_NOT_AVAILABLE";
-  else if (/\bhours?\b/i.test(text)) kind = "HOURS_CONDITION";
-  else if (/\bexpir(?:y|es|ation)\b/i.test(text)) kind = "EXPIRY_CONDITION";
-  else if (/\bvisa\b/i.test(text)) kind = "VISA_REQUIREMENT";
-  return {
-    kind: "WORK_RIGHTS",
+    | "UNKNOWN";
+  const kinds: WorkRightKind[] = [];
+  if (/\bunrestricted (?:Australian )?work rights\b/i.test(text))
+    kinds.push("UNRESTRICTED_WORK_RIGHTS");
+  else if (/\bvalid Australian work rights\b/i.test(text))
+    kinds.push("VALID_AUSTRALIAN_WORK_RIGHTS");
+  if (/\b(?:sponsorship (?:is )?available|visa sponsorship offered)\b/i.test(text))
+    kinds.push("SPONSORSHIP_AVAILABLE");
+  if (/\b(?:no|not)\s+(?:visa )?sponsorship|sponsorship (?:is )?not available\b/i.test(text))
+    kinds.push("SPONSORSHIP_NOT_AVAILABLE");
+  if (
+    /\b(?:visa|work)\s+hours?|hours?\s+(?:limit|condition|restriction)\b|\b(?:maximum|up to|limited to)\s+\d+(?:\.\d+)?\s+hours?\b/i.test(
+      text,
+    )
+  )
+    kinds.push("HOURS_CONDITION");
+  if (/\bexpir(?:y|es|ation)\b/i.test(text)) kinds.push("EXPIRY_CONDITION");
+  if (/\b(?:visa type|visa class|subclass|holder)\b/i.test(text)) kinds.push("VISA_REQUIREMENT");
+  if (kinds.length === 0) kinds.push("UNKNOWN");
+  return [...new Set(kinds)].map((kind) => ({
+    kind: "WORK_RIGHTS" as const,
     value: { kind, wording: text, condition: modality(text).condition },
-  };
+  }));
 }
 
-function normalizedRequirementValue(kind: RequirementKind, text: string): R2NormalizedValue {
-  if (kind === "EXPERIENCE") return experienceValue(text);
-  if (kind === "QUALIFICATION") return educationValue(text);
-  if (kind === "LICENCE") return licenceValue(text, "LICENCE");
-  if (kind === "CERTIFICATION") return licenceValue(text, "CERTIFICATION");
-  if (kind === "WORK_RIGHTS") return workRightsValue(text);
-  if (kind === "VEHICLE") {
-    return {
-      kind: "VEHICLE_TRAVEL",
-      value: {
-        kind: /access/i.test(text) ? "VEHICLE_ACCESS" : "OWN_VEHICLE",
-        percentage: null,
-        location: null,
-        distanceKm: null,
-        durationMinutes: null,
-      },
-    };
+const documentKinds = [
+  ["CV_RESUME", /\b(?:cv|resume)\b/i],
+  ["COVER_LETTER", /\bcover letter\b/i],
+  ["SELECTION_CRITERIA", /\bselection criteria\b/i],
+  ["PORTFOLIO", /\bportfolio\b/i],
+  ["TRANSCRIPT", /\btranscript\b/i],
+  ["LICENCE_CERTIFICATE_COPY", /\b(?:licence|certificate) copy\b/i],
+] as const;
+
+function normalizedRequirementValues(
+  kind: RequirementKind,
+  text: string,
+  statement: ReturnType<typeof modality>,
+): R2NormalizedValue[] {
+  if (kind === "EXPERIENCE") return [experienceValue(text)];
+  if (kind === "QUALIFICATION") return [educationValue(text)];
+  if (kind === "LICENCE") return [licenceValue(text, "LICENCE")];
+  if (kind === "CERTIFICATION") return [licenceValue(text, "CERTIFICATION")];
+  if (kind === "WORK_RIGHTS") return workRightsValues(text);
+  if (kind === "DOCUMENT") {
+    return documentKinds.flatMap(([documentKind, pattern]) =>
+      pattern.test(text)
+        ? [
+            {
+              kind: "DOCUMENT" as const,
+              value: {
+                documentKind,
+                state:
+                  statement.modality === "NEGATED"
+                    ? ("NOT_REQUIRED" as const)
+                    : statement.modality === "REQUIRED"
+                      ? ("REQUIRED" as const)
+                      : ("UNKNOWN" as const),
+                name: null,
+              },
+            },
+          ]
+        : [],
+    );
   }
-  if (kind === "PHYSICAL" || kind === "AGE") return { kind: "PHYSICAL", value: text };
-  return { kind: "TEXT", value: text };
+  if (kind === "VEHICLE") {
+    return [
+      {
+        kind: "VEHICLE_TRAVEL",
+        value: {
+          kind: /access/i.test(text) ? "VEHICLE_ACCESS" : "OWN_VEHICLE",
+          percentage: null,
+          location: null,
+          distanceKm: null,
+          durationMinutes: null,
+        },
+      },
+    ];
+  }
+  if (kind === "PHYSICAL" || kind === "AGE") return [{ kind: "PHYSICAL", value: text }];
+  return [{ kind: "TEXT", value: text }];
 }
 
 function requirementEvidence(
   source: string,
   observationId: string,
   span: Span,
-): R2RequirementEvidence | null {
+): R2RequirementEvidence[] {
   const kind = requirementKind(span.text);
   const statement = modality(span.text);
-  if (kind === "GENERAL" && statement.modality === "UNKNOWN") return null;
+  if (kind === "GENERAL" && statement.modality === "UNKNOWN") return [];
   const family = familyForKind(kind);
-  return R2RequirementEvidenceSchema.parse({
-    id: stableId(R2A_PARSER_VERSION, observationId, span.sourcePath, String(span.start), span.text),
-    sourceObservationId: observationId,
-    jobVersionId: null,
-    family,
-    canonicalKind: kind,
-    state: statement.modality === "CONDITIONAL" ? "CONDITIONAL" : "SOURCE_STATED",
-    modality: statement.modality,
-    condition: statement.condition,
-    source: pointer(source, span),
-    normalizedValue: normalizedRequirementValue(kind, span.text),
-    extractorVersion: R2A_PARSER_VERSION,
-    ruleId: `R2A_${kind}_${statement.modality}`,
-    derivationInputIds: [],
-    ownerCorrectionId: null,
-    conflictSetId: null,
-  });
+  return normalizedRequirementValues(kind, span.text, statement).map((normalizedValue, index) =>
+    R2RequirementEvidenceSchema.parse({
+      id: stableId(
+        R2A_PARSER_VERSION,
+        observationId,
+        span.sourcePath,
+        String(span.start),
+        span.text,
+        String(index),
+        JSON.stringify(normalizedValue),
+      ),
+      sourceObservationId: observationId,
+      jobVersionId: null,
+      family,
+      canonicalKind: kind,
+      state: "SOURCE_STATED",
+      modality: statement.modality,
+      condition: statement.condition,
+      source: pointer(source, span),
+      normalizedValue,
+      extractorVersion: R2A_PARSER_VERSION,
+      ruleId: `R2A_${kind}_${statement.modality}`,
+      derivationInputIds: [],
+      ownerCorrectionId: null,
+      conflictSetId: null,
+    }),
+  );
 }
 
 function parseLocation(label: string) {
@@ -449,8 +643,13 @@ function parseLocation(label: string) {
     : stateOrTerritory
       ? "STATE"
       : "UNKNOWN";
+  const statePattern =
+    "australian capital territory|new south wales|northern territory|queensland|south australia|tasmania|victoria|western australia|ACT|NSW|NT|QLD|SA|TAS|VIC|WA";
   const beforeState =
-    label.split(/,|\b(?:ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b|\b\d{4}\b/i)[0]?.trim() ?? "";
+    label
+      .split(new RegExp(`,|\\b(?:${statePattern})\\b|\\b\\d{4}\\b`, "i"))[0]
+      ?.replace(/\b(?:location|based in|located in)\s*:?\s*/i, "")
+      .trim() ?? "";
   return {
     rawLabel: label,
     locality: beforeState && !/remote|australia|national/i.test(beforeState) ? beforeState : null,
@@ -557,9 +756,18 @@ function hoursValues(
 
 function salaryValue(text: string): R2NormalizedValue | null {
   if (!/(?:AUD|A\$|\$)\s*\d|\bsalary\b|\bremuneration\b/i.test(text)) return null;
-  const numbers = [...text.matchAll(/(?:AUD\s*|A\$|\$)\s*([\d,]+(?:\.\d{1,2})?)/gi)].map((match) =>
-    Number(match[1]?.replaceAll(",", "")),
+  const amount = text.match(
+    /(?:AUD\s*|A\$|\$)\s*([\d,]+(?:\.\d{1,2})?)\s*([kK])?(?:\s*(?:-|–|to)\s*(?:(?:AUD\s*|A\$|\$)\s*)?([\d,]+(?:\.\d{1,2})?)\s*([kK])?)?/i,
   );
+  const parseAmount = (raw: string | undefined, suffix: string | undefined): number | null => {
+    if (!raw) return null;
+    const numeric = Number(raw.replaceAll(",", ""));
+    return Number.isFinite(numeric) ? numeric * (suffix ? 1000 : 1) : null;
+  };
+  const numbers = [
+    parseAmount(amount?.[1], amount?.[2]),
+    parseAmount(amount?.[3], amount?.[4]),
+  ].filter((value): value is number => value !== null);
   const shape = /\bfrom\b/i.test(text)
     ? "FROM"
     : /\bup to\b/i.test(text)
@@ -586,7 +794,7 @@ function salaryValue(text: string): R2NormalizedValue | null {
           ? "YEAR"
           : ((period as "HOUR" | "DAY" | "WEEK" | "FORTNIGHT" | "MONTH" | "YEAR" | undefined) ??
             "UNKNOWN"),
-      superannuation: /\bplus super\b/i.test(text)
+      superannuation: /\bplus super\b|\+\s*super\b/i.test(text)
         ? "PLUS"
         : /\bsuper(?:annuation)? included\b/i.test(text)
           ? "INCLUDED"
@@ -600,7 +808,22 @@ function salaryValue(text: string): R2NormalizedValue | null {
 }
 
 function dateValue(text: string): R2NormalizedValue {
-  const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})(?:T[^\s,;]+)?\b/);
+  const isoDateTime = text.match(
+    /\b(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?)\b/i,
+  );
+  if (isoDateTime?.[1]) {
+    const offset = isoDateTime[1].match(/(Z|[+-]\d{2}:\d{2})$/i)?.[1] ?? null;
+    return {
+      kind: "DATE",
+      value: {
+        value: isoDateTime[1],
+        precision: "DATE_TIME",
+        timezone: offset ? "KNOWN" : "UNKNOWN",
+        offset: offset?.toUpperCase() ?? null,
+      },
+    };
+  }
+  const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   const numeric = text.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/);
   const monthNames: Record<string, number> = {
     january: 1,
@@ -635,13 +858,23 @@ function dateValue(text: string): R2NormalizedValue {
     month = monthNames[named[2].toLowerCase()] ?? null;
     year = Number(named[3]);
   }
-  if (year === null || month === null || day === null) return { kind: "DATE", value: null };
+  if (year === null || month === null || day === null)
+    return {
+      kind: "DATE",
+      value: { value: null, precision: "UNKNOWN", timezone: "UNKNOWN", offset: null },
+    };
   const candidate = new Date(Date.UTC(year, month - 1, day));
   const valid =
     candidate.getUTCFullYear() === year &&
     candidate.getUTCMonth() === month - 1 &&
     candidate.getUTCDate() === day;
-  return { kind: "DATE", value: valid ? candidate.toISOString() : null };
+  const value = valid
+    ? `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    : null;
+  return {
+    kind: "DATE",
+    value: { value, precision: value ? "DATE_ONLY" : "UNKNOWN", timezone: "UNKNOWN", offset: null },
+  };
 }
 
 function scheduleValue(text: string): R2NormalizedValue | null {
@@ -672,14 +905,15 @@ function scheduleValue(text: string): R2NormalizedValue | null {
       if (!days.includes(day)) days.push(day);
     }
   }
-  const times = [...text.matchAll(/\b([01]?\d|2[0-3])(?::([0-5]\d))?\s*(am|pm)?\b/gi)].map(
-    (match) => {
-      let hour = Number(match[1]);
-      if (match[3]?.toLowerCase() === "pm" && hour < 12) hour += 12;
-      if (match[3]?.toLowerCase() === "am" && hour === 12) hour = 0;
-      return `${String(hour).padStart(2, "0")}:${match[2] ?? "00"}`;
-    },
-  );
+  const times = [
+    ...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b|\b(1[0-2]|0?[1-9])\s*(am|pm)\b/gi),
+  ].map((match) => {
+    let hour = Number(match[1] ?? match[4]);
+    const marker = (match[3] ?? match[5])?.toLowerCase();
+    if (marker === "pm" && hour < 12) hour += 12;
+    if (marker === "am" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${match[2] ?? "00"}`;
+  });
   return {
     kind: "SCHEDULE",
     value: {
@@ -704,21 +938,27 @@ function scheduleValue(text: string): R2NormalizedValue | null {
 }
 
 function documentValues(text: string): Array<{ field: string; value: R2NormalizedValue }> {
-  const documents = [
-    ["cvResume", "CV_RESUME", /\b(?:cv|resume)\b/i],
-    ["coverLetter", "COVER_LETTER", /\bcover letter\b/i],
-    ["selectionCriteria", "SELECTION_CRITERIA", /\bselection criteria\b/i],
-    ["portfolio", "PORTFOLIO", /\bportfolio\b/i],
-    ["transcript", "TRANSCRIPT", /\btranscript\b/i],
-    ["licenceCertificateCopy", "LICENCE_CERTIFICATE_COPY", /\b(?:licence|certificate) copy\b/i],
-  ] as const;
-  return documents.flatMap(([field, documentKind, pattern]) => {
+  return documentKinds.flatMap(([documentKind, pattern]) => {
     if (!pattern.test(text)) return [];
-    const state = /\b(?:no|not)\b[^.\n]{0,40}\brequired\b/i.test(text)
+    const state = /\b(?:no|not)\s+(?:required|necessary)|\b(?:is\s+)?not\s+required\b/i.test(text)
       ? "NOT_REQUIRED"
-      : /\b(?:attach|upload|include|submit|provide|required|must)\b/i.test(text)
-        ? "REQUIRED"
-        : "UNKNOWN";
+      : /\b(?:optional|may be required|depending on|where applicable)\b/i.test(text)
+        ? "UNKNOWN"
+        : /\b(?:attach|upload|include|submit|provide|required|must)\b/i.test(text)
+          ? "REQUIRED"
+          : "UNKNOWN";
+    const field =
+      documentKind === "CV_RESUME"
+        ? "cvResume"
+        : documentKind === "COVER_LETTER"
+          ? "coverLetter"
+          : documentKind === "SELECTION_CRITERIA"
+            ? "selectionCriteria"
+            : documentKind === "PORTFOLIO"
+              ? "portfolio"
+              : documentKind === "TRANSCRIPT"
+                ? "transcript"
+                : "licenceCertificateCopy";
     return [
       { field, value: { kind: "DOCUMENT" as const, value: { documentKind, state, name: null } } },
     ];
@@ -791,8 +1031,11 @@ export function normalizeR2AJobEvidence(input: {
   const structured = input.structured ?? {};
   const fields: R2JobFieldEvidence[] = [];
   const requirements: R2RequirementEvidence[] = [];
-  const sections = parseR2ASections(source);
-  const standaloneSpans = lineSpans(source)
+  const regionConflictPairs: Array<[R2JobFieldEvidence, R2JobFieldEvidence]> = [];
+  const structuredSpans = indexStructuredSpans(source, structured);
+  const isCanonicalStructuredSource = structuredSpans.size > 0;
+  const sections = isCanonicalStructuredSource ? [] : parseR2ASections(source);
+  const standaloneSpans = (isCanonicalStructuredSource ? [] : lineSpans(source))
     .map((span) => {
       const text = span.text.replace(/^[-*â€¢]\s*/, "").trim();
       const offset = span.text.indexOf(text);
@@ -803,44 +1046,72 @@ export function normalizeR2AJobEvidence(input: {
         end: span.start + Math.max(0, offset) + text.length,
       };
     })
-    .filter(({ text }) => text.length <= 1000);
-  const candidateSpans = [...sections.flatMap(({ items }) => items), ...standaloneSpans];
+    .filter(({ text }) => text.length <= 1000)
+    .flatMap(clauseSpans);
+  const descriptionValue = structuredText(structured.description);
+  const descriptionSource = structuredSpans.get("structured.description");
+  const structuredDescriptionSpans =
+    descriptionValue && descriptionSource
+      ? lineSpans(
+          /<[A-Za-z!/]/.test(descriptionValue)
+            ? extractInertHtmlText(descriptionValue)
+            : descriptionValue,
+        )
+          .filter((span) => isHeading(span) === undefined)
+          .flatMap(clauseSpans)
+          .map((span, index) => ({
+            text: span.text.replace(/^[-*•]\s*/, "").trim(),
+            start: descriptionSource.start,
+            end: descriptionSource.end,
+            sourcePath: `structured.description.item.${index}`,
+          }))
+      : [];
+  const candidateSpans = [
+    ...sections.flatMap(({ items }) => items.flatMap(clauseSpans)),
+    ...standaloneSpans,
+    ...structuredDescriptionSpans,
+  ];
   const seenSpans = new Set<string>();
   const uniqueSpans = candidateSpans.filter((span) => {
-    const key = `${span.start}:${span.end}`;
+    const key = span.sourcePath.startsWith("structured.")
+      ? `${span.start}:${span.end}:${span.sourcePath}:${span.text}`
+      : `${span.start}:${span.end}`;
     if (seenSpans.has(key)) return false;
     seenSpans.add(key);
     return true;
   });
 
-  const structuredLocation =
-    nestedStructured(structured.jobLocation, ["text", "addressLocality"]) ??
-    nestedStructured(structured.location, ["text", "addressLocality", "suburb"]) ??
-    structuredText(structured.location);
-  const structuredFields: Array<[string, JobFieldFamily, string, string | null]> = [
-    [
-      "title",
-      "IDENTITY",
-      "title",
-      structuredText(structured.title) ?? structuredText(structured.name),
-    ],
-    [
-      "company",
-      "IDENTITY",
-      "company",
-      nestedStructured(structured.hiringOrganization, ["name", "legalName"]) ??
+  const structuredFields: Array<{
+    canonicalField: string;
+    family: JobFieldFamily;
+    value: string | null;
+    paths: string[];
+  }> = [
+    {
+      canonicalField: "title",
+      family: "IDENTITY",
+      value: structuredText(structured.title) ?? structuredText(structured.name),
+      paths: ["structured.title", "structured.name"],
+    },
+    {
+      canonicalField: "company",
+      family: "IDENTITY",
+      value:
+        nestedStructured(structured.hiringOrganization, ["name", "legalName"]) ??
         structuredText(structured.company),
-    ],
-    ["location", "GEOGRAPHY", "location", structuredLocation],
+      paths: [
+        "structured.hiringOrganization.name",
+        "structured.hiringOrganization.legalName",
+        "structured.company",
+      ],
+    },
   ];
-  for (const [canonicalField, family, pathName, value] of structuredFields) {
+  for (const { canonicalField, family, value, paths } of structuredFields) {
     if (!value) continue;
-    const span = textSpan(source, value, `structured.${pathName}`);
+    const span =
+      paths.map((path) => structuredSpans.get(path)).find(Boolean) ??
+      textSpan(source, value, paths[0]!);
     if (!span) continue;
-    const normalizedValue: R2NormalizedValue =
-      family === "GEOGRAPHY"
-        ? { kind: "LOCATION", value: parseLocation(value) }
-        : { kind: "TEXT", value };
     fields.push(
       fieldEvidence({
         source,
@@ -848,8 +1119,82 @@ export function normalizeR2AJobEvidence(input: {
         family,
         canonicalField,
         span,
-        normalizedValue,
+        normalizedValue: { kind: "TEXT", value },
         ruleId: "R2A_STRUCTURED_FIELD",
+      }),
+    );
+  }
+
+  const structuredLocations = [
+    ...collectStructuredLocations(structured.jobLocation, "structured.jobLocation"),
+    ...collectStructuredLocations(structured.location, "structured.location"),
+  ];
+  for (const location of structuredLocations) {
+    if (location.components.length === 0) {
+      const span =
+        structuredSpans.get(location.path) ?? textSpan(source, location.label, location.path);
+      if (!span) continue;
+      fields.push(
+        fieldEvidence({
+          source,
+          observationId,
+          family: "GEOGRAPHY",
+          canonicalField: "location.alternative",
+          span,
+          normalizedValue: { kind: "LOCATION", value: parseLocation(location.label) },
+          ruleId: "R2A_STRUCTURED_LOCATION",
+        }),
+      );
+      continue;
+    }
+    const inputs = location.components.flatMap((component) => {
+      const span = structuredSpans.get(component.path);
+      if (!span) return [];
+      const evidence = fieldEvidence({
+        source,
+        observationId,
+        family: "GEOGRAPHY",
+        canonicalField: component.canonicalField,
+        span,
+        normalizedValue: { kind: "TEXT", value: component.value },
+        ruleId: "R2A_STRUCTURED_LOCATION_COMPONENT",
+      });
+      fields.push(evidence);
+      return [evidence];
+    });
+    if (inputs.length !== location.components.length || inputs.length === 0) continue;
+    const parsedLocation = parseLocation(location.label);
+    if (
+      parsedLocation.postcode &&
+      parsedLocation.stateOrTerritory &&
+      postcodeState(parsedLocation.postcode) &&
+      postcodeState(parsedLocation.postcode) !== parsedLocation.stateOrTerritory
+    ) {
+      const stateEvidence = inputs.find(
+        ({ canonicalField }) => canonicalField === "location.state",
+      );
+      const postcodeEvidence = inputs.find(
+        ({ canonicalField }) => canonicalField === "location.postcode",
+      );
+      if (stateEvidence && postcodeEvidence)
+        regionConflictPairs.push([stateEvidence, postcodeEvidence]);
+    }
+    fields.push(
+      fieldEvidence({
+        source,
+        observationId,
+        family: "GEOGRAPHY",
+        canonicalField: "location.alternative",
+        span: {
+          text: location.label,
+          start: inputs[0]!.source.start,
+          end: inputs[0]!.source.end,
+          sourcePath: `${location.path}.derived`,
+        },
+        normalizedValue: { kind: "LOCATION", value: parsedLocation },
+        state: "DERIVED",
+        derivationInputIds: inputs.map(({ id }) => id),
+        ruleId: "R2A_STRUCTURED_LOCATION_COMPOSITE",
       }),
     );
   }
@@ -860,7 +1205,8 @@ export function normalizeR2AJobEvidence(input: {
   ] as const) {
     const value = structuredText(structured[key]);
     if (!value) continue;
-    const span = textSpan(source, value, `structured.${key}`);
+    const span =
+      structuredSpans.get(`structured.${key}`) ?? textSpan(source, value, `structured.${key}`);
     if (!span) continue;
     fields.push(
       fieldEvidence({
@@ -887,7 +1233,8 @@ export function normalizeR2AJobEvidence(input: {
     const value = structuredText(structured[key]);
     if (!value) continue;
     const normalizedValue = parse(value);
-    const span = textSpan(source, value, `structured.${key}`);
+    const span =
+      structuredSpans.get(`structured.${key}`) ?? textSpan(source, value, `structured.${key}`);
     if (!normalizedValue || !span) continue;
     fields.push(
       fieldEvidence({
@@ -901,16 +1248,87 @@ export function normalizeR2AJobEvidence(input: {
       }),
     );
   }
-  const structuredRequirements = Array.isArray(structured.requirementTexts)
-    ? structured.requirementTexts
-    : Array.isArray(structured.requirements)
-      ? structured.requirements
-      : [];
-  for (const [index, item] of structuredRequirements.entries()) {
-    const value = structuredText(item);
-    if (!value) continue;
-    const span = textSpan(source, value, `structured.requirements.${index}`);
-    if (span) uniqueSpans.push(span);
+
+  const baseSalary = structured.baseSalary;
+  if (baseSalary && typeof baseSalary === "object" && !Array.isArray(baseSalary)) {
+    const salaryRecord = baseSalary as Record<string, unknown>;
+    const valueRecord =
+      salaryRecord.value && typeof salaryRecord.value === "object"
+        ? (salaryRecord.value as Record<string, unknown>)
+        : salaryRecord;
+    const minimum = Number(valueRecord.minValue ?? valueRecord.value);
+    const maximum = Number(valueRecord.maxValue ?? valueRecord.value);
+    const currency = structuredText(salaryRecord.currency);
+    const unit = structuredText(valueRecord.unitText)?.toUpperCase();
+    const components = [
+      ["salary.minimum", "structured.baseSalary.value.minValue", minimum],
+      ["salary.maximum", "structured.baseSalary.value.maxValue", maximum],
+      ["salary.currency", "structured.baseSalary.currency", currency],
+      ["salary.period", "structured.baseSalary.value.unitText", unit],
+    ] as const;
+    const inputs = components.flatMap(([canonicalField, path, value]) => {
+      const span = structuredSpans.get(path) ?? textSpan(source, String(value), path);
+      if (!span || value === null || value === undefined || Number.isNaN(value)) return [];
+      const evidence = fieldEvidence({
+        source,
+        observationId,
+        family: "COMPENSATION",
+        canonicalField,
+        span,
+        normalizedValue: { kind: "TEXT", value: String(value) },
+        ruleId: "R2A_STRUCTURED_SALARY_COMPONENT",
+      });
+      fields.push(evidence);
+      return [evidence];
+    });
+    if (inputs.length >= 2 && Number.isFinite(minimum)) {
+      const period =
+        unit === "HOUR" || unit === "DAY" || unit === "WEEK" || unit === "MONTH" || unit === "YEAR"
+          ? unit
+          : "UNKNOWN";
+      fields.push(
+        fieldEvidence({
+          source,
+          observationId,
+          family: "COMPENSATION",
+          canonicalField: "salary",
+          span: {
+            text: "structured salary",
+            start: inputs[0]!.source.start,
+            end: inputs[0]!.source.end,
+            sourcePath: "structured.baseSalary.derived",
+          },
+          normalizedValue: {
+            kind: "SALARY",
+            value: {
+              shape: Number.isFinite(maximum) && maximum !== minimum ? "RANGE" : "EXACT",
+              minimum,
+              maximum: Number.isFinite(maximum) ? maximum : minimum,
+              currency: currency?.length === 3 ? currency.toUpperCase() : null,
+              period,
+              superannuation: "UNKNOWN",
+              commission: false,
+              bonus: false,
+            },
+          },
+          state: "DERIVED",
+          derivationInputIds: inputs.map(({ id }) => id),
+          ruleId: "R2A_STRUCTURED_SALARY_COMPOSITE",
+        }),
+      );
+    }
+  }
+
+  for (const key of ["requirementTexts", "requirements", "skills", "qualifications"] as const) {
+    const raw = structured[key];
+    const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
+    for (const [index, item] of values.entries()) {
+      const value = structuredText(item);
+      if (!value) continue;
+      const path = Array.isArray(raw) ? `structured.${key}[${index}]` : `structured.${key}`;
+      const span = structuredSpans.get(path) ?? textSpan(source, value, path);
+      if (span) uniqueSpans.push(span);
+    }
   }
 
   for (const span of lineSpans(source)) {
@@ -942,12 +1360,17 @@ export function normalizeR2AJobEvidence(input: {
     );
   }
 
+  const structuredLocationLabels = new Set(structuredLocations.map(({ label }) => label));
+  const labelledLocationSources = uniqueSpans.flatMap((span) => {
+    const match = span.text.match(/^(?:location|based in|located in)\s*:\s*(.+)$/i);
+    return match?.[1] ? [{ value: match[1].trim(), path: span.sourcePath }] : [];
+  });
   const locationSources = [
-    ...(structuredLocation ? [{ value: structuredLocation, path: "structured.location" }] : []),
-    ...(input.explicitLocation && input.explicitLocation !== structuredLocation
+    ...(input.explicitLocation && !structuredLocationLabels.has(input.explicitLocation)
       ? [{ value: input.explicitLocation, path: "visibleText.location" }]
       : []),
-  ];
+    ...labelledLocationSources,
+  ].filter((item, index, all) => all.findIndex(({ value }) => value === item.value) === index);
   for (const locationSource of locationSources) {
     const baseSpan = textSpan(source, locationSource.value, locationSource.path);
     for (const alternative of locationSource.value
@@ -956,6 +1379,7 @@ export function normalizeR2AJobEvidence(input: {
       .filter(Boolean)) {
       const span = textSpan(source, alternative, baseSpan?.sourcePath ?? "visibleText.location");
       if (!span) continue;
+      const parsedLocation = parseLocation(alternative);
       fields.push(
         fieldEvidence({
           source,
@@ -963,19 +1387,50 @@ export function normalizeR2AJobEvidence(input: {
           family: "GEOGRAPHY",
           canonicalField: "location.alternative",
           span,
-          normalizedValue: { kind: "LOCATION", value: parseLocation(alternative) },
+          normalizedValue: { kind: "LOCATION", value: parsedLocation },
           ruleId: "R2A_AU_LOCATION",
         }),
       );
+      if (
+        parsedLocation.postcode &&
+        parsedLocation.stateOrTerritory &&
+        postcodeState(parsedLocation.postcode) &&
+        postcodeState(parsedLocation.postcode) !== parsedLocation.stateOrTerritory
+      ) {
+        const stateEvidence = fieldEvidence({
+          source,
+          observationId,
+          family: "GEOGRAPHY",
+          canonicalField: "location.state",
+          span,
+          normalizedValue: { kind: "TEXT", value: parsedLocation.stateOrTerritory },
+          ruleId: "R2A_LOCATION_STATE_STATED",
+        });
+        const postcodeEvidence = fieldEvidence({
+          source,
+          observationId,
+          family: "GEOGRAPHY",
+          canonicalField: "location.postcode",
+          span,
+          normalizedValue: { kind: "TEXT", value: parsedLocation.postcode },
+          ruleId: "R2A_LOCATION_POSTCODE_STATED",
+        });
+        fields.push(stateEvidence, postcodeEvidence);
+        regionConflictPairs.push([stateEvidence, postcodeEvidence]);
+      }
     }
   }
 
   const employmentCandidates: Span[] = [];
-  const structuredEmployment =
-    structuredText(structured.employmentType) ?? structuredText(structured.employmentTypeText);
-  if (structuredEmployment) {
-    const span = textSpan(source, structuredEmployment, "structured.employmentType");
-    if (span) employmentCandidates.push(span);
+  for (const key of ["employmentType", "employmentTypeText"] as const) {
+    const raw = structured[key];
+    const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
+    for (const [index, item] of values.entries()) {
+      const value = structuredText(item);
+      const path = Array.isArray(raw) ? `structured.${key}[${index}]` : `structured.${key}`;
+      const span = structuredSpans.get(path) ?? (value ? textSpan(source, value, path) : null);
+      if (value && span) employmentCandidates.push({ ...span, text: value });
+    }
   }
   for (const span of uniqueSpans) {
     if (
@@ -986,12 +1441,14 @@ export function normalizeR2AJobEvidence(input: {
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
-      const itemSpan = {
-        ...span,
-        text: item.match,
-        start: span.start + item.index,
-        end: span.start + item.index + item.match.length,
-      };
+      const itemSpan = span.sourcePath.startsWith("structured")
+        ? span
+        : {
+            ...span,
+            text: item.match,
+            start: span.start + item.index,
+            end: span.start + item.index + item.match.length,
+          };
       fields.push(
         fieldEvidence({
           source,
@@ -1151,8 +1608,7 @@ export function normalizeR2AJobEvidence(input: {
         }),
       );
 
-    const evidence = requirementEvidence(source, observationId, span);
-    if (evidence) requirements.push(evidence);
+    requirements.push(...requirementEvidence(source, observationId, span));
   }
 
   const conflicts: R2ANormalization["conflicts"] = [];
@@ -1163,37 +1619,28 @@ export function normalizeR2AJobEvidence(input: {
     byField.set(item.canonicalField, existing);
   }
   const conflictingIds = new Map<string, string>();
+  for (const pair of regionConflictPairs) {
+    const conflictId = stableId("R2A_REGION_CONFLICT", observationId, ...pair.map(({ id }) => id));
+    conflicts.push({
+      id: conflictId,
+      canonicalField: "location.region",
+      evidenceIds: pair.map(({ id }) => id),
+    });
+    for (const item of pair) conflictingIds.set(item.id, conflictId);
+  }
   for (const [canonicalField, evidence] of byField) {
     const distinct = new Set(
       evidence.map(({ normalizedValue }) => JSON.stringify(normalizedValue)),
     );
-    let materialConflict =
-      distinct.size > 1 &&
-      [
-        "employment.type",
-        "salary",
-        "location.alternative",
-        "dates.closing",
-        "dates.start",
-        "dates.posted",
-      ].includes(canonicalField);
+    let materialConflict = distinct.size > 1;
     if (canonicalField === "location.alternative") {
-      const postcodeConflict = evidence.some(({ normalizedValue }) => {
-        if (normalizedValue.kind !== "LOCATION") return false;
-        const { postcode, stateOrTerritory } = normalizedValue.value;
-        return Boolean(
-          postcode &&
-            stateOrTerritory &&
-            postcodeState(postcode) &&
-            postcodeState(postcode) !== stateOrTerritory,
-        );
-      });
       const structuredProseConflict =
         distinct.size > 1 &&
         evidence.some(({ source }) => source.sourcePath.startsWith("structured")) &&
         evidence.some(({ source }) => !source.sourcePath.startsWith("structured"));
-      materialConflict = postcodeConflict || structuredProseConflict;
+      materialConflict = structuredProseConflict;
     }
+    if (canonicalField === "schedule") materialConflict = false;
     if (!materialConflict) continue;
     const conflictId = stableId(
       "R2A_CONFLICT",
@@ -1210,33 +1657,76 @@ export function normalizeR2AJobEvidence(input: {
       ? R2JobFieldEvidenceSchema.parse({ ...item, state: "CONFLICTING", conflictSetId })
       : item;
   });
+  const requirementGroups = new Map<string, R2RequirementEvidence[]>();
+  for (const item of requirements) {
+    const key = r2RequirementPropositionKey(item);
+    const existing = requirementGroups.get(key) ?? [];
+    existing.push(item);
+    requirementGroups.set(key, existing);
+  }
+  for (const [propositionKey, evidence] of requirementGroups) {
+    const hasNegative = evidence.some((item) => r2RequirementPolarity(item) === "NEGATED");
+    const hasPositive = evidence.some((item) => r2RequirementPolarity(item) === "POSITIVE");
+    if (!hasNegative || !hasPositive) continue;
+    const conflictId = stableId(
+      "R2A_REQUIREMENT_CONFLICT",
+      observationId,
+      propositionKey,
+      ...evidence.map(({ id }) => id),
+    );
+    conflicts.push({
+      id: conflictId,
+      canonicalField: `requirement:${propositionKey}`,
+      evidenceIds: evidence.map(({ id }) => id),
+    });
+    for (const item of evidence) conflictingIds.set(item.id, conflictId);
+  }
+  const resolvedRequirements = requirements.map((item) => {
+    const conflictSetId = conflictingIds.get(item.id);
+    return conflictSetId
+      ? R2RequirementEvidenceSchema.parse({ ...item, state: "CONFLICTING", conflictSetId })
+      : item;
+  });
 
   const parsedRangesByFamily = new Map<JobFieldFamily, Set<string>>();
-  for (const item of [...resolvedFields, ...requirements]) {
+  for (const item of [...resolvedFields, ...resolvedRequirements]) {
     const ranges = parsedRangesByFamily.get(item.family) ?? new Set<string>();
-    ranges.add(`${item.source.start}:${item.source.end}`);
+    ranges.add(`${item.source.sourcePath}:${item.source.start}:${item.source.end}`);
     parsedRangesByFamily.set(item.family, ranges);
   }
   const coverage = familyValues.map((family) => {
     const evidenceIds = [
       ...resolvedFields.filter((item) => item.family === family),
-      ...requirements.filter((item) => item.family === family),
+      ...resolvedRequirements.filter((item) => item.family === family),
     ].map(({ id }) => id);
     const sectionItems = sections
       .filter((section) => section.family === family)
-      .flatMap(({ items }) => items);
+      .flatMap(({ items }) => items.flatMap(clauseSpans));
+    const materialSpans = uniqueSpans.filter((span) =>
+      materialFamilies(span.text).includes(family),
+    );
+    const scopeSpans = [...sectionItems, ...materialSpans].filter(
+      (span, index, all) =>
+        all.findIndex(
+          (candidate) =>
+            candidate.start === span.start &&
+            candidate.end === span.end &&
+            candidate.sourcePath === span.sourcePath,
+        ) === index,
+    );
     const parsed = parsedRangesByFamily.get(family) ?? new Set<string>();
-    const unparsedSpans = sectionItems
-      .filter((span) => !parsed.has(`${span.start}:${span.end}`))
+    const unparsedSpans = scopeSpans
+      .filter((span) => !parsed.has(`${span.sourcePath}:${span.start}:${span.end}`))
       .map((span) => pointer(source, span));
+    const credibleCompleteScope = sectionItems.length > 0;
     return {
       family,
       state:
-        evidenceIds.length === 0
+        evidenceIds.length === 0 && scopeSpans.length === 0
           ? ("UNKNOWN" as const)
-          : unparsedSpans.length
-            ? ("PARTIAL" as const)
-            : ("COMPLETE" as const),
+          : credibleCompleteScope && evidenceIds.length > 0 && unparsedSpans.length === 0
+            ? ("COMPLETE" as const)
+            : ("PARTIAL" as const),
       evidenceIds,
       unparsedSpans,
       parserVersion: R2A_PARSER_VERSION,
@@ -1250,12 +1740,26 @@ export function normalizeR2AJobEvidence(input: {
     evidenceContractVersion: R2A_EVIDENCE_CONTRACT_VERSION,
     normalizationVersion: R2A_NORMALIZATION_VERSION,
     fieldEvidence: resolvedFields,
-    requirementEvidence: requirements,
+    requirementEvidence: resolvedRequirements,
     conflicts,
     coverage,
   });
   assertR2ASourcePointers(result, source);
+  assertR2AExcerptHashes(result);
   return result;
+}
+
+export function assertR2AExcerptHashes(result: R2ANormalization): void {
+  const pointers = [
+    ...result.fieldEvidence.map(({ source }) => source),
+    ...result.requirementEvidence.map(({ source }) => source),
+    ...result.coverage.flatMap(({ unparsedSpans }) => unparsedSpans),
+  ];
+  for (const sourcePointer of pointers) {
+    if (digest(sourcePointer.excerpt) !== sourcePointer.excerptHash) {
+      throw new Error("R2A_EXCERPT_HASH_MISMATCH");
+    }
+  }
 }
 
 export function bindR2ANormalizationObservation(

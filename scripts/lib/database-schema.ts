@@ -11,3 +11,9 @@ export function databaseSchemaStatus(schemaVersion: number): DatabaseSchemaStatu
     unsupported: schemaVersion > CURRENT_DATABASE_SCHEMA_VERSION,
   };
 }
+
+export function assertMigrationSchemaSupported(schemaVersion: number): void {
+  if (databaseSchemaStatus(schemaVersion).unsupported) {
+    throw new Error("DATABASE_SCHEMA_NEWER_THAN_APPLICATION");
+  }
+}

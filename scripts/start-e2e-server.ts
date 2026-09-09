@@ -96,7 +96,7 @@ Documents
          content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
          policy_version,run_id,supersedes_observation_id)
        VALUES ('observation:e2e','job-e2e-document',NULL,'UNKNOWN',NULL,NULL,NULL,
-         'USER_SUPPLIED_CONTENT',?,'fixture:r2a-e2e',?,NULL,NULL,'3.0.0',NULL,NULL,NULL)`,
+         'USER_SUPPLIED_CONTENT',?,'fixture:r2a-e2e',?,NULL,NULL,'3.1.0',NULL,NULL,NULL)`,
     )
     .run(createHash("sha256").update(sourceText).digest("hex"), now);
   sqlite
@@ -114,6 +114,63 @@ Documents
       explicitLocation: "Sydney NSW 2000",
     }),
   );
+  const invalidJob = {
+    ...job,
+    id: "job-e2e-r2a-invalid",
+    title: "Fictional Corrupt Evidence Role",
+  };
+  sqlite
+    .prepare(
+      `INSERT INTO jobs
+        (id,title,company,category,location,employment_type,normalized_json,application_status,
+         date_discovered,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,'NEW',?,?,?)`,
+    )
+    .run(
+      invalidJob.id,
+      invalidJob.title,
+      invalidJob.company,
+      invalidJob.category,
+      invalidJob.location,
+      invalidJob.employmentType,
+      JSON.stringify(invalidJob),
+      now,
+      now,
+      now,
+    );
+  sqlite
+    .prepare(
+      `INSERT INTO source_observations
+        (id,job_id,source_record_id,source,tenant,external_id,source_url,acquisition_method,
+         content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
+         policy_version,run_id,supersedes_observation_id)
+       VALUES ('observation:e2e-invalid','job-e2e-r2a-invalid',NULL,'UNKNOWN',NULL,NULL,NULL,
+         'USER_SUPPLIED_CONTENT',?,'fixture:r2a-invalid',?,NULL,NULL,'3.1.0',NULL,NULL,NULL)`,
+    )
+    .run(createHash("sha256").update(sourceText).digest("hex"), now);
+  sqlite
+    .prepare(
+      `INSERT INTO job_versions
+        (id,job_id,version,normalized_json,content_digest,source_observation_id,created_at)
+       VALUES ('job-version:e2e-invalid','job-e2e-r2a-invalid',1,?,?,'observation:e2e-invalid',?)`,
+    )
+    .run(JSON.stringify(invalidJob), "c".repeat(64), now);
+  new R2ARepository(sqlite, () => new Date(now)).recordNormalization(
+    "job-version:e2e-invalid",
+    normalizeR2AJobEvidence({
+      sourceText,
+      sourceObservationId: "observation:e2e-invalid",
+      explicitLocation: "Sydney NSW 2000",
+    }),
+  );
+  sqlite
+    .prepare(
+      `UPDATE job_field_evidence_v2 SET excerpt_hash = ?
+       WHERE job_version_id = 'job-version:e2e-invalid' AND rowid =
+         (SELECT min(rowid) FROM job_field_evidence_v2
+          WHERE job_version_id = 'job-version:e2e-invalid')`,
+    )
+    .run("f".repeat(64));
   const insertArtifact = sqlite.prepare(
     `INSERT INTO document_artifacts
       (id,job_id,job_version_id,profile_version_id,type,template,format,file_name,local_path,

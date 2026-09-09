@@ -95,6 +95,7 @@ export interface R2APrivateReprocessResult {
   staleEvaluations: number;
   staleDocuments: number;
   invalidatedPackets: number;
+  created: boolean;
 }
 
 type StoredRecord = {
@@ -416,7 +417,7 @@ export class JobImportRepository {
         id,
       ),
       dateDiscovered: previousJob.dateDiscovered,
-      dateUpdated: now,
+      dateUpdated: provider ? now : previousJob.dateUpdated,
       applicationStatus: previousJob.applicationStatus,
     });
     const requirementEvidence = (
@@ -429,28 +430,31 @@ export class JobImportRepository {
     if (!fields.beta?.r2a) throw new Error("R2A_NORMALIZATION_MISSING");
     const r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
     const beta = new BetaRepository(this.sqlite, this.now);
-    const recorded = this.sqlite.transaction(() => {
-      this.updateJob(reprocessed, now);
-      return beta.recordJobVersion({
-        job: reprocessed,
-        sourceObservationId,
-        requirementEvidence,
-        r2aNormalization,
-      });
-    })();
-    if (!recorded.created) throw new Error("LEGACY_REPROCESS_DID_NOT_CREATE_VERSION");
     if (!provider) {
-      const activeProfile = this.sqlite
-        .prepare(
-          "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
-        )
-        .get() as { id: string | null } | undefined;
-      const stale = beta.invalidateStaleDependencies({
-        jobId: id,
-        currentJobVersionId: recorded.id,
-        currentProfileVersionId: activeProfile?.id ?? "r2a:no-active-profile",
-        reasonCode: "R2A_NORMALIZATION_CHANGED",
-      });
+      const transition = this.sqlite.transaction(() => {
+        const recorded = beta.recordJobVersion({
+          job: reprocessed,
+          sourceObservationId,
+          requirementEvidence,
+          r2aNormalization,
+        });
+        if (recorded.created) this.updateJob(reprocessed, now);
+        const activeProfile = this.sqlite
+          .prepare(
+            "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
+          )
+          .get() as { id: string | null } | undefined;
+        const stale = recorded.created
+          ? beta.invalidateStaleDependencies({
+              jobId: id,
+              currentJobVersionId: recorded.id,
+              currentProfileVersionId: activeProfile?.id ?? "r2a:no-active-profile",
+              reasonCode: "R2A_NORMALIZATION_CHANGED",
+            })
+          : { evaluations: 0, documents: 0, packets: 0 };
+        return { recorded, stale };
+      })();
+      const { recorded, stale } = transition;
       const summary = new R2ARepository(this.sqlite, this.now).summary(recorded.id);
       return {
         jobId: id,
@@ -465,8 +469,19 @@ export class JobImportRepository {
         staleEvaluations: stale.evaluations,
         staleDocuments: stale.documents,
         invalidatedPackets: stale.packets,
+        created: recorded.created,
       };
     }
+    const recorded = this.sqlite.transaction(() => {
+      this.updateJob(reprocessed, now);
+      return beta.recordJobVersion({
+        job: reprocessed,
+        sourceObservationId,
+        requirementEvidence,
+        r2aNormalization,
+      });
+    })();
+    if (!recorded.created) throw new Error("LEGACY_REPROCESS_DID_NOT_CREATE_VERSION");
     const evaluationState = await this.evaluate(id, provider);
     if (evaluationState !== "PRIVATE_LOCAL_PROFILE") {
       throw new Error("PRIVATE_PROFILE_EVALUATION_FAILED");

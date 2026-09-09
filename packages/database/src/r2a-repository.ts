@@ -7,8 +7,27 @@ import {
   R2NormalizedValueSchema,
   R2RequirementEvidenceSchema,
   SourceEvidencePointerSchema,
+  r2RequirementPropositionKey,
   type R2ANormalization,
 } from "@applypilot/job-model";
+
+export type R2AReadResult =
+  | { state: "AVAILABLE"; normalization: R2ANormalization }
+  | { state: "LEGACY_NOT_AVAILABLE"; normalization: null }
+  | { state: "INVALID"; normalization: null };
+
+function assertExcerptHashes(normalization: R2ANormalization): void {
+  const pointers = [
+    ...normalization.fieldEvidence.map(({ source }) => source),
+    ...normalization.requirementEvidence.map(({ source }) => source),
+    ...normalization.coverage.flatMap(({ unparsedSpans }) => unparsedSpans),
+  ];
+  for (const pointer of pointers) {
+    if (createHash("sha256").update(pointer.excerpt).digest("hex") !== pointer.excerptHash) {
+      throw new Error("R2A_EXCERPT_HASH_MISMATCH");
+    }
+  }
+}
 
 function stableId(jobVersionId: string, kind: string, id: string): string {
   return createHash("sha256").update(`${jobVersionId}\n${kind}\n${id}`).digest("hex");
@@ -18,6 +37,35 @@ export function r2aSemanticDigest(input: R2ANormalization): string {
   const value = R2ANormalizationSchema.parse(input);
   const sorted = <T>(items: T[]): T[] =>
     items.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  const fieldSignature = (item: R2ANormalization["fieldEvidence"][number]) => ({
+    family: item.family,
+    canonicalField: item.canonicalField,
+    state: item.state,
+    modality: item.modality,
+    source: item.source,
+    normalizedValue: item.normalizedValue,
+    extractorVersion: item.extractorVersion,
+    ruleId: item.ruleId,
+    ownerCorrectionId: item.ownerCorrectionId,
+  });
+  const requirementSignature = (item: R2ANormalization["requirementEvidence"][number]) => ({
+    family: item.family,
+    canonicalKind: item.canonicalKind,
+    state: item.state,
+    modality: item.modality,
+    condition: item.condition,
+    source: item.source,
+    normalizedValue: item.normalizedValue,
+    extractorVersion: item.extractorVersion,
+    ruleId: item.ruleId,
+    ownerCorrectionId: item.ownerCorrectionId,
+  });
+  const evidenceSignatures = new Map<string, string>([
+    ...value.fieldEvidence.map((item) => [item.id, JSON.stringify(fieldSignature(item))] as const),
+    ...value.requirementEvidence.map(
+      (item) => [item.id, JSON.stringify(requirementSignature(item))] as const,
+    ),
+  ]);
   return createHash("sha256")
     .update(
       JSON.stringify({
@@ -26,33 +74,23 @@ export function r2aSemanticDigest(input: R2ANormalization): string {
         normalizationVersion: value.normalizationVersion,
         fieldEvidence: sorted(
           value.fieldEvidence.map((item) => ({
-            family: item.family,
-            canonicalField: item.canonicalField,
-            state: item.state,
-            modality: item.modality,
-            source: item.source,
-            normalizedValue: item.normalizedValue,
-            extractorVersion: item.extractorVersion,
-            ruleId: item.ruleId,
+            ...fieldSignature(item),
+            derivationInputs: sorted(
+              item.derivationInputIds.map(
+                (id) => evidenceSignatures.get(id) ?? `UNRESOLVED_DERIVATION:${id}`,
+              ),
+            ),
           })),
         ),
-        requirementEvidence: sorted(
-          value.requirementEvidence.map((item) => ({
-            family: item.family,
-            canonicalKind: item.canonicalKind,
-            state: item.state,
-            modality: item.modality,
-            condition: item.condition,
-            source: item.source,
-            normalizedValue: item.normalizedValue,
-            extractorVersion: item.extractorVersion,
-            ruleId: item.ruleId,
-          })),
-        ),
+        requirementEvidence: sorted(value.requirementEvidence.map(requirementSignature)),
         conflicts: sorted(
           value.conflicts.map((item) => ({
             canonicalField: item.canonicalField,
-            evidenceCount: item.evidenceIds.length,
+            evidence: sorted(
+              item.evidenceIds.map(
+                (id) => evidenceSignatures.get(id) ?? `UNRESOLVED_CONFLICT:${id}`,
+              ),
+            ),
           })),
         ),
         coverage: sorted(
@@ -94,6 +132,7 @@ export class R2ARepository {
 
   recordNormalization(jobVersionId: string, input: R2ANormalization): R2APersistenceSummary {
     const normalization = R2ANormalizationSchema.parse(input);
+    assertExcerptHashes(normalization);
     if (!this.available()) throw new Error("R2A_SCHEMA_NOT_AVAILABLE");
     const version = this.sqlite
       .prepare(
@@ -436,20 +475,30 @@ export class R2ARepository {
       0,
       ...fieldEvidence.map(({ source }) => source.sourceLength),
       ...requirementEvidence.map(({ source }) => source.sourceLength),
+      ...coverageRows.flatMap(({ unparsedSpansJson }) =>
+        (JSON.parse(unparsedSpansJson) as Array<{ sourceLength?: unknown }>).map(
+          ({ sourceLength }) => (typeof sourceLength === "number" ? sourceLength : 0),
+        ),
+      ),
     );
-    return R2ANormalizationSchema.parse({
+    const parserVersion = coverageRows[0]?.parserVersion ?? "3.0.0";
+    const normalization = R2ANormalizationSchema.parse({
       sourceObservationId: version.sourceObservationId,
       sourceLength,
-      parserVersion: coverageRows[0]?.parserVersion ?? "3.0.0",
-      evidenceContractVersion: "3.0.0",
-      normalizationVersion: "3.0.0",
+      parserVersion,
+      evidenceContractVersion: parserVersion,
+      normalizationVersion: parserVersion,
       fieldEvidence,
       requirementEvidence,
       conflicts: [...conflictGroups].map(([id, evidenceIds]) => ({
         id,
         canonicalField:
           fieldEvidence.find((item) => item.conflictSetId === id)?.canonicalField ??
-          requirementEvidence.find((item) => item.conflictSetId === id)?.canonicalKind ??
+          (requirementEvidence.find((item) => item.conflictSetId === id)
+            ? `requirement:${r2RequirementPropositionKey(
+                requirementEvidence.find((item) => item.conflictSetId === id)!,
+              )}`
+            : undefined) ??
           "unknown",
         evidenceIds,
       })),
@@ -461,5 +510,41 @@ export class R2ARepository {
         parserVersion: row.parserVersion,
       })),
     });
+    assertExcerptHashes(normalization);
+    return normalization;
+  }
+
+  getNormalizationResult(jobVersionId: string): R2AReadResult {
+    if (!this.available()) return { state: "LEGACY_NOT_AVAILABLE", normalization: null };
+    const coverage = this.sqlite
+      .prepare(
+        `SELECT coverage_state AS state, parser_version AS parserVersion
+         FROM job_normalization_coverage
+         WHERE job_version_id = ?`,
+      )
+      .all(jobVersionId) as Array<{ state: string; parserVersion: string }>;
+    if (coverage.length === 0) return { state: "LEGACY_NOT_AVAILABLE", normalization: null };
+    const rules = this.sqlite
+      .prepare(
+        `SELECT rule_id AS ruleId FROM job_field_evidence_v2 WHERE job_version_id = ?
+         UNION ALL
+         SELECT rule_id AS ruleId FROM requirement_evidence_v2 WHERE job_version_id = ?`,
+      )
+      .all(jobVersionId, jobVersionId) as Array<{ ruleId: string }>;
+    const isLegacyPlaceholder =
+      coverage.every(({ state }) => state === "UNKNOWN") &&
+      coverage.every(({ parserVersion }) => parserVersion === "3.0.0") &&
+      rules.every(({ ruleId }) =>
+        ["R2A_LEGACY_FIELD_UNKNOWN", "R2A_LEGACY_REQUIREMENT_UNKNOWN"].includes(ruleId),
+      );
+    if (isLegacyPlaceholder) return { state: "LEGACY_NOT_AVAILABLE", normalization: null };
+    try {
+      const normalization = this.getNormalization(jobVersionId);
+      return normalization
+        ? { state: "AVAILABLE", normalization }
+        : { state: "LEGACY_NOT_AVAILABLE", normalization: null };
+    } catch {
+      return { state: "INVALID", normalization: null };
+    }
   }
 }

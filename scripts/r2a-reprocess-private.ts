@@ -1,28 +1,31 @@
+import { dirname, join } from "node:path";
+
 import BetterSqlite3 from "better-sqlite3";
 
 import { JobImportRepository } from "@applypilot/database";
 
-import { CURRENT_DATABASE_SCHEMA_VERSION } from "./lib/database-schema";
-import { localDatabasePath } from "./lib/runtime-safety";
+import { createDatabaseBackup } from "./lib/database-maintenance";
+import {
+  R2A_PRIVATE_CONFIRMATION,
+  assertPrivateDatabaseGitIsolation,
+  assertPrivateR2ADatabasePreflight,
+  assertR2APrivateConfirmation,
+} from "./lib/r2a-private-safety";
+import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
 
 async function main(): Promise<void> {
+  assertR2APrivateConfirmation(process.argv.slice(2));
+  const root = repositoryRoot();
   const databasePath = localDatabasePath();
+  assertPrivateDatabaseGitIsolation(databasePath, root);
   const sqlite = new BetterSqlite3(databasePath, { fileMustExist: true });
   sqlite.pragma("foreign_keys = ON");
   try {
-    if (
-      Number(sqlite.pragma("user_version", { simple: true })) !== CURRENT_DATABASE_SCHEMA_VERSION
-    ) {
-      throw new Error("R2A_SCHEMA_V3_REQUIRED");
-    }
-    if (sqlite.pragma("integrity_check", { simple: true }) !== "ok") {
-      throw new Error("DATABASE_INTEGRITY_FAILED");
-    }
-    if ((sqlite.pragma("foreign_key_check") as unknown[]).length > 0) {
-      throw new Error("DATABASE_FOREIGN_KEY_FAILED");
-    }
-    const jobIds = sqlite.prepare("SELECT id FROM jobs ORDER BY id").pluck().all() as string[];
-    if (jobIds.length !== 1) throw new Error("PRIVATE_R2A_REPROCESS_REQUIRES_ONE_STORED_JOB");
+    const jobId = assertPrivateR2ADatabasePreflight(sqlite);
+    const backup = await createDatabaseBackup({
+      databasePath,
+      backupRoot: join(dirname(databasePath), "private", "backups"),
+    });
     const before = {
       observations: Number(
         sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get(),
@@ -32,7 +35,7 @@ async function main(): Promise<void> {
       documents: Number(sqlite.prepare("SELECT count(*) FROM document_artifacts").pluck().get()),
       packets: Number(sqlite.prepare("SELECT count(*) FROM application_packets").pluck().get()),
     };
-    const result = await new JobImportRepository(sqlite).reprocessLegacyJobR2A(jobIds[0]!);
+    const result = await new JobImportRepository(sqlite).reprocessLegacyJobR2A(jobId);
     const after = {
       observations: Number(
         sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get(),
@@ -44,7 +47,7 @@ async function main(): Promise<void> {
     };
     if (
       after.observations !== before.observations ||
-      after.versions !== before.versions + 1 ||
+      after.versions !== before.versions + (result.created ? 1 : 0) ||
       after.evaluations !== before.evaluations ||
       after.documents !== before.documents ||
       after.packets !== before.packets
@@ -54,7 +57,7 @@ async function main(): Promise<void> {
     const currentVersion = sqlite
       .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
       .pluck()
-      .get(jobIds[0]);
+      .get(jobId);
     if (currentVersion !== result.jobVersionId || result.coverageCount !== 17) {
       throw new Error("R2A_CURRENT_VERSION_VERIFICATION_FAILED");
     }
@@ -64,7 +67,7 @@ async function main(): Promise<void> {
           "SELECT count(*) FROM evaluation_versions WHERE job_id = ? AND job_version_id <> ? AND stale = 0",
         )
         .pluck()
-        .get(jobIds[0], result.jobVersionId),
+        .get(jobId, result.jobVersionId),
     );
     const currentOldDocuments = Number(
       sqlite
@@ -72,7 +75,7 @@ async function main(): Promise<void> {
           "SELECT count(*) FROM document_artifacts WHERE job_id = ? AND job_version_id <> ? AND stale = 0",
         )
         .pluck()
-        .get(jobIds[0], result.jobVersionId),
+        .get(jobId, result.jobVersionId),
     );
     const currentOldPackets = Number(
       sqlite
@@ -80,7 +83,7 @@ async function main(): Promise<void> {
           "SELECT count(*) FROM application_packets WHERE job_id = ? AND job_version_id <> ? AND status <> 'INVALIDATED'",
         )
         .pluck()
-        .get(jobIds[0], result.jobVersionId),
+        .get(jobId, result.jobVersionId),
     );
     if (currentOldEvaluations || currentOldDocuments || currentOldPackets) {
       throw new Error("R2A_DOWNSTREAM_STALENESS_FAILED");
@@ -92,7 +95,7 @@ async function main(): Promise<void> {
       throw new Error("R2A_POST_REPROCESS_DATABASE_FAILED");
     }
     console.log(
-      `R2A_PRIVATE_REPROCESS_COMPLETE versions_before=${before.versions} versions_after=${after.versions} field_evidence=${result.fieldEvidenceCount} requirement_evidence=${result.requirementEvidenceCount} coverage=${result.coverageCount} conflicts=${result.conflictCount} unknown_coverage=${result.unknownCoverageCount} stale_evaluations=${result.staleEvaluations} stale_documents=${result.staleDocuments} invalidated_packets=${result.invalidatedPackets} real_source_calls=0 real_application_actions=0`,
+      `R2A_PRIVATE_REPROCESS_COMPLETE backup=${backup.backupId} confirmed=${R2A_PRIVATE_CONFIRMATION} created=${result.created ? "YES" : "NO"} versions_before=${before.versions} versions_after=${after.versions} field_evidence=${result.fieldEvidenceCount} requirement_evidence=${result.requirementEvidenceCount} coverage=${result.coverageCount} conflicts=${result.conflictCount} unknown_coverage=${result.unknownCoverageCount} stale_evaluations=${result.staleEvaluations} stale_documents=${result.staleDocuments} invalidated_packets=${result.invalidatedPackets} real_source_calls=0 real_application_actions=0`,
     );
   } finally {
     sqlite.close();
