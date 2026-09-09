@@ -26,6 +26,10 @@ const migration = [
   )
   .join("\n");
 const fixedNow = () => new Date("2026-09-05T12:00:00.000Z");
+const r2aMigration = readFileSync(
+  new URL("../../packages/database/drizzle/0003_r2a_evidence_normalization.sql", import.meta.url),
+  "utf8",
+);
 const content = `Title: Fictional Community Assistant
 Company: Example Harbour Services
 Location: Sydney NSW 2000
@@ -302,6 +306,40 @@ describe("real-world job intake persistence and profile gate", () => {
         .pluck()
         .get(result.evaluationVersionId),
     ).toBe(result.jobVersionId);
+  });
+
+  it("reprocesses a migrated legacy job into R2A without running another evaluation", async () => {
+    const provider: CandidateProfileProvider = {
+      resolve: async () => ({ state: "PRIVATE_LOCAL_PROFILE", profile: testProfile }),
+    };
+    const staged = repository.stage(prepared());
+    const confirmed = await repository.confirm(
+      staged.importId,
+      staged.previewToken,
+      selection(staged.records[0]!.recordId),
+      provider,
+    );
+    const jobId = confirmed.jobs[0]!.jobId;
+    expect(sqlite.prepare("SELECT count(*) FROM evaluation_versions").pluck().get()).toBe(1);
+    sqlite.exec(r2aMigration);
+
+    const result = await repository.reprocessLegacyJobR2A(jobId);
+
+    expect(result).toMatchObject({
+      coverageCount: 17,
+      fieldEvidenceCount: expect.any(Number),
+      requirementEvidenceCount: expect.any(Number),
+    });
+    expect(result.previousJobVersionId).not.toBe(result.jobVersionId);
+    expect(sqlite.prepare("SELECT count(*) FROM evaluation_versions").pluck().get()).toBe(1);
+    expect(sqlite.prepare("SELECT stale FROM evaluation_versions").pluck().get()).toBe(1);
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM job_normalization_coverage WHERE job_version_id = ?")
+        .pluck()
+        .get(result.jobVersionId),
+    ).toBe(17);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
   });
 
   it("refuses to guess legacy boundaries for a stored multi-job batch", async () => {

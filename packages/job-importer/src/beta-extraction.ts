@@ -1,6 +1,7 @@
 import type { Job } from "@applypilot/job-model";
 
 import { extractRequirementEvidence, requirementCoverage } from "./requirement-evidence";
+import { normalizeR2AJobEvidence } from "./r2a-normalization";
 
 export interface BetaExtractedFields {
   location: {
@@ -29,6 +30,7 @@ export interface BetaExtractedFields {
   };
   requirementEvidence: ReturnType<typeof extractRequirementEvidence>;
   extractionCoverage: ReturnType<typeof requirementCoverage>;
+  r2a: ReturnType<typeof normalizeR2AJobEvidence>;
   warnings: string[];
 }
 
@@ -110,6 +112,8 @@ function documentState(text: string, name: "resume" | "cv" | "cover letter") {
 export function extractBetaJobFields(input: {
   text: string;
   location: string | null;
+  structured?: Record<string, unknown> | null;
+  sourceObservationId?: string;
 }): BetaExtractedFields {
   const evidence = extractRequirementEvidence(input.text);
   const required = evidence.filter(({ modality }) => modality === "REQUIRED");
@@ -185,6 +189,22 @@ export function extractBetaJobFields(input: {
     documentRequirements: { resume, coverLetter, other: [] },
     requirementEvidence: evidence,
     extractionCoverage: requirementCoverage(input.text, evidence),
+    r2a: normalizeR2AJobEvidence({
+      sourceText: input.text,
+      sourceObservationId:
+        input.sourceObservationId ?? `preview:${createPreviewObservationId(input.text)}`,
+      structured: input.structured,
+      explicitLocation: input.location,
+    }),
     warnings,
   };
+}
+
+function createPreviewObservationId(text: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }

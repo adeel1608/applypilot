@@ -8,6 +8,7 @@ export * from "./job-discovery-repository";
 export * from "./job-import-repository";
 export * from "./document-consistency";
 export * from "./beta-repository";
+export * from "./r2a-repository";
 
 export function openApplyPilotDatabase(path: string) {
   const sqlite = new BetterSqlite3(path);

@@ -237,6 +237,120 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
         </article>
       </section>
 
+      <section className="panel" data-testid="r2a-evidence-layer">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">R2A extraction truth layer</span>
+            <h2>Evidence, conflicts, and coverage</h2>
+          </div>
+          <span className="source-pill">
+            {detail.r2a ? `Parser ${detail.r2a.parserVersion}` : "R2A unavailable"}
+          </span>
+        </div>
+        <p>
+          This evidence contract is separate from the existing fit and eligibility engine. It does
+          not make R2B rule outcomes or candidate eligibility claims.
+        </p>
+        <dl className="fact-list compact-facts">
+          {detail.jobVersions.map((version) => (
+            <div key={version.id}>
+              <dt>Job version {version.version}</dt>
+              <dd>
+                {version.id} ·{" "}
+                {version.r2aCoverageCount === 17 ? "R2A evidence" : "legacy evidence"}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {detail.r2a ? (
+          <>
+            <div className="detail-grid">
+              <div>
+                <h3>Version contract</h3>
+                <p>
+                  Evidence {detail.r2a.evidenceContractVersion} · normalization{" "}
+                  {detail.r2a.normalizationVersion}
+                </p>
+              </div>
+              <div>
+                <h3>Conflicts</h3>
+                {detail.r2a.conflicts.length ? (
+                  <ul>
+                    {detail.r2a.conflicts.map((conflict) => (
+                      <li key={conflict.id}>
+                        {conflict.canonicalField.replaceAll("_", " ")} · {conflict.evidenceCount}{" "}
+                        linked records
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No material extraction conflict is recorded.</p>
+                )}
+              </div>
+              <div>
+                <h3>Unknown sections</h3>
+                <p>
+                  {detail.r2a.coverage
+                    .filter(({ state }) => state === "UNKNOWN")
+                    .map(({ family }) => family.replaceAll("_", " "))
+                    .join(", ") || "None"}
+                </p>
+              </div>
+            </div>
+            <h3>Field-family coverage</h3>
+            <div className="inline-pills">
+              {detail.r2a.coverage.map((coverage) => (
+                <span className="source-pill" key={coverage.family}>
+                  {coverage.family.replaceAll("_", " ")}: {coverage.state} ·{" "}
+                  {coverage.evidenceCount} evidence · {coverage.unparsedSpanCount} unparsed
+                </span>
+              ))}
+            </div>
+            <h3>Typed field evidence</h3>
+            {detail.r2a.fields.length ? (
+              <dl className="fact-list">
+                {detail.r2a.fields.map((evidence) => (
+                  <div key={evidence.id}>
+                    <dt>
+                      {evidence.canonicalField} · {evidence.state}
+                      {evidence.modality ? ` · ${evidence.modality}` : ""} ·{" "}
+                      {evidence.normalizedKind}
+                    </dt>
+                    <dd>
+                      Bounded source [{evidence.start}, {evidence.end}):{" "}
+                      {evidence.excerpt ||
+                        "No copied source text; linked owner/legacy provenance only"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p>No current typed field evidence.</p>
+            )}
+            <h3>Typed requirement evidence</h3>
+            {detail.r2a.requirements.length ? (
+              <dl className="fact-list">
+                {detail.r2a.requirements.map((evidence) => (
+                  <div key={evidence.id}>
+                    <dt>
+                      {evidence.canonicalKind.replaceAll("_", " ")} · {evidence.state} ·{" "}
+                      {evidence.modality} · {evidence.normalizedKind}
+                    </dt>
+                    <dd>
+                      Bounded source [{evidence.start}, {evidence.end}): {evidence.excerpt}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p>No current typed requirement evidence.</p>
+            )}
+          </>
+        ) : (
+          <p>The current job version predates verified R2A evidence or schema migration.</p>
+        )}
+      </section>
+
       <section className="panel">
         <div className="panel-heading">
           <div>

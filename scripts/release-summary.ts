@@ -36,8 +36,8 @@ async function main(): Promise<void> {
   }
   const source = await loadPrivateSourceAllowlist(root);
   const manualBetaBlockers = [
-    ...(schemaVersion < 2 ? ["PENDING_DATABASE_MIGRATION"] : []),
-    ...(schemaVersion > 2 ? ["DATABASE_SCHEMA_UNSUPPORTED"] : []),
+    ...(schemaVersion < 3 ? ["PENDING_DATABASE_MIGRATION"] : []),
+    ...(schemaVersion > 3 ? ["DATABASE_SCHEMA_UNSUPPORTED"] : []),
     ...(databaseIntegrity !== "PASS" ? ["DATABASE_INTEGRITY_FAILED"] : []),
     ...(foreignKeyIssues > 0 ? ["DATABASE_FOREIGN_KEY_ISSUES"] : []),
   ];
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   console.log("RELEASE_PRIVACY status=PASS");
   console.log("RELEASE_QUALITY status=PASS");
   console.log(
-    `RELEASE_DATABASE schema_version=${schemaVersion} pending_migrations=${Math.max(0, 2 - schemaVersion)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
+    `RELEASE_DATABASE schema_version=${schemaVersion} pending_migrations=${Math.max(0, 3 - schemaVersion)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
   );
   console.log(
     `RELEASE_SOURCE state=${source.status} capability_count=${source.capabilities.length}`,

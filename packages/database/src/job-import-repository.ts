@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import type BetterSqlite3 from "better-sqlite3";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { evaluateEligibility } from "@applypilot/eligibility-engine";
 import { scoreJobFit } from "@applypilot/fit-scorer";
 import {
   canonicalizeJobUrl,
+  bindR2ANormalizationObservation,
   deriveJobIdentity,
   extractRequirementEvidence,
   JobFieldEditsSchema,
@@ -25,9 +26,15 @@ import {
   type JobFieldEdits,
   type PreparedJobImport,
 } from "@applypilot/job-importer";
-import { JobSchema, type Job } from "@applypilot/job-model";
+import {
+  JobSchema,
+  type Job,
+  type R2ANormalization,
+  type RequirementEvidence,
+} from "@applypilot/job-model";
 
 import { BetaRepository } from "./beta-repository";
+import { R2ARepository } from "./r2a-repository";
 
 const tokenLifetimeMs = 30 * 60 * 1000;
 const selectionSchema = z.object({
@@ -73,6 +80,21 @@ export interface LegacyReprocessResult {
   requirementEvidenceCount: number;
   evaluationVersionId: string;
   evaluationState: "PRIVATE_LOCAL_PROFILE";
+}
+
+export interface R2APrivateReprocessResult {
+  jobId: string;
+  sourceObservationId: string;
+  previousJobVersionId: string;
+  jobVersionId: string;
+  fieldEvidenceCount: number;
+  requirementEvidenceCount: number;
+  coverageCount: number;
+  conflictCount: number;
+  unknownCoverageCount: number;
+  staleEvaluations: number;
+  staleDocuments: number;
+  invalidatedPackets: number;
 }
 
 type StoredRecord = {
@@ -267,6 +289,17 @@ export class JobImportRepository {
     jobId: string,
     provider: CandidateProfileProvider,
   ): Promise<LegacyReprocessResult> {
+    return (await this.reprocessStoredJob(jobId, provider)) as LegacyReprocessResult;
+  }
+
+  async reprocessLegacyJobR2A(jobId: string): Promise<R2APrivateReprocessResult> {
+    return (await this.reprocessStoredJob(jobId, null)) as R2APrivateReprocessResult;
+  }
+
+  private async reprocessStoredJob(
+    jobId: string,
+    provider: CandidateProfileProvider | null,
+  ): Promise<LegacyReprocessResult | R2APrivateReprocessResult> {
     const id = z.string().min(1).parse(jobId);
     if (!this.betaSchemaAvailable()) throw new Error("BETA_SCHEMA_REQUIRED");
     const candidates = this.sqlite
@@ -393,6 +426,8 @@ export class JobImportRepository {
         sourcePath: "description",
       })
     ).map((evidence) => ({ ...evidence, sourceObservationId }));
+    if (!fields.beta?.r2a) throw new Error("R2A_NORMALIZATION_MISSING");
+    const r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
     const beta = new BetaRepository(this.sqlite, this.now);
     const recorded = this.sqlite.transaction(() => {
       this.updateJob(reprocessed, now);
@@ -400,9 +435,38 @@ export class JobImportRepository {
         job: reprocessed,
         sourceObservationId,
         requirementEvidence,
+        r2aNormalization,
       });
     })();
     if (!recorded.created) throw new Error("LEGACY_REPROCESS_DID_NOT_CREATE_VERSION");
+    if (!provider) {
+      const activeProfile = this.sqlite
+        .prepare(
+          "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
+        )
+        .get() as { id: string | null } | undefined;
+      const stale = beta.invalidateStaleDependencies({
+        jobId: id,
+        currentJobVersionId: recorded.id,
+        currentProfileVersionId: activeProfile?.id ?? "r2a:no-active-profile",
+        reasonCode: "R2A_NORMALIZATION_CHANGED",
+      });
+      const summary = new R2ARepository(this.sqlite, this.now).summary(recorded.id);
+      return {
+        jobId: id,
+        sourceObservationId,
+        previousJobVersionId: previousVersion.id,
+        jobVersionId: recorded.id,
+        fieldEvidenceCount: summary.fieldEvidenceCount,
+        requirementEvidenceCount: summary.requirementEvidenceCount,
+        coverageCount: summary.coverageCount,
+        conflictCount: summary.conflictCount,
+        unknownCoverageCount: summary.unknownCoverageCount,
+        staleEvaluations: stale.evaluations,
+        staleDocuments: stale.documents,
+        invalidatedPackets: stale.packets,
+      };
+    }
     const evaluationState = await this.evaluate(id, provider);
     if (evaluationState !== "PRIVATE_LOCAL_PROFILE") {
       throw new Error("PRIVATE_PROFILE_EVALUATION_FAILED");
@@ -687,6 +751,8 @@ export class JobImportRepository {
           importId,
           recordId: record.id,
           parserVersion: batch.parserVersion,
+          r2aNormalization: fields.beta?.r2a ?? null,
+          requirementEvidence: fields.beta?.requirementEvidence ?? [],
           now,
         });
         persistedJobIds.push(job.id);
@@ -1076,6 +1142,8 @@ export class JobImportRepository {
     importId: string;
     recordId: string;
     parserVersion: string;
+    r2aNormalization: R2ANormalization | null;
+    requirementEvidence: RequirementEvidence[];
     now: string;
   }): void {
     if (!this.betaSchemaAvailable()) return;
@@ -1108,60 +1176,23 @@ export class JobImportRepository {
         input.parserVersion,
         previous?.id ?? null,
       );
-    const normalized = JSON.stringify(input.job);
-    const contentDigest = createHash("sha256").update(normalized).digest("hex");
-    const latest = this.sqlite
-      .prepare(
-        "SELECT version, content_digest AS contentDigest FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1",
-      )
-      .get(input.job.id) as { version: number; contentDigest: string | null } | undefined;
-    if (latest?.contentDigest === contentDigest) return;
-    const jobVersionId = randomUUID();
-    this.sqlite
-      .prepare(
-        `INSERT INTO job_versions
-          (id, job_id, version, normalized_json, content_digest, source_observation_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        jobVersionId,
-        input.job.id,
-        (latest?.version ?? 0) + 1,
-        normalized,
-        contentDigest,
-        observationId,
-        input.now,
-      );
-    const requirements = extractRequirementEvidence(input.job.description, {
+    const requirements = (
+      input.requirementEvidence.length > 0
+        ? input.requirementEvidence
+        : extractRequirementEvidence(input.job.description, {
+            sourceObservationId: observationId,
+            sourcePath: "description",
+          })
+    ).map((item) => ({ ...item, sourceObservationId: observationId }));
+    const r2aNormalization = input.r2aNormalization
+      ? bindR2ANormalizationObservation(input.r2aNormalization, observationId)
+      : undefined;
+    new BetaRepository(this.sqlite, this.now).recordJobVersion({
+      job: input.job,
       sourceObservationId: observationId,
-      sourcePath: "description",
+      requirementEvidence: requirements,
+      r2aNormalization,
     });
-    const insert = this.sqlite.prepare(
-      `INSERT INTO requirement_evidence
-        (id, job_version_id, source_observation_id, source_path, start_offset, end_offset,
-         original_text, normalized_proposition, modality, kind, condition_text, certainty,
-         rule_id, extractor_version, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    for (const evidence of requirements) {
-      insert.run(
-        randomUUID(),
-        jobVersionId,
-        observationId,
-        evidence.sourcePath,
-        evidence.start,
-        evidence.end,
-        evidence.originalText,
-        evidence.normalizedProposition,
-        evidence.modality,
-        evidence.kind,
-        evidence.condition,
-        evidence.certainty,
-        evidence.ruleId,
-        evidence.extractorVersion,
-        input.now,
-      );
-    }
   }
 
   private persistBetaEvaluation(

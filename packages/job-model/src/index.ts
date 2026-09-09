@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export * from "./beta";
+export * from "./r2a";
 
 export const JobSourceSchema = z.enum([
   "SEEK",

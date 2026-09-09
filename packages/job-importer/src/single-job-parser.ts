@@ -170,7 +170,12 @@ export function parseImportedJobRecord(
       : section(record.text, ["responsibilities", "duties", "what you will do"]),
     datePosted: dateTime(structured.datePosted),
     coverLetterRequired: null,
-    beta: extractBetaJobFields({ text: record.text, location }),
+    beta: extractBetaJobFields({
+      text: record.text,
+      location,
+      structured: record.structured,
+      sourceObservationId: `preview:${record.id}`,
+    }),
   });
   const extractionRuleIds = [record.structured ? "STRUCTURED_JOB_FIELDS" : "LABELLED_VISIBLE_TEXT"];
   if (
@@ -204,7 +209,12 @@ export function parseImportedJobRecord(
           typeof job.sourceMetadata.coverLetterRequired === "boolean"
             ? job.sourceMetadata.coverLetterRequired
             : null,
-        beta: extractBetaJobFields({ text: record.text, location: job.location }),
+        beta: extractBetaJobFields({
+          text: record.text,
+          location: job.location,
+          structured: record.structured,
+          sourceObservationId: `preview:${record.id}`,
+        }),
       });
       extractionRuleIds.push("SEEK_PHASE_2_PARSER_REUSE");
     } catch {

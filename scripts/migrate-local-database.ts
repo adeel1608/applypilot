@@ -22,7 +22,7 @@ async function main(): Promise<void> {
       }
     }
     console.log(
-      `MIGRATION_PREVIEW current_schema=${version} target_schema=2 pending=${Math.max(0, 2 - version)}`,
+      `MIGRATION_PREVIEW current_schema=${version} target_schema=3 pending=${Math.max(0, 3 - version)}`,
     );
     console.log("No changes made. Re-run with --confirm to create a verified backup and migrate.");
     return;
@@ -62,6 +62,27 @@ async function main(): Promise<void> {
           )
           .all()
       : [];
+    const historicalCounts = hasFoundation
+      ? {
+          jobs: Number(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get()),
+          jobVersions:
+            version >= 2
+              ? Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get())
+              : 0,
+          observations:
+            version >= 2
+              ? Number(sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get())
+              : 0,
+          fieldEvidence:
+            version >= 2
+              ? Number(sqlite.prepare("SELECT count(*) FROM job_field_evidence").pluck().get())
+              : 0,
+          requirementEvidence:
+            version >= 2
+              ? Number(sqlite.prepare("SELECT count(*) FROM requirement_evidence").pluck().get())
+              : 0,
+        }
+      : { jobs: 0, jobVersions: 0, observations: 0, fieldEvidence: 0, requirementEvidence: 0 };
     const sourceDigest = createHash("sha256").update(JSON.stringify(sourceSnapshot)).digest("hex");
     if (!hasFoundation) {
       sqlite.exec(
@@ -87,6 +108,17 @@ async function main(): Promise<void> {
         ),
       );
     }
+    if (version < 3) {
+      sqlite.exec(
+        readFileSync(
+          new URL(
+            "../packages/database/drizzle/0003_r2a_evidence_normalization.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+    }
     const migratedSnapshot = sqlite
       .prepare(
         `SELECT id, job_id, source_id, external_id, source_url, payload_hash, discovered_at, fetched_at
@@ -106,8 +138,58 @@ async function main(): Promise<void> {
       sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get(),
     );
     const jobCount = Number(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get());
-    if (observationCount !== migratedSnapshot.length || jobVersionCount !== jobCount) {
+    if (
+      observationCount < migratedSnapshot.length ||
+      jobVersionCount < jobCount ||
+      (version >= 2 &&
+        (observationCount !== historicalCounts.observations ||
+          jobVersionCount !== historicalCounts.jobVersions))
+    ) {
       throw new Error("Beta observation/job-version mapping verification failed after migration.");
+    }
+    const unmappedSourceRecords = Number(
+      sqlite
+        .prepare(
+          `SELECT count(*) FROM job_source_records s
+           WHERE NOT EXISTS (SELECT 1 FROM source_observations o WHERE o.source_record_id = s.id)`,
+        )
+        .pluck()
+        .get(),
+    );
+    const unmappedJobs = Number(
+      sqlite
+        .prepare(
+          `SELECT count(*) FROM jobs j
+           WHERE NOT EXISTS (SELECT 1 FROM job_versions v WHERE v.job_id = j.id)`,
+        )
+        .pluck()
+        .get(),
+    );
+    const legacyFieldCount = Number(
+      sqlite.prepare("SELECT count(*) FROM job_field_evidence").pluck().get(),
+    );
+    const legacyRequirementCount = Number(
+      sqlite.prepare("SELECT count(*) FROM requirement_evidence").pluck().get(),
+    );
+    const r2aFieldCount = Number(
+      sqlite.prepare("SELECT count(*) FROM job_field_evidence_v2").pluck().get(),
+    );
+    const r2aRequirementCount = Number(
+      sqlite.prepare("SELECT count(*) FROM requirement_evidence_v2").pluck().get(),
+    );
+    const coverageCount = Number(
+      sqlite.prepare("SELECT count(*) FROM job_normalization_coverage").pluck().get(),
+    );
+    if (
+      unmappedJobs ||
+      unmappedSourceRecords ||
+      legacyFieldCount < historicalCounts.fieldEvidence ||
+      legacyRequirementCount < historicalCounts.requirementEvidence ||
+      r2aFieldCount < legacyFieldCount ||
+      r2aRequirementCount < legacyRequirementCount ||
+      coverageCount !== jobVersionCount * 17
+    ) {
+      throw new Error("R2A conservative backfill verification failed after migration.");
     }
     const foreignKeys = sqlite.pragma("foreign_key_check") as unknown[];
     const finalIntegrity = sqlite.pragma("integrity_check", { simple: true });
@@ -115,7 +197,7 @@ async function main(): Promise<void> {
       throw new Error("Database verification failed after migration.");
     }
     console.log(
-      `MIGRATION_COMPLETE schema_version=${Number(sqlite.pragma("user_version", { simple: true }))} integrity=PASS foreign_key_issues=0`,
+      `MIGRATION_COMPLETE schema_version=${Number(sqlite.pragma("user_version", { simple: true }))} integrity=PASS foreign_key_issues=0 jobs=${jobCount} job_versions=${jobVersionCount} r2a_field_evidence=${r2aFieldCount} r2a_requirement_evidence=${r2aRequirementCount} coverage=${coverageCount}`,
     );
   } finally {
     sqlite.close();

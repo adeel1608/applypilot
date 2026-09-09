@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   }
   console.log(`PREFLIGHT_PROFILE state=${profile.state}`);
   console.log(
-    `PREFLIGHT_DATABASE state=${databasePresent ? "PRESENT" : "ABSENT"} schema_version=${databaseSchema} pending_migrations=${Math.max(0, 2 - databaseSchema)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
+    `PREFLIGHT_DATABASE state=${databasePresent ? "PRESENT" : "ABSENT"} schema_version=${databaseSchema} pending_migrations=${Math.max(0, 3 - databaseSchema)} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
   );
   console.log("PREFLIGHT_LOOPBACK host=127.0.0.1 status=PASS");
   console.log("PREFLIGHT_OUTPUT_ROOT status=PASS");
