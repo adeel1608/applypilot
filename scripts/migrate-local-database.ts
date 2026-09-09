@@ -109,7 +109,7 @@ async function main(): Promise<void> {
         ),
       );
     }
-    if (version < 3) {
+    if (version < CURRENT_DATABASE_SCHEMA_VERSION) {
       sqlite.exec(
         readFileSync(
           new URL(

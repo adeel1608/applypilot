@@ -19,7 +19,7 @@ try {
   console.log(
     `DATABASE_STATUS present bytes=${statSync(databasePath).size} schema_version=${version} pending_migrations=${schemaStatus.pendingMigrations} integrity=${integrity === "ok" ? "PASS" : "FAIL"} foreign_key_issues=${foreignKeyIssues}`,
   );
-  if (integrity !== "ok" || foreignKeyIssues > 0 || version > 3) process.exitCode = 1;
+  if (integrity !== "ok" || foreignKeyIssues > 0 || schemaStatus.unsupported) process.exitCode = 1;
 } finally {
   sqlite.close();
 }
