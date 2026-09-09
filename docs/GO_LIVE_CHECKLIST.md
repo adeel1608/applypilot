@@ -2,7 +2,7 @@
 
 Status: **MANUAL-INTAKE PERSONAL BETA READY**. PR #10 was reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Source-enabled Personal Beta is `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; the real runner is `TARGET_APPROVAL_REQUIRED`. Exact implementation evidence is in [PROJECT_PLAN](../PROJECT_PLAN.md).
 
-R2A is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on its unmerged implementation review branch. The real ignored database is schema v3 with zero pending migrations and clean integrity/FKs after a verified backup, additive migration 0003, and offline stored-vacancy reprocess. R2B, R2C, and R2D remain `NOT_IMPLEMENTED`; this does not expand Manual-intake Personal Beta authority or enable a source/runner.
+R2A 3.1.0 is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on its unmerged implementation review branch, pending exact-head CI and final human review. The real ignored database is schema v3 with zero pending migrations and clean integrity/FKs after a freshly verified backup and one confirmed offline reprocess; historical versions 1–3 remain 3.0.0 and current version 4 is 3.1.0. Migration 0003 is unchanged and no 0004 was required. R2B, R2C, and R2D remain `NOT_IMPLEMENTED`; this does not expand Manual-intake Personal Beta authority or enable a source/runner.
 
 ## Earliest safe use — eight answers
 
@@ -39,7 +39,7 @@ R2A is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on its unme
 
 ## R2 and R1 gates — intentionally open
 
-- [x] R2A evidence-state/modality schemas, conservative additive migration, fictional corpus, evidence UI, and private offline reprocess are implemented and verified; implementation PR review remains pending.
+- [x] R2A 3.1.0 state/modality independence, persistable derivations/invariants, hash/provenance, conservative coverage/conflicts, atomic/idempotent reprocess, legacy/invalid UI, future-schema refusal, fictional corpus, and confirmed backed-up private offline reprocess are implemented and verified; exact-head CI and implementation PR review remain pending.
 - [ ] R2B legal/employer/preference outcomes and verified-only scoring/calibration gates pass.
 - [ ] R2C cross-source suggestions, owner link/reject/split, version-bound queue freshness, typed corrections, and audit schemas are durable.
 - [ ] R2D fictional golden corpus, private aggregate calibration threshold, uncertainty UX, and exact-head validation pass.
@@ -57,7 +57,7 @@ U = unit/domain; I = integration/persistence; B = fictional browser; S = securit
 | -------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Private profile/version                | I/B/S/M   | Valid current private snapshot; no public values; no demo fallback                                                            | Beta binding/path/privacy tests and private smoke pass; R2 adds per-field evidence states |
 | One/multi/HTML/file intake             | U/I/B/S/M | Bounded inert input, correct segments, explicit confirmation, canonical versions                                              | Beta gates pass; R2A expands ordinary headings, structured fields, and sparse coverage    |
-| Normalized evidence                    | U/I/B/M   | State + modality + span/path for geography, employment, salary, schedule, documents, and typed requirements                   | Foundation partial; R2A required                                                          |
+| Normalized evidence                    | U/I/B/M   | State + modality + hashed span/path for geography, employment, salary, schedule, documents, and typed requirements            | R2A 3.1.0 verified; R2B evaluation semantics still required                               |
 | Repeated/changed import                | U/I/B/M   | Repeat idempotent; change creates immutable observation/version after confirmation                                            | Beta repository/integration and private offline reprocess pass                            |
 | Cross-source duplicate                 | U/I/B     | Preserve observations; ambiguous stays suggested; owner link/reject/split is reversible                                       | Conservative helper/tests exist; durable R2C use required                                 |
 | Work rights/legal hours                | U/I/B/M   | Valid != unrestricted; expiry/hours/conditions and time basis explicit                                                        | Foundation passes; class/state-complete R2A/R2B required                                  |
