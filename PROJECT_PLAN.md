@@ -3,11 +3,11 @@
 Last updated: 2026-09-08
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `plan/r1-r2-next-gate`
+Working branch: `feat/r2a-evidence-normalization`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: PR #10 was human-reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged to `main` as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Manual-intake Personal Beta is `READY`. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; the real runner remains `TARGET_APPROVAL_REQUIRED`. This branch is documentation-only and plans [R2 matching quality](docs/R2_MATCHING_QUALITY_PLAN.md) plus a separate [R1 source-enabled Beta](docs/R1_SOURCE_ENABLED_BETA_PLAN.md). It authorises no application-code implementation, migration, tenant/source request, employer-form visit, upload, submission, deployment, or PR merge. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #11 was corrected, exact-head CI passed, and it merged as `78dc90e133f9ce39e8a651e4f975e698543b891c`. The current `feat/r2a-evidence-normalization` branch implements R2A and is awaiting its final unmerged implementation PR review. Manual-intake Personal Beta remains `READY`; R2B, R2C, and R2D remain `NOT_IMPLEMENTED`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -2588,7 +2588,7 @@ Exact forward sequence after this plan is separately reviewed and merged:
 5. R1C begins only after a fresh explicit one-tenant approval. Its first smoke is one Lever LIST request, `skip=0`, `limit=25`, at most 2 MB, zero redirects/retries/details, followed by local integrity/privacy/idempotency checks and default disablement.
 6. A separate post-smoke human decision is required to declare source-enabled Personal Beta ready. No R1 result authorises a real runner or application action.
 
-Recommended next implementation slice: **R2A — evidence model and normalization**. This plan PR must remain open and unmerged for human review.
+Historical plan decision: **R2A — evidence model and normalization** was selected as the next implementation slice. Its implementation result and current unmerged-review gate are recorded below.
 
 ### Planning implementation and local validation record
 
@@ -2602,7 +2602,7 @@ Recommended next implementation slice: **R2A — evidence model and normalizatio
 
 # R2A evidence model and normalization implementation — 2026-09-09
 
-Status: `IN_PROGRESS`. Human-approved plan PR #11 was corrected only for the reviewed commute-preference and `REVIEW_REQUIRED` recommendation audit findings, passed local and exact-head CI, and merged normally as `78dc90e133f9ce39e8a651e4f975e698543b891c`. This implementation branch, `feat/r2a-evidence-normalization`, was created from that clean merged main. R2B, R2C, R2D, R1 activation, real source requests, real browser targets, external uploads, and submissions are not authorised.
+Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`. Human-approved plan PR #11 was corrected only for the reviewed commute-preference and `REVIEW_REQUIRED` recommendation audit findings, passed local and exact-head CI, and merged normally as `78dc90e133f9ce39e8a651e4f975e698543b891c`. This implementation branch, `feat/r2a-evidence-normalization`, was created from that clean merged main. R2B, R2C, R2D, R1 activation, real source requests, real browser targets, external uploads, and submissions remain unauthorised and unimplemented.
 
 ## Current state and objective
 
@@ -2664,3 +2664,26 @@ R2A is complete only when all material field families have explicit state/proven
 7. Stop writers, verify the real schema-v2 DB and private profile, create and verify a fresh ignored backup, preview/apply migration 0003, and verify mapping/integrity/FKs.
 8. Offline-reprocess the existing stored vacancy through the general supported service, preserve history, and verify aggregate R2A state/coverage/conflict/unknown counts plus downstream staleness. Make zero network/application/document actions.
 9. Run final exact-head release/privacy/database/diff/fsck gates, update reality docs/results, commit by concern, push this branch, open one R2A PR, wait for exact-head CI, and stop with the PR unmerged.
+
+## R2A implementation and verification result
+
+R2A is `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED` on this branch. The implementation adds parser, evidence-contract, and normalization version `3.0.0`; migration `0003_r2a_evidence_normalization.sql`; the additive `job_field_evidence_v2`, `requirement_evidence_v2`, `evidence_derivations`, and `job_normalization_coverage` tables; immutable/idempotent repository persistence; owner-correction carry-forward; structured-first and ordinary-heading normalization; safe job-detail evidence UI; and a 12-role-family fictional corpus.
+
+Pre-private synthetic verification passed formatting, lint, typecheck, 215 unit tests across 33 files, 14 integration tests across 3 files, the Next.js production build, 19 serialized fictional E2E tests, the schema-v2 backup/migration/backfill/idempotency/restore rehearsal, privacy audit, full and production dependency audits, `git diff --check`, and `git fsck --strict`. Migration 0003 preserved legacy rows and conservatively mapped unmapped historical meaning to `UNKNOWN`.
+
+The real ignored local database was verified at schema v2 with exactly one pending migration, integrity `PASS`, zero FK issues, and a valid ignored private profile. ApplyPilot writers were already stopped. Fresh verified schema-v2 backups were created before the preview and confirmed migration; migration 0003 completed at schema v3 with zero pending migrations, integrity `PASS`, and zero FK issues. The database retained 1 job and 2 historical job versions before reprocess; conservative backfill produced 6 requirement evidence rows and 34 coverage rows across those versions.
+
+The existing single stored vacancy was then reprocessed offline from its immutable stored source with the general R2A parser. It retained the source observation and all historical evaluation/document/packet/application rows, created job version 3 with 5 field evidence rows, 7 requirement evidence rows, all 17 coverage rows, 7 unknown coverage families, and 0 conflicts. The prior evaluation, 2 documents, and 1 packet were made stale/invalidated. No R2B rule ran, no private document was regenerated, and real source calls, employer-form visits, uploads, submissions, and other real application actions remained `0`.
+
+Current train status:
+
+- R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; implementation PR must remain open and unmerged for human review.
+- R2B: `NOT_IMPLEMENTED`.
+- R2C: `NOT_IMPLEMENTED`.
+- R2D: `NOT_IMPLEMENTED`.
+- R1 source-enabled Beta: `WAITING_FOR_APPROVED_TENANT`; capability count remains 0 and no real source was activated.
+
+Non-blocking future hardening retained from the PR #10 review:
+
+- Before local packet preparation, optionally re-resolve the current private profile file and apply the same current-profile/evaluation consistency gate used for document generation.
+- Replace the cosmetic document-link separator with an encoding-safe separator and add a rendered-text regression.

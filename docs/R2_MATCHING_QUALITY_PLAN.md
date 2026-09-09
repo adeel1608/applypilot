@@ -1,6 +1,14 @@
 # R2 matching quality implementation blueprint
 
-Status: `PLAN_ONLY_AWAITING_HUMAN_REVIEW`
+Status: `R2A_IMPLEMENTED_AWAITING_HUMAN_REVIEW`; R2B, R2C, and R2D remain `NOT_IMPLEMENTED`.
+
+## R2A implementation result - 2026-09-09
+
+R2A is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on `feat/r2a-evidence-normalization`, pending human review of the unmerged implementation PR. Parser, evidence-contract, and normalization version `3.0.0` implement the reviewed evidence states, separate modality, bounded source pointers, 17-family coverage, ordinary headings, structured priority, Australian geography, scoped employment, unit-preserving hours, schedule, salary including unknown period, document tri-state, typed requirements, conflict sets, and owner-correction compatibility.
+
+Additive migration `0003_r2a_evidence_normalization.sql` preserves schema-v2 history and uses conservative `UNKNOWN` backfill. Its fictional schema-v2 backup/migration/idempotency/restore rehearsal passed. The ignored real local database was freshly backed up, migrated to schema v3 with integrity/FKs clean and zero pending migrations, then the one stored vacancy was reprocessed offline. Safe aggregates were 5 field evidence rows, 7 requirement evidence rows, 17 coverage rows, 7 unknown families, and 0 conflicts; historical rows remained and dependent prior rows became stale/invalidated.
+
+R2B, R2C, and R2D are **NOT_IMPLEMENTED**. Existing eligibility/fit output remains the older engine and is explicitly separate from R2A extraction. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; R2A made zero real source calls and authorised no source or application action.
 
 Baseline: merged Manual-intake Personal Beta at `4a0462d24b9a8db79ec49ff64242405d8f96f40d`
 
@@ -285,4 +293,4 @@ Two PR #10 review carryovers are separately classified and are not counted as R2
 3. Implement R2B against the stable R2A contract.
 4. Implement R2C, then R2D. R1 may consume R2 evidence later but cannot relax it.
 
-Recommended next implementation slice: **R2A — evidence model and normalization**. It removes the truth-loss boundaries that currently make later eligibility, scoring, queue, and real-source results look more certain than their evidence. Approval of this plan does not authorise that implementation, any real database migration, or any source call.
+Implementation outcome: **R2A — evidence model and normalization** is implemented and verified on its unmerged review branch. The next implementation decision is a separate human gate; R2B, R2C, R2D, and R1 activation remain unauthorised. This R2A result made no source call or application action.

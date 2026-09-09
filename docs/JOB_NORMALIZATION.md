@@ -1,6 +1,10 @@
 # Job Normalization
 
-Status: the merged Beta model is operational for owner-reviewed manual intake; the R2 evidence upgrade is planned, not implemented. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: R2A is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on the unmerged implementation branch. R2B, R2C, and R2D are `NOT_IMPLEMENTED`. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+
+R2A parser, evidence-contract, and normalization version `3.0.0` persist typed field and requirement evidence, derivation/conflict/correction links, exact bounded source pointers, and `COMPLETE | PARTIAL | UNKNOWN` coverage for all 17 reviewed field families. Migration 0003 is additive and retains the legacy projection/tables; uncertain legacy meaning is backfilled as `UNKNOWN`. The current `Job` remains a compatibility projection for the existing eligibility/fit engine and must not be mistaken for an R2B decision.
+
+The fictional 12-role-family corpus, schema-v2 migration/restore rehearsal, and private offline existing-vacancy reprocess passed. The private result created a new immutable job version and invalidated dependent older rows without a network request, document regeneration, or application action. No private source excerpt is recorded in this public document.
 
 ## Canonical model
 
