@@ -2,6 +2,7 @@ export interface JobQueueFilterItem {
   eligibilityStatus: string | null;
   fitScore: number | null;
   coverage: { percent: number; missingDimensions: string[] } | null;
+  coveragePercent?: number | null;
   category: string;
   employmentType: string;
   source: string;
@@ -57,7 +58,10 @@ export function filterJobQueue<T extends JobQueueFilterItem>(
       return false;
     }
     if (filters.fit && band(job.fitScore, 70, 40) !== filters.fit) return false;
-    if (filters.coverage && band(job.coverage?.percent ?? null, 80, 50) !== filters.coverage) {
+    if (
+      filters.coverage &&
+      band(job.coveragePercent ?? job.coverage?.percent ?? null, 80, 50) !== filters.coverage
+    ) {
       return false;
     }
     if (filters.category && job.category !== filters.category) return false;

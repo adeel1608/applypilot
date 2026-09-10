@@ -12,6 +12,7 @@ import {
   assertCurrentDocumentGenerationTuple,
   BetaRepository,
   JobImportRepository,
+  R2Repository,
 } from "@applypilot/database";
 import { prepareJobImport } from "@applypilot/job-importer";
 import { testProfile } from "../fixture-data";
@@ -28,6 +29,21 @@ const migration = [
 const fixedNow = () => new Date("2026-09-05T12:00:00.000Z");
 const r2aMigration = readFileSync(
   new URL("../../packages/database/drizzle/0003_r2a_evidence_normalization.sql", import.meta.url),
+  "utf8",
+);
+const r2Migration = readFileSync(
+  new URL("../../packages/database/drizzle/0004_r2_matching_quality.sql", import.meta.url),
+  "utf8",
+);
+const r2HardeningMigration = readFileSync(
+  new URL(
+    "../../packages/database/drizzle/0005_r2_matching_quality_hardening.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const r2CalibrationQualificationMigration = readFileSync(
+  new URL("../../packages/database/drizzle/0006_r2_calibration_qualification.sql", import.meta.url),
   "utf8",
 );
 const content = `Title: Fictional Community Assistant
@@ -139,6 +155,9 @@ async function seedR2AReprocessScenario(
     }),
   );
   sqlite.exec(r2aMigration);
+  sqlite.exec(r2Migration);
+  sqlite.exec(r2HardeningMigration);
+  sqlite.exec(r2CalibrationQualificationMigration);
   return { jobId, ...state };
 }
 
@@ -198,6 +217,135 @@ describe("real-world job intake persistence and profile gate", () => {
     expect(result.jobs[0]?.evaluationState).toBe("NO_ACTIVE_PROFILE");
     expect(sqlite.prepare("SELECT COUNT(*) FROM eligibility_results").pluck().get()).toBe(0);
     expect(sqlite.prepare("SELECT COUNT(*) FROM evaluation_versions").pluck().get()).toBe(0);
+  });
+
+  it("persists a conservative cross-source duplicate suggestion without auto-linking", async () => {
+    sqlite.exec(r2aMigration);
+    sqlite.exec(r2Migration);
+    sqlite.exec(r2HardeningMigration);
+    sqlite.exec(r2CalibrationQualificationMigration);
+    const provider: CandidateProfileProvider = {
+      resolve: async () => ({ state: "NO_ACTIVE_PROFILE", reasonCode: "PRIVATE_PROFILE_MISSING" }),
+    };
+    const common = {
+      title: "Fictional Cross-source Service Role",
+      company: "Example Harbour Services",
+      jobLocation: "Sydney NSW 2000",
+      employmentType: "Part time",
+      description: "Support visitors and maintain fictional service records.",
+      applicationUrl: "https://careers.example.test/apply/service-role",
+    };
+    const imports = [
+      {
+        sourceHint: "SEEK" as const,
+        url: "https://www.seek.com.au/job/11111111",
+        externalId: "seek-fictional-11111111",
+      },
+      {
+        sourceHint: "INDEED" as const,
+        url: "https://au.indeed.com/viewjob/fictional-22222222",
+        externalId: "indeed-fictional-22222222",
+      },
+    ];
+    for (const item of imports) {
+      const staged = repository.stage(
+        prepareJobImport(
+          {
+            inputType: "PASTED_SINGLE",
+            acquisitionMethod: "USER_SUPPLIED_CONTENT",
+            sourceHint: item.sourceHint,
+            content: JSON.stringify({ ...common, url: item.url, externalId: item.externalId }),
+          },
+          { now: fixedNow },
+        ),
+      );
+      await repository.confirm(
+        staged.importId,
+        staged.previewToken,
+        selection(staged.records[0]!.recordId),
+        provider,
+      );
+    }
+    expect(sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get()).toBe(2);
+    expect(sqlite.prepare("SELECT state FROM r2_duplicate_candidates").pluck().get()).toBe(
+      "SUGGESTED",
+    );
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_duplicate_decision_versions").pluck().get(),
+    ).toBe(0);
+    expect(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get()).toBe(2);
+
+    const observations = sqlite
+      .prepare("SELECT id, job_id AS jobId FROM source_observations ORDER BY observed_at, rowid")
+      .all() as Array<{ id: string; jobId: string }>;
+    const originalCandidate = sqlite
+      .prepare("SELECT id, evidence_digest AS evidenceDigest FROM r2_duplicate_candidates")
+      .get() as { id: string; evidenceDigest: string };
+    new R2Repository(sqlite, fixedNow).decideDuplicate({
+      candidateId: originalCandidate.id,
+      decision: "LINKED",
+      reasonCode: "OWNER_CONFIRMED_TARGET",
+      evidenceVersion: "r2-duplicate-1",
+    });
+    const correctedJob = JSON.parse(
+      sqlite
+        .prepare("SELECT normalized_json FROM jobs WHERE id = ?")
+        .pluck()
+        .get(observations[0]!.jobId) as string,
+    );
+    new BetaRepository(sqlite, fixedNow).recordOwnerCorrection({
+      job: { ...correctedJob, title: "Owner Corrected Canonical Projection" },
+      reasonCode: "OWNER_REVIEWED_FIELDS",
+      changedFields: ["title"],
+    });
+
+    expect(
+      repository.suggestHistoricalDuplicatePair(observations[0]!.id, observations[1]!.id),
+    ).toMatchObject({ candidateId: originalCandidate.id, created: false });
+    expect(
+      sqlite
+        .prepare("SELECT evidence_digest FROM r2_duplicate_candidates WHERE id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(originalCandidate.evidenceDigest);
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM r2_duplicate_decision_versions WHERE candidate_id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(1);
+
+    const third = repository.stage(
+      prepareJobImport(
+        {
+          inputType: "PASTED_SINGLE",
+          acquisitionMethod: "USER_SUPPLIED_CONTENT",
+          sourceHint: "UNKNOWN",
+          content: JSON.stringify({
+            ...common,
+            url: "https://jobs.example.test/fictional-service-role",
+            externalId: "fictional-third-observation",
+          }),
+        },
+        { now: fixedNow },
+      ),
+    );
+    await repository.confirm(
+      third.importId,
+      third.previewToken,
+      selection(third.records[0]!.recordId),
+      provider,
+    );
+    expect(sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get()).toBe(3);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_duplicate_candidates").pluck().get(),
+    ).toBeGreaterThan(1);
+    expect(
+      sqlite
+        .prepare("SELECT evidence_digest FROM r2_duplicate_candidates WHERE id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(originalCandidate.evidenceDigest);
   });
 
   it("evaluates with a valid private profile and records profile-version provenance", async () => {
@@ -439,6 +587,51 @@ describe("real-world job intake persistence and profile gate", () => {
     );
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+  });
+
+  it("preserves an owner correction through parser reprocessing and remains idempotent", async () => {
+    const { jobId } = await seedR2AReprocessScenario(sqlite, repository);
+    const first = await repository.reprocessLegacyJobR2A(jobId);
+    const job = JSON.parse(
+      sqlite.prepare("SELECT normalized_json FROM jobs WHERE id = ?").pluck().get(jobId) as string,
+    );
+    new BetaRepository(sqlite, fixedNow).recordOwnerCorrection({
+      job: { ...job, title: "Owner Corrected Fictional Community Role" },
+      reasonCode: "OWNER_REVIEWED_FIELDS",
+      changedFields: ["title"],
+    });
+    const afterCorrectionCount = Number(
+      sqlite.prepare("SELECT count(*) FROM job_versions WHERE job_id = ?").pluck().get(jobId),
+    );
+
+    const replayed = await repository.reprocessLegacyJobR2A(jobId);
+    expect(replayed.created).toBe(false);
+    expect(replayed.jobVersionId).not.toBe(first.jobVersionId);
+    expect(
+      JSON.parse(
+        sqlite
+          .prepare("SELECT normalized_json FROM jobs WHERE id = ?")
+          .pluck()
+          .get(jobId) as string,
+      ).title,
+    ).toBe("Owner Corrected Fictional Community Role");
+    expect(
+      sqlite
+        .prepare(
+          `SELECT evidence_state FROM job_field_evidence_v2
+           WHERE job_version_id = ? AND canonical_field = 'title'`,
+        )
+        .pluck()
+        .get(replayed.jobVersionId),
+    ).toBe("OWNER_CORRECTED");
+    expect(
+      Number(
+        sqlite.prepare("SELECT count(*) FROM job_versions WHERE job_id = ?").pluck().get(jobId),
+      ),
+    ).toBe(afterCorrectionCount);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_correction_overlay_bindings").pluck().get(),
+    ).toBe(1);
   });
 
   it.each([

@@ -5,7 +5,12 @@ import { join } from "node:path";
 
 import type BetterSqlite3 from "better-sqlite3";
 
-import { BetaRepository, JobImportRepository, openApplyPilotDatabase } from "@applypilot/database";
+import {
+  BetaRepository,
+  JobImportRepository,
+  R2Repository,
+  openApplyPilotDatabase,
+} from "@applypilot/database";
 import { resolveLocalDataDirectory } from "./local-data-directory";
 
 type Connection = ReturnType<typeof openApplyPilotDatabase>;
@@ -59,4 +64,11 @@ export function getJobImportRepository(): JobImportRepository | null {
 export function getBetaRepository(): BetaRepository | null {
   const local = getLocalDatabase();
   return local && hasBetaSchema(local.sqlite) ? new BetaRepository(local.sqlite) : null;
+}
+
+export function getR2Repository(): R2Repository | null {
+  const local = getLocalDatabase();
+  if (!local) return null;
+  const repository = new R2Repository(local.sqlite);
+  return repository.available() ? repository : null;
 }

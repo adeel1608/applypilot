@@ -7,6 +7,10 @@ import type { EvaluationCoverage, Job } from "@applypilot/job-model";
 import { clamp, normalizeText, VerificationStatus } from "@applypilot/shared";
 import type { EligibilityResult } from "@applypilot/eligibility-engine";
 
+export * from "./r2";
+export * from "./calibration";
+export * from "./golden";
+
 export const FIT_SCORER_VERSION = "1.0.0";
 
 export interface FitContribution {

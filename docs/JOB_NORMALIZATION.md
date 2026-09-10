@@ -1,6 +1,6 @@
 # Job Normalization
 
-Status: R2A is **IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED** on the unmerged implementation branch. R2B, R2C, and R2D are `NOT_IMPLEMENTED`. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: R2A 3.1.0 is merged and ready. The R2C immutable correction-overlay lifecycle is implemented on `feat/r2-matching-quality` and pending review with R2B/R2D. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 R2A parser, evidence-contract, and normalization version `3.1.0` persist typed field and requirement evidence, field-only derivation links, proposition-scoped conflicts, correction links, cryptographically verified bounded source pointers, and conservative `COMPLETE | PARTIAL | UNKNOWN` coverage for all 17 reviewed field families. Migration 0003 remains immutable and retains the legacy projection/tables; recognized UNKNOWN backfill is explicitly `LEGACY_NOT_AVAILABLE`, while inconsistent current data is `INVALID`. Historical 3.0.0 normalized values remain readable. The current `Job` remains a compatibility projection for the existing eligibility/fit engine and must not be mistaken for an R2B decision.
 
@@ -30,7 +30,7 @@ R2A introduces `SOURCE_STATED | OWNER_CORRECTED | DERIVED | UNKNOWN | CONDITIONA
 
 Phase 2.5 evaluates identity in order: explicit source/external ID, canonical HTTPS URL, exact segment content hash, then a versioned local fingerprint when title, company, location, and description are all explicit. The database records the selected identity kind/value and validates its evidence. Same identity plus same hash is unchanged; changed content requires explicit update confirmation; conflicting strong signals do not auto-merge. No fuzzy semantic merge is attempted.
 
-The merged cross-source helper already suggests review only for strong corroborated signals and keeps title-only/tenant-collision cases separate. R2C connects it to durable `SUGGESTED | LINKED | REJECTED | SPLIT` decisions while preserving every source observation. Similarity never auto-merges an ambiguous vacancy.
+The cross-source helper and production persistence use explicit application targets or requisition identity plus corroboration for a strong suggestion. R2C persists `SUGGESTED | LINKED | REJECTED | SPLIT` decisions while preserving every source observation. Similarity never auto-merges an ambiguous vacancy; owner-facing rejected/split projections remain distinct.
 
 ## Unknown fields
 

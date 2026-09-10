@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type BetterSqlite3 from "better-sqlite3";
+import { z } from "zod";
 
 import {
   SeekAdapterError,
@@ -22,6 +23,127 @@ import {
 import type { Job } from "@applypilot/job-model";
 
 const SOURCE_ID = "source:seek";
+
+const SafeIdentifierSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9:._-]+$/);
+const HashSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const CountSchema = z.number().int().nonnegative();
+const RunCountsSchema = z
+  .object({
+    discovered: CountSchema,
+    added: CountSchema,
+    updated: CountSchema,
+    duplicates: CountSchema,
+    failed: CountSchema,
+  })
+  .strict();
+const safeSourceReference = z
+  .string()
+  .max(500)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return !url.username && !url.password && !url.search && !url.hash;
+    } catch {
+      return SafeIdentifierSchema.safeParse(value).success;
+    }
+  }, "source reference must be an opaque identifier or a URL without credentials/query/fragment");
+
+const DiscoveryAuditMetadataSchemas = {
+  "discovery.run.started": z
+    .object({
+      mode: z.enum([
+        "FIXTURE_ONLY",
+        "PUBLIC_DISCOVERY",
+        "PUBLIC_JOB_DETAILS",
+        "ASSISTED_BROWSER",
+        "USER_SUPPLIED_URL",
+        "USER_SUPPLIED_CONTENT",
+      ]),
+      resumed: z.boolean(),
+      queryHash: HashSchema,
+    })
+    .strict(),
+  "discovery.page.completed": z
+    .object({
+      page: z.number().int().positive(),
+      discovered: CountSchema,
+      failed: CountSchema,
+      pageHash: HashSchema,
+      durationMs: CountSchema,
+    })
+    .strict(),
+  "discovery.job.added": z
+    .object({
+      source: z.literal("SEEK"),
+      externalId: SafeIdentifierSchema,
+      payloadHash: HashSchema,
+    })
+    .strict(),
+  "discovery.job.updated": z
+    .object({
+      source: z.literal("SEEK"),
+      externalId: SafeIdentifierSchema,
+      previousPayloadHash: HashSchema,
+      payloadHash: HashSchema,
+      fetchedAt: z.iso.datetime(),
+    })
+    .strict(),
+  "discovery.job.duplicate": z
+    .object({
+      source: z.literal("SEEK"),
+      externalId: SafeIdentifierSchema,
+      payloadHash: HashSchema,
+    })
+    .strict(),
+  "discovery.job.failed": z
+    .object({
+      externalId: SafeIdentifierSchema,
+      code: SafeIdentifierSchema,
+      diagnosticCode: SafeIdentifierSchema.nullable(),
+    })
+    .strict(),
+  "discovery.rate_limited": z
+    .object({ code: z.literal("RATE_LIMITED"), safeRetryAfter: CountSchema.nullable() })
+    .strict(),
+  "discovery.security_stopped": z
+    .object({
+      code: SafeIdentifierSchema,
+      diagnosticCode: SafeIdentifierSchema.nullable(),
+      sourceReference: safeSourceReference.nullable(),
+    })
+    .strict(),
+  "discovery.run.partial": z.union([
+    z.object({ reason: z.literal("DUPLICATE_PAGE"), pageHash: HashSchema }).strict(),
+    z
+      .object({ reason: SafeIdentifierSchema, retryable: z.boolean(), durationMs: CountSchema })
+      .strict(),
+    z
+      .object({ reason: SafeIdentifierSchema, durationMs: CountSchema })
+      .extend(RunCountsSchema.shape)
+      .strict(),
+  ]),
+  "discovery.run.completed": z
+    .object({ reason: SafeIdentifierSchema, resumed: z.boolean(), durationMs: CountSchema })
+    .extend(RunCountsSchema.shape)
+    .strict()
+    .or(
+      z
+        .object({ reason: SafeIdentifierSchema, durationMs: CountSchema })
+        .extend(RunCountsSchema.shape)
+        .strict(),
+    ),
+} as const;
+
+export function validateDiscoveryAuditMetadata(
+  eventType: SeekAuditEvent["eventType"],
+  metadata: unknown,
+): Record<string, SafeAuditValue> {
+  return DiscoveryAuditMetadataSchemas[eventType].parse(metadata) as Record<string, SafeAuditValue>;
+}
 
 function checkpointKey(queryHash: string, mode: SeekAccessMode): string {
   return `seek.discovery.checkpoint.${mode}.${queryHash}`;
@@ -250,16 +372,8 @@ export class JobDiscoveryRepository implements SeekDiscoveryPersistence {
         randomUUID(),
         event.eventType,
         event.runId,
-        JSON.stringify(this.redactMetadata(event.metadata)),
+        JSON.stringify(validateDiscoveryAuditMetadata(event.eventType, event.metadata)),
         event.occurredAt,
       );
-  }
-
-  private redactMetadata(metadata: Record<string, SafeAuditValue>): Record<string, SafeAuditValue> {
-    return Object.fromEntries(
-      Object.entries(metadata).filter(
-        ([key]) => !/(content|description|raw|cookie|token|secret)/i.test(key),
-      ),
-    );
   }
 }

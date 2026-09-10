@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the merged deterministic score is an uncalibrated owner-review aid. The verified-only R2 contract is planned in [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented and hardened on unmerged PR #13. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, owner approval, and final exact-head review. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
@@ -8,14 +8,14 @@ Eligibility answers whether a known hard condition prevents proceeding. Fit scor
 
 ## Deterministic model
 
-`scoreJobFit(job, profile, eligibility)` starts from a neutral baseline and applies bounded contributions for eligibility, preferred location or commute, preferred employment type, verified skill matches, missing skill evidence, experience evidence, education alignment, training, category preference, customer-service relevance, and technical relevance. The merged implementation already filters employment to verified entries and verification-gates preferred location, work-type, category, and the positive within-limit commute branch. Its commute fallback can still subtract points when `maximumCommuteKm` is `USER_CONFIRMATION_REQUIRED` or `UNKNOWN`, and `REVIEW_REQUIRED` can still become recommended at the score threshold; R2B owns both corrections.
+`scoreJobFit(job, profile, eligibility)` remains the compatibility path. `scoreR2JobFit` uses only current evidence-linked inputs: stale candidate bindings and unknown, conditional, conflicting, or unusable job evidence add no contribution. Commute scoring consumes current R2A `commute.distance` and `commute.duration` field records; kilometres and minutes never substitute. Unverified commute preferences produce no positive or negative points, and R2 recommendation cannot bypass review or ineligibility.
 
 The result contains:
 
 - integer score clamped to 0–100;
 - positive and negative explanations;
 - per-category point contributions; and
-- engine/weight version.
+- scorer/weight version and exact calibration-context version/run binding.
 
 Weights are transparent constants, not learned judgments. They are an ordering aid, not a probability of employment success.
 
@@ -27,8 +27,8 @@ Every contribution stores a stable reason code, signed points, field/evidence ID
 
 ## Calibration
 
-R2D calibrates first against a versioned fictional golden corpus and then, only if available, an ignored owner-labelled set of at least 30 cases spanning four role families and every eligibility status. Only safe aggregate pass/fail and ordinal metrics may be published. Until that gate passes the UI says `UNCALIBRATED` and never describes the score as a probability. Calibration must avoid protected characteristics, tiny-sample optimization, and using hiring outcomes as ground-truth merit.
+R2D first executes the real eligibility/scorer path against a versioned 12-case fictional golden corpus. The manifest contains expected outcomes but no expected scorer output; actual scores drive ordinal metrics. Private calibration evaluates the contents of owner labels and preferred pairs against their current eligibility, ordinal-band, recommendation, and score outcomes. Counts alone never promote: fewer than 30 labels remains `UNCALIBRATED`, while a count-qualified sample remains `CALIBRATION_PENDING` unless it spans four role families and every eligibility status, passes approved label/pair performance thresholds and every approved safety gate, and has explicit owner approval bound to those exact threshold/safety versions. Each evaluation stores its context version and optional calibration-run foreign key, so promotion never rewrites historical evaluations or collides with an older identity. Migration 0006 persists only safe aggregate counts/agreement, an opaque evidence digest, versions, approval metadata, and blockers; private label/pair contents stay local. Until every private gate passes, the UI never describes the score as a probability.
 
 ## Testing
 
-All fixtures remain inside 0–100 and have at least one explanation. Tests verify determinism, bounds, isolated-signal monotonicity, verified/unverified/unknown/stale ablation, no blocker/review override, no cross-category leakage, and reproducible evidence-linked contributions. Any rule/weight change requires golden-case and owner review plus a `PROJECT_PLAN.md` update.
+The executable corpus covers all 12 approved role families and obtains outputs from the production R2 engines. Independent executions verify determinism; actual scorer runs verify bounds, isolated-signal monotonicity and ablation; weight and eligibility mutations prove the expectations can fail; and recommendation regressions cover review/ineligible/stale/unresolved cases. Any rule/weight change requires golden-case and owner review plus a `PROJECT_PLAN.md` update.

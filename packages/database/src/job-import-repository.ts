@@ -32,9 +32,11 @@ import {
   type R2ANormalization,
   type RequirementEvidence,
 } from "@applypilot/job-model";
+import { ObservationIdentitySchema, type ObservationIdentity } from "@applypilot/job-normalizer";
 
 import { BetaRepository } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
+import { R2Repository } from "./r2-repository";
 
 const tokenLifetimeMs = 30 * 60 * 1000;
 const selectionSchema = z.object({
@@ -221,6 +223,8 @@ function normalizeImportedJob(
         manuallyEditedFields: provenance.editedFields,
       },
       coverLetterRequired: fields.coverLetterRequired,
+      applicationUrl: fields.applicationUrl,
+      requisitionId: fields.requisitionId,
       requirementEvidence: fields.beta?.requirementEvidence ?? [],
       extractionCoverage: fields.beta?.extractionCoverage ?? null,
       documentRequirementStates: fields.beta?.documentRequirements ?? {
@@ -284,6 +288,15 @@ export class JobImportRepository {
     const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(id);
     if (!exists) throw new Error("JOB_NOT_FOUND");
     return this.evaluate(id, provider);
+  }
+
+  suggestHistoricalDuplicatePair(leftObservationId: string, rightObservationId: string) {
+    const r2 = new R2Repository(this.sqlite, this.now);
+    if (!r2.available()) throw new Error("R2_SCHEMA_REQUIRED");
+    return r2.suggestDuplicate(
+      this.immutableObservationIdentity(leftObservationId),
+      this.immutableObservationIdentity(rightObservationId),
+    );
   }
 
   async reprocessLegacyJob(
@@ -428,17 +441,32 @@ export class JobImportRepository {
       })
     ).map((evidence) => ({ ...evidence, sourceObservationId }));
     if (!fields.beta?.r2a) throw new Error("R2A_NORMALIZATION_MISSING");
-    const r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
+    let r2aNormalization = bindR2ANormalizationObservation(fields.beta.r2a, sourceObservationId);
+    let currentJob = reprocessed;
+    const r2 = new R2Repository(this.sqlite, this.now);
+    if (r2.available()) {
+      const replay = r2.replayCorrectionOverlay({
+        jobId: id,
+        sourceObservationId,
+        job: reprocessed,
+        normalization: r2aNormalization,
+      });
+      if (replay.state === "REVIEW_REQUIRED") {
+        throw new Error("R2_CORRECTION_APPLICABILITY_REVIEW_REQUIRED");
+      }
+      currentJob = replay.job;
+      r2aNormalization = replay.normalization;
+    }
     const beta = new BetaRepository(this.sqlite, this.now);
     if (!provider) {
       const transition = this.sqlite.transaction(() => {
         const recorded = beta.recordJobVersion({
-          job: reprocessed,
+          job: currentJob,
           sourceObservationId,
           requirementEvidence,
           r2aNormalization,
         });
-        if (recorded.created) this.updateJob(reprocessed, now);
+        if (recorded.created) this.updateJob(currentJob, now);
         const activeProfile = this.sqlite
           .prepare(
             "SELECT active_version_id AS id FROM candidate_profiles ORDER BY created_at LIMIT 1",
@@ -473,9 +501,9 @@ export class JobImportRepository {
       };
     }
     const recorded = this.sqlite.transaction(() => {
-      this.updateJob(reprocessed, now);
+      this.updateJob(currentJob, now);
       return beta.recordJobVersion({
-        job: reprocessed,
+        job: currentJob,
         sourceObservationId,
         requirementEvidence,
         r2aNormalization,
@@ -1146,6 +1174,53 @@ export class JobImportRepository {
     );
   }
 
+  private immutableObservationIdentity(observationIdInput: string): ObservationIdentity {
+    const observationId = z.string().min(1).max(200).parse(observationIdInput);
+    const row = this.sqlite
+      .prepare(
+        `SELECT o.id AS observationId, o.source, o.tenant, o.external_id AS externalId,
+                v.normalized_json AS normalizedJson
+         FROM source_observations o
+         JOIN job_versions v ON v.id = (
+           SELECT first_version.id FROM job_versions first_version
+           WHERE first_version.source_observation_id = o.id
+           ORDER BY first_version.version, first_version.rowid LIMIT 1
+         )
+         WHERE o.id = ?`,
+      )
+      .get(observationId) as
+      | {
+          observationId: string;
+          source: string;
+          tenant: string | null;
+          externalId: string | null;
+          normalizedJson: string;
+        }
+      | undefined;
+    if (!row) throw new Error("R2_DUPLICATE_OBSERVATION_VERSION_REQUIRED");
+    const job = JobSchema.parse(JSON.parse(row.normalizedJson));
+    return ObservationIdentitySchema.parse({
+      observationId: row.observationId,
+      source: row.source,
+      tenant: row.tenant,
+      externalId: row.externalId,
+      applicationUrl:
+        typeof job.sourceMetadata.applicationUrl === "string" && job.sourceMetadata.applicationUrl
+          ? job.sourceMetadata.applicationUrl
+          : null,
+      requisitionId:
+        typeof job.sourceMetadata.requisitionId === "string" && job.sourceMetadata.requisitionId
+          ? job.sourceMetadata.requisitionId
+          : null,
+      company: job.company,
+      title: job.title,
+      location: job.location,
+      employmentType: job.employmentType,
+      datePosted: job.datePosted,
+      description: job.description,
+    });
+  }
+
   private persistBetaObservationAndVersion(input: {
     job: Job;
     sourceRecordId: string;
@@ -1191,6 +1266,7 @@ export class JobImportRepository {
         input.parserVersion,
         previous?.id ?? null,
       );
+    const r2 = new R2Repository(this.sqlite, this.now);
     const requirements = (
       input.requirementEvidence.length > 0
         ? input.requirementEvidence
@@ -1199,15 +1275,41 @@ export class JobImportRepository {
             sourcePath: "description",
           })
     ).map((item) => ({ ...item, sourceObservationId: observationId }));
-    const r2aNormalization = input.r2aNormalization
+    let r2aNormalization = input.r2aNormalization
       ? bindR2ANormalizationObservation(input.r2aNormalization, observationId)
       : undefined;
+    let currentJob = input.job;
+    if (r2.available() && r2aNormalization) {
+      const replay = r2.replayCorrectionOverlay({
+        jobId: input.job.id,
+        sourceObservationId: observationId,
+        job: input.job,
+        normalization: r2aNormalization,
+      });
+      if (replay.state === "REVIEW_REQUIRED") {
+        throw new Error("R2_CORRECTION_APPLICABILITY_REVIEW_REQUIRED");
+      }
+      currentJob = replay.job;
+      r2aNormalization = replay.normalization;
+      if (currentJob !== input.job) this.updateJob(currentJob, input.now);
+    }
     new BetaRepository(this.sqlite, this.now).recordJobVersion({
-      job: input.job,
+      job: currentJob,
       sourceObservationId: observationId,
       requirementEvidence: requirements,
       r2aNormalization,
     });
+    if (r2.available()) {
+      const candidates = this.sqlite
+        .prepare(
+          `SELECT id AS observationId FROM source_observations
+           WHERE id <> ? ORDER BY observed_at DESC, rowid DESC LIMIT 200`,
+        )
+        .all(observationId) as Array<{ observationId: string }>;
+      for (const candidate of candidates) {
+        this.suggestHistoricalDuplicatePair(observationId, candidate.observationId);
+      }
+    }
   }
 
   private persistBetaEvaluation(

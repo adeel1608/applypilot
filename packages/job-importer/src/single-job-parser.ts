@@ -150,11 +150,21 @@ export function parseImportedJobRecord(
     nestedText(structured.identifier, ["value", "name"]) ??
     asText(structured.externalId) ??
     label(record.text, ["external id", "job id", "reference"]);
+  const applicationUrl =
+    asText(structured.applicationUrl) ??
+    asText(structured.applyUrl) ??
+    asText(structured.applicationTargetUrl);
+  const requisitionId =
+    asText(structured.requisitionId) ??
+    asText(structured.jobPostingIdentifier) ??
+    label(record.text, ["requisition id", "requisition", "reference"]);
   const typeText =
     asText(structured.employmentType) ?? label(record.text, ["employment type", "work type"]);
   let fields = ParsedJobFieldsSchema.parse({
     externalId,
     sourceUrl,
+    applicationUrl,
+    requisitionId,
     title,
     company,
     location,

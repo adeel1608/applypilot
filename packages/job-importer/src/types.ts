@@ -88,6 +88,8 @@ export interface SplitImportResult {
 export interface ParsedJobFields {
   externalId: string | null;
   sourceUrl: string | null;
+  applicationUrl: string | null;
+  requisitionId: string | null;
   title: string | null;
   company: string | null;
   location: string | null;
@@ -105,6 +107,8 @@ export interface ParsedJobFields {
 export type EditableImportField =
   | "externalId"
   | "sourceUrl"
+  | "applicationUrl"
+  | "requisitionId"
   | "title"
   | "company"
   | "location"

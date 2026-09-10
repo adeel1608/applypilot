@@ -19,10 +19,18 @@ import {
   renderCoverLetterPdf,
   type CoverLetterTone,
 } from "@applypilot/cover-letter-engine";
-import type { EligibilityReason } from "@applypilot/eligibility-engine";
-import type { FitContribution } from "@applypilot/fit-scorer";
+import { evaluateR2Eligibility, type R2EligibilityReason } from "@applypilot/eligibility-engine";
+import {
+  R2_UNREVIEWED_CALIBRATION_CONTEXT,
+  scoreR2JobFit,
+  type R2FitContribution,
+} from "@applypilot/fit-scorer";
 import { normalizeAustralianLocation } from "@applypilot/job-importer";
-import { R2ARepository, assertCurrentDocumentGenerationTuple } from "@applypilot/database";
+import {
+  R2ARepository,
+  R2Repository,
+  assertCurrentDocumentGenerationTuple,
+} from "@applypilot/database";
 import { legacyStatusToBeta } from "@applypilot/application-tracker";
 import {
   ApplicationStatusSchema,
@@ -54,6 +62,7 @@ import {
   getBetaRepository,
   getJobImportRepository,
   getLocalDatabase,
+  getR2Repository,
   hasBetaSchema,
 } from "@web/lib/local-database";
 import { resolveLocalDataDirectory } from "@web/lib/local-data-directory";
@@ -72,12 +81,20 @@ interface JobListRow {
   unknownRequirementCount: number;
   jobVersionId: string | null;
   evaluationVersionId: string | null;
+  legacyEvaluationVersionId: string | null;
   eligibilityStatus: string | null;
   fitScore: number | null;
   coverageJson: string | null;
   evaluationStale: number | null;
   queueState: string | null;
   queueReason: string | null;
+  coveragePercent: number | null;
+  unresolvedConditionCount: number | null;
+  unresolvedConflictCount: number | null;
+  calibrationState: string | null;
+  recommended: number | null;
+  queueFreshness: string | null;
+  duplicateState: string | null;
 }
 
 export interface BetaJobListItem {
@@ -94,12 +111,20 @@ export interface BetaJobListItem {
   unknownRequirementCount: number;
   jobVersionId: string | null;
   evaluationVersionId: string | null;
+  legacyEvaluationVersionId: string | null;
   eligibilityStatus: "ELIGIBLE" | "INELIGIBLE" | "REVIEW_REQUIRED" | null;
   fitScore: number | null;
   coverage: EvaluationCoverage | null;
   evaluationStale: boolean;
   queueState: "REVIEWING" | "SHORTLISTED" | "SKIPPED" | "PREPARING" | null;
   queueReason: string | null;
+  coveragePercent: number | null;
+  unresolvedConditionCount: number;
+  unresolvedConflictCount: number;
+  calibrationState: "UNCALIBRATED" | "CALIBRATION_PENDING" | "CALIBRATED" | null;
+  recommended: boolean;
+  queueFreshness: "CURRENT" | "STALE" | null;
+  duplicateState: string | null;
 }
 
 export interface BetaDocumentItem {
@@ -124,15 +149,44 @@ export interface BetaJobDetail {
   jobVersionId: string | null;
   sourceObservationId: string | null;
   evaluationVersionId: string | null;
+  legacyEvaluationVersionId: string | null;
   eligibilityStatus: BetaJobListItem["eligibilityStatus"];
-  eligibilityReasons: EligibilityReason[];
+  eligibilityReasons: Array<
+    | R2EligibilityReason
+    | { code: string; severity: string; message: string; evidenceClass?: string }
+  >;
   fitScore: number | null;
-  fitContributions: FitContribution[];
+  fitContributions: Array<
+    R2FitContribution | { category: string; points: number; explanation: string; code?: string }
+  >;
   coverage: EvaluationCoverage | null;
   evaluationStale: boolean;
   queueState: BetaJobListItem["queueState"];
   queueReason: string | null;
   duplicateState: string | null;
+  coveragePercent: number | null;
+  unresolvedUnknownCount: number;
+  unresolvedConditionCount: number;
+  unresolvedConflictCount: number;
+  calibrationState: BetaJobListItem["calibrationState"];
+  recommended: boolean;
+  queueFreshness: BetaJobListItem["queueFreshness"];
+  duplicateCandidates: Array<{
+    id: string;
+    state: string;
+    leftObservationId: string;
+    rightObservationId: string;
+    matchedSignals: string[];
+    conflictingSignals: string[];
+    decisionReason: string | null;
+  }>;
+  corrections: Array<{
+    id: string;
+    actor: string;
+    reasonCode: string;
+    changedFields: string[];
+    createdAt: string;
+  }>;
   recommendedTemplate: ResumeTemplateCategory;
   templateStrategy: string;
   templateEvidencePriorities: string[];
@@ -223,17 +277,57 @@ function betaSqlite() {
 export function listBetaJobs(): BetaJobListItem[] {
   const sqlite = betaSqlite();
   if (!sqlite) return [];
+  const hasR2 = new R2Repository(sqlite).available();
   const rows = sqlite
     .prepare(
-      `SELECT j.id, j.title, j.company, j.location, j.category,
+      hasR2
+        ? `SELECT j.id, j.title, j.company, j.location, j.category,
          j.employment_type AS employmentType,
          json_extract(j.normalized_json, '$.source') AS source,
          json_extract(j.normalized_json, '$.state') AS state,
          j.date_discovered AS dateDiscovered,
          v.id AS jobVersionId, e.id AS evaluationVersionId,
+         (SELECT id FROM evaluation_versions WHERE job_id = j.id ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+           AS legacyEvaluationVersionId,
+         e.eligibility_status AS eligibilityStatus, e.fit_score AS fitScore,
+         NULL AS coverageJson, e.stale AS evaluationStale,
+         q.state AS queueState, q.reason_code AS queueReason,
+         e.coverage_percent AS coveragePercent,
+         e.unresolved_unknown_count AS unknownRequirementCount,
+         e.unresolved_condition_count AS unresolvedConditionCount,
+         e.unresolved_conflict_count AS unresolvedConflictCount,
+         e.calibration_state AS calibrationState, e.recommended,
+         q.freshness AS queueFreshness,
+         (SELECT c.state FROM r2_duplicate_candidates c
+            WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
+               OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
+            ORDER BY CASE c.state WHEN 'SUGGESTED' THEN 0 ELSE 1 END, c.updated_at DESC LIMIT 1)
+           AS duplicateState,
+         (SELECT o.expires_at FROM source_observations o
+            WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt
+       FROM jobs j
+       LEFT JOIN job_versions v ON v.id = (
+         SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
+       LEFT JOIN r2_evaluation_versions e ON e.id = (
+         SELECT id FROM r2_evaluation_versions WHERE job_id = j.id ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+       LEFT JOIN r2_queue_decision_versions q ON q.id = (
+         SELECT id FROM r2_queue_decision_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
+       ORDER BY CASE q.state WHEN 'SHORTLISTED' THEN 0 WHEN 'PREPARING' THEN 1
+         WHEN 'REVIEWING' THEN 2 WHEN 'SKIPPED' THEN 4 ELSE 3 END,
+         e.fit_score DESC, j.date_discovered DESC`
+        : `SELECT j.id, j.title, j.company, j.location, j.category,
+         j.employment_type AS employmentType,
+         json_extract(j.normalized_json, '$.source') AS source,
+         json_extract(j.normalized_json, '$.state') AS state,
+         j.date_discovered AS dateDiscovered,
+         v.id AS jobVersionId, e.id AS evaluationVersionId,
+         e.id AS legacyEvaluationVersionId,
          e.eligibility_status AS eligibilityStatus, e.fit_score AS fitScore,
          e.coverage_json AS coverageJson, e.stale AS evaluationStale,
          q.state AS queueState, q.reason_code AS queueReason,
+         NULL AS coveragePercent, NULL AS unresolvedConditionCount,
+         NULL AS unresolvedConflictCount, NULL AS calibrationState,
+         NULL AS recommended, NULL AS queueFreshness, NULL AS duplicateState,
          (SELECT o.expires_at FROM source_observations o
             WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt,
          (SELECT count(*) FROM requirement_evidence r
@@ -256,8 +350,18 @@ export function listBetaJobs(): BetaJobListItem[] {
     coverage: row.coverageJson
       ? EvaluationCoverageSchema.parse(parseJson(row.coverageJson, {}))
       : null,
+    coveragePercent:
+      row.coveragePercent ??
+      (row.coverageJson
+        ? EvaluationCoverageSchema.parse(parseJson(row.coverageJson, {})).percent
+        : null),
     evaluationStale: Boolean(row.evaluationStale),
     queueState: row.queueState as BetaJobListItem["queueState"],
+    unresolvedConditionCount: row.unresolvedConditionCount ?? 0,
+    unresolvedConflictCount: row.unresolvedConflictCount ?? 0,
+    calibrationState: row.calibrationState as BetaJobListItem["calibrationState"],
+    recommended: Boolean(row.recommended),
+    queueFreshness: row.queueFreshness as BetaJobListItem["queueFreshness"],
   }));
 }
 
@@ -319,14 +423,46 @@ function listDocuments(sqlite: NonNullable<ReturnType<typeof betaSqlite>>, jobId
 export function getBetaJob(jobId: string): BetaJobDetail | null {
   const sqlite = betaSqlite();
   if (!sqlite) return null;
+  const hasR2 = new R2Repository(sqlite).available();
   const row = sqlite
     .prepare(
-      `SELECT j.normalized_json AS normalizedJson, v.id AS jobVersionId,
+      hasR2
+        ? `SELECT j.normalized_json AS normalizedJson, v.id AS jobVersionId,
          v.source_observation_id AS sourceObservationId, e.id AS evaluationVersionId,
+         (SELECT id FROM evaluation_versions WHERE job_id = j.id ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+           AS legacyEvaluationVersionId,
+         e.eligibility_status AS eligibilityStatus, e.eligibility_reasons_json AS reasonsJson,
+         e.fit_score AS fitScore, e.fit_contributions_json AS contributionsJson,
+         NULL AS coverageJson, e.coverage_percent AS coveragePercent,
+         e.unresolved_unknown_count AS unresolvedUnknownCount,
+         e.unresolved_condition_count AS unresolvedConditionCount,
+         e.unresolved_conflict_count AS unresolvedConflictCount,
+         e.calibration_state AS calibrationState, e.recommended,
+         e.stale AS evaluationStale, q.state AS queueState,
+         q.reason_code AS queueReason, q.freshness AS queueFreshness,
+         (SELECT c.state FROM r2_duplicate_candidates c
+            WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
+               OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
+            ORDER BY CASE c.state WHEN 'SUGGESTED' THEN 0 ELSE 1 END, c.updated_at DESC LIMIT 1)
+           AS duplicateState
+       FROM jobs j
+       LEFT JOIN job_versions v ON v.id = (
+         SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
+       LEFT JOIN r2_evaluation_versions e ON e.id = (
+         SELECT id FROM r2_evaluation_versions WHERE job_id = j.id ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+       LEFT JOIN r2_queue_decision_versions q ON q.id = (
+         SELECT id FROM r2_queue_decision_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
+       WHERE j.id = ?`
+        : `SELECT j.normalized_json AS normalizedJson, v.id AS jobVersionId,
+         v.source_observation_id AS sourceObservationId, e.id AS evaluationVersionId,
+         e.id AS legacyEvaluationVersionId,
          e.eligibility_status AS eligibilityStatus, e.eligibility_reasons_json AS reasonsJson,
          e.fit_score AS fitScore, e.fit_contributions_json AS contributionsJson,
          e.coverage_json AS coverageJson, e.stale AS evaluationStale, q.state AS queueState,
          q.reason_code AS queueReason,
+         NULL AS coveragePercent, 0 AS unresolvedUnknownCount,
+         0 AS unresolvedConditionCount, 0 AS unresolvedConflictCount,
+         NULL AS calibrationState, 0 AS recommended, NULL AS queueFreshness,
          (SELECT c.state FROM duplicate_clusters c
             LEFT JOIN duplicate_cluster_members m ON m.cluster_id = c.id
             WHERE c.canonical_job_id = j.id OR m.source_observation_id = v.source_observation_id
@@ -344,6 +480,7 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         jobVersionId: string | null;
         sourceObservationId: string | null;
         evaluationVersionId: string | null;
+        legacyEvaluationVersionId: string | null;
         eligibilityStatus: BetaJobListItem["eligibilityStatus"];
         reasonsJson: string | null;
         fitScore: number | null;
@@ -353,6 +490,13 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         queueState: BetaJobListItem["queueState"];
         queueReason: string | null;
         duplicateState: string | null;
+        coveragePercent: number | null;
+        unresolvedUnknownCount: number | null;
+        unresolvedConditionCount: number | null;
+        unresolvedConflictCount: number | null;
+        calibrationState: BetaJobListItem["calibrationState"];
+        recommended: number | null;
+        queueFreshness: BetaJobListItem["queueFreshness"];
       }
     | undefined;
   if (!row) return null;
@@ -402,11 +546,59 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
   const readiness = packetRow
     ? parseJson<{ blockers?: string[]; warnings?: string[] }>(packetRow.readinessJson, {})
     : null;
+  const duplicateCandidates = hasR2
+    ? (
+        sqlite
+          .prepare(
+            `SELECT c.id, c.state, c.left_observation_id AS leftObservationId,
+             c.right_observation_id AS rightObservationId,
+             c.matched_signals_json AS matchedSignalsJson,
+             c.conflicting_signals_json AS conflictingSignalsJson,
+             (SELECT d.reason_code FROM r2_duplicate_decision_versions d
+                WHERE d.candidate_id = c.id ORDER BY d.version DESC LIMIT 1) AS decisionReason
+           FROM r2_duplicate_candidates c
+           WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
+              OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
+           ORDER BY CASE c.state WHEN 'SUGGESTED' THEN 0 ELSE 1 END, c.updated_at DESC`,
+          )
+          .all(jobId, jobId) as Array<{
+          id: string;
+          state: string;
+          leftObservationId: string;
+          rightObservationId: string;
+          matchedSignalsJson: string;
+          conflictingSignalsJson: string;
+          decisionReason: string | null;
+        }>
+      ).map(({ matchedSignalsJson, conflictingSignalsJson, ...candidate }) => ({
+        ...candidate,
+        matchedSignals: parseJson<string[]>(matchedSignalsJson, []),
+        conflictingSignals: parseJson<string[]>(conflictingSignalsJson, []),
+      }))
+    : [];
+  const corrections = (
+    sqlite
+      .prepare(
+        `SELECT id, actor, reason_code AS reasonCode, changed_fields_json AS changedFieldsJson,
+           created_at AS createdAt FROM job_corrections WHERE job_id = ? ORDER BY created_at DESC`,
+      )
+      .all(jobId) as Array<{
+      id: string;
+      actor: string;
+      reasonCode: string;
+      changedFieldsJson: string;
+      createdAt: string;
+    }>
+  ).map(({ changedFieldsJson, ...correction }) => ({
+    ...correction,
+    changedFields: parseJson<string[]>(changedFieldsJson, []),
+  }));
   return {
     job: parsedJob,
     jobVersionId: row.jobVersionId,
     sourceObservationId: row.sourceObservationId,
     evaluationVersionId: row.evaluationVersionId,
+    legacyEvaluationVersionId: row.legacyEvaluationVersionId,
     eligibilityStatus: row.eligibilityStatus,
     eligibilityReasons: parseJson(row.reasonsJson, []),
     fitScore: row.fitScore,
@@ -414,10 +606,23 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     coverage: row.coverageJson
       ? EvaluationCoverageSchema.parse(parseJson(row.coverageJson, {}))
       : null,
+    coveragePercent:
+      row.coveragePercent ??
+      (row.coverageJson
+        ? EvaluationCoverageSchema.parse(parseJson(row.coverageJson, {})).percent
+        : null),
+    unresolvedUnknownCount: row.unresolvedUnknownCount ?? 0,
+    unresolvedConditionCount: row.unresolvedConditionCount ?? 0,
+    unresolvedConflictCount: row.unresolvedConflictCount ?? 0,
+    calibrationState: row.calibrationState,
+    recommended: Boolean(row.recommended),
     evaluationStale: Boolean(row.evaluationStale),
     queueState: row.queueState,
     queueReason: row.queueReason,
+    queueFreshness: row.queueFreshness,
     duplicateState: row.duplicateState,
+    duplicateCandidates,
+    corrections,
     recommendedTemplate,
     templateStrategy: recommendedDesign.summaryStrategy,
     templateEvidencePriorities: recommendedDesign.evidencePriorities,
@@ -490,7 +695,7 @@ export async function getBetaResumeEvidencePreview(
     return { state: "PRIVATE_PROFILE_REQUIRED", template, claims: [] };
   }
   const sqlite = betaSqlite();
-  if (!sqlite || !detail.jobVersionId || !detail.evaluationVersionId) {
+  if (!sqlite || !detail.jobVersionId || !detail.legacyEvaluationVersionId) {
     return { state: "EVALUATION_STALE_REEVALUATE_REQUIRED", template, claims: [] };
   }
   try {
@@ -498,7 +703,7 @@ export async function getBetaResumeEvidencePreview(
       sqlite,
       profile: resolution.profile,
       jobVersionId: detail.jobVersionId,
-      evaluationVersionId: detail.evaluationVersionId,
+      evaluationVersionId: detail.legacyEvaluationVersionId,
     });
   } catch (error) {
     const state = error instanceof Error ? error.message : "";
@@ -530,18 +735,70 @@ export async function reevaluateBetaJob(jobId: string): Promise<string> {
   const legacyResult = await importer.reevaluateExistingJob(jobId, candidateProfileProvider);
   if (legacyResult !== "PRIVATE_LOCAL_PROFILE")
     throw new Error("PRIVATE_PROFILE_EVALUATION_FAILED");
-  const row = sqlite
+  const legacyRow = sqlite
     .prepare(
       `SELECT id FROM evaluation_versions WHERE job_id = ?
        ORDER BY evaluated_at DESC, rowid DESC LIMIT 1`,
     )
     .get(jobId) as { id: string } | undefined;
-  if (!row) throw new Error("BETA_VERSION_STATE_MISSING");
-  return row.id;
+  if (!legacyRow) throw new Error("BETA_VERSION_STATE_MISSING");
+  const r2 = getR2Repository();
+  if (!r2) return legacyRow.id;
+  const current = sqlite
+    .prepare(
+      `SELECT j.normalized_json AS normalizedJson, v.id AS jobVersionId,
+         p.active_version_id AS profileVersionId
+       FROM jobs j
+       JOIN job_versions v ON v.id = (
+         SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
+       JOIN candidate_profiles p ON p.id = ?
+       WHERE j.id = ?`,
+    )
+    .get(resolution.profile.profileId, jobId) as
+    | { normalizedJson: string; jobVersionId: string; profileVersionId: string | null }
+    | undefined;
+  if (!current?.profileVersionId) throw new Error("R2_CURRENT_PROFILE_VERSION_REQUIRED");
+  const normalization = new R2ARepository(sqlite).getNormalization(current.jobVersionId);
+  if (!normalization) throw new Error("R2_CURRENT_NORMALIZATION_REQUIRED");
+  const evaluationId = randomUUID();
+  const eligibility = evaluateR2Eligibility({
+    profile: resolution.profile,
+    normalization,
+    bindings: {
+      jobVersionId: current.jobVersionId,
+      currentJobVersionId: current.jobVersionId,
+      profileVersionId: current.profileVersionId,
+      currentProfileVersionId: current.profileVersionId,
+      evidenceContractVersion: normalization.evidenceContractVersion,
+      currentEvidenceContractVersion: normalization.evidenceContractVersion,
+      evaluationVersionId: evaluationId,
+    },
+    evaluatedAt: new Date().toISOString(),
+  });
+  const job = JobSchema.parse(JSON.parse(current.normalizedJson));
+  const fit = scoreR2JobFit({
+    profile: resolution.profile,
+    normalization,
+    eligibility,
+    calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT,
+    commute: {
+      distanceKm: job.estimatedCommuteKm,
+      durationMinutes: job.estimatedCommuteMinutes ?? null,
+    },
+  });
+  return r2.recordEvaluation({
+    id: evaluationId,
+    jobId,
+    jobVersionId: current.jobVersionId,
+    profileVersionId: current.profileVersionId,
+    normalization,
+    eligibility,
+    fit,
+  }).id;
 }
 
 interface CurrentDocumentContext {
-  detail: BetaJobDetail & { jobVersionId: string; evaluationVersionId: string };
+  detail: BetaJobDetail & { jobVersionId: string; legacyEvaluationVersionId: string };
   profile: CandidateProfile;
   profileVersionId: string;
   privateRoot: string;
@@ -553,20 +810,20 @@ async function currentDocumentContext(jobId: string): Promise<CurrentDocumentCon
   const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
   if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
   const detail = getBetaJob(jobId);
-  if (!detail?.jobVersionId || !detail.evaluationVersionId) {
+  if (!detail?.jobVersionId || !detail.legacyEvaluationVersionId) {
     throw new Error("EVALUATION_STALE_REEVALUATE_REQUIRED");
   }
   const tuple = assertCurrentDocumentGenerationTuple({
     sqlite,
     profile: resolution.profile,
     jobVersionId: detail.jobVersionId,
-    evaluationVersionId: detail.evaluationVersionId,
+    evaluationVersionId: detail.legacyEvaluationVersionId,
   });
   return {
     detail: {
       ...detail,
       jobVersionId: detail.jobVersionId,
-      evaluationVersionId: detail.evaluationVersionId,
+      legacyEvaluationVersionId: detail.legacyEvaluationVersionId,
     },
     profile: resolution.profile,
     profileVersionId: tuple.profileVersionId,
@@ -727,25 +984,123 @@ export function setBetaQueueState(
   const detail = getBetaJob(jobId);
   const beta = getBetaRepository();
   if (!detail || !beta) throw new Error("BETA_JOB_NOT_FOUND");
+  const r2 = getR2Repository();
+  if (r2 && detail.evaluationVersionId) {
+    r2.recordQueueDecision({
+      jobId,
+      state,
+      r2EvaluationId: detail.evaluationVersionId,
+      duplicateResolutionVersion: r2.duplicateResolutionVersion(jobId),
+      actor: "OWNER",
+      reasonCode,
+    });
+    return;
+  }
   beta.setQueueState({
     jobId,
     state,
-    evaluationVersionId: detail.evaluationVersionId,
+    evaluationVersionId: detail.legacyEvaluationVersionId,
     reasonCode,
+  });
+}
+
+export function decideBetaDuplicate(
+  jobId: string,
+  candidateId: string,
+  decision: "LINKED" | "REJECTED" | "SPLIT",
+): void {
+  const r2 = getR2Repository();
+  if (!r2) throw new Error("R2_DATABASE_NOT_READY");
+  const detail = getBetaJob(jobId);
+  if (!detail?.duplicateCandidates.some(({ id }) => id === candidateId)) {
+    throw new Error("DUPLICATE_CANDIDATE_NOT_FOUND_FOR_JOB");
+  }
+  r2.decideDuplicate({
+    candidateId,
+    decision,
+    reasonCode:
+      decision === "LINKED"
+        ? "OWNER_CONFIRMED_DUPLICATE"
+        : decision === "SPLIT"
+          ? "OWNER_CONFIRMED_DISTINCT"
+          : "OWNER_REJECTED_SUGGESTION",
+    evidenceVersion: "r2-duplicate-1",
   });
 }
 
 export async function correctBetaJob(
   jobId: string,
-  input: { title: string; company: string; location: string; category: string },
+  input: {
+    title: string;
+    company: string;
+    location: string;
+    category: string;
+    employmentType: Job["employmentType"];
+    salaryMinimum: string;
+    salaryMaximum: string;
+    salaryCurrency: string;
+    salaryPeriod: NonNullable<Job["salary"]>["period"];
+    hoursPerWeekMinimum: string;
+    hoursPerWeekMaximum: string;
+    hoursPerFortnightMinimum: string;
+    hoursPerFortnightMaximum: string;
+    rosterType: NonNullable<Job["schedule"]["rosterType"]>;
+    scheduleDay: Job["schedule"]["shifts"][number]["day"] | "";
+    scheduleStart: string;
+    scheduleEnd: string;
+    coverLetterState: "REQUIRED" | "NOT_REQUIRED";
+    workRightsRequirement: Job["workRightsRequirement"];
+    vehicleRequirement: Job["vehicleRequirement"];
+    requirementsText: string;
+    preferredRequirementsText: string;
+    requiredSkillsText: string;
+  },
 ): Promise<void> {
   const detail = getBetaJob(jobId);
   const beta = getBetaRepository();
   if (!detail || !beta) throw new Error("BETA_JOB_NOT_FOUND");
-  const changedFields = (Object.keys(input) as Array<keyof typeof input>).filter(
-    (field) => input[field].trim() !== detail.job[field],
-  );
-  if (!changedFields.length) throw new Error("CORRECTION_HAS_NO_CHANGE");
+  const numberOrNull = (value: string): number | null => {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) throw new Error("INVALID_CORRECTION_NUMBER");
+    return parsed;
+  };
+  const lines = (value: string) =>
+    [
+      ...new Set(
+        value
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean),
+      ),
+    ].slice(0, 100);
+  const salaryMinimum = numberOrNull(input.salaryMinimum);
+  const salaryMaximum = numberOrNull(input.salaryMaximum);
+  const salary =
+    salaryMinimum === null && salaryMaximum === null
+      ? null
+      : {
+          minimum: salaryMinimum,
+          maximum: salaryMaximum,
+          currency: input.salaryCurrency.trim().toUpperCase(),
+          period: input.salaryPeriod,
+          text: null,
+        };
+  const weeklyMinimum = numberOrNull(input.hoursPerWeekMinimum);
+  const weeklyMaximum = numberOrNull(input.hoursPerWeekMaximum);
+  const fortnightlyMinimum = numberOrNull(input.hoursPerFortnightMinimum);
+  const fortnightlyMaximum = numberOrNull(input.hoursPerFortnightMaximum);
+  const shifts =
+    input.scheduleDay && input.scheduleStart && input.scheduleEnd
+      ? [
+          {
+            day: input.scheduleDay,
+            startTime: input.scheduleStart,
+            endTime: input.scheduleEnd,
+            mandatory: true,
+          },
+        ]
+      : [];
   const correctedLocation = normalizeAustralianLocation(input.location.trim());
   const job = JobSchema.parse({
     ...detail.job,
@@ -757,17 +1112,76 @@ export async function correctBetaJob(
     postcode: correctedLocation.postcode,
     country: correctedLocation.country,
     category: input.category.trim(),
+    employmentType: input.employmentType,
+    casual: input.employmentType === "CASUAL",
+    partTime: input.employmentType === "PART_TIME",
+    fullTime: input.employmentType === "FULL_TIME",
+    contract: input.employmentType === "CONTRACT",
+    internship: input.employmentType === "INTERNSHIP",
+    salary,
+    hoursPerWeek:
+      weeklyMinimum === null && weeklyMaximum === null
+        ? null
+        : { minimum: weeklyMinimum, maximum: weeklyMaximum },
+    hoursPerFortnight:
+      fortnightlyMinimum === null && fortnightlyMaximum === null
+        ? null
+        : { minimum: fortnightlyMinimum, maximum: fortnightlyMaximum },
+    schedule: {
+      ...detail.job.schedule,
+      fixed: input.rosterType === "FIXED" ? true : input.rosterType === "UNKNOWN" ? null : false,
+      rosterType: input.rosterType,
+      shifts,
+    },
+    requirements: lines(input.requirementsText),
+    preferredRequirements: lines(input.preferredRequirementsText),
+    requiredSkills: lines(input.requiredSkillsText),
+    documentRequirements: {
+      ...detail.job.documentRequirements,
+      coverLetterRequired: input.coverLetterState === "REQUIRED",
+    },
+    coverLetterRequired: input.coverLetterState === "REQUIRED",
+    workRightsRequirement: input.workRightsRequirement,
+    vehicleRequirement: input.vehicleRequirement,
     dateUpdated: new Date().toISOString(),
     eligibilityStatus: null,
     eligibilityReasons: [],
     fitScore: null,
     fitReasons: [],
   });
+  const correctionFields = [
+    "title",
+    "company",
+    "location",
+    "suburb",
+    "state",
+    "postcode",
+    "country",
+    "category",
+    "employmentType",
+    "salary",
+    "hoursPerWeek",
+    "hoursPerFortnight",
+    "schedule",
+    "requirements",
+    "preferredRequirements",
+    "requiredSkills",
+    "documentRequirements",
+    "coverLetterRequired",
+    "workRightsRequirement",
+    "vehicleRequirement",
+  ] as const;
+  const changedFields = correctionFields.filter(
+    (field) => JSON.stringify(job[field]) !== JSON.stringify(detail.job[field]),
+  );
+  if (!changedFields.length) throw new Error("CORRECTION_HAS_NO_CHANGE");
   beta.recordOwnerCorrection({ job, reasonCode: "OWNER_REVIEWED_FIELDS", changedFields });
   await reevaluateBetaJob(jobId);
 }
 
-export function preparePrivatePacket(jobId: string): { packetId: string; status: string } {
+export async function preparePrivatePacket(
+  jobId: string,
+): Promise<{ packetId: string; status: string }> {
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
   const detail = getBetaJob(jobId);
@@ -775,15 +1189,33 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
     !sqlite ||
     !beta ||
     !detail?.jobVersionId ||
-    !detail.evaluationVersionId ||
+    !detail.legacyEvaluationVersionId ||
     !detail.eligibilityStatus
   ) {
     throw new Error("BETA_JOB_NOT_READY");
   }
-  const profileVersion = sqlite
-    .prepare("SELECT profile_version_id AS id FROM evaluation_versions WHERE id = ?")
-    .get(detail.evaluationVersionId) as { id: string } | undefined;
-  if (!profileVersion) throw new Error("PROFILE_VERSION_NOT_FOUND");
+  if (
+    getR2Repository()?.available() &&
+    (!detail.recommended ||
+      detail.evaluationStale ||
+      detail.queueFreshness === "STALE" ||
+      detail.duplicateState === "SUGGESTED")
+  ) {
+    throw new Error("R2_QUEUE_PREPARING_NOT_READY");
+  }
+  const r2 = getR2Repository();
+  if (r2?.available()) {
+    if (!detail.evaluationVersionId) throw new Error("R2_QUEUE_CURRENT_PREPARING_REQUIRED");
+    r2.assertCurrentPreparing(jobId, detail.evaluationVersionId);
+  }
+  const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
+  if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
+  const profileVersion = assertCurrentDocumentGenerationTuple({
+    sqlite,
+    profile: resolution.profile,
+    jobVersionId: detail.jobVersionId,
+    evaluationVersionId: detail.legacyEvaluationVersionId,
+  });
   const currentDocuments = detail.documents.filter(
     ({ stale, approved, format }) => !stale && approved && format === "PDF",
   );
@@ -805,8 +1237,8 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
     id: randomUUID(),
     jobId,
     jobVersionId: detail.jobVersionId,
-    profileVersionId: profileVersion.id,
-    evaluationVersionId: detail.evaluationVersionId,
+    profileVersionId: profileVersion.profileVersionId,
+    evaluationVersionId: detail.legacyEvaluationVersionId,
     eligibilityStatus: detail.eligibilityStatus,
     targetUrl: null,
     targetHost: null,
@@ -828,7 +1260,6 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
     answers: [],
   } satisfies ApplicationPacket);
   const result = beta.persistApplicationPacket(packet);
-  setBetaQueueState(jobId, "PREPARING");
   const now = new Date().toISOString();
   let application = sqlite
     .prepare("SELECT id FROM applications WHERE job_id = ? ORDER BY created_at LIMIT 1")
@@ -842,7 +1273,7 @@ export function preparePrivatePacket(jobId: string): { packetId: string; status:
            cover_letter_document_id, submitted_at, created_at, updated_at)
          VALUES (?, ?, ?, 'DISCOVERED', ?, NULL, NULL, NULL, ?, ?)`,
       )
-      .run(application.id, jobId, profileVersion.id, detail.job.source, now, now);
+      .run(application.id, jobId, profileVersion.profileVersionId, detail.job.source, now, now);
   }
   const transitions = ["DISCOVERED", "REVIEWING", "SHORTLISTED", "PREPARING"] as const;
   for (const toStatus of transitions) {
