@@ -30,6 +30,8 @@ const environment = {
   APPLYPILOT_DB_FILENAME: filename,
   APPLYPILOT_PROFILE_FILENAME: "profile.e2e.private.json",
   APPLYPILOT_SYNTHETIC_MODE: "1",
+  APPLYPILOT_SOURCE_ALLOWLIST_FILENAME: "source-allowlist.e2e.private.json",
+  APPLYPILOT_RUNNER_ALLOWLIST_FILENAME: "runner-target-allowlist.e2e.private.json",
 };
 const sqlite = new BetterSqlite3(databasePath);
 try {
@@ -42,6 +44,7 @@ try {
       "0004_r2_matching_quality.sql",
       "0005_r2_matching_quality_hardening.sql",
       "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),

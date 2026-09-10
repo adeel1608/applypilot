@@ -1,10 +1,10 @@
 # R1 source-enabled Personal Beta implementation blueprint
 
-Status: `PLAN_ONLY_WAITING_FOR_APPROVED_TENANT`
+Status: `R1A_OFFLINE_READY_R1B_LEVER_FIXTURE_READY_WAITING_FOR_APPROVED_TENANT`
 
 Reviewed evidence date: 2026-09-08
 
-Current authority: documentation research and fictional transport tests only. No real source request or tenant activation is authorised.
+Current authority: the versioned R1A enforcement layer, fictional Lever R1B reader, durable checkpoints, and source-to-R2 queue wiring are implemented offline. No real source request or tenant activation is authorised. The first real GET still requires the exact owner approval in `OFFLINE_GO_LIVE_ENABLEMENT.md`.
 
 ## Scope and non-goals
 

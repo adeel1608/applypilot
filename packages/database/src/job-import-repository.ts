@@ -140,7 +140,7 @@ function sourceId(source: DetectedJobSource): string {
   return `source:${source.toLowerCase()}`;
 }
 
-function normalizeImportedJob(
+export function normalizeImportedJob(
   fields: z.infer<typeof ParsedJobFieldsSchema>,
   source: DetectedJobSource,
   provenance: {

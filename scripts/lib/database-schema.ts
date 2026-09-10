@@ -1,4 +1,4 @@
-export const CURRENT_DATABASE_SCHEMA_VERSION = 6;
+export const CURRENT_DATABASE_SCHEMA_VERSION = 7;
 
 export interface DatabaseSchemaStatus {
   pendingMigrations: number;

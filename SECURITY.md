@@ -4,7 +4,7 @@
 
 Current GitHub visibility is PUBLIC by explicit owner authorisation on 2026-09-07. Historical private-repository checkpoints do not change the current setting. Private profile, real input, SQLite/WAL/backups, personal documents and sessions remain local/ignored. Keep npm `"private": true` unchanged.
 
-The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes implemented Beta controls from remaining V1 gates. Manual-intake Beta now has loopback Host/Origin checks, an HttpOnly SameSite=Strict local session, expiring one-use action-bound nonces, verified-only R2 evaluation/document evidence, event-specific allowlisted audit metadata, immutable evaluation/duplicate/queue/correction history, private artifact confinement, and tested backup/restore recovery. This does not establish hosted-production or real-target browser readiness.
+The [V1 threat model](docs/THREAT_MODEL_V1.md) distinguishes implemented controls from activation authority. Offline enablement now adds immutable source/target capability versions, exact HTTPS host/path/query operations, public-address DNS validation with connection pinning, bounded source requests/pages/records/bytes/time/retries/redirects, fictional Lever parsing, frozen runner bindings, one-use consent, protection stops, and terminal unknown-outcome recovery. It does not activate a source, establish hosted-production, or approve a real target.
 
 ApplyPilot treats candidate profiles, personal documents, application answers, user-supplied job content, and authenticated browser sessions as sensitive. The preferred design keeps these artifacts on the user's computer. Phase 2 commits only fictional source fixtures and makes no live job-board requests.
 
@@ -47,7 +47,7 @@ Generated content uses only facts marked `VERIFIED`. Missing facts are omitted. 
 
 ## Human confirmation
 
-Final application submission always requires explicit human confirmation. The real runner remains disabled and there is no real submit method. Synthetic tests separate mapping, frozen review, consent, and one final action; changed packets/forms/domains, stale or replayed consent, CAPTCHA, MFA, authentication, access denial, rate limits, unsupported controls, and lost responses all stop safely.
+Final application submission always requires explicit human confirmation. The target-independent framework has no configured real adapter or target. Synthetic tests separate mapping, frozen review, consent, and one final action; changed packets/forms/domains/adapters/documents/disclosures, stale or replayed consent, CAPTCHA, MFA, authentication, bot detection, access denial, rate limits, unsupported controls, and lost responses all stop safely. A lost or ambiguous response becomes terminal `OUTCOME_UNKNOWN` and is never blindly retried.
 
 ## GitHub expectations
 

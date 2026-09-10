@@ -2,6 +2,8 @@ import type { CandidateProfile } from "@applypilot/candidate-profile";
 import type { Job } from "@applypilot/job-model";
 
 export * from "./beta";
+export * from "./target-runner";
+export * from "./private-target-allowlist";
 
 export const ApplicationRunnerMode = {
   DISCOVERY_ONLY: "DISCOVERY_ONLY",

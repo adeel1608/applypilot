@@ -47,6 +47,13 @@ describe("database foundation", () => {
         "r2CalibrationRuns",
         "r2CalibrationQualifications",
         "r2AuditEvents",
+        "sourceCapabilityVersions",
+        "sourceRunCheckpoints",
+        "sourceRunPages",
+        "sourceObservationPayloads",
+        "runnerTargetCapabilityVersions",
+        "runnerRunBindings",
+        "runnerRecoveryEvents",
       ]),
     );
   });
@@ -108,6 +115,7 @@ describe("database foundation", () => {
       "0004_r2_matching_quality.sql",
       "0005_r2_matching_quality_hardening.sql",
       "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -136,9 +144,77 @@ describe("database foundation", () => {
         "r2_calibration_runs",
         "r2_calibration_qualifications",
         "r2_audit_events",
+        "source_capability_versions",
+        "source_run_checkpoints",
+        "source_run_pages",
+        "source_observation_payloads",
+        "runner_target_capability_versions",
+        "runner_run_bindings",
+        "runner_recovery_events",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(6);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(7);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("upgrades schema v6 to v7 additively without changing historical rows", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    const previousMigrations = [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+      "0006_r2_calibration_qualification.sql",
+    ];
+    for (const name of previousMigrations) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    const timestamp = "2026-09-10T00:00:00.000Z";
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+         (id,title,company,category,location,employment_type,normalized_json,
+          application_status,date_discovered,created_at,updated_at)
+         VALUES ('v6-job','Fictional','Fictional','Fixture','Melbourne VIC','PART_TIME',
+          '{}','NEW',?,?,?)`,
+      )
+      .run(timestamp, timestamp, timestamp);
+    const historicalCounts = Object.fromEntries(
+      (
+        sqlite
+          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+          .all() as Array<{ name: string }>
+      ).map(({ name }) => [
+        name,
+        Number(sqlite.prepare(`SELECT count(*) FROM "${name}"`).pluck().get()),
+      ]),
+    );
+    sqlite.exec(
+      readFileSync(
+        new URL("../drizzle/0007_personal_live_v1_enablement.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    for (const [table, count] of Object.entries(historicalCounts)) {
+      expect(Number(sqlite.prepare(`SELECT count(*) FROM "${table}"`).pluck().get())).toBe(count);
+    }
+    for (const table of [
+      "source_capability_versions",
+      "source_run_checkpoints",
+      "source_run_pages",
+      "source_observation_payloads",
+      "runner_target_capability_versions",
+      "runner_run_bindings",
+      "runner_recovery_events",
+    ]) {
+      expect(sqlite.prepare(`SELECT count(*) AS count FROM "${table}"`).get()).toEqual({
+        count: 0,
+      });
+    }
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(7);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

@@ -1,17 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { recordManualOutcomeAction } from "@web/app/applications/actions";
+import {
+  approveRunnerTargetAction,
+  recordManualOutcomeAction,
+  revokeRunnerTargetAction,
+} from "@web/app/applications/actions";
 import { listBetaApplications } from "@web/lib/beta-workspace";
 import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
+import { getRunnerEnablementView } from "@web/lib/runner-workspace";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationsPage() {
   const applications = listBetaApplications();
+  const runnerView = await getRunnerEnablementView();
   const outcomeNonces = await Promise.all(
     applications.map(() => issueLocalMutationNonce("APPLICATION_OUTCOME", "/applications")),
+  );
+  const runnerNonces = await Promise.all(
+    runnerView.capabilities.map(async () => ({
+      approve: await issueLocalMutationNonce("RUNNER_TARGET_APPROVE", "/applications"),
+      revoke: await issueLocalMutationNonce("RUNNER_TARGET_REVOKE", "/applications"),
+    })),
   );
   return (
     <div className="page-stack">
@@ -145,12 +157,119 @@ export default async function ApplicationsPage() {
           </article>
         ))
       )}
+      <section className="panel" aria-labelledby="runner-approval-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Target-independent runner authority</span>
+            <h2 id="runner-approval-heading">{runnerView.status.replaceAll("_", " ")}</h2>
+          </div>
+          <span className="source-pill">No automatic resume or retry</span>
+        </div>
+        {runnerView.status === "WAITING_FOR_APPROVED_TARGET" && (
+          <p>No real target capability is configured. Real target interaction remains blocked.</p>
+        )}
+        {runnerView.status === "CONFIGURATION_REJECTED" && (
+          <p role="alert">
+            The ignored private target allowlist failed strict validation. No target can open.
+          </p>
+        )}
+        {runnerView.status === "DATABASE_MIGRATION_REQUIRED" && (
+          <p role="alert">Local schema 0007 is required before a runner target can be approved.</p>
+        )}
+        {runnerView.capabilities.map((capability, index) => (
+          <article className="job-row" key={`${capability.capabilityId}:${capability.version}`}>
+            <div className="job-row__main">
+              <h3>
+                {capability.alias} · {capability.targetKind.replaceAll("_", " ")}
+              </h3>
+              <p>
+                {capability.allowedOrigin}
+                {capability.allowedPathPrefix} · form {capability.formVersion} · adapter{" "}
+                {capability.adapterVersion}
+              </p>
+              <p>
+                {capability.readiness.replaceAll("_", " ")} · capability expires{" "}
+                {new Date(capability.capabilityExpiresAt).toLocaleString("en-AU")}
+              </p>
+              <p>
+                Approval persists authority only. It does not open a form, upload a document, or
+                submit.
+              </p>
+            </div>
+            <div className="page-stack">
+              <form action={approveRunnerTargetAction} className="import-form">
+                <input type="hidden" name="mutationNonce" value={runnerNonces[index]?.approve} />
+                <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                <label>
+                  Exact approval confirmation
+                  <input
+                    name="confirmationText"
+                    autoComplete="off"
+                    required
+                    aria-describedby={`runner-approve-${index}`}
+                  />
+                </label>
+                <p id={`runner-approve-${index}`}>
+                  Type <code>APPROVE {capability.capabilityId}</code>. A separate exact approval is
+                  still required before first interaction.
+                </p>
+                <label className="checkbox-line">
+                  <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve this
+                  exact versioned target boundary.
+                </label>
+                <button className="button button--secondary">Persist target approval</button>
+              </form>
+              <form action={revokeRunnerTargetAction} className="import-form">
+                <input type="hidden" name="mutationNonce" value={runnerNonces[index]?.revoke} />
+                <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                <label>
+                  Exact revocation confirmation
+                  <input
+                    name="confirmationText"
+                    autoComplete="off"
+                    required
+                    aria-describedby={`runner-revoke-${index}`}
+                  />
+                </label>
+                <p id={`runner-revoke-${index}`}>
+                  Type <code>REVOKE {capability.capabilityId}</code>.
+                </p>
+                <label className="checkbox-line">
+                  <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
+                  immutable revocation.
+                </label>
+                <button className="button button--secondary">Revoke target</button>
+              </form>
+            </div>
+          </article>
+        ))}
+        <h3>Recovery decisions</h3>
+        {runnerView.recoveries.length ? (
+          <ol>
+            {runnerView.recoveries.map((recovery) => (
+              <li key={recovery.id}>
+                <strong>{recovery.decision.replaceAll("_", " ")}</strong> ·{" "}
+                {recovery.reasonCode.replaceAll("_", " ")} · {recovery.state.replaceAll("_", " ")}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>
+            No runner recovery event exists. CAPTCHA, MFA, authentication, bot, rate, access, form
+            drift and ambiguous outcomes all require owner review.
+          </p>
+        )}
+      </section>
       <section className="safety-banner">
         <div>
           <span className="section-kicker">Runner boundary</span>
-          <h2>Real target approval required</h2>
+          <h2>Real target interaction approval required</h2>
         </div>
-        <p>Only the synthetic loopback runner is executable. No employer page is opened here.</p>
+        <p>
+          A versioned target approval alone cannot open or submit. The frozen packet, current
+          versions, disclosures, exact one-use final consent and a separate owner-started
+          interaction are all required.
+        </p>
       </section>
     </div>
   );

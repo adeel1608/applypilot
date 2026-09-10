@@ -1,6 +1,6 @@
 # Local release and recovery runbook
 
-Status: executable **Manual-intake Personal Beta READY** local operations. These commands do not enable R1 sources, a real application target, scheduling, hosting, submission, or deployment. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT` and the real runner remains `TARGET_APPROVAL_REQUIRED`.
+Status: executable **offline Personal Live V1 enablement READY** local operations. These commands do not activate an R1 tenant, a real application target, scheduling, hosting, upload, submission, or deployment. Source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT` and the real runner remains `TARGET_APPROVAL_REQUIRED`. Follow the separate exact approvals in [OFFLINE_GO_LIVE_ENABLEMENT](OFFLINE_GO_LIVE_ENABLEMENT.md).
 
 ## Current local commands
 
