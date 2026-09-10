@@ -3,11 +3,11 @@
 Last updated: 2026-09-10
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/r2-matching-quality`
+Working branch: `feat/personal-live-v1-enablement`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: PR #12 passed final human review at exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa` and merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. R2A is `READY`; R2B, R2C, and R2D software are hardened and locally verified on the still-unmerged PR #13 branch `feat/r2-matching-quality`; calibration remains truthfully `UNCALIBRATED`. Manual-intake Personal Beta remains `READY`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #13 passed final human review at exact head `22798673e785723840d88e66a0dce6f8ff1d4d8f` and merged normally as `d5a613ce156a6c719b9d9e1caec381e7e616ca4c` on 2026-09-10. R2A, R2B, R2C, and R2D software are merged; calibration remains truthfully `UNCALIBRATED`. This branch implements the approved final offline Personal Live V1 enablement train. Manual-intake Personal Beta remains `READY`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production remain `NOT_READY` until the offline train and later owner-gated real source/target steps are separately accepted; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -3011,3 +3011,102 @@ Pre-private synthetic validation passed: focused calibration/eligibility/reposit
 Private acceptance used no source or application action. ApplyPilot-owned writers were already stopped; the private profile validated; profile, private directory, SQLite, and vacancy paths remained ignored/untracked; and preflight showed schema v5, one pending migration, integrity `PASS`, and zero FK issues. Verified ignored v5 backups `backup-2026-09-10T01-49-24.369Z-db2f8301` and `backup-2026-09-10T01-49-27.527Z-c7471892` preceded migration. Migration applied only 0006 and finished at schema v6 with zero pending migrations, integrity `PASS`, zero FK issues, one job, four preserved job versions, 10 R2A field rows, 20 R2A requirement rows, and 68 coverage rows. Two legacy evaluations, two R2 evaluations, and two `UNCALIBRATED` calibration runs remain; qualification rows are zero. Post-migration privacy, doctor, and preflight checks pass. No private reevaluation, label/pair creation, document generation, packet creation, source call, employer-form visit, upload, submission, or other real application action occurred.
 
 Remaining release mechanics: commit this coherent application/schema/docs delta, run the complete release matrix on that unchanged exact head, push only the same branch, update the existing PR #13 body with safe results, require both push and pull-request GitHub Actions to succeed for the exact head, and stop with PR #13 unmerged.
+
+# Final offline Personal Live V1 enablement train - 2026-09-10
+
+Status: `IN_PROGRESS / OFFLINE_ONLY`. Human approval merged PR #13 at reviewed head `22798673e785723840d88e66a0dce6f8ff1d4d8f`; merge commit and fresh branch base are `d5a613ce156a6c719b9d9e1caec381e7e616ca4c`. The implementation branch is `feat/personal-live-v1-enablement`. The future implementation PR must remain open and unmerged for review.
+
+## Current state and objective
+
+The merged repository is schema v6 and already contains R2 evidence/evaluation/queue controls, default-disabled Greenhouse and Lever read helpers, an ignored private allowlist loader, immutable observations, application packets, durable runner/checkpoint/consent tables, a synthetic loopback application surface, and an in-memory consent-bound synthetic runner. The existing source capability is the older mutable v1 record: it lacks immutable approval versions, independent policy/capability expiry, explicit revocation/supersession, complete request/page/body/time budgets, crash-safe page checkpoints, strict audit schemas, and a DNS-pinned production transport. The current reader has fictional unit coverage but no complete source-to-R2 transactional orchestration or owner-started source action. The runner proves important safety behavior synthetically, but its target rule is hard-coded to loopback instead of a closed target-capability/adapter contract, and its durable run does not bind the complete packet/document/answer/disclosure/target snapshot or expose recovery decisions to the owner.
+
+The objective is to finish every remaining implementation task that can be proven offline: R1A source authority and transport enforcement, R1B Lever fixture pagination, the source-to-observation-to-R2 queue pipeline, a target-independent runner contract exercised only by fictional loopback targets, durable binding/recovery/audit semantics, and truthful owner-facing status/approval UI. No real tenant or employer target is selected or activated. The end state is an offline-reviewed Personal Live V1 enablement candidate, not authority for a live operation.
+
+## Assumptions, requirements, and hard boundaries
+
+- Real source GETs, employer-form visits, external uploads, and submissions are each exactly zero in this train. No tenant enumeration, opportunistic public-company selection, external browser navigation, candidate-data transmission, or real application action is permitted.
+- Candidate profiles, preferences, documents, answers, packets, sessions, and credentials are absent from source request construction. Returned hosted/application URLs are inert data and never become runner authority.
+- Source execution requires one exact current immutable `APPROVED` capability, a fresh owner-start action, exact operation approval, independent policy/capability validity, remaining budgets, and no revocation/supersession/security stop. Family-level approval never supplies a tenant.
+- Final runner execution always requires a current packet, approved disclosure for every mapped value, an exact approved target capability, a fresh frozen final-review snapshot, and one expiring single-use final-submit consent. This implementation creates no real target capability and cannot visit a real target.
+- CAPTCHA, MFA, authentication, access control, bot detection, rate limiting, website restriction, drift, unsupported controls, destination/form/version/document/packet/profile/answer/disclosure changes, lost responses, or ambiguous outcomes stop. Protections are never bypassed. `OUTCOME_UNKNOWN` is terminal and never retried automatically.
+- Migrations `0000` through `0006` are applied history and must remain byte-for-byte unchanged. Any persistence needed here is additive migration `0007_personal_live_v1_enablement.sql` only. Existing private rows/files are preserved.
+- No new runtime dependency is expected. The source transport uses Node HTTPS with a validated pinned address and original-host TLS verification; tests inject fictional transports and make no network or DNS request.
+
+## Architecture and data flow
+
+R1 uses a closed `SourceCapabilityV2` schema with immutable local configuration digest and version. The ignored file remains the owner authority; the database retains only its safe operational projection and history. A source run snapshots that exact capability version, enters `RUNNING` before a request, records each request/page budget and checkpoint transactionally with immutable observations, and never auto-resumes after interruption. Revocation and every request boundary revalidate the current capability digest.
+
+The production source transport constructs URLs only from typed source/tenant/operation inputs, permits HTTPS and port 443 only, enforces exact host, tenant path-segment, and operation-specific query keys, resolves all addresses, rejects any non-public address, pins one validated address for the TLS connection while retaining the original hostname for SNI/certificate validation, and revalidates every permitted redirect. Limits cover attempts, redirects, retries, pages, records, decoded bytes, request/run time, one in-flight request per tenant, cursor progress, cancellation, content type, UTF-8, JSON structure, and schema. First-use settings can still choose zero redirects/retries; no policy value silently increases a cap.
+
+The source pipeline is:
+
+`exact ignored capability -> owner start + preflight -> bounded GET abstraction -> typed Lever page -> immutable source run/page/observation -> R2A normalization/evidence -> conservative duplicate candidate -> local private-profile R2 evaluation only after source IO ends -> durable REVIEWING queue snapshot`
+
+Production code and tests share the pipeline, but this train supplies only a fictional in-memory Lever transport. The pipeline accepts a candidate resolver only at its post-discovery evaluation stage; transport and raw observation interfaces cannot receive candidate-shaped data. Repeated pages, records, or crash replay are idempotent by exact capability/source/region/tenant/external ID/content digest and immutable page digest.
+
+The runner uses a closed `RunnerTargetCapability` plus an injected target adapter. A frozen run binding contains packet/job/profile/evaluation versions, packet digest, approved document IDs/digests, answer truth/disclosure versions and digest, exact target origin/path/form version, adapter version, unresolved count, and capability version. Synthetic loopback capability is test-only and environment-gated. Real capabilities remain absent and report `TARGET_APPROVAL_REQUIRED`.
+
+The runner flow is:
+
+`current PREPARING packet -> target capability preflight -> durable frozen binding -> adapter inspect/map -> disclosure-approved fill -> checkpoint/pause or final review -> fresh one-use consent -> exactly one adapter final action -> SYNTHETIC_SUBMITTED or terminal OUTCOME_UNKNOWN`
+
+Every checkpoint is append-only and recovery shows the last safe state, stop reason, frozen versions, and permitted next owner action. Resume revalidates every binding and capability; a changed or ambiguous state refuses resume instead of rebuilding authority.
+
+## Additive persistence plan
+
+Add migration `0007_personal_live_v1_enablement.sql`; do not edit or rebuild prior migrations. Add only:
+
+- `source_capability_versions`: immutable closed v2 projections, configuration digest, version/predecessor, source/region/tenant/alias, exact host/path/operations, approval/policy references and timestamps, independent expiries, all budgets/caps, parser version, state/revocation/supersession reason, and created timestamp. Only one non-revoked current version per capability ID is projected by repository logic.
+- `source_run_checkpoints`: one durable run snapshot bound to the capability version/digest, operation, status, current/next cursor, seen-page digest list, request/page/record/byte/retry/redirect counts, safe error/retry-after, owner start/cancel times, and completion timestamp.
+- `source_run_pages`: immutable page identities/cursors/digests/counts linked to a run. No response body or candidate data is stored here; raw local content remains in the existing immutable observation boundary.
+- `runner_target_capability_versions`: immutable synthetic-or-real target approval projections with exact origin/path/form/adapter/policy/expiry/state/configuration digest. The migration creates no real approved row.
+- `runner_run_bindings`: one immutable complete packet/target/answer/disclosure/document/version digest snapshot linked to the existing `application_runs` row and optional target capability version.
+- `runner_recovery_events`: append-only closed safe recovery decisions/stops linked to the run; metadata is IDs, versions, enums, counts, booleans, and timestamps only.
+
+Every table has strict CHECK/FK/unique constraints and indexes. Fresh/v6/v7/future-schema, failed-transaction, backup/restore, idempotency, history, integrity, and FK tests are mandatory. The real database is migrated only after every synthetic gate passes, owned writers are stopped, a fresh ignored consistent v6 backup is verified, migration preview succeeds, and recovery time is available. No real source/runner row is created by migration.
+
+## Proposed file scope
+
+- Source domain: replace the v1-only contract in `packages/job-sources/src/public-postings.ts` and `private-allowlist.ts` with backward-readable but v2-executable capability/approval/budget schemas; add a pinned transport, closed error/audit contracts, run engine, and complete fictional security tests. Extend `lever/reader.ts` mapping for categories, all locations, country, workplace type, salary and page checkpoints; keep Greenhouse behavior default-disabled and regression-tested.
+- Source persistence/pipeline: add focused repository/service files under `packages/database/src/` for immutable capabilities, run/page checkpoints, observation ingestion, R2 normalization/evaluation/queue handoff, crash recovery, revocation, and typed audit. Update schema exports and add migration 0007.
+- Runner domain/persistence: extend `packages/application-runner` with target capability, adapter/inspection/mapping/frozen-review/recovery schemas and a target-independent runner. Keep the existing synthetic API compatibility where useful. Extend database repositories to bind runs/consents/checkpoints atomically and consume consent exactly once before the irreversible adapter call.
+- Web: after reading the installed Next.js 16 route/action/header/cookie guidance, add nonce/session/origin-protected owner actions and status views to `/sources` and `/applications`. Show exact safe capability/limits/expiry/revocation/start state, source run recovery, target approval requirements, frozen disclosure/document/answer state, terminal unknown-outcome guidance, and no live-ready label without an approved capability. Synthetic controls exist only in E2E mode.
+- Fixtures/tests: add fictional Lever list/detail/page/changed/repeat/malformed/security fixtures, source pipeline integration tests, target-adapter fixtures, durable runner/recovery tests, and browser accessibility/error/empty/revoked/stale/unknown-outcome tests. Automated and browser tests remain entirely fictional.
+- Operations/docs: update schema version/status/preflight/release/private-smoke tooling, source matrix, runner guide, Personal Live V1, threat model, go-live checklist, release runbook, README/architecture/security, and this plan with verified reality. Do not change npm publication guards or CI permissions/artifact policy.
+
+## Security, privacy, and failure risks
+
+Principal risks are arbitrary destination construction, DNS time-of-check/time-of-use, private/mapped IPv6 destinations, redirect escape, budget reset across pages/retries, cursor loops, tenant crossover, schema drift, source content leaking to audit/UI, candidate data crossing the source boundary, partial observation/evaluation writes, real-target activation by a synthetic flag, stale packet/disclosure reuse, duplicate final action after lost response, and misleading readiness UI. Controls are strict closed schemas, exact source-built URLs, pinned validated connections, transactionally monotonic counters/checkpoints, tenant-scoped identities, event-specific audit schemas, package/interface separation, frozen version/digest bindings, capability absence for real targets, single-use consent, terminal unknown outcomes, and fictional canary tests.
+
+No capability file body, tenant value considered secret-like, private profile/job source body, document, answer, packet content, token, cookie, session, DNS address, response body, path, or free-form exception may enter public logs, audit metadata, screenshots, traces, Git, CI, PR text, or build artifacts. Private/runtime/quarantine/database/backup/output paths remain ignored and untracked. The privacy audit must pass after build and E2E.
+
+## Testing strategy and acceptance criteria
+
+Required source tests cover schema closure; draft/approved/revoked/expired/superseded states; independent policy/capability expiry; approval binding; operation and parser versions; exact HTTPS/host/port/path/query rules; IPv4, IPv6, mapped IPv6, mixed-answer and rebinding cases; pinned connection contract; redirects; content type/encoding/body/depth/size/time/cancel; 400/401/403/404/409/429/security interstitial stops; retry/attempt/page/record/byte/run/concurrency budgets; cursor repeat/reversal/gap; crash/owner-resume; cross-tenant identity; raw observation idempotency; strict audit redaction; and candidate-data canaries. Lever fixture integration must exercise empty, partial and full pages, multiple pages, list/detail schema, changed and repeated observations, malformed data, inert apply URLs, and zero global network calls.
+
+Required pipeline tests exercise the real production service boundary from fictional Lever pages through immutable observations, R2A evidence, conservative duplicate suggestions, R2 evaluation, and a fresh REVIEWING queue decision. They prove source IO ends before private-profile resolution, missing/invalid/demo profile never substitutes, no auto-link occurs, stale dependencies invalidate safely, crash replay does not duplicate, and revocation blocks the next page.
+
+Required runner tests cover target-independent adapter selection, no real capability, exact origin/path/form/action, packet/job/profile/evaluation/document/answer/disclosure bindings, unknown/sensitive answer pause, approved digest-only upload mapping, every auth/CAPTCHA/MFA/bot/rate/access/restriction/drift/unsupported stop, durable recovery, consent expiry/replay/change, exactly one fictional final click, persistence failure before action causing zero clicks, terminal lost/ambiguous response with one click and no retry, and accessibility of owner-facing recovery instructions.
+
+The complete gate is format, lint, strict typecheck, unit, integration, production build, serialized E2E, migration fresh/v6/v7/future/backup/restore/history/integrity/FK, security/privacy/audit, doctor/status/quality/preflight/release, diff check, and strict fsck. Full and production dependency audits must report no known vulnerability. Exact-head push and pull-request GitHub Actions must pass.
+
+Acceptance requires R1A `READY` offline, Lever fixture integration `READY`, the full fictional source pipeline `READY`, and the target-independent runner framework `READY`; all real operation counts remain zero; no real capability is active; owner UI truthfully reports `WAITING_FOR_APPROVED_TENANT` and `TARGET_APPROVAL_REQUIRED`; the real private database, if migrated to v7, has zero pending migrations, integrity PASS, zero FK issues, and preserved historical counts; one PR titled `feat: prepare Personal Live V1 enablement` is open with exact-head green CI and remains unmerged.
+
+Personal Live V1 is not operationally released by this offline train. After merge, the exact next owner gates are: (A) a new approval of one exact immutable Lever capability/tenant/policy/budgets followed by a separately authorised first GET; and (B) a new target-specific plan/review plus one exact immutable employer target capability, disclosure/frozen packet review, and separate final-submit confirmation. Neither can be inferred from this train.
+
+## Rollback and exact implementation sequence
+
+Repository rollback is normal focused commit revert or closing the unmerged PR. Source and runner capabilities default disabled; disabling/revoking a capability retains immutable observations/runs/checkpoints/events. Migration 0007 is additive and has no destructive down path; if the private migration fails, stop and restore only through the existing verified explicit restore workflow and exact owner confirmation. Never delete or rewrite historical source, evaluation, packet, runner, or submission evidence.
+
+Exact sequence:
+
+1. Commit this consolidated plan-first blueprint before application/schema code.
+2. Implement and test SourceCapabilityV2, immutable approval/revocation/budgets, pinned HTTPS transport, strict errors/audits, and the private v2 loader with zero real calls.
+3. Implement Lever fixture pagination/detail mapping and the transactional source run/page/observation pipeline into R2 normalization, duplicate review, evaluation, and queue.
+4. Add migration 0007 and repository fresh/v6/v7/failure/history/backup/restore tests; update schema-version tooling.
+5. Implement the target capability/adapter/frozen-binding/recovery model and durable generic runner, retaining the synthetic loopback fixture as the only executable target.
+6. Read installed Next.js guidance, implement protected owner source/runner approval/start/recovery views/actions, and add fictional browser/accessibility/security coverage.
+7. Run the complete synthetic gate and fix every failure before any private database operation.
+8. Stop owned writers, verify private ignore/untracked state and schema-v6 health, create/verify a fresh backup, preview/confirm only migration 0007, and verify history/counts/integrity/FKs. Do not create a source capability, run a source request, visit a target, upload, or submit.
+9. Update verified documentation and safe counts; run the complete final matrix on the committed tree, audit migration 0000-0006 hashes/diff, push this branch, open the one implementation PR, update its body, and require exact-head push/PR CI green.
+10. Stop with the new PR unmerged for ChatGPT/human review.
