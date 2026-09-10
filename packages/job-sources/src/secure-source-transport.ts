@@ -102,6 +102,52 @@ function allowedQuery(operation: SourceOperation, capability: SourceCapabilityV2
   return operation === "LIST_JOBS" ? new Set(["content"]) : new Set();
 }
 
+function exactlyOne(searchParams: URLSearchParams, key: string): string {
+  const values = searchParams.getAll(key);
+  if (values.length !== 1) throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  return values[0]!;
+}
+
+function canonicalNonnegativeInteger(value: string): number {
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) {
+    throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  return parsed;
+}
+
+function validateLeverRequestSemantics(
+  url: URL,
+  capability: SourceCapabilityV2,
+  operation: SourceOperation,
+): void {
+  if (exactlyOne(url.searchParams, "mode") !== "json") {
+    throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  }
+  const prefix = capability.allowedPathPrefix;
+  if (operation === "LIST_JOBS") {
+    if (url.pathname !== prefix || url.searchParams.size !== 3) {
+      throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+    }
+    const skip = canonicalNonnegativeInteger(exactlyOne(url.searchParams, "skip"));
+    const limit = canonicalNonnegativeInteger(exactlyOne(url.searchParams, "limit"));
+    if (
+      skip >= capability.recordCap ||
+      limit < 1 ||
+      limit > capability.pageSizeCap ||
+      skip + limit > capability.recordCap
+    ) {
+      throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+    }
+    return;
+  }
+  const suffix = url.pathname.startsWith(`${prefix}/`) ? url.pathname.slice(prefix.length + 1) : "";
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(suffix) || url.searchParams.size !== 1) {
+    throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  }
+}
+
 export async function validateSecureSourceUrl(
   value: string,
   capabilityInput: SourceCapabilityV2,
@@ -129,9 +175,7 @@ export async function validateSecureSourceUrl(
   if ([...queryKeys].some((key) => !allowed.has(key))) {
     throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
   }
-  if (capability.source === "LEVER" && url.searchParams.get("mode") !== "json") {
-    throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
-  }
+  if (capability.source === "LEVER") validateLeverRequestSemantics(url, capability, operation);
   const addresses = [...new Set(await resolveHost(url.hostname))];
   if (addresses.length === 0 || addresses.some(isBlockedNetworkAddress)) {
     throw new SecureSourceError("DESTINATION_ADDRESS_FORBIDDEN");

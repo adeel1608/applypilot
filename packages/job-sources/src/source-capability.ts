@@ -82,6 +82,13 @@ export const SourceCapabilityV2Schema = z
     if (value.source === "GREENHOUSE" && value.region !== "GLOBAL") {
       context.addIssue({ code: "custom", path: ["region"], message: "SOURCE_REGION_MISMATCH" });
     }
+    if (value.source === "LEVER" && value.maxRedirects !== 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["maxRedirects"],
+        message: "LEVER_REDIRECTS_FORBIDDEN",
+      });
+    }
     if (value.predecessorVersion !== null && value.predecessorVersion >= value.version) {
       context.addIssue({
         code: "custom",

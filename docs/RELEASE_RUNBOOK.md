@@ -81,6 +81,8 @@ Interfaces use bounded schemas, safe enums/counts, and predictable statuses. Mis
 
 Schema mismatch/corruption/disk full: stop writes, preserve files, request reviewed recovery; never create a blank replacement silently. Browser expiry/auth/CAPTCHA/MFA: pause for legitimate manual owner interaction and explicit resume. Lost submit response: OUTCOME_UNKNOWN, owner checks visible receipt/history; never auto-retry. Logical rollback preserves an irreversible submission event even if the owner later withdraws.
 
+For an owner-started source run that stops after one or more committed pages, never delete the stopped run or its observations and never resume automatically. A fresh owner restart begins a new bounded run. Only after that run completes, capability-scoped reconciliation includes current jobs from earlier stopped runs, reuses any current R2 evaluation, creates only missing evaluation/queue state, and leaves an exact replay unchanged. Lever requests remain exact canonical GETs with zero redirects throughout.
+
 ## Publication/release and incident boundaries
 
 Verify personal CLI identity, `adeel1608/applypilot`, exact branch/head and PUBLIC visibility. Audit new commits, index, tracked files, advertised refs/history, PR body and CI artifacts/logs. `.env.example` is allowed only as reviewed non-secret local defaults; all npm `private: true` guards stay unchanged. Stage explicit safe paths, inspect staged scope/diff, push feature branch and open PR; final-head CI and human review are separate gates. No private diagnostics in PRs.

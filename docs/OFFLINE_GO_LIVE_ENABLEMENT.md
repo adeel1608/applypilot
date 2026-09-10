@@ -4,7 +4,9 @@ Status: **OFFLINE FRAMEWORK READY; EXTERNAL ACTIVATION NOT AUTHORISED.**
 
 The versioned R1A source authority, fictional Lever R1B integration, source-to-R2 queue pipeline, target-independent runner framework, durable recovery records, and owner approval surfaces are implemented. Automated validation uses fictional payloads and a loopback synthetic form only. This release does not select a tenant or employer, activate a real adapter, visit an employer form, upload a document, submit an application, or deploy ApplyPilot.
 
-Schema `0007_personal_live_v1_enablement.sql` is additive. It stores immutable source and target capability versions, bounded source checkpoints/pages/raw observation payloads, frozen runner bindings, and safe recovery decisions. Migrations `0000`–`0006` are immutable.
+Schema `0007_personal_live_v1_enablement.sql` is additive. It stores immutable source and target capability versions, bounded source checkpoints/pages/raw observation payloads, frozen runner bindings, and safe recovery decisions. Migrations `0000`–`0007` are immutable.
+
+Final source hardening accepts Lever's official `on-site`, `remote`, `hybrid`, and `unspecified` workplace values and maps `on-site` to the internal `onsite` value. Official `lists[]` sections are parser-converted to inert text, retained in order as typed source sections, and supplied to R2 normalization; active HTML elements are discarded and source HTML is never rendered or executed. The original bounded raw posting remains immutable local observation evidence. Lever list queries require exactly one `mode=json`, canonical bounded `skip`, and canonical bounded `limit`; Lever redirects are always zero. A completed owner restart reconciles current jobs across the durable capability's earlier stopped runs, evaluates missing current tuples, reuses current evaluations when only queueing remains, and makes an exact replay a no-op.
 
 ## Approval A — first real Lever tenant GET
 

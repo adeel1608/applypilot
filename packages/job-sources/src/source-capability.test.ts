@@ -104,6 +104,9 @@ describe("R1A source capability and transport", () => {
     expect(
       SourceCapabilityV2Schema.safeParse({ ...approved, candidateName: "Forbidden" }).success,
     ).toBe(false);
+    expect(SourceCapabilityV2Schema.safeParse({ ...approved, maxRedirects: 1 }).success).toBe(
+      false,
+    );
     expect(
       SourceCapabilityV2Schema.safeParse({
         ...approved,
@@ -189,6 +192,82 @@ describe("R1A source capability and transport", () => {
         async () => ["8.8.8.8", "127.0.0.1"],
       ),
     ).rejects.toThrow("DESTINATION_ADDRESS_FORBIDDEN");
+  });
+
+  it("requires exact canonical Lever list and detail query semantics", async () => {
+    const approved = capability();
+    const resolveHost = vi.fn(async () => ["8.8.8.8"]);
+    await expect(
+      validateSecureSourceUrl(
+        "https://api.lever.co/v0/postings/fictional?limit=2&mode=json&skip=0",
+        approved,
+        "LIST_JOBS",
+        resolveHost,
+      ),
+    ).resolves.toMatchObject({ pinnedAddress: "8.8.8.8" });
+    await expect(
+      validateSecureSourceUrl(
+        "https://api.lever.co/v0/postings/fictional?mode=json&skip=5&limit=1",
+        approved,
+        "LIST_JOBS",
+        resolveHost,
+      ),
+    ).resolves.toMatchObject({ pinnedAddress: "8.8.8.8" });
+
+    const invalidQueries = [
+      "skip=0&limit=2",
+      "mode=json&mode=json&skip=0&limit=2",
+      "mode=JSON&skip=0&limit=2",
+      "mode=json&limit=2",
+      "mode=json&skip=0",
+      "mode=json&skip=0&skip=1&limit=2",
+      "mode=json&skip=0&limit=2&limit=1",
+      "mode=json&skip=&limit=2",
+      "mode=json&skip=-0&limit=2",
+      "mode=json&skip=%2B0&limit=2",
+      "mode=json&skip=00&limit=2",
+      "mode=json&skip=1.0&limit=2",
+      "mode=json&skip=1e0&limit=2",
+      "mode=json&skip=%200&limit=2",
+      "mode=json&skip=0&limit=0",
+      "mode=json&skip=0&limit=3",
+      "mode=json&skip=5&limit=2",
+      "mode=json&skip=6&limit=1",
+      "mode=json&skip=9007199254740992&limit=1",
+      "mode=json&skip=0&limit=2&unexpected=1",
+    ];
+    for (const query of invalidQueries) {
+      const resolver = vi.fn(async () => ["8.8.8.8"]);
+      await expect(
+        validateSecureSourceUrl(
+          `https://api.lever.co/v0/postings/fictional?${query}`,
+          approved,
+          "LIST_JOBS",
+          resolver,
+        ),
+        query,
+      ).rejects.toThrow("QUERY_NOT_ALLOWLISTED");
+      expect(resolver, query).not.toHaveBeenCalled();
+    }
+
+    await expect(
+      validateSecureSourceUrl(
+        "https://api.lever.co/v0/postings/fictional/fixture-1?mode=json",
+        approved,
+        "GET_JOB",
+        resolveHost,
+      ),
+    ).resolves.toMatchObject({ pinnedAddress: "8.8.8.8" });
+    for (const query of ["", "mode=json&mode=json", "mode=json&skip=0", "mode=json&limit=1"]) {
+      await expect(
+        validateSecureSourceUrl(
+          `https://api.lever.co/v0/postings/fictional/fixture-1${query ? `?${query}` : ""}`,
+          approved,
+          "GET_JOB",
+          async () => ["8.8.8.8"],
+        ),
+      ).rejects.toThrow("QUERY_NOT_ALLOWLISTED");
+    }
   });
 
   it("rejects a connection that does not use the validated pinned address", async () => {
@@ -323,6 +402,74 @@ describe("R1A source capability and transport", () => {
         dependencies: transport([]),
       }),
     ).rejects.toThrow(SecureSourceError);
+  });
+
+  it.each([
+    ["on-site", "onsite"],
+    ["remote", "remote"],
+    ["hybrid", "hybrid"],
+    ["unspecified", "unspecified"],
+  ] as const)("accepts official workplaceType %s and maps it to %s", async (wire, internal) => {
+    const value = posting(1);
+    value.workplaceType = wire;
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]?.workplaceType).toBe(internal);
+  });
+
+  it("converts Lever list HTML to inert ordered text while freezing the raw payload", async () => {
+    const value = {
+      ...posting(1),
+      workplaceType: "on-site",
+      descriptionPlain: "",
+      description: "<p>Fictional &amp; safe overview.</p>",
+      additional: "<div>Closing text.<iframe>hidden</iframe></div>",
+      lists: [
+        {
+          text: "<strong>Requirements</strong>",
+          content:
+            "<ul><li>Customer &amp; visitor support</li><li>Safe systems</li></ul><script>alert('never')</script>",
+        },
+        {
+          text: "Benefits",
+          content: "<p>Fictional mentoring</p><img src=x onerror=alert(1)>",
+        },
+      ],
+    };
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    const record = page.records[0]!;
+    expect(record.workplaceType).toBe("onsite");
+    expect(record.sections).toEqual([
+      {
+        heading: "Requirements",
+        content: "Customer & visitor support\nSafe systems",
+        kind: "REQUIREMENTS",
+      },
+      { heading: "Benefits", content: "Fictional mentoring", kind: "BENEFITS" },
+    ]);
+    expect(record.description).toContain("Fictional & safe overview.");
+    expect(record.description).toContain("Requirements\nCustomer & visitor support\nSafe systems");
+    expect(record.description).toContain("Benefits\nFictional mentoring");
+    expect(record.description).toContain("Closing text.");
+    expect(record.description).not.toMatch(/<|alert|hidden|onerror/i);
+    expect(record.rawPayload.lists[0]?.content).toBe(value.lists[0]?.content);
+    expect(Object.isFrozen(record.rawPayload)).toBe(true);
+    expect(Object.isFrozen(record.rawPayload.lists)).toBe(true);
+    expect(Object.isFrozen(record.rawPayload.lists[0])).toBe(true);
+    expect(() => {
+      (record.rawPayload as unknown as { lists: Array<{ content: string }> }).lists[0]!.content =
+        "mutated";
+    }).toThrow(TypeError);
+    expect(record.rawPayload.lists[0]?.content).toBe(value.lists[0]?.content);
   });
 
   it("requires explicit GET_JOB authority and keeps application URLs inert", async () => {

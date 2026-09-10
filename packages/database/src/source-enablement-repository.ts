@@ -48,6 +48,11 @@ function structuredLeverRecord(
     : record.location
       ? [record.location]
       : [];
+  const sections = record.sections.map(({ heading, content, kind }) => ({
+    heading,
+    content,
+    kind,
+  }));
   return {
     "@context": "https://schema.org",
     "@type": "JobPosting",
@@ -74,7 +79,25 @@ function structuredLeverRecord(
     department: record.department,
     team: record.team,
     country: record.country,
+    sourceSections: sections,
+    requirementTexts: sections
+      .filter(({ kind }) => kind === "REQUIREMENTS")
+      .map(({ content }) => content),
+    responsibilities: sections
+      .filter(({ kind }) => kind === "RESPONSIBILITIES")
+      .map(({ content }) => content),
+    benefitTexts: sections.filter(({ kind }) => kind === "BENEFITS").map(({ content }) => content),
   };
+}
+
+function evidenceLines(record: LeverPostingRecordV2, kind: "REQUIREMENTS" | "RESPONSIBILITIES") {
+  return record.sections
+    .filter((section) => section.kind === kind)
+    .flatMap(({ content }) => content.split("\n"))
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 500)
+    .map((line) => line.slice(0, 4_096));
 }
 
 export interface PersistedSourcePageResult {
@@ -387,6 +410,60 @@ export class SourceEnablementRepository implements SourceRunSink {
     ).map(({ jobId }) => jobId);
   }
 
+  pipelineWorkForCompletedRun(
+    runId: string,
+  ): Array<{ jobId: string; evaluationId: string | null }> {
+    const run = this.sqlite
+      .prepare(
+        `SELECT r.status,c.capability_id AS capabilityId
+         FROM source_run_checkpoints r
+         JOIN source_capability_versions c ON c.id=r.capability_version_id
+         WHERE r.id=?`,
+      )
+      .get(runId) as { status: string; capabilityId: string } | undefined;
+    if (!run || run.status !== "COMPLETE") throw new Error("SOURCE_RUN_NOT_COMPLETE");
+    const jobs = this.sqlite
+      .prepare(
+        `SELECT DISTINCT o.job_id AS jobId
+         FROM source_observations o
+         JOIN source_run_checkpoints historical_run ON historical_run.id=o.run_id
+         JOIN source_capability_versions historical_capability
+           ON historical_capability.id=historical_run.capability_version_id
+         WHERE historical_capability.capability_id=? AND o.job_id IS NOT NULL
+         ORDER BY o.observed_at,o.id`,
+      )
+      .all(run.capabilityId) as Array<{ jobId: string }>;
+    const work: Array<{ jobId: string; evaluationId: string | null }> = [];
+    for (const { jobId } of jobs) {
+      const version = this.sqlite
+        .prepare("SELECT id FROM job_versions WHERE job_id=? ORDER BY version DESC LIMIT 1")
+        .get(jobId) as { id: string } | undefined;
+      if (!version) throw new Error("SOURCE_JOB_VERSION_REQUIRED");
+      const evaluation = this.sqlite
+        .prepare(
+          `SELECT id FROM r2_evaluation_versions
+           WHERE job_id=? AND job_version_id=? AND stale=0
+             AND EXISTS (SELECT 1 FROM candidate_profiles
+               WHERE active_version_id=r2_evaluation_versions.profile_version_id)
+           ORDER BY evaluated_at DESC,rowid DESC LIMIT 1`,
+        )
+        .get(jobId, version.id) as { id: string } | undefined;
+      if (!evaluation) {
+        work.push({ jobId, evaluationId: null });
+        continue;
+      }
+      const queue = this.sqlite
+        .prepare(
+          `SELECT freshness,r2_evaluation_id AS evaluationId
+           FROM r2_queue_decision_versions WHERE job_id=? ORDER BY version DESC LIMIT 1`,
+        )
+        .get(jobId) as { freshness: string; evaluationId: string } | undefined;
+      if (queue?.freshness === "CURRENT" && queue.evaluationId === evaluation.id) continue;
+      work.push({ jobId, evaluationId: evaluation.id });
+    }
+    return work;
+  }
+
   recovery(runId: string) {
     return this.sqlite
       .prepare(
@@ -464,8 +541,8 @@ export class SourceEnablementRepository implements SourceRunSink {
       description: record.description,
       salaryText: null,
       employmentType: employmentType(record.commitment),
-      requirements: [],
-      responsibilities: [],
+      requirements: evidenceLines(record, "REQUIREMENTS"),
+      responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
       datePosted: record.postedAt,
       coverLetterRequired: null,
     });
@@ -550,7 +627,6 @@ export class SourceEnablementRepository implements SourceRunSink {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXTERNAL_ID', ?, 'APPROVED_SOURCE_FETCH')
          ON CONFLICT(source_id,identity_kind,identity_value) DO UPDATE SET
            job_id=excluded.job_id, source_url=excluded.source_url,
-           raw_payload_json=excluded.raw_payload_json, payload_hash=excluded.payload_hash,
            fetched_at=excluded.fetched_at`,
       )
       .run(
@@ -787,8 +863,9 @@ export async function runLeverSourceToQueue(input: {
   });
   const queuedJobIds: string[] = [];
   if (result.status === "COMPLETE") {
-    for (const jobId of input.repository.jobIdsForRun(result.runId)) {
-      const evaluationId = await input.evaluateJob(jobId);
+    for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
+      const { jobId } = work;
+      const evaluationId = work.evaluationId ?? (await input.evaluateJob(jobId));
       if (!evaluationId) continue;
       await input.queueJob(jobId, evaluationId);
       queuedJobIds.push(jobId);

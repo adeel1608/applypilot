@@ -89,7 +89,14 @@ function posting(id: number) {
       department: "Fictional Operations",
     },
     country: "AU",
-    workplaceType: "onsite",
+    workplaceType: "on-site",
+    lists: [
+      {
+        text: "Requirements",
+        content: "<ul><li>Customer service experience is required.</li></ul>",
+      },
+      { text: "Benefits", content: "<p>Fictional mentoring.</p>" },
+    ],
     createdAt: 1788998400000,
   };
 }
@@ -107,6 +114,104 @@ function pagedTransport(): SecureSourceTransportDependencies {
         connectedAddress: pinnedAddress,
       };
     }),
+  };
+}
+
+function installFixtureProfile(sqlite: BetterSqlite3.Database) {
+  const profile = CandidateProfileSchema.parse({
+    ...testProfile,
+    profileId: "profile:source-restart-fixture",
+  });
+  sqlite
+    .prepare(
+      `INSERT INTO candidate_profiles (id,active_version_id,created_at,updated_at)
+       VALUES (?, 'profile-version:source-restart-fixture', ?, ?)`,
+    )
+    .run(profile.profileId, instant.toISOString(), instant.toISOString());
+  sqlite
+    .prepare(
+      `INSERT INTO candidate_profile_versions
+       (id,profile_id,version,schema_version,snapshot_json,content_hash,created_at)
+       VALUES ('profile-version:source-restart-fixture',?,1,1,?,?,?)`,
+    )
+    .run(
+      profile.profileId,
+      JSON.stringify(profile),
+      candidateProfileContentHash(profile),
+      instant.toISOString(),
+    );
+  return profile;
+}
+
+function fixturePipeline(
+  sqlite: BetterSqlite3.Database,
+  profile: ReturnType<typeof installFixtureProfile>,
+  nextId: () => string,
+) {
+  const evaluated: string[] = [];
+  const queued: Array<[string, string]> = [];
+  const r2 = new R2Repository(sqlite, () => instant, nextId);
+  return {
+    evaluated,
+    queued,
+    evaluateJob: async (jobId: string) => {
+      evaluated.push(jobId);
+      const current = sqlite
+        .prepare(
+          `SELECT j.normalized_json AS normalizedJson,v.id AS jobVersionId
+           FROM jobs j JOIN job_versions v ON v.id=(SELECT id FROM job_versions
+             WHERE job_id=j.id ORDER BY version DESC LIMIT 1) WHERE j.id=?`,
+        )
+        .get(jobId) as { normalizedJson: string; jobVersionId: string };
+      const normalization = new R2ARepository(sqlite).getNormalization(current.jobVersionId);
+      if (!normalization) throw new Error("TEST_NORMALIZATION_REQUIRED");
+      const evaluationId = `evaluation:restart:${jobId}`;
+      const eligibility = evaluateR2Eligibility({
+        profile,
+        normalization,
+        bindings: {
+          jobVersionId: current.jobVersionId,
+          currentJobVersionId: current.jobVersionId,
+          profileVersionId: "profile-version:source-restart-fixture",
+          currentProfileVersionId: "profile-version:source-restart-fixture",
+          evidenceContractVersion: normalization.evidenceContractVersion,
+          currentEvidenceContractVersion: normalization.evidenceContractVersion,
+          evaluationVersionId: evaluationId,
+        },
+        evaluatedAt: instant.toISOString(),
+      });
+      const job = JobSchema.parse(JSON.parse(current.normalizedJson));
+      const fit = scoreR2JobFit({
+        profile,
+        normalization,
+        eligibility,
+        calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT,
+        commute: {
+          distanceKm: job.estimatedCommuteKm,
+          durationMinutes: job.estimatedCommuteMinutes ?? null,
+        },
+      });
+      return r2.recordEvaluation({
+        id: evaluationId,
+        jobId,
+        jobVersionId: current.jobVersionId,
+        profileVersionId: "profile-version:source-restart-fixture",
+        normalization,
+        eligibility,
+        fit,
+      }).id;
+    },
+    queueJob: (jobId: string, evaluationId: string) => {
+      r2.recordQueueDecision({
+        jobId,
+        state: "REVIEWING",
+        r2EvaluationId: evaluationId,
+        duplicateResolutionVersion: r2.duplicateResolutionVersion(jobId),
+        actor: "SYSTEM",
+        reasonCode: "SOURCE_R2_READY",
+      });
+      queued.push([jobId, evaluationId]);
+    },
   };
 }
 
@@ -237,6 +342,40 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(sqlite.prepare("SELECT count(*) count FROM source_observation_payloads").get()).toEqual({
       count: 3,
     });
+    const leverJob = JobSchema.parse(
+      JSON.parse(
+        (
+          sqlite
+            .prepare("SELECT normalized_json AS normalizedJson FROM jobs ORDER BY title LIMIT 1")
+            .get() as { normalizedJson: string }
+        ).normalizedJson,
+      ),
+    );
+    expect(leverJob.description).toContain(
+      "Requirements\nCustomer service experience is required.",
+    );
+    expect(leverJob.description).toContain("Benefits\nFictional mentoring.");
+    expect(leverJob.requirements).toContain("Customer service experience is required.");
+    expect(leverJob.description).not.toMatch(/<li|<p|<script/i);
+    expect(
+      (
+        sqlite
+          .prepare(
+            "SELECT payload_json AS payloadJson FROM source_observation_payloads ORDER BY observation_id LIMIT 1",
+          )
+          .get() as { payloadJson: string }
+      ).payloadJson,
+    ).toContain("<li>Customer service experience is required.</li>");
+    expect(
+      (
+        sqlite
+          .prepare(
+            `SELECT count(*) AS count FROM requirement_evidence_v2
+             WHERE excerpt LIKE '%Customer service experience is required%'`,
+          )
+          .get() as { count: number }
+      ).count,
+    ).toBeGreaterThan(0);
     expect(
       sqlite
         .prepare("SELECT count(DISTINCT job_version_id) count FROM job_normalization_coverage")
@@ -293,6 +432,144 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("reconciles page-one records after page-two failure, restart, and exact replay", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const nextId = () => `restart:${++id}`;
+    const repository = new SourceEnablementRepository(sqlite, () => instant, nextId);
+    const approved = capability();
+    repository.persistCapabilityVersion(approved);
+    const pipeline = fixturePipeline(sqlite, profile, nextId);
+    const pageTwoFailure: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ url, pinnedAddress }) => {
+        const skip = Number(new URL(url).searchParams.get("skip"));
+        return skip === 0
+          ? {
+              status: 200,
+              headers: { "content-type": "application/json", "content-encoding": "identity" },
+              body: Buffer.from(JSON.stringify([posting(1), posting(2)])),
+              connectedAddress: pinnedAddress,
+            }
+          : {
+              status: 500,
+              headers: { "content-type": "application/json", "content-encoding": "identity" },
+              body: Buffer.from("{}"),
+              connectedAddress: pinnedAddress,
+            };
+      }),
+    };
+    const stopped = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: pageTwoFailure,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(stopped).toMatchObject({ status: "STOPPED", pageCount: 1, recordCount: 2 });
+    expect(pipeline.evaluated).toHaveLength(0);
+    expect(pipeline.queued).toHaveLength(0);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 0,
+    });
+
+    const restarted = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: pagedTransport(),
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(restarted).toMatchObject({ status: "COMPLETE", pageCount: 2, recordCount: 3 });
+    expect(restarted.queuedJobIds).toHaveLength(3);
+    expect(pipeline.evaluated).toHaveLength(3);
+    expect(pipeline.queued).toHaveLength(3);
+    const stableCounts = {
+      observations: (
+        sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
+          count: number;
+        }
+      ).count,
+      versions: (
+        sqlite.prepare("SELECT count(*) AS count FROM job_versions").get() as {
+          count: number;
+        }
+      ).count,
+      legacyEvaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      r2Evaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      queues: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get() as {
+          count: number;
+        }
+      ).count,
+    };
+    expect(stableCounts).toEqual({
+      observations: 3,
+      versions: 3,
+      legacyEvaluations: 0,
+      r2Evaluations: 3,
+      queues: 3,
+    });
+
+    const replayed = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: pagedTransport(),
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(replayed).toMatchObject({ status: "COMPLETE", queuedJobIds: [] });
+    expect(pipeline.evaluated).toHaveLength(3);
+    expect(pipeline.queued).toHaveLength(3);
+    expect({
+      observations: (
+        sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
+          count: number;
+        }
+      ).count,
+      versions: (
+        sqlite.prepare("SELECT count(*) AS count FROM job_versions").get() as {
+          count: number;
+        }
+      ).count,
+      legacyEvaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      r2Evaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      queues: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get() as {
+          count: number;
+        }
+      ).count,
+    }).toEqual(stableCounts);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("keeps repeated pages idempotent and links a changed observation without rewriting history", async () => {
     const sqlite = database();
     let id = 0;
@@ -312,15 +589,21 @@ describe("offline source-to-R2 queue persistence", () => {
         evaluateJob: async (jobId) => `evaluation:${jobId}`,
         queueJob: () => undefined,
       });
-    expect((await run(pagedTransport())).queuedJobIds).toHaveLength(3);
-    expect((await run(pagedTransport())).queuedJobIds).toHaveLength(0);
+    await run(pagedTransport());
+    await run(pagedTransport());
     expect(sqlite.prepare("SELECT count(*) count FROM source_observations").get()).toEqual({
       count: 3,
     });
+    const originalRaw = sqlite
+      .prepare(
+        `SELECT raw_payload_json AS payload,payload_hash AS digest FROM job_source_records
+         WHERE external_id='fictional-1'`,
+      )
+      .get() as { payload: string; digest: string };
     const changed = posting(1);
     changed.descriptionPlain = "Changed fictional evidence retained as a new observation.";
     const body = Buffer.from(JSON.stringify([changed]));
-    const result = await run({
+    await run({
       resolveHost: async () => ["8.8.8.8"],
       request: async ({ pinnedAddress }) => ({
         status: 200,
@@ -329,10 +612,26 @@ describe("offline source-to-R2 queue persistence", () => {
         connectedAddress: pinnedAddress,
       }),
     });
-    expect(result.queuedJobIds).toHaveLength(1);
     expect(sqlite.prepare("SELECT count(*) count FROM source_observations").get()).toEqual({
       count: 4,
     });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT raw_payload_json AS payload,payload_hash AS digest FROM job_source_records
+           WHERE external_id='fictional-1'`,
+        )
+        .get(),
+    ).toEqual(originalRaw);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT count(*) AS count FROM source_observation_payloads p
+           JOIN source_observations o ON o.id=p.observation_id
+           WHERE o.external_id='fictional-1'`,
+        )
+        .get(),
+    ).toEqual({ count: 2 });
     expect(
       sqlite
         .prepare(
