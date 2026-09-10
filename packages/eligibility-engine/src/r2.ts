@@ -157,14 +157,27 @@ function legalHoursLimitApplicability(
   if (!basis || basis.verification !== VerificationStatus.VERIFIED || basis.kind === "UNKNOWN") {
     return "REVIEW_REQUIRED";
   }
-  if (basis.kind === "CURRENT") return "APPLIES";
+  const currentDate = evaluatedAt.toISOString().slice(0, 10);
+  const boundedAssertionIsCurrent = (asOf?: string, validThrough?: string): boolean | null => {
+    if (!asOf || !validThrough) return null;
+    return currentDate >= asOf && currentDate <= validThrough;
+  };
+  if (basis.kind === "CURRENT") {
+    return boundedAssertionIsCurrent(basis.asOf, basis.validThrough)
+      ? "APPLIES"
+      : "REVIEW_REQUIRED";
+  }
   if (basis.kind === "DATE_WINDOW") {
-    const currentDate = evaluatedAt.toISOString().slice(0, 10);
     return currentDate >= basis.startDate && currentDate <= basis.endDate
       ? "APPLIES"
       : "DOES_NOT_APPLY";
   }
-  if (basis.appliesNow === null) return "REVIEW_REQUIRED";
+  if (
+    basis.appliesNow === null ||
+    boundedAssertionIsCurrent(basis.asOf, basis.validThrough) !== true
+  ) {
+    return "REVIEW_REQUIRED";
+  }
   return basis.appliesNow ? "APPLIES" : "DOES_NOT_APPLY";
 }
 

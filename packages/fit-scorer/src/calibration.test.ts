@@ -4,15 +4,93 @@ import { r2GoldenCorpus } from "../../../fixtures/r2/manifest";
 
 import {
   R2CalibrationContextSchema,
+  assessR2Calibration,
   createR2CalibrationContext,
   evaluateR2GoldenRanking,
   r2AblationDelta,
   r2CalibrationState,
+  type R2CalibrationGateInput,
 } from "./calibration";
 import { assessR2GoldenExecution, executeR2GoldenCase, executeR2GoldenCorpus } from "./golden";
 import { R2_FIT_SCORER_VERSION, R2_FIT_WEIGHTS, R2_GOLDEN_CORPUS_VERSION } from "./r2";
 
 describe("R2 executable golden corpus and calibration", () => {
+  const emptyPrivateGate: R2CalibrationGateInput = {
+    sourceLabelCount: 0,
+    sourcePairCount: 0,
+    labels: [],
+    pairs: [],
+    performanceThresholds: null,
+    safetyGates: null,
+    ownerApproval: null,
+  };
+
+  const qualifiedPrivateGate = (): R2CalibrationGateInput => {
+    const labels = Array.from({ length: 30 }, (_, index) => {
+      const common = { id: `private-label-${index}`, roleFamily: `family-${index % 4}` };
+      if (index % 3 === 0) {
+        return {
+          ...common,
+          ownerLabel: "GOOD_MATCH" as const,
+          eligibility: "ELIGIBLE" as const,
+          ordinalBand: "STRONG_REVIEW" as const,
+          recommended: true,
+        };
+      }
+      if (index % 3 === 1) {
+        return {
+          ...common,
+          ownerLabel: "AMBIGUOUS" as const,
+          eligibility: "REVIEW_REQUIRED" as const,
+          ordinalBand: "POSSIBLE_REVIEW" as const,
+          recommended: false,
+        };
+      }
+      return {
+        ...common,
+        ownerLabel: "POOR_MATCH" as const,
+        eligibility: "INELIGIBLE" as const,
+        ordinalBand: "DO_NOT_RECOMMEND" as const,
+        recommended: false,
+      };
+    });
+    const pairs = Array.from({ length: 5 }, (_, index) => ({
+      id: `private-pair-${index}`,
+      preferredScore: 80 - index,
+      otherScore: 40 + index,
+    }));
+    return {
+      sourceLabelCount: labels.length,
+      sourcePairCount: pairs.length,
+      labels,
+      pairs,
+      performanceThresholds: {
+        version: "owner-thresholds-1",
+        minimumLabelAgreementBasisPoints: 10_000,
+        minimumPairComparisons: 5,
+        minimumPairAgreementBasisPoints: 10_000,
+      },
+      safetyGates: {
+        version: "r2-safety-gates-1",
+        executableGoldenCorpus: true,
+        determinism: true,
+        monotonicity: true,
+        ablation: true,
+        bounds: true,
+        recommendationInvariants: true,
+        privacyAudit: true,
+        migrationIntegrity: true,
+      },
+      ownerApproval: {
+        approvalId: "owner-approval-fictional",
+        approvedAt: "2026-09-10T00:00:00.000Z",
+        performanceThresholdVersion: "owner-thresholds-1",
+        safetyGateVersion: "r2-safety-gates-1",
+        approved: true,
+      },
+    };
+  };
+
   it("covers every required role family, matching state, and ordinal class", () => {
     expect(new Set(r2GoldenCorpus.map(({ roleFamily }) => roleFamily))).toEqual(
       new Set([
@@ -47,22 +125,23 @@ describe("R2 executable golden corpus and calibration", () => {
     );
   });
 
-  it("keeps current state uncalibrated but can bind a qualifying durable calibration run", () => {
-    const belowThreshold = {
-      independentlyReviewedPrivateJobs: 29,
-      roleFamilies: 12,
-      statuses: ["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"] as Array<
-        "ELIGIBLE" | "REVIEW_REQUIRED" | "INELIGIBLE"
-      >,
+  it("keeps current state uncalibrated and count-qualified evidence pending approval", () => {
+    expect(r2CalibrationState(emptyPrivateGate)).toBe("UNCALIBRATED");
+    const qualified = qualifiedPrivateGate();
+    const countsOnly = {
+      ...qualified,
+      performanceThresholds: null,
+      safetyGates: null,
+      ownerApproval: null,
     };
-    expect(r2CalibrationState(belowThreshold)).toBe("UNCALIBRATED");
-    expect(
-      r2CalibrationState({
-        independentlyReviewedPrivateJobs: 30,
-        roleFamilies: 4,
-        statuses: ["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"],
-      }),
-    ).toBe("CALIBRATED");
+    expect(r2CalibrationState(countsOnly)).toBe("CALIBRATION_PENDING");
+    expect(assessR2Calibration(countsOnly).blockerCodes).toEqual(
+      expect.arrayContaining([
+        "PRIVATE_PERFORMANCE_THRESHOLDS_NOT_APPROVED",
+        "CALIBRATION_SAFETY_GATES_NOT_APPROVED",
+        "CALIBRATION_OWNER_APPROVAL_REQUIRED",
+      ]),
+    );
     expect(() =>
       createR2CalibrationContext({
         version: "calibration-context:qualified",
@@ -70,11 +149,7 @@ describe("R2 executable golden corpus and calibration", () => {
         weightVersion: R2_FIT_WEIGHTS.version,
         corpusVersion: R2_GOLDEN_CORPUS_VERSION,
         runId: null,
-        gate: {
-          independentlyReviewedPrivateJobs: 30,
-          roleFamilies: 4,
-          statuses: ["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"],
-        },
+        gate: qualified,
       }),
     ).toThrow();
     expect(
@@ -85,14 +160,61 @@ describe("R2 executable golden corpus and calibration", () => {
           weightVersion: R2_FIT_WEIGHTS.version,
           corpusVersion: R2_GOLDEN_CORPUS_VERSION,
           runId: "calibration-run:qualified",
-          gate: {
-            independentlyReviewedPrivateJobs: 30,
-            roleFamilies: 4,
-            statuses: ["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"],
-          },
+          gate: qualified,
         }),
       ).state,
     ).toBe("CALIBRATED");
+  });
+
+  it("rejects inconsistent private contents and premature safety or owner approval", () => {
+    const qualified = qualifiedPrivateGate();
+    expect(assessR2Calibration({ ...qualified, labels: qualified.labels.slice(1) })).toMatchObject({
+      state: "CALIBRATION_PENDING",
+      blockerCodes: expect.arrayContaining(["PRIVATE_LABEL_ROWS_INCONSISTENT"]),
+    });
+    expect(
+      assessR2Calibration({
+        ...qualified,
+        labels: qualified.labels.map((label, index) =>
+          index === 0 ? { ...label, ownerLabel: "POOR_MATCH" as const } : label,
+        ),
+      }),
+    ).toMatchObject({
+      state: "CALIBRATION_PENDING",
+      blockerCodes: expect.arrayContaining(["PRIVATE_LABEL_PERFORMANCE_BELOW_THRESHOLD"]),
+    });
+    expect(
+      assessR2Calibration({
+        ...qualified,
+        pairs: qualified.pairs.map((pair, index) =>
+          index === 0 ? { ...pair, preferredScore: 20, otherScore: 80 } : pair,
+        ),
+      }),
+    ).toMatchObject({
+      state: "CALIBRATION_PENDING",
+      blockerCodes: expect.arrayContaining(["PRIVATE_PAIR_PERFORMANCE_BELOW_THRESHOLD"]),
+    });
+    expect(
+      assessR2Calibration({
+        ...qualified,
+        safetyGates: { ...qualified.safetyGates!, privacyAudit: false },
+      }),
+    ).toMatchObject({
+      state: "CALIBRATION_PENDING",
+      blockerCodes: expect.arrayContaining(["CALIBRATION_SAFETY_GATE_FAILED"]),
+    });
+    expect(
+      assessR2Calibration({
+        ...qualified,
+        ownerApproval: {
+          ...qualified.ownerApproval!,
+          performanceThresholdVersion: "different-thresholds",
+        },
+      }),
+    ).toMatchObject({
+      state: "CALIBRATION_PENDING",
+      blockerCodes: expect.arrayContaining(["CALIBRATION_OWNER_APPROVAL_INCONSISTENT"]),
+    });
   });
 
   it("executes actual eligibility and scorer inputs twice with matching golden outcomes", () => {
@@ -112,7 +234,7 @@ describe("R2 executable golden corpus and calibration", () => {
         score: fit.score,
         expectedBand: fixture.expectedBand,
       })),
-      { independentlyReviewedPrivateJobs: 0, roleFamilies: 0, statuses: [] },
+      emptyPrivateGate,
     );
     expect(metrics).toMatchObject({
       total: 12,

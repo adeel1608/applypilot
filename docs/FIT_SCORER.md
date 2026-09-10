@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented and hardened on unmerged PR #13. R2 remains an `UNCALIBRATED` owner-review ordering aid pending the approved private threshold and final exact-head review. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented and hardened on unmerged PR #13. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, owner approval, and final exact-head review. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
@@ -27,7 +27,7 @@ Every contribution stores a stable reason code, signed points, field/evidence ID
 
 ## Calibration
 
-R2D first executes the real eligibility/scorer path against a versioned 12-case fictional golden corpus. The manifest contains expected outcomes but no expected scorer output; actual scores drive ordinal metrics. Only an ignored owner-labelled set of at least 30 independently reviewed jobs spanning four role families and every eligibility status can produce a durable `CALIBRATED` context. Each evaluation stores its context version and optional calibration-run foreign key, so promotion never rewrites historical evaluations or collides with an older identity. Only safe aggregate pass/fail and ordinal metrics may be published. Until the private gate passes the UI says `UNCALIBRATED` and never describes the score as a probability.
+R2D first executes the real eligibility/scorer path against a versioned 12-case fictional golden corpus. The manifest contains expected outcomes but no expected scorer output; actual scores drive ordinal metrics. Private calibration evaluates the contents of owner labels and preferred pairs against their current eligibility, ordinal-band, recommendation, and score outcomes. Counts alone never promote: fewer than 30 labels remains `UNCALIBRATED`, while a count-qualified sample remains `CALIBRATION_PENDING` unless it spans four role families and every eligibility status, passes approved label/pair performance thresholds and every approved safety gate, and has explicit owner approval bound to those exact threshold/safety versions. Each evaluation stores its context version and optional calibration-run foreign key, so promotion never rewrites historical evaluations or collides with an older identity. Migration 0006 persists only safe aggregate counts/agreement, an opaque evidence digest, versions, approval metadata, and blockers; private label/pair contents stay local. Until every private gate passes, the UI never describes the score as a probability.
 
 ## Testing
 

@@ -558,6 +558,26 @@ export const r2CalibrationRuns = sqliteTable("r2_calibration_runs", {
   createdAt: text("created_at").notNull(),
 });
 
+export const r2CalibrationQualifications = sqliteTable("r2_calibration_qualifications", {
+  runId: text("run_id")
+    .primaryKey()
+    .references(() => r2CalibrationRuns.id, { onDelete: "restrict" }),
+  evidenceVersion: text("evidence_version").notNull(),
+  privateEvidenceDigest: text("private_evidence_digest").notNull(),
+  sourceLabelCount: integer("source_label_count").notNull(),
+  comparedLabelCount: integer("compared_label_count").notNull(),
+  sourcePairCount: integer("source_pair_count").notNull(),
+  comparedPairCount: integer("compared_pair_count").notNull(),
+  labelAgreementBasisPoints: integer("label_agreement_basis_points").notNull(),
+  pairAgreementBasisPoints: integer("pair_agreement_basis_points").notNull(),
+  performanceThresholdVersion: text("performance_threshold_version"),
+  safetyGateVersion: text("safety_gate_version"),
+  ownerApprovalId: text("owner_approval_id"),
+  ownerApprovedAt: text("owner_approved_at"),
+  blockerCodesJson: text("blocker_codes_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const r2EvaluationVersions = sqliteTable("r2_evaluation_versions", {
   id: text("id").primaryKey(),
   jobId: text("job_id")
@@ -891,6 +911,7 @@ export const schema = {
   r2QueueDecisionVersions,
   r2CorrectionOverlayBindings,
   r2CalibrationRuns,
+  r2CalibrationQualifications,
   r2AuditEvents,
   documentArtifacts,
   documentApprovals,

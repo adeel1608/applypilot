@@ -48,15 +48,23 @@ export async function generateMetadata({
 
 async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
   const path = `/jobs/${detail.job.id}`;
-  const [queueNonce, evaluateNonce, correctionNonce, generateNonce, coverLetterNonce, packetNonce] =
-    await Promise.all([
-      issueLocalMutationNonce("JOB_QUEUE", path),
-      issueLocalMutationNonce("JOB_REEVALUATE", path),
-      issueLocalMutationNonce("JOB_CORRECT", path),
-      issueLocalMutationNonce("DOCUMENT_GENERATE", path),
-      issueLocalMutationNonce("COVER_LETTER_GENERATE", path),
-      issueLocalMutationNonce("PACKET_PREPARE", path),
-    ]);
+  const [
+    queueNonce,
+    preparingNonce,
+    evaluateNonce,
+    correctionNonce,
+    generateNonce,
+    coverLetterNonce,
+    packetNonce,
+  ] = await Promise.all([
+    issueLocalMutationNonce("JOB_QUEUE", path),
+    issueLocalMutationNonce("JOB_QUEUE", path),
+    issueLocalMutationNonce("JOB_REEVALUATE", path),
+    issueLocalMutationNonce("JOB_CORRECT", path),
+    issueLocalMutationNonce("DOCUMENT_GENERATE", path),
+    issueLocalMutationNonce("COVER_LETTER_GENERATE", path),
+    issueLocalMutationNonce("PACKET_PREPARE", path),
+  ]);
   const approvalNonces = await Promise.all(
     detail.documents.map(() => issueLocalMutationNonce("DOCUMENT_APPROVE", path)),
   );
@@ -71,6 +79,15 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
     resumeTemplateCategories.find((template) => template === currentCvTemplate) ??
     detail.recommendedTemplate;
   const evidencePreview = await getBetaResumeEvidencePreview(job.id, previewTemplate);
+  const canEnterPreparing =
+    detail.eligibilityStatus === "ELIGIBLE" &&
+    detail.recommended &&
+    !detail.evaluationStale &&
+    detail.queueFreshness !== "STALE" &&
+    detail.duplicateState !== "SUGGESTED" &&
+    Boolean(detail.evaluationVersionId);
+  const canPreparePacket =
+    canEnterPreparing && detail.queueState === "PREPARING" && detail.queueFreshness === "CURRENT";
   return (
     <div className="page-stack">
       <Link className="back-link" href="/jobs">
@@ -847,10 +864,27 @@ async function BetaJobWorkspace({ detail }: { detail: BetaJobDetail }) {
           A real local packet deliberately has no approved application destination. Preparation
           stops before any employer form and therefore remains review-required.
         </p>
+        <p>
+          First enter PREPARING to bind the current evaluation and duplicate state. Any later
+          evaluation or duplicate change invalidates that decision.
+        </p>
+        <form action={setQueueStateAction} aria-label="Enter packet preparation">
+          <input type="hidden" name="mutationNonce" value={preparingNonce} />
+          <input type="hidden" name="jobId" value={job.id} />
+          <input type="hidden" name="queueState" value="PREPARING" />
+          <button
+            className="button button--secondary"
+            disabled={!canEnterPreparing || canPreparePacket}
+          >
+            {canPreparePacket ? "Current PREPARING decision recorded" : "Enter PREPARING"}
+          </button>
+        </form>
         <form action={preparePacketAction}>
           <input type="hidden" name="mutationNonce" value={packetNonce} />
           <input type="hidden" name="jobId" value={job.id} />
-          <button className="button button--primary">Prepare local packet</button>
+          <button className="button button--primary" disabled={!canPreparePacket}>
+            Prepare local packet
+          </button>
         </form>
       </section>
     </div>

@@ -8,7 +8,11 @@ import BetterSqlite3 from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
-import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit } from "@applypilot/fit-scorer";
+import {
+  R2_UNREVIEWED_CALIBRATION_CONTEXT,
+  scoreR2JobFit,
+  type R2CalibrationGateInput,
+} from "@applypilot/fit-scorer";
 import {
   r2FieldEvidence,
   r2RequirementEvidence,
@@ -103,6 +107,7 @@ function setup() {
     "0003_r2a_evidence_normalization.sql",
     "0004_r2_matching_quality.sql",
     "0005_r2_matching_quality_hardening.sql",
+    "0006_r2_calibration_qualification.sql",
   ]) {
     sqlite.exec(migration(name));
   }
@@ -132,6 +137,72 @@ function currentEvaluation(normalization: ReturnType<typeof r2TestNormalization>
       eligibility,
       calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT,
     }),
+  };
+}
+
+function qualifiedCalibrationGate(): R2CalibrationGateInput {
+  const labels = Array.from({ length: 30 }, (_, index) => {
+    const common = { id: `label-${index}`, roleFamily: `family-${index % 4}` };
+    if (index % 3 === 0) {
+      return {
+        ...common,
+        ownerLabel: "GOOD_MATCH" as const,
+        eligibility: "ELIGIBLE" as const,
+        ordinalBand: "STRONG_REVIEW" as const,
+        recommended: true,
+      };
+    }
+    if (index % 3 === 1) {
+      return {
+        ...common,
+        ownerLabel: "AMBIGUOUS" as const,
+        eligibility: "REVIEW_REQUIRED" as const,
+        ordinalBand: "POSSIBLE_REVIEW" as const,
+        recommended: false,
+      };
+    }
+    return {
+      ...common,
+      ownerLabel: "POOR_MATCH" as const,
+      eligibility: "INELIGIBLE" as const,
+      ordinalBand: "DO_NOT_RECOMMEND" as const,
+      recommended: false,
+    };
+  });
+  const pairs = Array.from({ length: 5 }, (_, index) => ({
+    id: `pair-${index}`,
+    preferredScore: 90 - index,
+    otherScore: 30 + index,
+  }));
+  return {
+    sourceLabelCount: labels.length,
+    sourcePairCount: pairs.length,
+    labels,
+    pairs,
+    performanceThresholds: {
+      version: "owner-thresholds-1",
+      minimumLabelAgreementBasisPoints: 10_000,
+      minimumPairComparisons: 5,
+      minimumPairAgreementBasisPoints: 10_000,
+    },
+    safetyGates: {
+      version: "r2-safety-gates-1",
+      executableGoldenCorpus: true,
+      determinism: true,
+      monotonicity: true,
+      ablation: true,
+      bounds: true,
+      recommendationInvariants: true,
+      privacyAudit: true,
+      migrationIntegrity: true,
+    },
+    ownerApproval: {
+      approvalId: "owner-approval-fictional",
+      approvedAt: now,
+      performanceThresholdVersion: "owner-thresholds-1",
+      safetyGateVersion: "r2-safety-gates-1",
+      approved: true,
+    },
   };
 }
 
@@ -183,7 +254,7 @@ afterEach(async () => {
 });
 
 describe("R2 persistence", () => {
-  it("backs up schema v3, migrates through v4 to v5, preserves history, and restores", async () => {
+  it("backs up schema v3, migrates through v4/v5 to v6, preserves history, and restores", async () => {
     const root = await mkdtemp(join(tmpdir(), "applypilot-r2-"));
     roots.push(root);
     const databasePath = join(root, "data", "applypilot.sqlite");
@@ -222,6 +293,8 @@ describe("R2 persistence", () => {
     expect(sqlite.pragma("user_version", { simple: true })).toBe(4);
     sqlite.exec(migration("0005_r2_matching_quality_hardening.sql"));
     expect(sqlite.pragma("user_version", { simple: true })).toBe(5);
+    sqlite.exec(migration("0006_r2_calibration_qualification.sql"));
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(6);
     expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     expect({
@@ -298,6 +371,71 @@ describe("R2 persistence", () => {
     expect(restored.restored.schemaVersion).toBe(4);
     expect(inspectDatabase(databasePath)).toMatchObject({
       schemaVersion: 4,
+      integrity: "PASS",
+      foreignKeyIssues: 0,
+    });
+  });
+
+  it("backs up populated v5, adds only v6 qualification storage, and restores v5", async () => {
+    const root = await mkdtemp(join(tmpdir(), "applypilot-r2-v5-"));
+    roots.push(root);
+    const databasePath = join(root, "data", "applypilot.sqlite");
+    const backupRoot = join(root, "data", "private", "backups");
+    await mkdir(backupRoot, { recursive: true });
+    let sqlite = new BetterSqlite3(databasePath);
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+    ]) {
+      sqlite.exec(migration(name));
+    }
+    seedBase(sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_calibration_runs
+          (id,scorer_version,weight_version,corpus_version,fictional_case_count,
+           private_reviewed_count,role_family_count,status_count,ordinal_agreement_basis_points,
+           top_k,top_k_utility_basis_points,state,created_at)
+         VALUES ('legacy-count-only','2.0.0','r2-weights-1','r2-golden-2',12,30,4,3,
+           10000,5,10000,'CALIBRATED',?)`,
+      )
+      .run(now);
+    sqlite.close();
+    const backup = await createDatabaseBackup({
+      databasePath,
+      backupRoot,
+      now: new Date(now),
+      randomSuffix: "c5d6e7f8",
+    });
+    expect(backup.schemaVersion).toBe(5);
+
+    sqlite = new BetterSqlite3(databasePath);
+    sqlite.exec(migration("0006_r2_calibration_qualification.sql"));
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(6);
+    expect(sqlite.prepare("SELECT state FROM r2_calibration_runs").pluck().get()).toBe(
+      "CALIBRATED",
+    );
+    expect(sqlite.prepare("SELECT count(*) FROM r2_calibration_qualifications").pluck().get()).toBe(
+      0,
+    );
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+
+    const restored = await restoreDatabase({
+      databasePath,
+      backupRoot,
+      backupId: backup.backupId,
+      confirmation: `RESTORE:${backup.backupId}`,
+      now: new Date("2026-09-09T00:03:00.000Z"),
+    });
+    expect(restored.restored.schemaVersion).toBe(5);
+    expect(inspectDatabase(databasePath)).toMatchObject({
+      schemaVersion: 5,
       integrity: "PASS",
       foreignKeyIssues: 0,
     });
@@ -558,13 +696,14 @@ describe("R2 persistence", () => {
       () => new Date(now),
       () => `calibration-id-${++sequence}`,
     );
+    const gate = qualifiedCalibrationGate();
     const runId = repository.recordCalibrationRun({
       corpusVersion: "r2-golden-2",
       scorerVersion: "2.0.0",
       weightVersion: "r2-weights-1",
-      privateReviewedCount: 30,
-      roleFamilyCount: 4,
-      statusCount: 3,
+      gate,
+      evidenceVersion: "r2-private-calibration-evidence-1",
+      privateEvidenceDigest: "d".repeat(64),
       metrics: {
         total: 12,
         ordinalAgreement: 1,
@@ -596,6 +735,21 @@ describe("R2 persistence", () => {
         .prepare("SELECT calibration_state, calibration_run_id FROM r2_evaluation_versions")
         .get(),
     ).toEqual({ calibration_state: "CALIBRATED", calibration_run_id: runId });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT source_label_count, compared_label_count, source_pair_count,
+                  compared_pair_count, blocker_codes_json
+           FROM r2_calibration_qualifications WHERE run_id = ?`,
+        )
+        .get(runId),
+    ).toEqual({
+      source_label_count: 30,
+      compared_label_count: 30,
+      source_pair_count: 5,
+      compared_pair_count: 5,
+      blocker_codes_json: "[]",
+    });
     expect(() =>
       repository.recordEvaluation({
         jobId: job.id,
@@ -606,6 +760,36 @@ describe("R2 persistence", () => {
         fit: { ...calibratedFit, calibrationRunId: "missing-run" },
       }),
     ).toThrow("R2_CALIBRATION_RUN_BINDING_MISMATCH");
+  });
+
+  it("refuses a legacy count-only calibrated run without a v6 qualification", () => {
+    const { sqlite, job, normalization } = setup();
+    sqlite
+      .prepare(
+        `INSERT INTO r2_calibration_runs
+          (id,scorer_version,weight_version,corpus_version,fictional_case_count,
+           private_reviewed_count,role_family_count,status_count,ordinal_agreement_basis_points,
+           top_k,top_k_utility_basis_points,state,created_at)
+         VALUES ('count-only-calibrated','2.0.0','r2-weights-1','r2-golden-2',12,30,4,3,
+           10000,5,10000,'CALIBRATED',?)`,
+      )
+      .run(now);
+    const result = currentEvaluation(normalization);
+    expect(() =>
+      new R2Repository(sqlite).recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility: result.eligibility,
+        fit: {
+          ...result.fit,
+          calibrationState: "CALIBRATED",
+          calibrationContextVersion: "legacy-count-only-context",
+          calibrationRunId: "count-only-calibrated",
+        },
+      }),
+    ).toThrow("R2_CALIBRATION_RUN_NOT_QUALIFIED");
   });
 
   it("keeps ambiguous duplicate observations and owner link/split decisions immutable", () => {

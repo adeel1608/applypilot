@@ -7,7 +7,12 @@ import {
   R2_MINIMUM_EXTRACTION_COVERAGE,
   type R2EligibilityResult,
 } from "@applypilot/eligibility-engine";
-import type { R2FitResult, R2GoldenMetrics } from "@applypilot/fit-scorer";
+import {
+  assessR2Calibration,
+  type R2CalibrationGateInput,
+  type R2FitResult,
+  type R2GoldenMetrics,
+} from "@applypilot/fit-scorer";
 import {
   R2ANormalizationSchema,
   JobSchema,
@@ -322,11 +327,25 @@ export class R2Repository {
     if (calibrationRunId) {
       const calibration = this.sqlite
         .prepare(
-          `SELECT scorer_version AS scorerVersion, weight_version AS weightVersion, state
-           FROM r2_calibration_runs WHERE id = ?`,
+          `SELECT r.scorer_version AS scorerVersion, r.weight_version AS weightVersion, r.state,
+                  q.performance_threshold_version AS performanceThresholdVersion,
+                  q.safety_gate_version AS safetyGateVersion,
+                  q.owner_approval_id AS ownerApprovalId,
+                  q.blocker_codes_json AS blockerCodesJson
+           FROM r2_calibration_runs r
+           LEFT JOIN r2_calibration_qualifications q ON q.run_id = r.id
+           WHERE r.id = ?`,
         )
         .get(calibrationRunId) as
-        | { scorerVersion: string; weightVersion: string; state: string }
+        | {
+            scorerVersion: string;
+            weightVersion: string;
+            state: string;
+            performanceThresholdVersion: string | null;
+            safetyGateVersion: string | null;
+            ownerApprovalId: string | null;
+            blockerCodesJson: string | null;
+          }
         | undefined;
       if (
         !calibration ||
@@ -335,6 +354,15 @@ export class R2Repository {
         calibration.state !== input.fit.calibrationState
       ) {
         throw new Error("R2_CALIBRATION_RUN_BINDING_MISMATCH");
+      }
+      if (
+        input.fit.calibrationState === "CALIBRATED" &&
+        (!calibration.performanceThresholdVersion ||
+          !calibration.safetyGateVersion ||
+          !calibration.ownerApprovalId ||
+          calibration.blockerCodesJson !== "[]")
+      ) {
+        throw new Error("R2_CALIBRATION_RUN_NOT_QUALIFIED");
       }
     }
     const latestJob = this.sqlite
@@ -974,9 +1002,9 @@ export class R2Repository {
 
   recordCalibrationRun(input: {
     metrics: R2GoldenMetrics;
-    privateReviewedCount: number;
-    roleFamilyCount: number;
-    statusCount: number;
+    gate: R2CalibrationGateInput;
+    evidenceVersion: string;
+    privateEvidenceDigest: string;
     scorerVersion: string;
     weightVersion: string;
     corpusVersion: string;
@@ -985,10 +1013,30 @@ export class R2Repository {
     const scorerVersion = SafeVersionSchema.parse(input.scorerVersion);
     const weightVersion = SafeVersionSchema.parse(input.weightVersion);
     const corpusVersion = SafeVersionSchema.parse(input.corpusVersion);
-    const privateReviewedCount = z.number().int().nonnegative().parse(input.privateReviewedCount);
-    const roleFamilyCount = z.number().int().nonnegative().parse(input.roleFamilyCount);
-    const statusCount = z.number().int().min(0).max(3).parse(input.statusCount);
+    const evidenceVersion = SafeVersionSchema.parse(input.evidenceVersion);
+    const privateEvidenceDigest = z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .parse(input.privateEvidenceDigest);
+    const assessment = assessR2Calibration(input.gate);
+    if (input.metrics.calibrationState !== assessment.state) {
+      throw new Error("R2_CALIBRATION_ASSESSMENT_MISMATCH");
+    }
+    const performanceThresholdVersion = input.gate.performanceThresholds
+      ? SafeVersionSchema.parse(input.gate.performanceThresholds.version)
+      : null;
+    const safetyGateVersion = input.gate.safetyGates
+      ? SafeVersionSchema.parse(input.gate.safetyGates.version)
+      : null;
+    const ownerApprovalId = input.gate.ownerApproval
+      ? SafeIdSchema.parse(input.gate.ownerApproval.approvalId)
+      : null;
+    const ownerApprovedAt = input.gate.ownerApproval
+      ? z.iso.datetime().parse(input.gate.ownerApproval.approvedAt)
+      : null;
+    const blockerCodes = z.array(SafeCodeSchema).parse(assessment.blockerCodes);
     this.sqlite.transaction(() => {
+      const createdAt = this.now().toISOString();
       this.sqlite
         .prepare(
           `INSERT INTO r2_calibration_runs
@@ -1003,20 +1051,47 @@ export class R2Repository {
           weightVersion,
           corpusVersion,
           input.metrics.total,
-          privateReviewedCount,
-          roleFamilyCount,
-          statusCount,
+          assessment.sourceLabelCount,
+          assessment.roleFamilyCount,
+          assessment.statusCount,
           Math.round(input.metrics.ordinalAgreement * 10_000),
           input.metrics.topK,
           Math.round(input.metrics.topKReviewUtility * 10_000),
-          input.metrics.calibrationState,
-          this.now().toISOString(),
+          assessment.state,
+          createdAt,
+        );
+      this.sqlite
+        .prepare(
+          `INSERT INTO r2_calibration_qualifications
+            (run_id,evidence_version,private_evidence_digest,source_label_count,
+             compared_label_count,source_pair_count,compared_pair_count,
+             label_agreement_basis_points,pair_agreement_basis_points,
+             performance_threshold_version,safety_gate_version,owner_approval_id,
+             owner_approved_at,blocker_codes_json,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        )
+        .run(
+          id,
+          evidenceVersion,
+          privateEvidenceDigest,
+          assessment.sourceLabelCount,
+          assessment.comparedLabelCount,
+          assessment.sourcePairCount,
+          assessment.comparedPairCount,
+          assessment.labelAgreementBasisPoints,
+          assessment.pairAgreementBasisPoints,
+          performanceThresholdVersion,
+          safetyGateVersion,
+          ownerApprovalId,
+          ownerApprovedAt,
+          JSON.stringify(blockerCodes),
+          createdAt,
         );
       this.audit("r2.calibration.completed", "calibration", id, {
         fictionalCaseCount: input.metrics.total,
-        privateReviewedCount,
-        roleFamilyCount,
-        state: input.metrics.calibrationState,
+        privateReviewedCount: assessment.sourceLabelCount,
+        roleFamilyCount: assessment.roleFamilyCount,
+        state: assessment.state,
       });
     })();
     return id;

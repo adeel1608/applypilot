@@ -117,6 +117,7 @@ async function main(): Promise<void> {
               "r2_queue_decision_versions",
               "r2_correction_overlay_bindings",
               "r2_calibration_runs",
+              ...(version >= 6 ? ["r2_calibration_qualifications"] : []),
               "r2_audit_events",
             ].map((table) => [
               table,
@@ -173,6 +174,17 @@ async function main(): Promise<void> {
         readFileSync(
           new URL(
             "../packages/database/drizzle/0005_r2_matching_quality_hardening.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+    }
+    if (version < 6) {
+      sqlite.exec(
+        readFileSync(
+          new URL(
+            "../packages/database/drizzle/0006_r2_calibration_qualification.sql",
             import.meta.url,
           ),
           "utf8",

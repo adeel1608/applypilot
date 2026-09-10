@@ -40,3 +40,53 @@ test("R2 review remains keyboard usable without clipping at narrow zoom", async 
   );
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("owner explicitly enters PREPARING before local packet preparation succeeds", async ({
+  page,
+}) => {
+  await page.goto("/jobs/job-e2e-preparing");
+
+  const enterPreparing = page.getByRole("button", { name: "Enter PREPARING" });
+  const preparePacket = page.getByRole("button", { name: "Prepare local packet" });
+  await expect(page.getByRole("heading", { name: "Not prepared" })).toBeVisible();
+  await expect(page.getByText("ELIGIBLE", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/recommendation available/)).toBeVisible();
+  await expect(page.getByText("Stale evaluation", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("SUGGESTED", { exact: true })).toHaveCount(0);
+  await expect(enterPreparing).toBeEnabled();
+  await expect(preparePacket).toBeDisabled();
+
+  await enterPreparing.click();
+  await expect(page.getByText("Queue: PREPARING", { exact: true })).toBeVisible();
+  await expect(page.getByText("Queue freshness: CURRENT", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Current PREPARING decision recorded" }),
+  ).toBeDisabled();
+  await expect(preparePacket).toBeEnabled();
+
+  await preparePacket.click();
+  await expect(page.getByRole("heading", { name: "REVIEW_REQUIRED · version 1" })).toBeVisible();
+  await expect(page.getByText("Queue: PREPARING", { exact: true })).toBeVisible();
+});
+
+test("packet preparation fails closed for absent, stale, nonrecommended, and duplicate-blocked decisions", async ({
+  page,
+}) => {
+  await page.goto("/jobs/job-e2e-preparing-absent");
+  await expect(page.getByRole("button", { name: "Prepare local packet" })).toBeDisabled();
+
+  await page.goto("/jobs/job-e2e-preparing-stale");
+  await expect(page.getByText("Queue freshness: STALE", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enter PREPARING" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Prepare local packet" })).toBeDisabled();
+
+  await page.goto("/jobs/job-e2e-preparing-nonrecommended");
+  await expect(page.getByText(/recommendation blocked/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enter PREPARING" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Prepare local packet" })).toBeDisabled();
+
+  await page.goto("/jobs/job-e2e-preparing-duplicate");
+  await expect(page.getByText("SUGGESTED", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enter PREPARING" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Prepare local packet" })).toBeDisabled();
+});

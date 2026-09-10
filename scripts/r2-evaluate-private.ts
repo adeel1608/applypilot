@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -14,7 +14,9 @@ import {
   createR2CalibrationContext,
   evaluateR2GoldenRanking,
   executeR2GoldenCorpus,
+  r2OrdinalBand,
   scoreR2JobFit,
+  type R2CalibrationGateInput,
 } from "@applypilot/fit-scorer";
 import { JobSchema } from "@applypilot/job-model";
 import { createDatabaseBackup } from "./lib/database-maintenance";
@@ -167,21 +169,57 @@ async function main(): Promise<void> {
       },
       evaluatedAt: now,
     });
-    const labelAggregates = sqlite
+    const labelRows = sqlite
       .prepare(
-        `SELECT count(DISTINCT l.job_id) AS reviewed,
-                count(DISTINCT j.category) AS roleFamilies
-         FROM calibration_labels l JOIN jobs j ON j.id = l.job_id`,
+        `SELECT l.id, j.category AS roleFamily, l.label AS ownerLabel,
+                e.eligibility_status AS eligibility, e.fit_score AS score, e.recommended
+         FROM calibration_labels l
+         JOIN jobs j ON j.id = l.job_id
+         LEFT JOIN r2_evaluation_versions e ON e.id = (
+           SELECT id FROM r2_evaluation_versions
+           WHERE job_id = l.job_id AND stale = 0
+           ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+         ORDER BY l.id`,
       )
-      .get() as { reviewed: number; roleFamilies: number };
-    const statuses = sqlite
+      .all() as Array<{
+      id: string;
+      roleFamily: string;
+      ownerLabel: "GOOD_MATCH" | "POOR_MATCH" | "AMBIGUOUS";
+      eligibility: "ELIGIBLE" | "REVIEW_REQUIRED" | "INELIGIBLE" | null;
+      score: number | null;
+      recommended: number | null;
+    }>;
+    const pairRows = sqlite
       .prepare(
-        `SELECT DISTINCT e.eligibility_status AS status
-         FROM calibration_labels l JOIN r2_evaluation_versions e ON e.job_id = l.job_id
-         WHERE e.stale = 0`,
+        `SELECT p.id, preferred.fit_score AS preferredScore, other.fit_score AS otherScore
+         FROM calibration_pairs p
+         LEFT JOIN r2_evaluation_versions preferred ON preferred.id = (
+           SELECT id FROM r2_evaluation_versions
+           WHERE job_id = p.preferred_job_id AND stale = 0
+           ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+         LEFT JOIN r2_evaluation_versions other ON other.id = (
+           SELECT id FROM r2_evaluation_versions
+           WHERE job_id = p.other_job_id AND stale = 0
+           ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
+         ORDER BY p.id`,
       )
-      .pluck()
-      .all() as Array<"ELIGIBLE" | "REVIEW_REQUIRED" | "INELIGIBLE">;
+      .all() as Array<{ id: string; preferredScore: number | null; otherScore: number | null }>;
+    const calibrationGate: R2CalibrationGateInput = {
+      sourceLabelCount: labelRows.length,
+      sourcePairCount: pairRows.length,
+      labels: labelRows.map(({ score, recommended, ...label }) => ({
+        ...label,
+        ordinalBand:
+          label.eligibility === null || score === null
+            ? null
+            : r2OrdinalBand(label.eligibility, score),
+        recommended: recommended === null ? null : Boolean(recommended),
+      })),
+      pairs: pairRows,
+      performanceThresholds: null,
+      safetyGates: null,
+      ownerApproval: null,
+    };
     const goldenExecutions = executeR2GoldenCorpus();
     const metrics = evaluateR2GoldenRanking(
       goldenExecutions.map(({ fixture, eligibility: result, fit: scored }) => ({
@@ -191,18 +229,16 @@ async function main(): Promise<void> {
         score: scored.score,
         expectedBand: fixture.expectedBand,
       })),
-      {
-        independentlyReviewedPrivateJobs: Number(labelAggregates.reviewed),
-        roleFamilies: Number(labelAggregates.roleFamilies),
-        statuses,
-      },
+      calibrationGate,
     );
     const repository = new R2Repository(sqlite, () => new Date(now));
     const calibrationRunId = repository.recordCalibrationRun({
       metrics,
-      privateReviewedCount: Number(labelAggregates.reviewed),
-      roleFamilyCount: Number(labelAggregates.roleFamilies),
-      statusCount: new Set(statuses).size,
+      gate: calibrationGate,
+      evidenceVersion: "r2-private-calibration-evidence-1",
+      privateEvidenceDigest: createHash("sha256")
+        .update(JSON.stringify({ labels: calibrationGate.labels, pairs: calibrationGate.pairs }))
+        .digest("hex"),
       scorerVersion: R2_FIT_SCORER_VERSION,
       weightVersion: R2_FIT_WEIGHT_VERSION,
       corpusVersion: R2_GOLDEN_CORPUS_VERSION,
@@ -213,11 +249,7 @@ async function main(): Promise<void> {
       weightVersion: R2_FIT_WEIGHT_VERSION,
       corpusVersion: R2_GOLDEN_CORPUS_VERSION,
       runId: calibrationRunId,
-      gate: {
-        independentlyReviewedPrivateJobs: Number(labelAggregates.reviewed),
-        roleFamilies: Number(labelAggregates.roleFamilies),
-        statuses,
-      },
+      gate: calibrationGate,
     });
     const fit = scoreR2JobFit({
       profile,
@@ -265,9 +297,30 @@ async function main(): Promise<void> {
     ) {
       throw new Error("R2_PRIVATE_POST_EVALUATION_DATABASE_FAILED");
     }
-    console.log(
-      `R2_PRIVATE_EVALUATION_COMPLETE backup=${backup.backupId} created=${recorded.created ? "YES" : "NO"} eligibility=${eligibility.status} recommended=${fit.recommended ? "YES" : "NO"} coverage=${eligibility.coveragePercent} unknowns=${eligibility.unresolvedMaterialUnknowns} conditions=${eligibility.unresolvedMaterialConditions} conflicts=${eligibility.unresolvedMaterialConflicts} fit_band=${eligibility.status === "INELIGIBLE" ? "DO_NOT_RECOMMEND" : fit.score >= 70 ? "STRONG_REVIEW" : fit.score >= 45 ? "POSSIBLE_REVIEW" : "LOW_PRIORITY"} calibration=${metrics.calibrationState} private_reviewed=${Number(labelAggregates.reviewed)} role_families=${Number(labelAggregates.roleFamilies)} statuses=${new Set(statuses).size} historical_legacy_evaluations=${after.legacyEvaluations} historical_r2_evaluations=${after.r2Evaluations} stale_documents=${after.staleDocuments} invalidated_packets=${after.invalidatedPackets} integrity=PASS foreign_key_issues=0 real_source_calls=0 real_application_actions=0`,
-    );
+    const safeSummary = [
+      `backup=${backup.backupId}`,
+      `created=${recorded.created ? "YES" : "NO"}`,
+      `eligibility=${eligibility.status}`,
+      `recommended=${fit.recommended ? "YES" : "NO"}`,
+      `coverage=${eligibility.coveragePercent}`,
+      `unknowns=${eligibility.unresolvedMaterialUnknowns}`,
+      `conditions=${eligibility.unresolvedMaterialConditions}`,
+      `conflicts=${eligibility.unresolvedMaterialConflicts}`,
+      `fit_band=${r2OrdinalBand(eligibility.status, fit.score)}`,
+      `calibration=${metrics.calibrationState}`,
+      `private_reviewed=${calibrationGate.sourceLabelCount}`,
+      `role_families=${new Set(calibrationGate.labels.map(({ roleFamily }) => roleFamily)).size}`,
+      `statuses=${new Set(calibrationGate.labels.map(({ eligibility: state }) => state).filter(Boolean)).size}`,
+      `historical_legacy_evaluations=${after.legacyEvaluations}`,
+      `historical_r2_evaluations=${after.r2Evaluations}`,
+      `stale_documents=${after.staleDocuments}`,
+      `invalidated_packets=${after.invalidatedPackets}`,
+      "integrity=PASS",
+      "foreign_key_issues=0",
+      "real_source_calls=0",
+      "real_application_actions=0",
+    ].join(" ");
+    console.log(`R2_PRIVATE_EVALUATION_COMPLETE ${safeSummary}`);
   } finally {
     sqlite.close();
   }

@@ -42,6 +42,10 @@ const r2HardeningMigration = readFileSync(
   ),
   "utf8",
 );
+const r2CalibrationQualificationMigration = readFileSync(
+  new URL("../../packages/database/drizzle/0006_r2_calibration_qualification.sql", import.meta.url),
+  "utf8",
+);
 const content = `Title: Fictional Community Assistant
 Company: Example Harbour Services
 Location: Sydney NSW 2000
@@ -153,6 +157,7 @@ async function seedR2AReprocessScenario(
   sqlite.exec(r2aMigration);
   sqlite.exec(r2Migration);
   sqlite.exec(r2HardeningMigration);
+  sqlite.exec(r2CalibrationQualificationMigration);
   return { jobId, ...state };
 }
 
@@ -218,6 +223,7 @@ describe("real-world job intake persistence and profile gate", () => {
     sqlite.exec(r2aMigration);
     sqlite.exec(r2Migration);
     sqlite.exec(r2HardeningMigration);
+    sqlite.exec(r2CalibrationQualificationMigration);
     const provider: CandidateProfileProvider = {
       resolve: async () => ({ state: "NO_ACTIVE_PROFILE", reasonCode: "PRIVATE_PROFILE_MISSING" }),
     };

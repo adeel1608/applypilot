@@ -32,31 +32,51 @@ export const VerifiedAchievementSchema = z.object({
   verification: z.literal(VerificationStatus.VERIFIED),
 });
 
-export const WorkRightsHoursLimitTimeBasisSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("CURRENT"),
-    verification: VerificationStatusSchema,
-  }),
-  z
-    .object({
-      kind: z.literal("DATE_WINDOW"),
-      startDate: z.iso.date(),
-      endDate: z.iso.date(),
+export const WorkRightsHoursLimitTimeBasisSchema = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("CURRENT"),
+      asOf: z.iso.date().optional(),
+      validThrough: z.iso.date().optional(),
       verification: VerificationStatusSchema,
-    })
-    .refine(({ startDate, endDate }) => startDate <= endDate, {
-      message: "work-right hours-limit date window must be ordered",
     }),
-  z.object({
-    kind: z.enum(["TEACHING_PERIOD", "BREAK_PERIOD", "VISA_PERIOD"]),
-    appliesNow: z.boolean().nullable(),
-    verification: VerificationStatusSchema,
-  }),
-  z.object({
-    kind: z.literal("UNKNOWN"),
-    verification: VerificationStatusSchema,
-  }),
-]);
+    z
+      .object({
+        kind: z.literal("DATE_WINDOW"),
+        startDate: z.iso.date(),
+        endDate: z.iso.date(),
+        verification: VerificationStatusSchema,
+      })
+      .refine(({ startDate, endDate }) => startDate <= endDate, {
+        message: "work-right hours-limit date window must be ordered",
+      }),
+    z.object({
+      kind: z.enum(["TEACHING_PERIOD", "BREAK_PERIOD", "VISA_PERIOD"]),
+      appliesNow: z.boolean().nullable(),
+      asOf: z.iso.date().optional(),
+      validThrough: z.iso.date().optional(),
+      verification: VerificationStatusSchema,
+    }),
+    z.object({
+      kind: z.literal("UNKNOWN"),
+      verification: VerificationStatusSchema,
+    }),
+  ])
+  .superRefine((basis, context) => {
+    if (
+      basis.kind !== "DATE_WINDOW" &&
+      "asOf" in basis &&
+      basis.asOf &&
+      basis.validThrough &&
+      basis.asOf > basis.validThrough
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["validThrough"],
+        message: "work-right hours-limit temporal assertion must be ordered",
+      });
+    }
+  });
 
 export const CandidateProfileSchema = z
   .object({

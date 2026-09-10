@@ -13,12 +13,16 @@ import { evaluateR2Eligibility } from "./r2";
 
 const evaluatedAt = "2026-09-09T00:00:00.000Z";
 
-function evaluate(normalization: ReturnType<typeof r2TestNormalization>, profile = testProfile) {
+function evaluate(
+  normalization: ReturnType<typeof r2TestNormalization>,
+  profile = testProfile,
+  at = evaluatedAt,
+) {
   return evaluateR2Eligibility({
     profile,
     normalization,
     bindings: currentR2Bindings,
-    evaluatedAt,
+    evaluatedAt: at,
   });
 }
 
@@ -102,7 +106,12 @@ describe("R2 eligibility", () => {
         ...testProfile.workRights,
         value: {
           ...testProfile.workRights.value,
-          hoursLimitTimeBasis: { kind: "CURRENT", verification: "VERIFIED" },
+          hoursLimitTimeBasis: {
+            kind: "CURRENT",
+            asOf: "2026-09-01",
+            validThrough: "2026-09-30",
+            verification: "VERIFIED",
+          },
         },
       },
     });
@@ -161,6 +170,97 @@ describe("R2 eligibility", () => {
     expect(evaluate(normalization, priorWindow).reasons.map(({ code }) => code)).not.toContain(
       "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
     );
+  });
+
+  it("reviews stale or unbounded current legal-hours assertions instead of blocking", () => {
+    const fortnightly = r2FieldEvidence("hours-current-bounds", "HOURS", {
+      kind: "HOURS",
+      value: { minimum: 76, maximum: 76, unit: "FORTNIGHT" },
+    });
+    const normalization = r2TestNormalization({ fields: [fortnightly] });
+    for (const hoursLimitTimeBasis of [
+      { kind: "CURRENT", verification: "VERIFIED" },
+      {
+        kind: "CURRENT",
+        asOf: "2026-08-01",
+        validThrough: "2026-08-31",
+        verification: "VERIFIED",
+      },
+      {
+        kind: "CURRENT",
+        asOf: "2026-09-10",
+        validThrough: "2026-09-30",
+        verification: "VERIFIED",
+      },
+    ] as const) {
+      const profile = CandidateProfileSchema.parse({
+        ...testProfile,
+        workRights: {
+          ...testProfile.workRights,
+          value: { ...testProfile.workRights.value, hoursLimitTimeBasis },
+        },
+      });
+      const result = evaluate(normalization, profile);
+      expect(result.status).toBe("REVIEW_REQUIRED");
+      expect(result.reasons.map(({ code }) => code)).toContain(
+        "R2_LEGAL_HOURS_TIME_BASIS_REVIEW_REQUIRED",
+      );
+      expect(result.reasons.map(({ code }) => code)).not.toContain(
+        "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
+      );
+    }
+  });
+
+  it("re-evaluates teaching and break assertions across their bounded transition", () => {
+    const fortnightly = r2FieldEvidence("hours-period-transition", "HOURS", {
+      kind: "HOURS",
+      value: { minimum: 76, maximum: 76, unit: "FORTNIGHT" },
+    });
+    const normalization = r2TestNormalization({ fields: [fortnightly] });
+    const teaching = CandidateProfileSchema.parse({
+      ...testProfile,
+      workRights: {
+        ...testProfile.workRights,
+        value: {
+          ...testProfile.workRights.value,
+          hoursLimitTimeBasis: {
+            kind: "TEACHING_PERIOD",
+            appliesNow: true,
+            asOf: "2026-09-01",
+            validThrough: "2026-09-14",
+            verification: "VERIFIED",
+          },
+        },
+      },
+    });
+    expect(evaluate(normalization, teaching, "2026-09-09T00:00:00.000Z").status).toBe("INELIGIBLE");
+    const staleTeaching = evaluate(normalization, teaching, "2026-09-15T00:00:00.000Z");
+    expect(staleTeaching.status).toBe("REVIEW_REQUIRED");
+    expect(staleTeaching.reasons.map(({ code }) => code)).not.toContain(
+      "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
+    );
+
+    const breakPeriod = CandidateProfileSchema.parse({
+      ...testProfile,
+      workRights: {
+        ...testProfile.workRights,
+        value: {
+          ...testProfile.workRights.value,
+          hoursLimitTimeBasis: {
+            kind: "BREAK_PERIOD",
+            appliesNow: false,
+            asOf: "2026-09-15",
+            validThrough: "2026-09-30",
+            verification: "VERIFIED",
+          },
+        },
+      },
+    });
+    expect(
+      evaluate(normalization, breakPeriod, "2026-09-15T00:00:00.000Z").reasons.map(
+        ({ code }) => code,
+      ),
+    ).not.toContain("R2_LEGAL_FORTNIGHT_HOURS_MISMATCH");
   });
 
   it("keeps licences, vehicle access, and commute as separate propositions", () => {

@@ -97,7 +97,7 @@ Description: Maintain fictional uploaded service records locally.`),
 
 test("shows only the safe private-profile runtime state", async ({ page }) => {
   await page.goto("/profile");
-  await expect(page.getByRole("heading", { name: "Private profile missing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Private profile loaded" })).toBeVisible();
   const source = await page.content();
   expect(source).not.toContain('"referees":');
   expect(source).not.toContain('"contact":');
