@@ -96,9 +96,71 @@ describe("R2 eligibility", () => {
       kind: "HOURS",
       value: { minimum: 76, maximum: 76, unit: "FORTNIGHT" },
     });
+    const currentLimitProfile = CandidateProfileSchema.parse({
+      ...testProfile,
+      workRights: {
+        ...testProfile.workRights,
+        value: {
+          ...testProfile.workRights.value,
+          hoursLimitTimeBasis: { kind: "CURRENT", verification: "VERIFIED" },
+        },
+      },
+    });
     expect(
-      evaluate(r2TestNormalization({ fields: [fortnightly] })).reasons.map(({ code }) => code),
+      evaluate(r2TestNormalization({ fields: [fortnightly] }), currentLimitProfile).reasons.map(
+        ({ code }) => code,
+      ),
     ).toContain("R2_LEGAL_FORTNIGHT_HOURS_MISMATCH");
+  });
+
+  it("requires a verified applicable time basis before legal-hours blocking", () => {
+    const fortnightly = r2FieldEvidence("hours-temporal", "HOURS", {
+      kind: "HOURS",
+      value: { minimum: 76, maximum: 76, unit: "FORTNIGHT" },
+    });
+    const normalization = r2TestNormalization({ fields: [fortnightly] });
+    const unresolved = evaluate(normalization);
+    expect(unresolved.status).toBe("REVIEW_REQUIRED");
+    expect(unresolved.reasons.map(({ code }) => code)).toContain(
+      "R2_LEGAL_HOURS_TIME_BASIS_REVIEW_REQUIRED",
+    );
+    expect(unresolved.reasons.map(({ code }) => code)).not.toContain(
+      "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
+    );
+
+    for (const hoursLimitTimeBasis of [
+      { kind: "TEACHING_PERIOD", appliesNow: null, verification: "VERIFIED" },
+      { kind: "BREAK_PERIOD", appliesNow: true, verification: "UNKNOWN" },
+      { kind: "VISA_PERIOD", appliesNow: null, verification: "USER_CONFIRMATION_REQUIRED" },
+    ] as const) {
+      const profile = CandidateProfileSchema.parse({
+        ...testProfile,
+        workRights: {
+          ...testProfile.workRights,
+          value: { ...testProfile.workRights.value, hoursLimitTimeBasis },
+        },
+      });
+      expect(evaluate(normalization, profile).status).toBe("REVIEW_REQUIRED");
+    }
+
+    const priorWindow = CandidateProfileSchema.parse({
+      ...testProfile,
+      workRights: {
+        ...testProfile.workRights,
+        value: {
+          ...testProfile.workRights.value,
+          hoursLimitTimeBasis: {
+            kind: "DATE_WINDOW",
+            startDate: "2026-01-01",
+            endDate: "2026-08-31",
+            verification: "VERIFIED",
+          },
+        },
+      },
+    });
+    expect(evaluate(normalization, priorWindow).reasons.map(({ code }) => code)).not.toContain(
+      "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
+    );
   });
 
   it("keeps licences, vehicle access, and commute as separate propositions", () => {

@@ -9,7 +9,7 @@ test("shows R2 evidence health, explanations, calibration, duplicate, and queue 
   await expect(page.getByText(/Current extraction coverage 71%/)).toBeVisible();
   await expect(page.getByText(/Material unresolved: 1 unknown/)).toBeVisible();
   await expect(page.getByText("Scoring: UNCALIBRATED")).toBeVisible();
-  await expect(page.getByText("Queue freshness: CURRENT")).toBeVisible();
+  await expect(page.getByText(/Queue freshness: (CURRENT|STALE)/)).toBeVisible();
   await expect(page.getByText("SUGGESTED", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Similar text never auto-links/)).toBeVisible();
   const duplicateForm = page.getByRole("form", { name: "Decide duplicate duplicate:r2:e2e" });

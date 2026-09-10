@@ -9,6 +9,7 @@ import type { EligibilityResult } from "@applypilot/eligibility-engine";
 
 export * from "./r2";
 export * from "./calibration";
+export * from "./golden";
 
 export const FIT_SCORER_VERSION = "1.0.0";
 

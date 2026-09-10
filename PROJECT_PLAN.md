@@ -1,13 +1,13 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
 Working branch: `feat/r2-matching-quality`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
-Current forward baseline: PR #12 passed final human review at exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa` and merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. The current `feat/r2-matching-quality` branch starts from that clean merged main and is authorised to implement R2B, R2C, and R2D as one coherent train. R2A is `READY`; Manual-intake Personal Beta remains `READY`; R2B, R2C, and R2D are `IN_PROGRESS`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+Current forward baseline: PR #12 passed final human review at exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa` and merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. R2A is `READY`; R2B, R2C, and R2D software are hardened and locally verified on the still-unmerged PR #13 branch `feat/r2-matching-quality`; calibration remains truthfully `UNCALIBRATED`. Manual-intake Personal Beta remains `READY`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
 
 ## 1. Vision
 
@@ -2908,3 +2908,30 @@ Exact sequence:
 7. Run the complete synthetic gate, including migration/restore and every review-specific regression. Fix every failure before private work.
 8. Stop owned writers; verify ignored/untracked private state, schema v4, integrity/FKs; create and verify a fresh backup; apply only 0005; verify schema v5/history/integrity/FKs; run at most one local R2 re-evaluation if needed without tuning.
 9. Update truthful docs and PR #13, commit coherent changes, run the exact final matrix on the final head, push the same branch, require exact-head push and pull-request CI green, and stop with PR #13 unmerged.
+
+## PR #13 hardening implementation and private v5 acceptance - 2026-09-10
+
+Status: `IMPLEMENTED / SYNTHETIC GATE PASS / PRIVATE V5 PASS / LOCAL FINAL MATRIX PASS`. The work remained on `feat/r2-matching-quality`; PR #13 remains the only implementation PR and has not been merged. Migrations 0000-0004 are unchanged from reviewed starting head `f33f634eedda9835e88c50b98a81e886ff2de14e`.
+
+Completed implementation:
+
+- replaced self-referential score metadata with 12 executable fictional scenarios that build profiles, R2A evidence, bindings, commute inputs, and duplicate identities, then execute production R2 eligibility/scoring/comparison plus database duplicate persistence;
+- added real weight/eligibility mutation detection, independent determinism, actual-scorer monotonicity/ablation/bounds, stale/current, zero-contribution, and review/ineligible recommendation regressions;
+- introduced a closed versioned calibration context and durable run binding; current state remains `UNCALIBRATED`, while a threshold-qualified stored run can represent `CALIBRATED` without rewriting history;
+- added transactional `0005_r2_matching_quality_hardening.sql`, preserving v4 rows and adding calibration context/run columns plus a complete algorithm identity tuple and SQL recommendation checks;
+- updated repository identity/idempotency so independent eligibility-engine, scorer, weight, or calibration-context changes append a new immutable evaluation and stale the older current row;
+- rebuilt duplicate inputs from each source observation's earliest bound immutable job version, added deterministic duplicate-resolution digests, and made new evidence or decisions stale queue/packet readiness without rewriting owner decision history;
+- chose explicit packet workflow A: the owner first records CURRENT PREPARING, and packet preparation requires its exact current job/profile/R2 evaluation/evidence/coverage/duplicate binding;
+- connected R2A commute distance/time field evidence to the scorer without unit conversion, added verified time-basis modelling for legal fortnight limits, and made unresolved temporal applicability review-required;
+- changed only a corrected UNKNOWN family to PARTIAL while preserving all unparsed spans and unrelated UNKNOWN families; and
+- independently enforced fit/eligibility coverage, calibration-run, and recommendation invariants at the repository and SQLite boundaries.
+
+Pre-private synthetic validation passed: `npm.cmd run format:check`; `npm.cmd run lint` with zero warnings; `npm.cmd run typecheck`; 285 unit tests in 41 files; 21 integration tests in 3 files; production build with 31/31 static-page generation; 22 serialized fictional E2E tests; full and production npm audits with zero vulnerabilities; privacy audit (`tracked_files=248`, `history_paths_checked=605`, `history_blobs_checked=606`, `build_test_artifacts_checked=1100`, 11 canaries); `git diff --check`; and `git fsck --strict`. Focused hardening coverage was 45 tests across six files before the full run. The first E2E run passed 21/22 and truthfully displayed queue freshness `STALE` after an earlier shared-database import created new duplicate evidence; the old assertion required `CURRENT`. The seed was bound to the production duplicate-resolution digest and the UI assertion now accepts the truthful current-or-stale state; the complete rerun passed 22/22. No product failure was waived.
+
+Private acceptance: ApplyPilot-owned writers were already stopped. The private profile validated, and profile/database/private/vacancy paths remained ignored and untracked. Preflight reported schema v4, one pending migration, integrity `PASS`, zero FK issues, one job, four job versions, two legacy evaluations, one R2 evaluation, four document artifacts, two packets, one calibration run, and two R2 audit events. Verified ignored v4 backups `backup-2026-09-09T23-37-56.962Z-061ba74d` and `backup-2026-09-09T23-37-58.339Z-e47f7bd3` preceded migration. Migration 0005 completed at schema v5 with zero pending migrations, integrity `PASS`, zero FK issues, and exact preservation of every pre-migration count and historical R2 evaluation projection.
+
+One approved local-only R2 reevaluation then created verified ignored v5 backup `backup-2026-09-09T23-38-33.239Z-296f279f` and appended one new current evaluation plus calibration aggregate. Safe result: `REVIEW_REQUIRED`, recommended `NO`, 71% coverage, 3 material unknowns, 3 material conditions, 0 conflicts, `LOW_PRIORITY`, `UNCALIBRATED`, 0 private reviewed labels, 0 role families, and 0 represented statuses. Post-run totals are two legacy evaluations, two R2 evaluations, two calibration runs, four R2 audit events, four preserved job versions, four stale historical documents, and two invalidated historical packets; integrity remains `PASS` with zero FK issues. No parser, rule, weight, or threshold was tuned. Real source calls, employer-form visits, uploads, submissions, document generation, and packet preparation were all 0.
+
+Final-tree local verification passed all required commands: `npm.cmd run format:check`; `npm.cmd run lint` with zero warnings; `npm.cmd run typecheck`; `npm.cmd test` with 288 tests in 41 files; `npm.cmd run test:integration` with 21 tests in three files; `npm.cmd run build` with successful compilation and 31/31 static-page generation; `npm.cmd run test:e2e` with 22 tests; `npm.cmd audit` and `npm.cmd run audit:production` with zero vulnerabilities; `npm.cmd run privacy:audit` with 11 private canaries; `npm.cmd run doctor`; `npm.cmd run db:status`; `npm.cmd run quality`; `npm.cmd run preflight`; `npm.cmd run release:check`; `git diff --check`; and `git fsck --strict`. Release status remains schema v5, zero pending migrations, integrity `PASS`, zero FK issues, Manual-intake Personal Beta `READY`, Source-enabled Personal Beta `WAITING_FOR_APPROVED_TENANT`, Personal Live V1 `NOT_READY`, and real runner `TARGET_APPROVAL_REQUIRED`.
+
+The remaining release mechanics are to commit this coherent delta, repeat the exact matrix on that unchanged committed tree, push only the same branch, update the existing PR #13 body, require exact-head push and pull-request CI success, and stop with PR #13 open/unmerged for ChatGPT review. Real source calls, employer-form visits, external uploads, submissions, document generation, packet preparation, and all other real application actions remain 0.

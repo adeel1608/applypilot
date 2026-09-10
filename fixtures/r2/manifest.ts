@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ObservationIdentitySchema } from "@applypilot/job-normalizer";
+
 export const R2GoldenBandSchema = z.enum([
   "STRONG_REVIEW",
   "POSSIBLE_REVIEW",
@@ -7,31 +9,63 @@ export const R2GoldenBandSchema = z.enum([
   "DO_NOT_RECOMMEND",
 ]);
 
-export const R2GoldenCaseSchema = z.object({
-  id: z.string().min(1),
-  roleFamily: z.string().min(1),
-  title: z.string().min(1),
-  company: z.string().min(1),
-  location: z.string().min(1),
-  expectedEligibility: z.enum(["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"]),
-  expectedBand: R2GoldenBandSchema,
-  expectedDuplicate: z.enum(["DISTINCT", "SUGGESTED", "LINKED", "REJECTED", "SPLIT"]),
-  materialStates: z.array(
-    z.enum([
-      "VERIFIED_MATCH",
-      "VERIFIED_MISMATCH",
-      "UNKNOWN",
-      "CONDITIONAL",
-      "CONFLICTING",
-      "STALE",
-      "SPARSE_COVERAGE",
-      "DUPLICATE_AMBIGUITY",
-    ]),
-  ),
-  expectedScore: z.number().int().min(0).max(100),
-});
+export const R2GoldenScenarioSchema = z.enum([
+  "VERIFIED_DISTANCE_MATCH",
+  "UNKNOWN_REQUIREMENT",
+  "CONDITIONAL_REQUIREMENT",
+  "VEHICLE_MISMATCH",
+  "VERIFIED_SKILLS",
+  "STALE_BINDING",
+  "CONFLICTING_REQUIREMENT",
+  "SPARSE_COVERAGE",
+  "UNKNOWN_WORK_RIGHTS",
+  "LICENCE_MISMATCH",
+  "VERIFIED_TIME_MATCH",
+  "DUPLICATE_AMBIGUITY",
+]);
+
+export const R2GoldenCaseSchema = z
+  .object({
+    id: z.string().min(1),
+    roleFamily: z.string().min(1),
+    title: z.string().min(1),
+    company: z.string().min(1),
+    location: z.string().min(1),
+    scenario: R2GoldenScenarioSchema,
+    verifiedSignalCount: z.number().int().min(0).max(20),
+    expectedEligibility: z.enum(["ELIGIBLE", "REVIEW_REQUIRED", "INELIGIBLE"]),
+    expectedBand: R2GoldenBandSchema,
+    expectedRecommendation: z.boolean(),
+    expectedDuplicate: z.enum(["DISTINCT", "SUGGESTED", "LINKED", "REJECTED", "SPLIT"]),
+    expectedContributions: z.array(
+      z.object({
+        code: z.string().min(1),
+        direction: z.enum(["POSITIVE", "NEGATIVE", "ZERO"]),
+      }),
+    ),
+    materialStates: z.array(
+      z.enum([
+        "VERIFIED_MATCH",
+        "VERIFIED_MISMATCH",
+        "UNKNOWN",
+        "CONDITIONAL",
+        "CONFLICTING",
+        "STALE",
+        "SPARSE_COVERAGE",
+        "DUPLICATE_AMBIGUITY",
+      ]),
+    ),
+    duplicateObservations: z
+      .object({ left: ObservationIdentitySchema, right: ObservationIdentitySchema })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 export type R2GoldenCase = z.infer<typeof R2GoldenCaseSchema>;
+
+const skillMatch = { code: "R2_REQUIRED_SKILL_VERIFIED_MATCH", direction: "POSITIVE" } as const;
+const skillZero = { code: "R2_REQUIRED_SKILL_VERIFIED_MATCH", direction: "ZERO" } as const;
 
 export const r2GoldenCorpus: R2GoldenCase[] = [
   {
@@ -40,11 +74,17 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Weekend Venue Host",
     company: "Lantern Table Group",
     location: "Carlton VIC 3053",
+    scenario: "VERIFIED_DISTANCE_MATCH",
+    verifiedSignalCount: 10,
     expectedEligibility: "ELIGIBLE",
     expectedBand: "STRONG_REVIEW",
+    expectedRecommendation: true,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [
+      skillMatch,
+      { code: "R2_COMMUTE_DISTANCE_VERIFIED_MATCH", direction: "POSITIVE" },
+    ],
     materialStates: ["VERIFIED_MATCH"],
-    expectedScore: 78,
   },
   {
     id: "retail-unknown-roster",
@@ -52,11 +92,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Store Team Assistant",
     company: "Southern Shelf Co",
     location: "Geelong VIC 3220",
+    scenario: "UNKNOWN_REQUIREMENT",
+    verifiedSignalCount: 0,
     expectedEligibility: "REVIEW_REQUIRED",
-    expectedBand: "POSSIBLE_REVIEW",
+    expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillZero],
     materialStates: ["UNKNOWN"],
-    expectedScore: 54,
   },
   {
     id: "admin-conditional-certificate",
@@ -64,11 +107,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Reception Coordinator",
     company: "Civic Lantern Services",
     location: "Canberra ACT 2601",
+    scenario: "CONDITIONAL_REQUIREMENT",
+    verifiedSignalCount: 0,
     expectedEligibility: "REVIEW_REQUIRED",
     expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillZero],
     materialStates: ["CONDITIONAL"],
-    expectedScore: 38,
   },
   {
     id: "warehouse-vehicle-mismatch",
@@ -76,11 +122,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Dispatch Worker",
     company: "Paper Crane Logistics",
     location: "Brisbane QLD 4000",
+    scenario: "VEHICLE_MISMATCH",
+    verifiedSignalCount: 2,
     expectedEligibility: "INELIGIBLE",
     expectedBand: "DO_NOT_RECOMMEND",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillMatch],
     materialStates: ["VERIFIED_MISMATCH"],
-    expectedScore: 26,
   },
   {
     id: "engineering-verified",
@@ -88,11 +137,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Graduate Controls Engineer",
     company: "Kestrel Circuit Works",
     location: "Adelaide SA 5000",
+    scenario: "VERIFIED_SKILLS",
+    verifiedSignalCount: 11,
     expectedEligibility: "ELIGIBLE",
     expectedBand: "STRONG_REVIEW",
+    expectedRecommendation: true,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillMatch],
     materialStates: ["VERIFIED_MATCH"],
-    expectedScore: 84,
   },
   {
     id: "robotics-stale-evaluation",
@@ -100,11 +152,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Robotics Test Intern",
     company: "Harbour Motion Lab",
     location: "Hobart TAS 7000",
+    scenario: "STALE_BINDING",
+    verifiedSignalCount: 9,
     expectedEligibility: "REVIEW_REQUIRED",
-    expectedBand: "POSSIBLE_REVIEW",
+    expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillZero],
     materialStates: ["STALE"],
-    expectedScore: 61,
   },
   {
     id: "automation-conflict",
@@ -112,11 +167,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Automation Support Trainee",
     company: "Copper Relay Systems",
     location: "Sydney NSW 2000",
+    scenario: "CONFLICTING_REQUIREMENT",
+    verifiedSignalCount: 0,
     expectedEligibility: "REVIEW_REQUIRED",
     expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillZero],
     materialStates: ["CONFLICTING"],
-    expectedScore: 34,
   },
   {
     id: "embedded-sparse",
@@ -124,11 +182,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Embedded Systems Apprentice",
     company: "Northern Signal Studio",
     location: "Darwin NT 0800",
+    scenario: "SPARSE_COVERAGE",
+    verifiedSignalCount: 3,
     expectedEligibility: "REVIEW_REQUIRED",
     expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillMatch],
     materialStates: ["SPARSE_COVERAGE"],
-    expectedScore: 31,
   },
   {
     id: "internship-work-rights",
@@ -136,11 +197,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Software Engineering Intern",
     company: "Westward Code Works",
     location: "Perth WA 6000",
+    scenario: "UNKNOWN_WORK_RIGHTS",
+    verifiedSignalCount: 7,
     expectedEligibility: "REVIEW_REQUIRED",
     expectedBand: "POSSIBLE_REVIEW",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillMatch],
     materialStates: ["UNKNOWN"],
-    expectedScore: 49,
   },
   {
     id: "licensed-role-mismatch",
@@ -148,11 +212,14 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Community Health Practitioner",
     company: "West Arc Health Collective",
     location: "Perth WA 6000",
+    scenario: "LICENCE_MISMATCH",
+    verifiedSignalCount: 2,
     expectedEligibility: "INELIGIBLE",
     expectedBand: "DO_NOT_RECOMMEND",
+    expectedRecommendation: false,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [skillMatch],
     materialStates: ["VERIFIED_MISMATCH"],
-    expectedScore: 18,
   },
   {
     id: "remote-verified",
@@ -160,11 +227,17 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Remote Customer Support Associate",
     company: "Cloud Wattle Services",
     location: "Remote Australia",
+    scenario: "VERIFIED_TIME_MATCH",
+    verifiedSignalCount: 7,
     expectedEligibility: "ELIGIBLE",
     expectedBand: "POSSIBLE_REVIEW",
+    expectedRecommendation: true,
     expectedDuplicate: "DISTINCT",
+    expectedContributions: [
+      skillMatch,
+      { code: "R2_COMMUTE_TIME_VERIFIED_MATCH", direction: "POSITIVE" },
+    ],
     materialStates: ["VERIFIED_MATCH"],
-    expectedScore: 64,
   },
   {
     id: "multi-location-duplicate-ambiguity",
@@ -172,11 +245,44 @@ export const r2GoldenCorpus: R2GoldenCase[] = [
     title: "Service Desk Associate",
     company: "Blue Gum Retail",
     location: "Melbourne VIC or Geelong VIC",
+    scenario: "DUPLICATE_AMBIGUITY",
+    verifiedSignalCount: 0,
     expectedEligibility: "REVIEW_REQUIRED",
     expectedBand: "LOW_PRIORITY",
+    expectedRecommendation: false,
     expectedDuplicate: "SUGGESTED",
+    expectedContributions: [skillZero],
     materialStates: ["DUPLICATE_AMBIGUITY", "CONFLICTING"],
-    expectedScore: 40,
+    duplicateObservations: {
+      left: {
+        observationId: "golden-observation-left",
+        source: "GREENHOUSE",
+        tenant: "blue-gum",
+        externalId: "greenhouse-100",
+        applicationUrl: "https://careers.example.test/apply/service-desk",
+        requisitionId: "REQ-GOLDEN-100",
+        company: "Blue Gum Retail",
+        title: "Service Desk Associate",
+        location: "Melbourne VIC or Geelong VIC",
+        employmentType: "PART_TIME",
+        datePosted: "2026-09-01T00:00:00.000Z",
+        description: "Provide fictional service desk support.",
+      },
+      right: {
+        observationId: "golden-observation-right",
+        source: "LEVER",
+        tenant: "blue-gum-lever",
+        externalId: "lever-200",
+        applicationUrl: "https://careers.example.test/apply/service-desk",
+        requisitionId: "REQ-GOLDEN-100",
+        company: "Blue Gum Retail",
+        title: "Service Desk Associate",
+        location: "Melbourne VIC or Geelong VIC",
+        employmentType: "PART_TIME",
+        datePosted: "2026-09-01T00:00:00.000Z",
+        description: "Provide fictional service desk support.",
+      },
+    },
   },
 ];
 

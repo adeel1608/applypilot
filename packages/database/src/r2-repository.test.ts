@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,7 +8,7 @@ import BetterSqlite3 from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
-import { scoreR2JobFit } from "@applypilot/fit-scorer";
+import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit } from "@applypilot/fit-scorer";
 import {
   r2FieldEvidence,
   r2RequirementEvidence,
@@ -19,6 +20,7 @@ import {
   restoreDatabase,
 } from "../../../scripts/lib/database-maintenance";
 import { fixtureJob, testProfile } from "../../../tests/fixture-data";
+import { r2GoldenCorpus } from "../../../fixtures/r2/manifest";
 
 import { BetaRepository } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
@@ -100,6 +102,7 @@ function setup() {
     "0002_personal_live_beta_core.sql",
     "0003_r2a_evidence_normalization.sql",
     "0004_r2_matching_quality.sql",
+    "0005_r2_matching_quality_hardening.sql",
   ]) {
     sqlite.exec(migration(name));
   }
@@ -121,7 +124,57 @@ function currentEvaluation(normalization: ReturnType<typeof r2TestNormalization>
     },
     evaluatedAt: now,
   });
-  return { eligibility, fit: scoreR2JobFit({ profile: testProfile, normalization, eligibility }) };
+  return {
+    eligibility,
+    fit: scoreR2JobFit({
+      profile: testProfile,
+      normalization,
+      eligibility,
+      calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT,
+    }),
+  };
+}
+
+function recommendedNormalization() {
+  return r2TestNormalization({
+    fields: [
+      r2FieldEvidence("work-type", "EMPLOYMENT", {
+        kind: "EMPLOYMENT_TYPE",
+        value: "PART_TIME",
+      }),
+      r2FieldEvidence("location", "GEOGRAPHY", {
+        kind: "LOCATION",
+        value: {
+          rawLabel: "Melbourne VIC",
+          locality: "Melbourne",
+          suburb: "Melbourne",
+          stateOrTerritory: "VIC",
+          postcode: null,
+          countryCode: "AU",
+          workplaceType: "ON_SITE",
+          remoteScope: "UNKNOWN",
+        },
+      }),
+      r2FieldEvidence("schedule", "SCHEDULE", {
+        kind: "SCHEDULE",
+        value: {
+          days: ["MONDAY"],
+          startTime: "10:00",
+          endTime: "12:00",
+          rosterType: "FIXED",
+          overnight: false,
+          timezone: "Australia/Melbourne",
+          exceptions: [],
+        },
+      }),
+    ],
+    requirements: ["Customer service", "Communication", "Teamwork"].map((value, index) =>
+      r2RequirementEvidence(`skill-${index}`, "SKILLS", "SKILL", {
+        kind: "TEXT",
+        value,
+      }),
+    ),
+  });
 }
 
 afterEach(async () => {
@@ -130,7 +183,7 @@ afterEach(async () => {
 });
 
 describe("R2 persistence", () => {
-  it("backs up schema v3, migrates additively to v4, preserves history, and restores", async () => {
+  it("backs up schema v3, migrates through v4 to v5, preserves history, and restores", async () => {
     const root = await mkdtemp(join(tmpdir(), "applypilot-r2-"));
     roots.push(root);
     const databasePath = join(root, "data", "applypilot.sqlite");
@@ -167,6 +220,8 @@ describe("R2 persistence", () => {
     sqlite = new BetterSqlite3(databasePath);
     sqlite.exec(migration("0004_r2_matching_quality.sql"));
     expect(sqlite.pragma("user_version", { simple: true })).toBe(4);
+    sqlite.exec(migration("0005_r2_matching_quality_hardening.sql"));
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(5);
     expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     expect({
@@ -198,6 +253,159 @@ describe("R2 persistence", () => {
     });
     expect(restored.restored.schemaVersion).toBe(3);
     expect(inspectDatabase(databasePath).tableCounts.jobs).toBe(historical.jobs);
+  });
+
+  it("backs up a v4 database, verifies v5, and restores the exact v4 snapshot", async () => {
+    const root = await mkdtemp(join(tmpdir(), "applypilot-r2-v4-"));
+    roots.push(root);
+    const databasePath = join(root, "data", "applypilot.sqlite");
+    const backupRoot = join(root, "data", "private", "backups");
+    await mkdir(backupRoot, { recursive: true });
+    let sqlite = new BetterSqlite3(databasePath);
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+    ]) {
+      sqlite.exec(migration(name));
+    }
+    seedBase(sqlite);
+    sqlite.close();
+    const backup = await createDatabaseBackup({
+      databasePath,
+      backupRoot,
+      now: new Date(now),
+      randomSuffix: "b4c5d6e7",
+    });
+    expect(backup.schemaVersion).toBe(4);
+
+    sqlite = new BetterSqlite3(databasePath);
+    sqlite.exec(migration("0005_r2_matching_quality_hardening.sql"));
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(5);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+
+    const restored = await restoreDatabase({
+      databasePath,
+      backupRoot,
+      backupId: backup.backupId,
+      confirmation: `RESTORE:${backup.backupId}`,
+      now: new Date("2026-09-09T00:02:00.000Z"),
+    });
+    expect(restored.restored.schemaVersion).toBe(4);
+    expect(inspectDatabase(databasePath)).toMatchObject({
+      schemaVersion: 4,
+      integrity: "PASS",
+      foreignKeyIssues: 0,
+    });
+  });
+
+  it("migrates an existing populated v4 evaluation to v5 without changing its history", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    databases.push(sqlite);
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+    ]) {
+      sqlite.exec(migration(name));
+    }
+    const { job } = seedBase(sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_evaluation_versions
+          (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
+           normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
+           fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
+           weight_version,calibration_state,recommended,coverage_percent,unresolved_unknown_count,
+           unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
+         VALUES ('r2-evaluation-v4',?,'job-version-current','profile-version-current','3.1.0',
+           '3.1.0','3.1.0:3.1.0','ELIGIBLE','[]',50,'[]','2.0.0','2.0.0',
+           'r2-weights-1','UNCALIBRATED',1,100,0,0,0,0,?)`,
+      )
+      .run(job.id, now);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_queue_decision_versions
+          (id,job_id,version,state,freshness,job_version_id,profile_version_id,r2_evaluation_id,
+           evidence_contract_version,duplicate_resolution_version,coverage_version,actor,
+           reason_code,supersedes_decision_id,created_at)
+         VALUES ('r2-queue-v4',?,1,'REVIEWING','CURRENT','job-version-current',
+           'profile-version-current','r2-evaluation-v4','3.1.0','r2-duplicate-1:none',
+           '3.1.0:3.1.0','OWNER','OWNER_REVIEWING',NULL,?)`,
+      )
+      .run(job.id, now);
+    const before = sqlite.prepare("SELECT * FROM r2_evaluation_versions").get() as Record<
+      string,
+      unknown
+    >;
+
+    sqlite.exec(migration("0005_r2_matching_quality_hardening.sql"));
+
+    const after = sqlite.prepare("SELECT * FROM r2_evaluation_versions").get() as Record<
+      string,
+      unknown
+    >;
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(5);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    expect(after).toMatchObject(before);
+    expect(after).toMatchObject({
+      calibration_context_version: "legacy-v4:uncalibrated",
+      calibration_run_id: null,
+    });
+    expect(sqlite.prepare("SELECT count(*) FROM r2_queue_decision_versions").pluck().get()).toBe(1);
+  });
+
+  it("rolls back the v5 replacement when an incompatible v4 row cannot be copied", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    databases.push(sqlite);
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+    ]) {
+      sqlite.exec(migration(name));
+    }
+    const { job } = seedBase(sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_evaluation_versions
+          (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
+           normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
+           fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
+           weight_version,calibration_state,recommended,coverage_percent,unresolved_unknown_count,
+           unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
+         VALUES ('incompatible-v4',?,'job-version-current','profile-version-current','3.1.0',
+           '3.1.0','3.1.0:3.1.0','REVIEW_REQUIRED','[]',100,'[]','2.0.0','2.0.0',
+           'r2-weights-1','UNCALIBRATED',1,100,0,0,0,0,?)`,
+      )
+      .run(job.id, now);
+
+    expect(() => sqlite.exec(migration("0005_r2_matching_quality_hardening.sql"))).toThrow();
+    expect(sqlite.inTransaction).toBe(true);
+    sqlite.exec("ROLLBACK; PRAGMA foreign_keys = ON;");
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(4);
+    expect(sqlite.prepare("SELECT id FROM r2_evaluation_versions").pluck().get()).toBe(
+      "incompatible-v4",
+    );
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) FROM pragma_table_info('r2_evaluation_versions') WHERE name = 'calibration_context_version'",
+        )
+        .pluck()
+        .get(),
+    ).toBe(0);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
   });
 
   it("persists one immutable idempotent evaluation and rejects unsafe audit metadata", () => {
@@ -234,6 +442,170 @@ describe("R2 persistence", () => {
         nested: { token: "secret" },
       }),
     ).toThrow();
+  });
+
+  it("keys immutable evaluations by every algorithm and calibration identity input", () => {
+    const { sqlite, job, normalization } = setup();
+    const repository = new R2Repository(sqlite, () => new Date(now));
+    const initial = currentEvaluation(normalization);
+    const record = (eligibility: typeof initial.eligibility, fit: typeof initial.fit) =>
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility,
+        fit,
+      });
+
+    const first = record(initial.eligibility, initial.fit);
+    expect(record(initial.eligibility, initial.fit)).toEqual({ id: first.id, created: false });
+    const eligibilityUpgrade = {
+      ...initial.eligibility,
+      engineVersion: "2.0.1",
+    };
+    expect(record(eligibilityUpgrade, initial.fit).created).toBe(true);
+    const scorerUpgrade = {
+      ...initial.fit,
+      scorerVersion: "2.0.1",
+      calibrationContextVersion: "r2-calibration-context-1:scorer-upgrade",
+      contributions: initial.fit.contributions.map((item) => ({
+        ...item,
+        scorerVersion: "2.0.1",
+      })),
+    };
+    expect(record(initial.eligibility, scorerUpgrade).created).toBe(true);
+    const weightUpgrade = {
+      ...initial.fit,
+      weightVersion: "r2-weights-2",
+      calibrationContextVersion: "r2-calibration-context-1:weight-upgrade",
+      contributions: initial.fit.contributions.map((item) => ({
+        ...item,
+        weightVersion: "r2-weights-2",
+      })),
+    };
+    expect(record(initial.eligibility, weightUpgrade).created).toBe(true);
+    const calibrationUpgrade = {
+      ...initial.fit,
+      calibrationContextVersion: "r2-calibration-context-2:unreviewed",
+    };
+    expect(record(initial.eligibility, calibrationUpgrade).created).toBe(true);
+
+    expect(sqlite.prepare("SELECT count(*) FROM r2_evaluation_versions").pluck().get()).toBe(5);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_evaluation_versions WHERE stale = 0").pluck().get(),
+    ).toBe(1);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_evaluation_versions WHERE stale = 1").pluck().get(),
+    ).toBe(4);
+  });
+
+  it("rejects impossible recommendation states at both repository and SQL boundaries", () => {
+    const { sqlite, job, normalization } = setup();
+    const repository = new R2Repository(sqlite, () => new Date(now));
+    const result = currentEvaluation(normalization);
+    expect(() =>
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility: {
+          ...result.eligibility,
+          status: "REVIEW_REQUIRED",
+          unresolvedMaterialUnknowns: 1,
+        },
+        fit: {
+          ...result.fit,
+          recommended: true,
+          recommendationBlockers: [],
+        },
+      }),
+    ).toThrow("R2_RECOMMENDATION_INVARIANT_VIOLATION");
+    expect(() =>
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility: { ...result.eligibility, current: false },
+        fit: { ...result.fit, recommended: true, recommendationBlockers: [] },
+      }),
+    ).toThrow("R2_EVALUATION_BINDING_STALE");
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO r2_evaluation_versions
+            (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
+             normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
+             fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
+             weight_version,calibration_state,calibration_context_version,calibration_run_id,
+             recommended,coverage_percent,unresolved_unknown_count,unresolved_condition_count,
+             unresolved_conflict_count,stale,evaluated_at)
+           VALUES ('invalid-recommendation',?,'job-version-current','profile-version-current',
+             '3.1.0','3.1.0','3.1.0:3.1.0','REVIEW_REQUIRED','[]',100,'[]','2.0.0',
+             '2.0.0','r2-weights-1','UNCALIBRATED','context:invalid',NULL,1,100,0,0,0,0,?)`,
+        )
+        .run(job.id, now),
+    ).toThrow();
+  });
+
+  it("persists a qualified calibration context only when it binds its durable run", () => {
+    const { sqlite, job, normalization } = setup();
+    let sequence = 0;
+    const repository = new R2Repository(
+      sqlite,
+      () => new Date(now),
+      () => `calibration-id-${++sequence}`,
+    );
+    const runId = repository.recordCalibrationRun({
+      corpusVersion: "r2-golden-2",
+      scorerVersion: "2.0.0",
+      weightVersion: "r2-weights-1",
+      privateReviewedCount: 30,
+      roleFamilyCount: 4,
+      statusCount: 3,
+      metrics: {
+        total: 12,
+        ordinalAgreement: 1,
+        topK: 5,
+        topKReviewUtility: 1,
+        boundsPass: true,
+        calibrationState: "CALIBRATED",
+      },
+    });
+    const result = currentEvaluation(normalization);
+    const calibratedFit = {
+      ...result.fit,
+      calibrationState: "CALIBRATED" as const,
+      calibrationContextVersion: `r2-calibration-context-1:${runId}`,
+      calibrationRunId: runId,
+    };
+    expect(
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility: result.eligibility,
+        fit: calibratedFit,
+      }).created,
+    ).toBe(true);
+    expect(
+      sqlite
+        .prepare("SELECT calibration_state, calibration_run_id FROM r2_evaluation_versions")
+        .get(),
+    ).toEqual({ calibration_state: "CALIBRATED", calibration_run_id: runId });
+    expect(() =>
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        eligibility: { ...result.eligibility, engineVersion: "2.0.1" },
+        fit: { ...calibratedFit, calibrationRunId: "missing-run" },
+      }),
+    ).toThrow("R2_CALIBRATION_RUN_BINDING_MISMATCH");
   });
 
   it("keeps ambiguous duplicate observations and owner link/split decisions immutable", () => {
@@ -319,6 +691,43 @@ describe("R2 persistence", () => {
     ).toBe(2);
   });
 
+  it("executes the golden duplicate ambiguity through production persistence", () => {
+    const { sqlite, job } = setup();
+    const fixture = r2GoldenCorpus.find(({ scenario }) => scenario === "DUPLICATE_AMBIGUITY")!;
+    const observations = fixture.duplicateObservations!;
+    const insert = sqlite.prepare(
+      `INSERT INTO source_observations
+        (id,job_id,source_record_id,source,tenant,external_id,source_url,acquisition_method,
+         content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
+         policy_version,run_id,supersedes_observation_id)
+       VALUES (?,?,NULL,?,?,?,?,'FIXTURE',?,'fixture:golden-duplicate',?,NULL,NULL,'3.1.0',NULL,NULL,NULL)`,
+    );
+    for (const identity of [observations.left, observations.right]) {
+      insert.run(
+        identity.observationId,
+        job.id,
+        identity.source,
+        identity.tenant,
+        identity.externalId,
+        identity.applicationUrl,
+        createHash("sha256").update(identity.observationId).digest("hex"),
+        now,
+      );
+    }
+    const result = new R2Repository(sqlite, () => new Date(now)).suggestDuplicate(
+      observations.left,
+      observations.right,
+    );
+    expect(result.state).toBe(fixture.expectedDuplicate);
+    expect(result.created).toBe(true);
+    expect(
+      sqlite
+        .prepare("SELECT state FROM r2_duplicate_candidates WHERE id = ?")
+        .pluck()
+        .get(result.candidateId),
+    ).toBe("SUGGESTED");
+  });
+
   it("binds queue decisions to the current evaluation and visibly stales readiness", () => {
     const { sqlite, job, normalization } = setup();
     const repository = new R2Repository(sqlite, () => new Date(now));
@@ -333,7 +742,7 @@ describe("R2 persistence", () => {
       jobId: job.id,
       state: "SHORTLISTED",
       r2EvaluationId: evaluation.id,
-      duplicateResolutionVersion: "r2-duplicate-1",
+      duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
       actor: "OWNER",
       reasonCode: "OWNER_SHORTLISTED",
     });
@@ -363,7 +772,7 @@ describe("R2 persistence", () => {
         jobId: job.id,
         state: "PREPARING",
         r2EvaluationId: evaluation.id,
-        duplicateResolutionVersion: "r2-duplicate-1",
+        duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
         actor: "OWNER",
         reasonCode: "OWNER_PREPARED",
       }),
@@ -373,45 +782,7 @@ describe("R2 persistence", () => {
 
   it("downgrades a stale PREPARING projection and preserves its immutable decision", () => {
     const { sqlite, job } = setup();
-    const normalization = r2TestNormalization({
-      fields: [
-        r2FieldEvidence("work-type", "EMPLOYMENT", {
-          kind: "EMPLOYMENT_TYPE",
-          value: "PART_TIME",
-        }),
-        r2FieldEvidence("location", "GEOGRAPHY", {
-          kind: "LOCATION",
-          value: {
-            rawLabel: "Melbourne VIC",
-            locality: "Melbourne",
-            suburb: "Melbourne",
-            stateOrTerritory: "VIC",
-            postcode: null,
-            countryCode: "AU",
-            workplaceType: "ON_SITE",
-            remoteScope: "UNKNOWN",
-          },
-        }),
-        r2FieldEvidence("schedule", "SCHEDULE", {
-          kind: "SCHEDULE",
-          value: {
-            days: ["MONDAY"],
-            startTime: "10:00",
-            endTime: "12:00",
-            rosterType: "FIXED",
-            overnight: false,
-            timezone: "Australia/Melbourne",
-            exceptions: [],
-          },
-        }),
-      ],
-      requirements: ["Customer service", "Communication", "Teamwork"].map((value, index) =>
-        r2RequirementEvidence(`skill-${index}`, "SKILLS", "SKILL", {
-          kind: "TEXT",
-          value,
-        }),
-      ),
-    });
+    const normalization = recommendedNormalization();
     const repository = new R2Repository(sqlite, () => new Date(now));
     const evaluationResult = currentEvaluation(normalization);
     expect(evaluationResult.fit.recommended).toBe(true);
@@ -426,7 +797,7 @@ describe("R2 persistence", () => {
       jobId: job.id,
       state: "PREPARING",
       r2EvaluationId: evaluation.id,
-      duplicateResolutionVersion: "r2-duplicate-1",
+      duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
       actor: "OWNER",
       reasonCode: "OWNER_PREPARED",
     });
@@ -440,6 +811,163 @@ describe("R2 persistence", () => {
         .pluck()
         .get(queue.id),
     ).toBe("PREPARING");
+  });
+
+  it("requires the exact current PREPARING decision before packet persistence", () => {
+    const { sqlite, job } = setup();
+    const normalization = recommendedNormalization();
+    const repository = new R2Repository(sqlite, () => new Date(now));
+    const result = currentEvaluation(normalization);
+    expect(result.fit.recommended).toBe(true);
+    const evaluation = repository.recordEvaluation({
+      jobId: job.id,
+      jobVersionId: "job-version-current",
+      profileVersionId: "profile-version-current",
+      normalization,
+      ...result,
+    });
+    expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).toThrow(
+      "R2_QUEUE_CURRENT_PREPARING_REQUIRED",
+    );
+    for (const state of ["REVIEWING", "SHORTLISTED"] as const) {
+      repository.recordQueueDecision({
+        jobId: job.id,
+        state,
+        r2EvaluationId: evaluation.id,
+        duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
+        actor: "OWNER",
+        reasonCode: `OWNER_${state}`,
+      });
+      expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).toThrow(
+        "R2_QUEUE_CURRENT_PREPARING_REQUIRED",
+      );
+    }
+    repository.recordQueueDecision({
+      jobId: job.id,
+      state: "PREPARING",
+      r2EvaluationId: evaluation.id,
+      duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
+      actor: "OWNER",
+      reasonCode: "OWNER_PREPARED",
+    });
+    expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).not.toThrow();
+    expect(repository.markQueueStale(job.id, "PROFILE_CHANGED")).toBe(1);
+    expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).toThrow(
+      "R2_QUEUE_CURRENT_PREPARING_REQUIRED",
+    );
+  });
+
+  it("stales PREPARING and invalidates a packet when a duplicate decision changes", () => {
+    const { sqlite, job } = setup();
+    const secondJob = { ...job, id: "job-r2-duplicate-second" };
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+          (id,title,company,category,location,employment_type,normalized_json,application_status,
+           date_discovered,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,'NEW',?,?,?)`,
+      )
+      .run(
+        secondJob.id,
+        secondJob.title,
+        secondJob.company,
+        secondJob.category,
+        secondJob.location,
+        secondJob.employmentType,
+        JSON.stringify(secondJob),
+        now,
+        now,
+        now,
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO source_observations
+          (id,job_id,source_record_id,source,tenant,external_id,source_url,acquisition_method,
+           content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
+           policy_version,run_id,supersedes_observation_id)
+         VALUES ('observation-r2-decision-second',?,NULL,'UNKNOWN',NULL,NULL,NULL,'FIXTURE',?,
+           'fixture:r2:decision-second',?,NULL,NULL,'3.1.0',NULL,NULL,NULL)`,
+      )
+      .run(secondJob.id, "e".repeat(64), now);
+    const repository = new R2Repository(sqlite, () => new Date(now));
+    const candidate = repository.suggestDuplicate(
+      {
+        observationId: "observation-r2-fixture",
+        source: "FIXTURE",
+        tenant: null,
+        externalId: null,
+        applicationUrl: "https://example.test/apply/role",
+        requisitionId: null,
+        company: job.company,
+        title: job.title,
+        location: job.location,
+        employmentType: job.employmentType,
+        datePosted: null,
+        description: job.description,
+      },
+      {
+        observationId: "observation-r2-decision-second",
+        source: "UNKNOWN",
+        tenant: null,
+        externalId: null,
+        applicationUrl: "https://example.test/apply/role",
+        requisitionId: null,
+        company: job.company,
+        title: job.title,
+        location: job.location,
+        employmentType: job.employmentType,
+        datePosted: null,
+        description: job.description,
+      },
+    );
+    repository.decideDuplicate({
+      candidateId: candidate.candidateId!,
+      decision: "REJECTED",
+      reasonCode: "OWNER_CONFIRMED_DISTINCT",
+      evidenceVersion: "r2-duplicate-1",
+    });
+    const normalization = recommendedNormalization();
+    const evaluation = repository.recordEvaluation({
+      jobId: job.id,
+      jobVersionId: "job-version-current",
+      profileVersionId: "profile-version-current",
+      normalization,
+      ...currentEvaluation(normalization),
+    });
+    repository.recordQueueDecision({
+      jobId: job.id,
+      state: "PREPARING",
+      r2EvaluationId: evaluation.id,
+      duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
+      actor: "OWNER",
+      reasonCode: "OWNER_PREPARED",
+    });
+    sqlite
+      .prepare(
+        `INSERT INTO application_packets
+          (id,job_id,job_version_id,profile_version_id,evaluation_version_id,target_url,target_host,
+           status,readiness_json,version,created_at,updated_at)
+         VALUES ('packet:r2:duplicate',?,'job-version-current','profile-version-current',NULL,
+           NULL,NULL,'READY_TO_APPLY','{}',1,?,?)`,
+      )
+      .run(job.id, now, now);
+
+    repository.decideDuplicate({
+      candidateId: candidate.candidateId!,
+      decision: "LINKED",
+      reasonCode: "OWNER_CONFIRMED_TARGET",
+      evidenceVersion: "r2-duplicate-1",
+    });
+
+    expect(
+      sqlite
+        .prepare("SELECT freshness FROM r2_queue_decision_versions ORDER BY version DESC LIMIT 1")
+        .pluck()
+        .get(),
+    ).toBe("STALE");
+    expect(sqlite.prepare("SELECT status FROM application_packets").pluck().get()).toBe(
+      "INVALIDATED",
+    );
   });
 
   it("invalidates current documents, approvals, and packets when an R2 evaluation changes", () => {

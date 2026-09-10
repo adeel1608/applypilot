@@ -7,7 +7,35 @@ export const R2OrdinalBandSchema = z.enum([
   "DO_NOT_RECOMMEND",
 ]);
 
+export const R2CalibrationStateSchema = z.enum([
+  "UNCALIBRATED",
+  "CALIBRATION_PENDING",
+  "CALIBRATED",
+]);
+
+export const R2CalibrationContextSchema = z
+  .object({
+    version: z.string().min(1).max(200),
+    state: R2CalibrationStateSchema,
+    scorerVersion: z.string().min(1).max(100),
+    weightVersion: z.string().min(1).max(100),
+    corpusVersion: z.string().min(1).max(100),
+    runId: z.string().min(1).max(200).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.state === "CALIBRATED" && value.runId === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["runId"],
+        message: "a calibrated context must bind a durable calibration run",
+      });
+    }
+  });
+
 export type R2OrdinalBand = z.infer<typeof R2OrdinalBandSchema>;
+export type R2CalibrationContext = z.infer<typeof R2CalibrationContextSchema>;
+export type R2CalibrationState = z.infer<typeof R2CalibrationStateSchema>;
 
 export interface R2GoldenObservation {
   id: string;
@@ -28,9 +56,8 @@ export interface R2GoldenMetrics {
   ordinalAgreement: number;
   topK: number;
   topKReviewUtility: number;
-  deterministic: true;
   boundsPass: boolean;
-  calibrationState: "CALIBRATED" | "UNCALIBRATED";
+  calibrationState: R2CalibrationState;
 }
 
 export function r2OrdinalBand(
@@ -52,6 +79,24 @@ export function r2CalibrationState(input: R2CalibrationGateInput): "CALIBRATED" 
     statuses.has("INELIGIBLE")
     ? "CALIBRATED"
     : "UNCALIBRATED";
+}
+
+export function createR2CalibrationContext(input: {
+  version: string;
+  scorerVersion: string;
+  weightVersion: string;
+  corpusVersion: string;
+  runId: string | null;
+  gate: R2CalibrationGateInput;
+}): R2CalibrationContext {
+  return R2CalibrationContextSchema.parse({
+    version: input.version,
+    state: r2CalibrationState(input.gate),
+    scorerVersion: input.scorerVersion,
+    weightVersion: input.weightVersion,
+    corpusVersion: input.corpusVersion,
+    runId: input.runId,
+  });
 }
 
 export function evaluateR2GoldenRanking(
@@ -79,7 +124,6 @@ export function evaluateR2GoldenRanking(
     ordinalAgreement: observations.length === 0 ? 1 : agreement / observations.length,
     topK: selected.length,
     topKReviewUtility: selected.length === 0 ? 1 : useful / selected.length,
-    deterministic: true,
     boundsPass: observations.every(({ score }) => score >= 0 && score <= 100),
     calibrationState: r2CalibrationState(gate),
   };

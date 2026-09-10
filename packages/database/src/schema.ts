@@ -542,6 +542,22 @@ export const jobQueueEntries = sqliteTable("job_queue_entries", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const r2CalibrationRuns = sqliteTable("r2_calibration_runs", {
+  id: text("id").primaryKey(),
+  scorerVersion: text("scorer_version").notNull(),
+  weightVersion: text("weight_version").notNull(),
+  corpusVersion: text("corpus_version").notNull(),
+  fictionalCaseCount: integer("fictional_case_count").notNull(),
+  privateReviewedCount: integer("private_reviewed_count").notNull(),
+  roleFamilyCount: integer("role_family_count").notNull(),
+  statusCount: integer("status_count").notNull(),
+  ordinalAgreementBasisPoints: integer("ordinal_agreement_basis_points").notNull(),
+  topK: integer("top_k").notNull(),
+  topKUtilityBasisPoints: integer("top_k_utility_basis_points").notNull(),
+  state: text("state").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const r2EvaluationVersions = sqliteTable("r2_evaluation_versions", {
   id: text("id").primaryKey(),
   jobId: text("job_id")
@@ -564,6 +580,10 @@ export const r2EvaluationVersions = sqliteTable("r2_evaluation_versions", {
   fitScorerVersion: text("fit_scorer_version").notNull(),
   weightVersion: text("weight_version").notNull(),
   calibrationState: text("calibration_state").notNull(),
+  calibrationContextVersion: text("calibration_context_version").notNull(),
+  calibrationRunId: text("calibration_run_id").references(() => r2CalibrationRuns.id, {
+    onDelete: "restrict",
+  }),
   recommended: integer("recommended", { mode: "boolean" }).notNull(),
   coveragePercent: integer("coverage_percent").notNull(),
   unresolvedUnknownCount: integer("unresolved_unknown_count").notNull(),
@@ -643,22 +663,6 @@ export const r2CorrectionOverlayBindings = sqliteTable("r2_correction_overlay_bi
   sourceValueDigest: text("source_value_digest").notNull(),
   correctedValueJson: text("corrected_value_json").notNull(),
   applicabilityRuleVersion: text("applicability_rule_version").notNull(),
-  createdAt: text("created_at").notNull(),
-});
-
-export const r2CalibrationRuns = sqliteTable("r2_calibration_runs", {
-  id: text("id").primaryKey(),
-  scorerVersion: text("scorer_version").notNull(),
-  weightVersion: text("weight_version").notNull(),
-  corpusVersion: text("corpus_version").notNull(),
-  fictionalCaseCount: integer("fictional_case_count").notNull(),
-  privateReviewedCount: integer("private_reviewed_count").notNull(),
-  roleFamilyCount: integer("role_family_count").notNull(),
-  statusCount: integer("status_count").notNull(),
-  ordinalAgreementBasisPoints: integer("ordinal_agreement_basis_points").notNull(),
-  topK: integer("top_k").notNull(),
-  topKUtilityBasisPoints: integer("top_k_utility_basis_points").notNull(),
-  state: text("state").notNull(),
   createdAt: text("created_at").notNull(),
 });
 

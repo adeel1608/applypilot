@@ -20,7 +20,11 @@ import {
   type CoverLetterTone,
 } from "@applypilot/cover-letter-engine";
 import { evaluateR2Eligibility, type R2EligibilityReason } from "@applypilot/eligibility-engine";
-import { scoreR2JobFit, type R2FitContribution } from "@applypilot/fit-scorer";
+import {
+  R2_UNREVIEWED_CALIBRATION_CONTEXT,
+  scoreR2JobFit,
+  type R2FitContribution,
+} from "@applypilot/fit-scorer";
 import { normalizeAustralianLocation } from "@applypilot/job-importer";
 import {
   R2ARepository,
@@ -776,6 +780,7 @@ export async function reevaluateBetaJob(jobId: string): Promise<string> {
     profile: resolution.profile,
     normalization,
     eligibility,
+    calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT,
     commute: {
       distanceKm: job.estimatedCommuteKm,
       durationMinutes: job.estimatedCommuteMinutes ?? null,
@@ -981,25 +986,11 @@ export function setBetaQueueState(
   if (!detail || !beta) throw new Error("BETA_JOB_NOT_FOUND");
   const r2 = getR2Repository();
   if (r2 && detail.evaluationVersionId) {
-    const sqlite = betaSqlite();
-    if (!sqlite) throw new Error("BETA_DATABASE_NOT_READY");
-    const resolution = sqlite
-      .prepare(
-        `SELECT COALESCE(
-           (SELECT 'r2-duplicate-1:decision-' || MAX(d.version)
-              FROM r2_duplicate_decision_versions d
-              JOIN r2_duplicate_candidates c ON c.id = d.candidate_id
-              WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
-                 OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)),
-           'r2-duplicate-1:none')`,
-      )
-      .pluck()
-      .get(jobId, jobId) as string;
     r2.recordQueueDecision({
       jobId,
       state,
       r2EvaluationId: detail.evaluationVersionId,
-      duplicateResolutionVersion: resolution,
+      duplicateResolutionVersion: r2.duplicateResolutionVersion(jobId),
       actor: "OWNER",
       reasonCode,
     });
@@ -1212,6 +1203,11 @@ export async function preparePrivatePacket(
   ) {
     throw new Error("R2_QUEUE_PREPARING_NOT_READY");
   }
+  const r2 = getR2Repository();
+  if (r2?.available()) {
+    if (!detail.evaluationVersionId) throw new Error("R2_QUEUE_CURRENT_PREPARING_REQUIRED");
+    r2.assertCurrentPreparing(jobId, detail.evaluationVersionId);
+  }
   const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
   if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
   const profileVersion = assertCurrentDocumentGenerationTuple({
@@ -1264,7 +1260,6 @@ export async function preparePrivatePacket(
     answers: [],
   } satisfies ApplicationPacket);
   const result = beta.persistApplicationPacket(packet);
-  setBetaQueueState(jobId, "PREPARING");
   const now = new Date().toISOString();
   let application = sqlite
     .prepare("SELECT id FROM applications WHERE job_id = ? ORDER BY created_at LIMIT 1")

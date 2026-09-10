@@ -136,4 +136,30 @@ describe("R2 typed owner-correction overlay", () => {
         .every(({ ownerCorrectionId }) => ownerCorrectionId === "correction:typed"),
     ).toBe(true);
   });
+
+  it("resolves the corrected value without overstating family coverage", () => {
+    const pointer = r2FieldEvidence("pointer-template", "HOURS", {
+      kind: "HOURS",
+      value: { minimum: null, maximum: null, unit: "WEEK" },
+    }).source;
+    const priorBase = r2TestNormalization({ unknownFamilies: ["HOURS", "GEOGRAPHY"] });
+    const prior = {
+      ...priorBase,
+      coverage: priorBase.coverage.map((row) =>
+        row.family === "HOURS" ? { ...row, unparsedSpans: [pointer] } : row,
+      ),
+    };
+    const base = fixtureJob("job-retail-sales-assistant");
+    const result = ownerCorrectedR2Normalization({
+      prior,
+      job: { ...base, hoursPerWeek: { minimum: 12, maximum: 20 } },
+      changedFields: new Set(["hoursPerWeek"]),
+      correctionId: "correction:coverage",
+    });
+    const hours = result.coverage.find(({ family }) => family === "HOURS")!;
+    expect(hours.state).toBe("PARTIAL");
+    expect(hours.unparsedSpans).toEqual([pointer]);
+    expect(hours.evidenceIds).toHaveLength(1);
+    expect(result.coverage.find(({ family }) => family === "GEOGRAPHY")?.state).toBe("UNKNOWN");
+  });
 });

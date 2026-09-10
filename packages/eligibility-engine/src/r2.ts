@@ -149,6 +149,25 @@ function textFromRequirement(requirement: R2RequirementEvidence): string | null 
   return null;
 }
 
+function legalHoursLimitApplicability(
+  profile: CandidateProfile,
+  evaluatedAt: Date,
+): "APPLIES" | "DOES_NOT_APPLY" | "REVIEW_REQUIRED" {
+  const basis = profile.workRights.value.hoursLimitTimeBasis;
+  if (!basis || basis.verification !== VerificationStatus.VERIFIED || basis.kind === "UNKNOWN") {
+    return "REVIEW_REQUIRED";
+  }
+  if (basis.kind === "CURRENT") return "APPLIES";
+  if (basis.kind === "DATE_WINDOW") {
+    const currentDate = evaluatedAt.toISOString().slice(0, 10);
+    return currentDate >= basis.startDate && currentDate <= basis.endDate
+      ? "APPLIES"
+      : "DOES_NOT_APPLY";
+  }
+  if (basis.appliesNow === null) return "REVIEW_REQUIRED";
+  return basis.appliesNow ? "APPLIES" : "DOES_NOT_APPLY";
+}
+
 export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityResult {
   const profile = CandidateProfileSchema.parse(input.profile);
   const normalization = R2ANormalizationSchema.parse(input.normalization);
@@ -352,14 +371,26 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
         profile.workRights.value.maximumHoursPerFortnight !== null &&
         minimum > profile.workRights.value.maximumHoursPerFortnight
       ) {
-        add(
-          "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
-          "BLOCKER",
-          "LEGAL_LIMIT",
-          [field.id],
-          ["workRights.maximumHoursPerFortnight"],
-          "The stated fortnightly minimum exceeds the verified current fortnightly legal limit.",
-        );
+        const applicability = legalHoursLimitApplicability(profile, evaluatedAt);
+        if (applicability === "APPLIES") {
+          add(
+            "R2_LEGAL_FORTNIGHT_HOURS_MISMATCH",
+            "BLOCKER",
+            "LEGAL_LIMIT",
+            [field.id],
+            ["workRights.maximumHoursPerFortnight", "workRights.hoursLimitTimeBasis"],
+            "The stated fortnightly minimum exceeds a verified currently applicable fortnightly legal limit.",
+          );
+        } else if (applicability === "REVIEW_REQUIRED") {
+          add(
+            "R2_LEGAL_HOURS_TIME_BASIS_REVIEW_REQUIRED",
+            "REVIEW",
+            "LEGAL_LIMIT",
+            [field.id],
+            ["workRights.maximumHoursPerFortnight", "workRights.hoursLimitTimeBasis"],
+            "The fortnightly limit has no deterministically resolved current period; no legal blocker was inferred.",
+          );
+        }
       }
       if (
         profile.preferences.maximumHoursPerFortnight.verification === VerificationStatus.VERIFIED &&

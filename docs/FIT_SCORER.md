@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented. R2 remains an `UNCALIBRATED` owner-review ordering aid pending the approved private threshold and review of the unmerged matching-quality PR. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented and hardened on unmerged PR #13. R2 remains an `UNCALIBRATED` owner-review ordering aid pending the approved private threshold and final exact-head review. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
@@ -8,14 +8,14 @@ Eligibility answers whether a known hard condition prevents proceeding. Fit scor
 
 ## Deterministic model
 
-`scoreJobFit(job, profile, eligibility)` remains the compatibility path. `scoreR2JobFit` uses only current evidence-linked inputs: stale candidate bindings and unknown, conditional, conflicting, or unusable job evidence add no contribution. Unverified commute preferences produce no positive or negative points, and R2 recommendation cannot bypass review or ineligibility.
+`scoreJobFit(job, profile, eligibility)` remains the compatibility path. `scoreR2JobFit` uses only current evidence-linked inputs: stale candidate bindings and unknown, conditional, conflicting, or unusable job evidence add no contribution. Commute scoring consumes current R2A `commute.distance` and `commute.duration` field records; kilometres and minutes never substitute. Unverified commute preferences produce no positive or negative points, and R2 recommendation cannot bypass review or ineligibility.
 
 The result contains:
 
 - integer score clamped to 0–100;
 - positive and negative explanations;
 - per-category point contributions; and
-- engine/weight version.
+- scorer/weight version and exact calibration-context version/run binding.
 
 Weights are transparent constants, not learned judgments. They are an ordering aid, not a probability of employment success.
 
@@ -27,8 +27,8 @@ Every contribution stores a stable reason code, signed points, field/evidence ID
 
 ## Calibration
 
-R2D calibrates first against a versioned fictional golden corpus and then, only if available, an ignored owner-labelled set of at least 30 cases spanning four role families and every eligibility status. Only safe aggregate pass/fail and ordinal metrics may be published. Until that gate passes the UI says `UNCALIBRATED` and never describes the score as a probability. Calibration must avoid protected characteristics, tiny-sample optimization, and using hiring outcomes as ground-truth merit.
+R2D first executes the real eligibility/scorer path against a versioned 12-case fictional golden corpus. The manifest contains expected outcomes but no expected scorer output; actual scores drive ordinal metrics. Only an ignored owner-labelled set of at least 30 independently reviewed jobs spanning four role families and every eligibility status can produce a durable `CALIBRATED` context. Each evaluation stores its context version and optional calibration-run foreign key, so promotion never rewrites historical evaluations or collides with an older identity. Only safe aggregate pass/fail and ordinal metrics may be published. Until the private gate passes the UI says `UNCALIBRATED` and never describes the score as a probability.
 
 ## Testing
 
-All fixtures remain inside 0–100 and have at least one explanation. Tests verify determinism, bounds, isolated-signal monotonicity, verified/unverified/unknown/stale ablation, no blocker/review override, no cross-category leakage, and reproducible evidence-linked contributions. Any rule/weight change requires golden-case and owner review plus a `PROJECT_PLAN.md` update.
+The executable corpus covers all 12 approved role families and obtains outputs from the production R2 engines. Independent executions verify determinism; actual scorer runs verify bounds, isolated-signal monotonicity and ablation; weight and eligibility mutations prove the expectations can fail; and recommendation regressions cover review/ineligible/stale/unresolved cases. Any rule/weight change requires golden-case and owner review plus a `PROJECT_PLAN.md` update.

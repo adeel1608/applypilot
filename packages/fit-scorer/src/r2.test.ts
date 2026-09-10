@@ -4,12 +4,17 @@ import { CandidateProfileSchema } from "@applypilot/candidate-profile";
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
 import {
   currentR2Bindings,
+  r2FieldEvidence,
   r2RequirementEvidence,
   r2TestNormalization,
 } from "../../../fixtures/r2/test-helpers";
 import { testProfile } from "../../../tests/fixture-data";
 
-import { scoreR2JobFit } from "./r2";
+import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit, type R2FitInput } from "./r2";
+
+function score(input: Omit<R2FitInput, "calibrationContext">) {
+  return scoreR2JobFit({ ...input, calibrationContext: R2_UNREVIEWED_CALIBRATION_CONTEXT });
+}
 
 function eligible(normalization: ReturnType<typeof r2TestNormalization>, profile = testProfile) {
   return evaluateR2Eligibility({
@@ -27,7 +32,7 @@ describe("R2 fit scoring", () => {
       value: "Customer service",
     });
     const normalization = r2TestNormalization({ requirements: [skill] });
-    const result = scoreR2JobFit({
+    const result = score({
       profile: testProfile,
       normalization,
       eligibility: eligible(normalization),
@@ -48,10 +53,9 @@ describe("R2 fit scoring", () => {
   });
 
   it("gives unverified commute limits zero positive and zero negative points", () => {
-    const commute = r2RequirementEvidence(
+    const commute = r2FieldEvidence(
       "commute-distance",
-      "VEHICLE",
-      "LOCATION",
+      "GEOGRAPHY",
       {
         kind: "VEHICLE_TRAVEL",
         value: {
@@ -62,9 +66,9 @@ describe("R2 fit scoring", () => {
           durationMinutes: null,
         },
       },
-      { modality: "PREFERRED" },
+      { canonicalField: "commute.distance" },
     );
-    const normalization = r2TestNormalization({ requirements: [commute] });
+    const normalization = r2TestNormalization({ fields: [commute] });
     const profile = CandidateProfileSchema.parse({
       ...testProfile,
       transport: {
@@ -75,7 +79,7 @@ describe("R2 fit scoring", () => {
         },
       },
     });
-    const result = scoreR2JobFit({
+    const result = score({
       profile,
       normalization,
       eligibility: eligible(normalization, profile),
@@ -97,7 +101,7 @@ describe("R2 fit scoring", () => {
     const normalization = r2TestNormalization({ requirements: [unknown] });
     const eligibility = eligible(normalization);
     expect(eligibility.status).toBe("REVIEW_REQUIRED");
-    const result = scoreR2JobFit({
+    const result = score({
       profile: testProfile,
       normalization,
       eligibility,
@@ -108,10 +112,9 @@ describe("R2 fit scoring", () => {
   });
 
   it("keeps commute time and distance independent", () => {
-    const commute = r2RequirementEvidence(
+    const commute = r2FieldEvidence(
       "commute-time",
-      "VEHICLE",
-      "LOCATION",
+      "GEOGRAPHY",
       {
         kind: "VEHICLE_TRAVEL",
         value: {
@@ -122,16 +125,82 @@ describe("R2 fit scoring", () => {
           durationMinutes: 50,
         },
       },
-      { modality: "PREFERRED" },
+      { canonicalField: "commute.duration" },
     );
-    const normalization = r2TestNormalization({ requirements: [commute] });
-    const result = scoreR2JobFit({
+    const normalization = r2TestNormalization({ fields: [commute] });
+    const result = score({
       profile: testProfile,
       normalization,
       eligibility: eligible(normalization),
       commute: { distanceKm: null, durationMinutes: 50 },
     });
     expect(result.contributions.filter(({ code }) => code.includes("COMMUTE_"))).toEqual([]);
+  });
+
+  it("consumes actual R2A commute fields without crossing time and distance units", () => {
+    const profile = CandidateProfileSchema.parse({
+      ...testProfile,
+      transport: {
+        ...testProfile.transport,
+        maximumCommuteMinutes: { value: 45, verification: "VERIFIED" },
+      },
+    });
+    const distance = r2FieldEvidence(
+      "commute-field-distance",
+      "GEOGRAPHY",
+      {
+        kind: "VEHICLE_TRAVEL",
+        value: {
+          kind: "COMMUTE",
+          percentage: null,
+          location: null,
+          distanceKm: 25,
+          durationMinutes: null,
+        },
+      },
+      { canonicalField: "commute.distance" },
+    );
+    const duration = r2FieldEvidence(
+      "commute-field-duration",
+      "GEOGRAPHY",
+      {
+        kind: "VEHICLE_TRAVEL",
+        value: {
+          kind: "COMMUTE",
+          percentage: null,
+          location: null,
+          distanceKm: null,
+          durationMinutes: 40,
+        },
+      },
+      { canonicalField: "commute.duration" },
+    );
+    const normalization = r2TestNormalization({ fields: [distance, duration] });
+    const run = (distanceKm: number | null, durationMinutes: number | null) =>
+      score({
+        profile,
+        normalization,
+        eligibility: eligible(normalization, profile),
+        commute: { distanceKm, durationMinutes },
+      });
+    expect(run(25, null).contributions).toContainEqual(
+      expect.objectContaining({ code: "R2_COMMUTE_DISTANCE_VERIFIED_MATCH", points: 8 }),
+    );
+    expect(run(40, null).contributions).toContainEqual(
+      expect.objectContaining({ code: "R2_COMMUTE_DISTANCE_VERIFIED_MISMATCH", points: -8 }),
+    );
+    expect(run(null, 40).contributions).toContainEqual(
+      expect.objectContaining({ code: "R2_COMMUTE_TIME_VERIFIED_MATCH", points: 8 }),
+    );
+    expect(run(null, 60).contributions).toContainEqual(
+      expect.objectContaining({ code: "R2_COMMUTE_TIME_VERIFIED_MISMATCH", points: -8 }),
+    );
+    expect(run(25, null).contributions.some(({ code }) => code.includes("COMMUTE_TIME"))).toBe(
+      false,
+    );
+    expect(run(null, 40).contributions.some(({ code }) => code.includes("COMMUTE_DISTANCE"))).toBe(
+      false,
+    );
   });
 
   it("is deterministic, bounded, and monotonic for an added verified signal", () => {
@@ -141,7 +210,7 @@ describe("R2 fit scoring", () => {
       value: "Teamwork",
     });
     const enhancedNormalization = r2TestNormalization({ requirements: [matchedSkill] });
-    const base = scoreR2JobFit({
+    const base = score({
       profile: testProfile,
       normalization: baseNormalization,
       eligibility: eligible(baseNormalization),
@@ -151,8 +220,8 @@ describe("R2 fit scoring", () => {
       normalization: enhancedNormalization,
       eligibility: eligible(enhancedNormalization),
     };
-    const first = scoreR2JobFit(enhancedInput);
-    const second = scoreR2JobFit(enhancedInput);
+    const first = score(enhancedInput);
+    const second = score(enhancedInput);
     expect(first).toEqual(second);
     expect(first.score).toBeGreaterThanOrEqual(base.score);
     expect(first.score).toBeGreaterThanOrEqual(0);
@@ -179,7 +248,7 @@ describe("R2 fit scoring", () => {
       );
       const normalization = r2TestNormalization({ requirements: [evidence] });
       expect(
-        scoreR2JobFit({
+        score({
           profile: testProfile,
           normalization,
           eligibility: eligible(normalization),
@@ -211,7 +280,7 @@ describe("R2 fit scoring", () => {
       ],
     });
     expect(
-      scoreR2JobFit({
+      score({
         profile: testProfile,
         normalization: conflictingNormalization,
         eligibility: eligible(conflictingNormalization),
@@ -231,7 +300,7 @@ describe("R2 fit scoring", () => {
       bindings: { ...currentR2Bindings, currentProfileVersionId: "new-profile-version" },
       evaluatedAt: "2026-09-09T00:00:00.000Z",
     });
-    const result = scoreR2JobFit({
+    const result = score({
       profile: testProfile,
       normalization,
       eligibility: staleEligibility,

@@ -96,6 +96,34 @@ async function main(): Promise<void> {
               : 0,
         }
       : { jobs: 0, jobVersions: 0, observations: 0, fieldEvidence: 0, requirementEvidence: 0 };
+    const r2EvaluationProjection = `id,job_id,job_version_id,profile_version_id,
+      evidence_contract_version,normalization_version,coverage_version,eligibility_status,
+      eligibility_reasons_json,fit_score,fit_contributions_json,eligibility_engine_version,
+      fit_scorer_version,weight_version,calibration_state,recommended,coverage_percent,
+      unresolved_unknown_count,unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at`;
+    const historicalR2Evaluations =
+      version >= 4
+        ? sqlite
+            .prepare(`SELECT ${r2EvaluationProjection} FROM r2_evaluation_versions ORDER BY id`)
+            .all()
+        : [];
+    const historicalR2Counts =
+      version >= 4
+        ? Object.fromEntries(
+            [
+              "r2_evaluation_versions",
+              "r2_duplicate_candidates",
+              "r2_duplicate_decision_versions",
+              "r2_queue_decision_versions",
+              "r2_correction_overlay_bindings",
+              "r2_calibration_runs",
+              "r2_audit_events",
+            ].map((table) => [
+              table,
+              Number(sqlite.prepare(`SELECT count(*) FROM ${table}`).pluck().get()),
+            ]),
+          )
+        : {};
     const sourceDigest = createHash("sha256").update(JSON.stringify(sourceSnapshot)).digest("hex");
     if (!hasFoundation) {
       sqlite.exec(
@@ -132,10 +160,21 @@ async function main(): Promise<void> {
         ),
       );
     }
-    if (version < CURRENT_DATABASE_SCHEMA_VERSION) {
+    if (version < 4) {
       sqlite.exec(
         readFileSync(
           new URL("../packages/database/drizzle/0004_r2_matching_quality.sql", import.meta.url),
+          "utf8",
+        ),
+      );
+    }
+    if (version < 5) {
+      sqlite.exec(
+        readFileSync(
+          new URL(
+            "../packages/database/drizzle/0005_r2_matching_quality_hardening.sql",
+            import.meta.url,
+          ),
           "utf8",
         ),
       );
@@ -212,13 +251,33 @@ async function main(): Promise<void> {
     ) {
       throw new Error("R2A conservative backfill verification failed after migration.");
     }
+    if (version >= 4) {
+      const migratedR2Evaluations = sqlite
+        .prepare(`SELECT ${r2EvaluationProjection} FROM r2_evaluation_versions ORDER BY id`)
+        .all();
+      if (
+        createHash("sha256").update(JSON.stringify(historicalR2Evaluations)).digest("hex") !==
+        createHash("sha256").update(JSON.stringify(migratedR2Evaluations)).digest("hex")
+      ) {
+        throw new Error("R2 evaluation history verification failed after migration.");
+      }
+      for (const [table, count] of Object.entries(historicalR2Counts)) {
+        if (Number(sqlite.prepare(`SELECT count(*) FROM ${table}`).pluck().get()) !== count) {
+          throw new Error(`R2 history row-count verification failed after migration: ${table}`);
+        }
+      }
+    }
     const foreignKeys = sqlite.pragma("foreign_key_check") as unknown[];
     const finalIntegrity = sqlite.pragma("integrity_check", { simple: true });
     if (foreignKeys.length || finalIntegrity !== "ok") {
       throw new Error("Database verification failed after migration.");
     }
+    const finalSchemaVersion = Number(sqlite.pragma("user_version", { simple: true }));
+    if (finalSchemaVersion !== CURRENT_DATABASE_SCHEMA_VERSION) {
+      throw new Error("Database schema version verification failed after migration.");
+    }
     console.log(
-      `MIGRATION_COMPLETE schema_version=${Number(sqlite.pragma("user_version", { simple: true }))} integrity=PASS foreign_key_issues=0 jobs=${jobCount} job_versions=${jobVersionCount} r2a_field_evidence=${r2aFieldCount} r2a_requirement_evidence=${r2aRequirementCount} coverage=${coverageCount}`,
+      `MIGRATION_COMPLETE schema_version=${finalSchemaVersion} integrity=PASS foreign_key_issues=0 jobs=${jobCount} job_versions=${jobVersionCount} r2a_field_evidence=${r2aFieldCount} r2a_requirement_evidence=${r2aRequirementCount} coverage=${coverageCount}`,
     );
   } finally {
     sqlite.close();

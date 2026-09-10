@@ -32,6 +32,7 @@ import {
   type R2ANormalization,
   type RequirementEvidence,
 } from "@applypilot/job-model";
+import { ObservationIdentitySchema, type ObservationIdentity } from "@applypilot/job-normalizer";
 
 import { BetaRepository } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
@@ -287,6 +288,15 @@ export class JobImportRepository {
     const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(id);
     if (!exists) throw new Error("JOB_NOT_FOUND");
     return this.evaluate(id, provider);
+  }
+
+  suggestHistoricalDuplicatePair(leftObservationId: string, rightObservationId: string) {
+    const r2 = new R2Repository(this.sqlite, this.now);
+    if (!r2.available()) throw new Error("R2_SCHEMA_REQUIRED");
+    return r2.suggestDuplicate(
+      this.immutableObservationIdentity(leftObservationId),
+      this.immutableObservationIdentity(rightObservationId),
+    );
   }
 
   async reprocessLegacyJob(
@@ -1164,6 +1174,53 @@ export class JobImportRepository {
     );
   }
 
+  private immutableObservationIdentity(observationIdInput: string): ObservationIdentity {
+    const observationId = z.string().min(1).max(200).parse(observationIdInput);
+    const row = this.sqlite
+      .prepare(
+        `SELECT o.id AS observationId, o.source, o.tenant, o.external_id AS externalId,
+                v.normalized_json AS normalizedJson
+         FROM source_observations o
+         JOIN job_versions v ON v.id = (
+           SELECT first_version.id FROM job_versions first_version
+           WHERE first_version.source_observation_id = o.id
+           ORDER BY first_version.version, first_version.rowid LIMIT 1
+         )
+         WHERE o.id = ?`,
+      )
+      .get(observationId) as
+      | {
+          observationId: string;
+          source: string;
+          tenant: string | null;
+          externalId: string | null;
+          normalizedJson: string;
+        }
+      | undefined;
+    if (!row) throw new Error("R2_DUPLICATE_OBSERVATION_VERSION_REQUIRED");
+    const job = JobSchema.parse(JSON.parse(row.normalizedJson));
+    return ObservationIdentitySchema.parse({
+      observationId: row.observationId,
+      source: row.source,
+      tenant: row.tenant,
+      externalId: row.externalId,
+      applicationUrl:
+        typeof job.sourceMetadata.applicationUrl === "string" && job.sourceMetadata.applicationUrl
+          ? job.sourceMetadata.applicationUrl
+          : null,
+      requisitionId:
+        typeof job.sourceMetadata.requisitionId === "string" && job.sourceMetadata.requisitionId
+          ? job.sourceMetadata.requisitionId
+          : null,
+      company: job.company,
+      title: job.title,
+      location: job.location,
+      employmentType: job.employmentType,
+      datePosted: job.datePosted,
+      description: job.description,
+    });
+  }
+
   private persistBetaObservationAndVersion(input: {
     job: Job;
     sourceRecordId: string;
@@ -1210,74 +1267,6 @@ export class JobImportRepository {
         previous?.id ?? null,
       );
     const r2 = new R2Repository(this.sqlite, this.now);
-    if (r2.available()) {
-      const applicationUrl =
-        typeof input.job.sourceMetadata.applicationUrl === "string" &&
-        input.job.sourceMetadata.applicationUrl
-          ? input.job.sourceMetadata.applicationUrl
-          : null;
-      const requisitionId =
-        typeof input.job.sourceMetadata.requisitionId === "string" &&
-        input.job.sourceMetadata.requisitionId
-          ? input.job.sourceMetadata.requisitionId
-          : null;
-      const candidates = this.sqlite
-        .prepare(
-          `SELECT o.id AS observationId, o.source, o.tenant, o.external_id AS externalId,
-             j.normalized_json AS normalizedJson
-           FROM source_observations o JOIN jobs j ON j.id = o.job_id
-           WHERE o.id <> ? ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 200`,
-        )
-        .all(observationId) as Array<{
-        observationId: string;
-        source: string;
-        tenant: string | null;
-        externalId: string | null;
-        normalizedJson: string;
-      }>;
-      for (const candidate of candidates) {
-        const other = JobSchema.parse(JSON.parse(candidate.normalizedJson));
-        const otherRequisition =
-          typeof other.sourceMetadata.requisitionId === "string" &&
-          other.sourceMetadata.requisitionId
-            ? other.sourceMetadata.requisitionId
-            : null;
-        r2.suggestDuplicate(
-          {
-            observationId,
-            source: input.source,
-            tenant: null,
-            externalId: input.externalId,
-            applicationUrl,
-            requisitionId,
-            company: input.job.company,
-            title: input.job.title,
-            location: input.job.location,
-            employmentType: input.job.employmentType,
-            datePosted: input.job.datePosted,
-            description: input.job.description,
-          },
-          {
-            observationId: candidate.observationId,
-            source: candidate.source,
-            tenant: candidate.tenant,
-            externalId: candidate.externalId,
-            applicationUrl:
-              typeof other.sourceMetadata.applicationUrl === "string" &&
-              other.sourceMetadata.applicationUrl
-                ? other.sourceMetadata.applicationUrl
-                : null,
-            requisitionId: otherRequisition,
-            company: other.company,
-            title: other.title,
-            location: other.location,
-            employmentType: other.employmentType,
-            datePosted: other.datePosted,
-            description: other.description,
-          },
-        );
-      }
-    }
     const requirements = (
       input.requirementEvidence.length > 0
         ? input.requirementEvidence
@@ -1310,6 +1299,17 @@ export class JobImportRepository {
       requirementEvidence: requirements,
       r2aNormalization,
     });
+    if (r2.available()) {
+      const candidates = this.sqlite
+        .prepare(
+          `SELECT id AS observationId FROM source_observations
+           WHERE id <> ? ORDER BY observed_at DESC, rowid DESC LIMIT 200`,
+        )
+        .all(observationId) as Array<{ observationId: string }>;
+      for (const candidate of candidates) {
+        this.suggestHistoricalDuplicatePair(observationId, candidate.observationId);
+      }
+    }
   }
 
   private persistBetaEvaluation(

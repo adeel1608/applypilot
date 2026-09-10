@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 
-import { R2ARepository } from "@applypilot/database";
+import { R2ARepository, R2Repository } from "@applypilot/database";
 import { normalizeR2AJobEvidence } from "@applypilot/job-importer";
 import { fixtureJob } from "../tests/fixture-data";
 
@@ -37,6 +37,7 @@ try {
       "0002_personal_live_beta_core.sql",
       "0003_r2a_evidence_normalization.sql",
       "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
@@ -178,11 +179,13 @@ Documents
         (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
          normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
          fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
-         weight_version,calibration_state,recommended,coverage_percent,unresolved_unknown_count,
+         weight_version,calibration_state,calibration_context_version,calibration_run_id,
+         recommended,coverage_percent,unresolved_unknown_count,
          unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
        VALUES ('evaluation:r2:e2e','job-e2e-document','job-version:e2e','profile-version:e2e',
          '3.1.0','3.1.0','3.1.0:3.1.0','REVIEW_REQUIRED',?,34,?,'2.0.0','2.0.0',
-         'r2-weights-1','UNCALIBRATED',0,71,1,1,0,0,?)`,
+         'r2-weights-1','UNCALIBRATED','r2-calibration-context-1:unreviewed',NULL,
+         0,71,1,1,0,0,?)`,
     )
     .run(
       JSON.stringify([
@@ -242,6 +245,12 @@ Documents
       now,
       now,
     );
+  sqlite
+    .prepare(
+      `UPDATE r2_queue_decision_versions SET duplicate_resolution_version = ?
+       WHERE id = 'queue:r2:e2e'`,
+    )
+    .run(new R2Repository(sqlite).duplicateResolutionVersion("job-e2e-document"));
   const insertArtifact = sqlite.prepare(
     `INSERT INTO document_artifacts
       (id,job_id,job_version_id,profile_version_id,type,template,format,file_name,local_path,

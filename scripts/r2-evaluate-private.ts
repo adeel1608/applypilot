@@ -7,9 +7,16 @@ import BetterSqlite3 from "better-sqlite3";
 import { R2ARepository, R2Repository } from "@applypilot/database";
 import { CandidateProfileSchema, candidateProfileContentHash } from "@applypilot/candidate-profile";
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
-import { evaluateR2GoldenRanking, scoreR2JobFit } from "@applypilot/fit-scorer";
+import {
+  R2_FIT_SCORER_VERSION,
+  R2_FIT_WEIGHT_VERSION,
+  R2_GOLDEN_CORPUS_VERSION,
+  createR2CalibrationContext,
+  evaluateR2GoldenRanking,
+  executeR2GoldenCorpus,
+  scoreR2JobFit,
+} from "@applypilot/fit-scorer";
 import { JobSchema } from "@applypilot/job-model";
-import { r2GoldenCorpus } from "../fixtures/r2/manifest";
 import { createDatabaseBackup } from "./lib/database-maintenance";
 import { CURRENT_DATABASE_SCHEMA_VERSION } from "./lib/database-schema";
 import { assertPrivateDatabaseGitIsolation } from "./lib/r2a-private-safety";
@@ -160,17 +167,6 @@ async function main(): Promise<void> {
       },
       evaluatedAt: now,
     });
-    const fit = scoreR2JobFit({ profile, normalization: read.normalization, eligibility });
-    const repository = new R2Repository(sqlite, () => new Date(now));
-    const recorded = repository.recordEvaluation({
-      id: evaluationId,
-      jobId: job.id,
-      jobVersionId,
-      profileVersionId,
-      normalization: read.normalization,
-      eligibility,
-      fit,
-    });
     const labelAggregates = sqlite
       .prepare(
         `SELECT count(DISTINCT l.job_id) AS reviewed,
@@ -186,13 +182,14 @@ async function main(): Promise<void> {
       )
       .pluck()
       .all() as Array<"ELIGIBLE" | "REVIEW_REQUIRED" | "INELIGIBLE">;
+    const goldenExecutions = executeR2GoldenCorpus();
     const metrics = evaluateR2GoldenRanking(
-      r2GoldenCorpus.map((item) => ({
-        id: item.id,
-        roleFamily: item.roleFamily,
-        eligibility: item.expectedEligibility,
-        score: item.expectedScore,
-        expectedBand: item.expectedBand,
+      goldenExecutions.map(({ fixture, eligibility: result, fit: scored }) => ({
+        id: fixture.id,
+        roleFamily: fixture.roleFamily,
+        eligibility: result.status,
+        score: scored.score,
+        expectedBand: fixture.expectedBand,
       })),
       {
         independentlyReviewedPrivateJobs: Number(labelAggregates.reviewed),
@@ -200,13 +197,42 @@ async function main(): Promise<void> {
         statuses,
       },
     );
-    repository.recordCalibrationRun({
+    const repository = new R2Repository(sqlite, () => new Date(now));
+    const calibrationRunId = repository.recordCalibrationRun({
       metrics,
       privateReviewedCount: Number(labelAggregates.reviewed),
       roleFamilyCount: Number(labelAggregates.roleFamilies),
       statusCount: new Set(statuses).size,
-      scorerVersion: fit.scorerVersion,
-      weightVersion: fit.weightVersion,
+      scorerVersion: R2_FIT_SCORER_VERSION,
+      weightVersion: R2_FIT_WEIGHT_VERSION,
+      corpusVersion: R2_GOLDEN_CORPUS_VERSION,
+    });
+    const calibrationContext = createR2CalibrationContext({
+      version: `r2-calibration-context-1:${calibrationRunId}`,
+      scorerVersion: R2_FIT_SCORER_VERSION,
+      weightVersion: R2_FIT_WEIGHT_VERSION,
+      corpusVersion: R2_GOLDEN_CORPUS_VERSION,
+      runId: calibrationRunId,
+      gate: {
+        independentlyReviewedPrivateJobs: Number(labelAggregates.reviewed),
+        roleFamilies: Number(labelAggregates.roleFamilies),
+        statuses,
+      },
+    });
+    const fit = scoreR2JobFit({
+      profile,
+      normalization: read.normalization,
+      eligibility,
+      calibrationContext,
+    });
+    const recorded = repository.recordEvaluation({
+      id: evaluationId,
+      jobId: job.id,
+      jobVersionId,
+      profileVersionId,
+      normalization: read.normalization,
+      eligibility,
+      fit,
     });
     const after = {
       legacyEvaluations: Number(

@@ -11,12 +11,56 @@ import {
   type R2EligibilityResult,
 } from "@applypilot/eligibility-engine";
 import { clamp, normalizeText, VerificationStatus } from "@applypilot/shared";
+import { z } from "zod";
+
+import {
+  R2CalibrationContextSchema,
+  type R2CalibrationContext,
+  type R2CalibrationState,
+} from "./calibration";
 
 export const R2_FIT_SCORER_VERSION = "2.0.0";
 export const R2_FIT_WEIGHT_VERSION = "r2-weights-1";
 export const R2_RECOMMENDATION_THRESHOLD = 50;
+export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-2";
 
-export type R2CalibrationState = "UNCALIBRATED" | "CALIBRATION_PENDING" | "CALIBRATED";
+export const R2FitWeightsSchema = z
+  .object({
+    version: z.string().min(1).max(100),
+    requiredEvidenceMatch: z.number().int(),
+    preferredEvidenceMatch: z.number().int(),
+    workTypeMatch: z.number().int(),
+    workTypeMismatch: z.number().int(),
+    locationMatch: z.number().int(),
+    commuteMatch: z.number().int(),
+    commuteMismatch: z.number().int(),
+    scheduleMatch: z.number().int(),
+  })
+  .strict();
+
+export type R2FitWeights = z.infer<typeof R2FitWeightsSchema>;
+
+export const R2_FIT_WEIGHTS: R2FitWeights = R2FitWeightsSchema.parse({
+  version: R2_FIT_WEIGHT_VERSION,
+  requiredEvidenceMatch: 7,
+  preferredEvidenceMatch: 4,
+  workTypeMatch: 10,
+  workTypeMismatch: -5,
+  locationMatch: 10,
+  commuteMatch: 8,
+  commuteMismatch: -8,
+  scheduleMatch: 10,
+});
+
+export const R2_UNREVIEWED_CALIBRATION_CONTEXT: R2CalibrationContext =
+  R2CalibrationContextSchema.parse({
+    version: "r2-calibration-context-1:unreviewed",
+    state: "UNCALIBRATED",
+    scorerVersion: R2_FIT_SCORER_VERSION,
+    weightVersion: R2_FIT_WEIGHT_VERSION,
+    corpusVersion: R2_GOLDEN_CORPUS_VERSION,
+    runId: null,
+  });
 
 export interface R2FitContribution {
   code: string;
@@ -37,6 +81,8 @@ export interface R2FitInput {
     distanceKm: number | null;
     durationMinutes: number | null;
   };
+  calibrationContext: R2CalibrationContext;
+  weights?: R2FitWeights;
   recommendationThreshold?: number;
 }
 
@@ -46,6 +92,8 @@ export interface R2FitResult {
   scorerVersion: string;
   weightVersion: string;
   calibrationState: R2CalibrationState;
+  calibrationContextVersion: string;
+  calibrationRunId: string | null;
   recommended: boolean;
   recommendationBlockers: string[];
   coveragePercent: number;
@@ -99,6 +147,14 @@ function requirementText(evidence: R2RequirementEvidence): string | null {
 export function scoreR2JobFit(input: R2FitInput): R2FitResult {
   const profile = CandidateProfileSchema.parse(input.profile);
   const normalization = R2ANormalizationSchema.parse(input.normalization);
+  const weights = R2FitWeightsSchema.parse(input.weights ?? R2_FIT_WEIGHTS);
+  const calibrationContext = R2CalibrationContextSchema.parse(input.calibrationContext);
+  if (
+    calibrationContext.scorerVersion !== R2_FIT_SCORER_VERSION ||
+    calibrationContext.weightVersion !== weights.version
+  ) {
+    throw new Error("R2_CALIBRATION_CONTEXT_VERSION_MISMATCH");
+  }
   const contributions: R2FitContribution[] = [];
   const contributionKeys = new Set<string>();
   const add = (
@@ -122,7 +178,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
       jobEvidenceReferences: [...jobEvidenceReferences].sort(),
       evidenceClass,
       scorerVersion: R2_FIT_SCORER_VERSION,
-      weightVersion: R2_FIT_WEIGHT_VERSION,
+      weightVersion: weights.version,
       safeExplanation,
     });
   };
@@ -152,7 +208,10 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
     if (evidence.modality === "NEGATED") continue;
     const text = requirementText(evidence);
     if (!text) continue;
-    const weight = evidence.modality === "PREFERRED" ? 4 : 7;
+    const weight =
+      evidence.modality === "PREFERRED"
+        ? weights.preferredEvidenceMatch
+        : weights.requiredEvidenceMatch;
     const evidenceClass: EvaluationEvidenceClass = "EMPLOYER_REQUIREMENT";
     if (evidence.normalizedValue.kind === "EDUCATION") {
       const match = verifiedEducation.find(
@@ -250,7 +309,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
       compatible
         ? "R2_WORK_TYPE_VERIFIED_PREFERENCE_MATCH"
         : "R2_WORK_TYPE_VERIFIED_PREFERENCE_MISMATCH",
-      compatible ? 10 : -5,
+      compatible ? weights.workTypeMatch : weights.workTypeMismatch,
       ["preferences.signalVerification.preferredWorkTypes"],
       [employmentEvidence.id],
       "CANDIDATE_PREFERENCE",
@@ -286,7 +345,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
     if (matchingLocation) {
       add(
         "R2_LOCATION_VERIFIED_PREFERENCE_MATCH",
-        10,
+        weights.locationMatch,
         ["preferences.signalVerification.preferredLocations"],
         [matchingLocation.id],
         "CANDIDATE_PREFERENCE",
@@ -297,9 +356,10 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
 
   if (input.commute?.distanceKm !== null && input.commute?.distanceKm !== undefined) {
     if (profile.transport.maximumCommuteKm.verification === VerificationStatus.VERIFIED) {
-      const distanceEvidence = normalization.requirementEvidence.find(
-        ({ normalizedValue, state }) =>
+      const distanceEvidence = normalization.fieldEvidence.find(
+        ({ canonicalField, normalizedValue, state }) =>
           usableState(state) &&
+          canonicalField === "commute.distance" &&
           normalizedValue.kind === "VEHICLE_TRAVEL" &&
           normalizedValue.value.kind === "COMMUTE" &&
           normalizedValue.value.distanceKm !== null,
@@ -308,7 +368,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
         const within = input.commute.distanceKm <= profile.transport.maximumCommuteKm.value;
         add(
           within ? "R2_COMMUTE_DISTANCE_VERIFIED_MATCH" : "R2_COMMUTE_DISTANCE_VERIFIED_MISMATCH",
-          within ? 8 : -8,
+          within ? weights.commuteMatch : weights.commuteMismatch,
           ["transport.maximumCommuteKm"],
           [distanceEvidence.id],
           "CANDIDATE_PREFERENCE",
@@ -322,9 +382,10 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
   if (input.commute?.durationMinutes !== null && input.commute?.durationMinutes !== undefined) {
     const maximumMinutes = profile.transport.maximumCommuteMinutes;
     if (maximumMinutes?.verification === VerificationStatus.VERIFIED) {
-      const timeEvidence = normalization.requirementEvidence.find(
-        ({ normalizedValue, state }) =>
+      const timeEvidence = normalization.fieldEvidence.find(
+        ({ canonicalField, normalizedValue, state }) =>
           usableState(state) &&
+          canonicalField === "commute.duration" &&
           normalizedValue.kind === "VEHICLE_TRAVEL" &&
           normalizedValue.value.kind === "COMMUTE" &&
           normalizedValue.value.durationMinutes !== null,
@@ -333,7 +394,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
         const within = input.commute.durationMinutes <= maximumMinutes.value;
         add(
           within ? "R2_COMMUTE_TIME_VERIFIED_MATCH" : "R2_COMMUTE_TIME_VERIFIED_MISMATCH",
-          within ? 8 : -8,
+          within ? weights.commuteMatch : weights.commuteMismatch,
           ["transport.maximumCommuteMinutes"],
           [timeEvidence.id],
           "CANDIDATE_PREFERENCE",
@@ -364,7 +425,7 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
     if (matching) {
       add(
         "R2_SCHEDULE_VERIFIED_MATCH",
-        10,
+        weights.scheduleMatch,
         ["availability.recurring"],
         [evidence.id],
         "EMPLOYER_REQUIREMENT",
@@ -401,8 +462,10 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
     score,
     contributions,
     scorerVersion: R2_FIT_SCORER_VERSION,
-    weightVersion: R2_FIT_WEIGHT_VERSION,
-    calibrationState: "UNCALIBRATED",
+    weightVersion: weights.version,
+    calibrationState: calibrationContext.state,
+    calibrationContextVersion: calibrationContext.version,
+    calibrationRunId: calibrationContext.runId,
     recommended: recommendationBlockers.length === 0,
     recommendationBlockers,
     coveragePercent: input.eligibility.coveragePercent,

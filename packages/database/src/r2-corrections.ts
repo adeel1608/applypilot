@@ -355,6 +355,7 @@ export function ownerCorrectedR2Normalization(input: {
     ];
     return {
       ...item,
+      state: additions.length > 0 && item.state === "UNKNOWN" ? ("PARTIAL" as const) : item.state,
       evidenceIds: [
         ...item.evidenceIds.filter((id) => !removedIds.has(id) && !removedRequirementIds.has(id)),
         ...additions,

@@ -105,6 +105,7 @@ describe("database foundation", () => {
       "0002_personal_live_beta_core.sql",
       "0003_r2a_evidence_normalization.sql",
       "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -134,7 +135,7 @@ describe("database foundation", () => {
         "r2_audit_events",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(4);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(5);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

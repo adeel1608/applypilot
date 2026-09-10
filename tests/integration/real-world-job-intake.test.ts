@@ -12,6 +12,7 @@ import {
   assertCurrentDocumentGenerationTuple,
   BetaRepository,
   JobImportRepository,
+  R2Repository,
 } from "@applypilot/database";
 import { prepareJobImport } from "@applypilot/job-importer";
 import { testProfile } from "../fixture-data";
@@ -32,6 +33,13 @@ const r2aMigration = readFileSync(
 );
 const r2Migration = readFileSync(
   new URL("../../packages/database/drizzle/0004_r2_matching_quality.sql", import.meta.url),
+  "utf8",
+);
+const r2HardeningMigration = readFileSync(
+  new URL(
+    "../../packages/database/drizzle/0005_r2_matching_quality_hardening.sql",
+    import.meta.url,
+  ),
   "utf8",
 );
 const content = `Title: Fictional Community Assistant
@@ -144,6 +152,7 @@ async function seedR2AReprocessScenario(
   );
   sqlite.exec(r2aMigration);
   sqlite.exec(r2Migration);
+  sqlite.exec(r2HardeningMigration);
   return { jobId, ...state };
 }
 
@@ -208,6 +217,7 @@ describe("real-world job intake persistence and profile gate", () => {
   it("persists a conservative cross-source duplicate suggestion without auto-linking", async () => {
     sqlite.exec(r2aMigration);
     sqlite.exec(r2Migration);
+    sqlite.exec(r2HardeningMigration);
     const provider: CandidateProfileProvider = {
       resolve: async () => ({ state: "NO_ACTIVE_PROFILE", reasonCode: "PRIVATE_PROFILE_MISSING" }),
     };
@@ -258,6 +268,78 @@ describe("real-world job intake persistence and profile gate", () => {
       sqlite.prepare("SELECT count(*) FROM r2_duplicate_decision_versions").pluck().get(),
     ).toBe(0);
     expect(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get()).toBe(2);
+
+    const observations = sqlite
+      .prepare("SELECT id, job_id AS jobId FROM source_observations ORDER BY observed_at, rowid")
+      .all() as Array<{ id: string; jobId: string }>;
+    const originalCandidate = sqlite
+      .prepare("SELECT id, evidence_digest AS evidenceDigest FROM r2_duplicate_candidates")
+      .get() as { id: string; evidenceDigest: string };
+    new R2Repository(sqlite, fixedNow).decideDuplicate({
+      candidateId: originalCandidate.id,
+      decision: "LINKED",
+      reasonCode: "OWNER_CONFIRMED_TARGET",
+      evidenceVersion: "r2-duplicate-1",
+    });
+    const correctedJob = JSON.parse(
+      sqlite
+        .prepare("SELECT normalized_json FROM jobs WHERE id = ?")
+        .pluck()
+        .get(observations[0]!.jobId) as string,
+    );
+    new BetaRepository(sqlite, fixedNow).recordOwnerCorrection({
+      job: { ...correctedJob, title: "Owner Corrected Canonical Projection" },
+      reasonCode: "OWNER_REVIEWED_FIELDS",
+      changedFields: ["title"],
+    });
+
+    expect(
+      repository.suggestHistoricalDuplicatePair(observations[0]!.id, observations[1]!.id),
+    ).toMatchObject({ candidateId: originalCandidate.id, created: false });
+    expect(
+      sqlite
+        .prepare("SELECT evidence_digest FROM r2_duplicate_candidates WHERE id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(originalCandidate.evidenceDigest);
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM r2_duplicate_decision_versions WHERE candidate_id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(1);
+
+    const third = repository.stage(
+      prepareJobImport(
+        {
+          inputType: "PASTED_SINGLE",
+          acquisitionMethod: "USER_SUPPLIED_CONTENT",
+          sourceHint: "UNKNOWN",
+          content: JSON.stringify({
+            ...common,
+            url: "https://jobs.example.test/fictional-service-role",
+            externalId: "fictional-third-observation",
+          }),
+        },
+        { now: fixedNow },
+      ),
+    );
+    await repository.confirm(
+      third.importId,
+      third.previewToken,
+      selection(third.records[0]!.recordId),
+      provider,
+    );
+    expect(sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get()).toBe(3);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM r2_duplicate_candidates").pluck().get(),
+    ).toBeGreaterThan(1);
+    expect(
+      sqlite
+        .prepare("SELECT evidence_digest FROM r2_duplicate_candidates WHERE id = ?")
+        .pluck()
+        .get(originalCandidate.id),
+    ).toBe(originalCandidate.evidenceDigest);
   });
 
   it("evaluates with a valid private profile and records profile-version provenance", async () => {

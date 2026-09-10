@@ -3,7 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import type BetterSqlite3 from "better-sqlite3";
 import { z } from "zod";
 
-import type { R2EligibilityResult } from "@applypilot/eligibility-engine";
+import {
+  R2_MINIMUM_EXTRACTION_COVERAGE,
+  type R2EligibilityResult,
+} from "@applypilot/eligibility-engine";
 import type { R2FitResult, R2GoldenMetrics } from "@applypilot/fit-scorer";
 import {
   R2ANormalizationSchema,
@@ -21,8 +24,6 @@ import { ownerCorrectedR2Normalization, r2CorrectionValueDigest } from "./r2-cor
 
 export const R2_DUPLICATE_DETECTOR_VERSION = "r2-duplicate-1";
 export const R2_CORRECTION_APPLICABILITY_VERSION = "r2-correction-applicability-1";
-export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-1";
-
 const SafeIdSchema = z
   .string()
   .min(1)
@@ -164,6 +165,100 @@ export class R2Repository {
     );
   }
 
+  duplicateResolutionVersion(jobIdInput: string): string {
+    const jobId = SafeIdSchema.parse(jobIdInput);
+    const rows = this.sqlite
+      .prepare(
+        `SELECT c.id, c.state, c.detector_version AS detectorVersion,
+                c.evidence_digest AS evidenceDigest,
+                (SELECT d.version FROM r2_duplicate_decision_versions d
+                 WHERE d.candidate_id = c.id ORDER BY d.version DESC LIMIT 1) AS decisionVersion,
+                (SELECT d.decision FROM r2_duplicate_decision_versions d
+                 WHERE d.candidate_id = c.id ORDER BY d.version DESC LIMIT 1) AS decision
+         FROM r2_duplicate_candidates c
+         WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
+            OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
+         ORDER BY c.id`,
+      )
+      .all(jobId, jobId);
+    return `${R2_DUPLICATE_DETECTOR_VERSION}:${digest(rows)}`;
+  }
+
+  assertCurrentPreparing(jobIdInput: string, evaluationIdInput: string): void {
+    const jobId = SafeIdSchema.parse(jobIdInput);
+    const evaluationId = SafeIdSchema.parse(evaluationIdInput);
+    const row = this.sqlite
+      .prepare(
+        `SELECT q.state, q.freshness, q.job_version_id AS queueJobVersionId,
+                q.profile_version_id AS queueProfileVersionId,
+                q.r2_evaluation_id AS queueEvaluationId,
+                q.evidence_contract_version AS queueEvidenceContractVersion,
+                q.coverage_version AS queueCoverageVersion,
+                q.duplicate_resolution_version AS queueDuplicateResolutionVersion,
+                e.job_version_id AS evaluationJobVersionId,
+                e.profile_version_id AS evaluationProfileVersionId,
+                e.evidence_contract_version AS evaluationEvidenceContractVersion,
+                e.coverage_version AS evaluationCoverageVersion,
+                e.eligibility_status AS eligibilityStatus, e.recommended, e.stale,
+                (SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1)
+                  AS currentJobVersionId,
+                EXISTS(SELECT 1 FROM candidate_profiles
+                       WHERE active_version_id = e.profile_version_id) AS currentProfile
+         FROM r2_queue_decision_versions q
+         JOIN r2_evaluation_versions e ON e.id = q.r2_evaluation_id
+         WHERE q.job_id = ? ORDER BY q.version DESC LIMIT 1`,
+      )
+      .get(jobId, jobId) as
+      | {
+          state: string;
+          freshness: string;
+          queueJobVersionId: string;
+          queueProfileVersionId: string;
+          queueEvaluationId: string;
+          queueEvidenceContractVersion: string;
+          queueCoverageVersion: string;
+          queueDuplicateResolutionVersion: string;
+          evaluationJobVersionId: string;
+          evaluationProfileVersionId: string;
+          evaluationEvidenceContractVersion: string;
+          evaluationCoverageVersion: string;
+          eligibilityStatus: string;
+          recommended: number;
+          stale: number;
+          currentJobVersionId: string | null;
+          currentProfile: number;
+        }
+      | undefined;
+    const unresolvedDuplicate = this.sqlite
+      .prepare(
+        `SELECT 1 FROM r2_duplicate_candidates c
+         WHERE c.state = 'SUGGESTED' AND (
+           c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?) OR
+           c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = ?)
+         ) LIMIT 1`,
+      )
+      .get(jobId, jobId);
+    if (
+      !row ||
+      row.state !== "PREPARING" ||
+      row.freshness !== "CURRENT" ||
+      row.queueEvaluationId !== evaluationId ||
+      row.queueJobVersionId !== row.evaluationJobVersionId ||
+      row.queueProfileVersionId !== row.evaluationProfileVersionId ||
+      row.queueEvidenceContractVersion !== row.evaluationEvidenceContractVersion ||
+      row.queueCoverageVersion !== row.evaluationCoverageVersion ||
+      row.queueJobVersionId !== row.currentJobVersionId ||
+      !row.currentProfile ||
+      row.eligibilityStatus !== "ELIGIBLE" ||
+      !row.recommended ||
+      row.stale !== 0 ||
+      row.queueDuplicateResolutionVersion !== this.duplicateResolutionVersion(jobId) ||
+      unresolvedDuplicate
+    ) {
+      throw new Error("R2_QUEUE_CURRENT_PREPARING_REQUIRED");
+    }
+  }
+
   private audit(
     type: R2AuditEventType,
     entityType: string,
@@ -203,6 +298,45 @@ export class R2Repository {
     ) {
       throw new Error("R2_EVALUATION_BINDING_MISMATCH");
     }
+    if (input.fit.coveragePercent !== input.eligibility.coveragePercent) {
+      throw new Error("R2_EVALUATION_COVERAGE_MISMATCH");
+    }
+    if (
+      input.fit.recommended &&
+      (input.eligibility.status !== "ELIGIBLE" ||
+        input.eligibility.unresolvedMaterialUnknowns > 0 ||
+        input.eligibility.unresolvedMaterialConditions > 0 ||
+        input.eligibility.unresolvedMaterialConflicts > 0 ||
+        input.eligibility.coveragePercent < R2_MINIMUM_EXTRACTION_COVERAGE ||
+        input.fit.recommendationBlockers.length > 0)
+    ) {
+      throw new Error("R2_RECOMMENDATION_INVARIANT_VIOLATION");
+    }
+    const calibrationContextVersion = SafeVersionSchema.parse(input.fit.calibrationContextVersion);
+    const calibrationRunId = input.fit.calibrationRunId
+      ? SafeIdSchema.parse(input.fit.calibrationRunId)
+      : null;
+    if (input.fit.calibrationState === "CALIBRATED" && !calibrationRunId) {
+      throw new Error("R2_CALIBRATION_RUN_REQUIRED");
+    }
+    if (calibrationRunId) {
+      const calibration = this.sqlite
+        .prepare(
+          `SELECT scorer_version AS scorerVersion, weight_version AS weightVersion, state
+           FROM r2_calibration_runs WHERE id = ?`,
+        )
+        .get(calibrationRunId) as
+        | { scorerVersion: string; weightVersion: string; state: string }
+        | undefined;
+      if (
+        !calibration ||
+        calibration.scorerVersion !== input.fit.scorerVersion ||
+        calibration.weightVersion !== input.fit.weightVersion ||
+        calibration.state !== input.fit.calibrationState
+      ) {
+        throw new Error("R2_CALIBRATION_RUN_BINDING_MISMATCH");
+      }
+    }
     const latestJob = this.sqlite
       .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
       .get(jobId) as { id: string } | undefined;
@@ -216,17 +350,29 @@ export class R2Repository {
       .prepare(
         `SELECT id, eligibility_status AS eligibilityStatus, eligibility_reasons_json AS reasons,
                 fit_score AS fitScore, fit_contributions_json AS contributions,
-                calibration_state AS calibrationState, recommended
+                calibration_state AS calibrationState,
+                calibration_context_version AS calibrationContextVersion,
+                calibration_run_id AS calibrationRunId, recommended,
+                coverage_percent AS coveragePercent,
+                unresolved_unknown_count AS unresolvedUnknownCount,
+                unresolved_condition_count AS unresolvedConditionCount,
+                unresolved_conflict_count AS unresolvedConflictCount
          FROM r2_evaluation_versions
          WHERE job_version_id = ? AND profile_version_id = ? AND evidence_contract_version = ?
-           AND fit_scorer_version = ? AND weight_version = ?`,
+           AND normalization_version = ? AND coverage_version = ?
+           AND eligibility_engine_version = ? AND fit_scorer_version = ?
+           AND weight_version = ? AND calibration_context_version = ?`,
       )
       .get(
         jobVersionId,
         profileVersionId,
         normalization.evidenceContractVersion,
+        normalization.normalizationVersion,
+        `${normalization.parserVersion}:${normalization.normalizationVersion}`,
+        input.eligibility.engineVersion,
         input.fit.scorerVersion,
         input.fit.weightVersion,
+        calibrationContextVersion,
       ) as
       | {
           id: string;
@@ -235,7 +381,13 @@ export class R2Repository {
           fitScore: number;
           contributions: string;
           calibrationState: string;
+          calibrationContextVersion: string;
+          calibrationRunId: string | null;
           recommended: number;
+          coveragePercent: number;
+          unresolvedUnknownCount: number;
+          unresolvedConditionCount: number;
+          unresolvedConflictCount: number;
         }
       | undefined;
     if (existing) {
@@ -245,7 +397,13 @@ export class R2Repository {
         existing.fitScore === input.fit.score &&
         existing.contributions === JSON.stringify(input.fit.contributions) &&
         existing.calibrationState === input.fit.calibrationState &&
-        Boolean(existing.recommended) === input.fit.recommended;
+        existing.calibrationContextVersion === calibrationContextVersion &&
+        existing.calibrationRunId === calibrationRunId &&
+        Boolean(existing.recommended) === input.fit.recommended &&
+        existing.coveragePercent === input.eligibility.coveragePercent &&
+        existing.unresolvedUnknownCount === input.eligibility.unresolvedMaterialUnknowns &&
+        existing.unresolvedConditionCount === input.eligibility.unresolvedMaterialConditions &&
+        existing.unresolvedConflictCount === input.eligibility.unresolvedMaterialConflicts;
       if (!same) throw new Error("R2_EVALUATION_IDEMPOTENCY_CONFLICT");
       return { id: existing.id, created: false };
     }
@@ -263,9 +421,10 @@ export class R2Repository {
             (id,job_id,job_version_id,profile_version_id,evidence_contract_version,
              normalization_version,coverage_version,eligibility_status,eligibility_reasons_json,
              fit_score,fit_contributions_json,eligibility_engine_version,fit_scorer_version,
-             weight_version,calibration_state,recommended,coverage_percent,unresolved_unknown_count,
-             unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
+             weight_version,calibration_state,calibration_context_version,calibration_run_id,
+             recommended,coverage_percent,unresolved_unknown_count,unresolved_condition_count,
+             unresolved_conflict_count,stale,evaluated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
         )
         .run(
           id,
@@ -283,6 +442,8 @@ export class R2Repository {
           input.fit.scorerVersion,
           input.fit.weightVersion,
           input.fit.calibrationState,
+          calibrationContextVersion,
+          calibrationRunId,
           input.fit.recommended ? 1 : 0,
           input.eligibility.coveragePercent,
           input.eligibility.unresolvedMaterialUnknowns,
@@ -395,6 +556,12 @@ export class R2Repository {
         matchedCount: matched.length,
         conflictCount: conflicting.length,
       });
+      const jobs = this.sqlite
+        .prepare("SELECT DISTINCT job_id AS jobId FROM source_observations WHERE id IN (?, ?)")
+        .all(leftObservationId, rightObservationId) as Array<{ jobId: string }>;
+      for (const { jobId } of jobs) {
+        this.markQueueStale(jobId, "DUPLICATE_EVIDENCE_CHANGED");
+      }
     })();
     return { state: "SUGGESTED", candidateId: id, created: true };
   }
@@ -478,6 +645,9 @@ export class R2Repository {
     const jobId = SafeIdSchema.parse(input.jobId);
     const reasonCode = SafeCodeSchema.parse(input.reasonCode);
     const duplicateResolutionVersion = SafeVersionSchema.parse(input.duplicateResolutionVersion);
+    if (duplicateResolutionVersion !== this.duplicateResolutionVersion(jobId)) {
+      throw new Error("R2_DUPLICATE_RESOLUTION_BINDING_MISMATCH");
+    }
     const evaluation = this.sqlite
       .prepare(
         `SELECT id, job_version_id AS jobVersionId, profile_version_id AS profileVersionId,
@@ -599,6 +769,18 @@ export class R2Repository {
          WHERE job_id = ? AND state = 'PREPARING'`,
       )
       .run(reasonCode, this.now().toISOString(), jobId);
+    if (changed > 0) {
+      this.sqlite
+        .prepare(
+          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+           WHERE job_id = ? AND status <> 'INVALIDATED'`,
+        )
+        .run(
+          JSON.stringify({ status: "REVIEW_REQUIRED", blockers: [reasonCode], warnings: [] }),
+          this.now().toISOString(),
+          jobId,
+        );
+    }
     if (writeAudit && changed > 0) {
       this.audit("r2.queue.stale", "job", jobId, { reasonCode, count: changed });
     }
@@ -797,10 +979,12 @@ export class R2Repository {
     statusCount: number;
     scorerVersion: string;
     weightVersion: string;
+    corpusVersion: string;
   }): string {
     const id = this.id();
     const scorerVersion = SafeVersionSchema.parse(input.scorerVersion);
     const weightVersion = SafeVersionSchema.parse(input.weightVersion);
+    const corpusVersion = SafeVersionSchema.parse(input.corpusVersion);
     const privateReviewedCount = z.number().int().nonnegative().parse(input.privateReviewedCount);
     const roleFamilyCount = z.number().int().nonnegative().parse(input.roleFamilyCount);
     const statusCount = z.number().int().min(0).max(3).parse(input.statusCount);
@@ -817,7 +1001,7 @@ export class R2Repository {
           id,
           scorerVersion,
           weightVersion,
-          R2_GOLDEN_CORPUS_VERSION,
+          corpusVersion,
           input.metrics.total,
           privateReviewedCount,
           roleFamilyCount,

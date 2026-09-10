@@ -15,7 +15,7 @@ function fakeDatabase(input: {
 }) {
   return {
     pragma(statement: string) {
-      if (statement === "user_version") return input.schema ?? 4;
+      if (statement === "user_version") return input.schema ?? 5;
       if (statement === "integrity_check") return input.integrity ?? "ok";
       if (statement === "foreign_key_check") return input.foreignKeys ?? [];
       throw new Error(`UNEXPECTED_PRAGMA:${statement}`);
@@ -49,7 +49,7 @@ describe("private R2A reprocess safety", () => {
 
   it("accepts only the current, healthy, single-job supported provenance", () => {
     expect(assertPrivateR2ADatabasePreflight(fakeDatabase({}))).toBe("job:fictional");
-    expect(() => assertPrivateR2ADatabasePreflight(fakeDatabase({ schema: 5 }))).toThrow(
+    expect(() => assertPrivateR2ADatabasePreflight(fakeDatabase({ schema: 6 }))).toThrow(
       "R2A_CURRENT_SCHEMA_REQUIRED",
     );
     expect(() => assertPrivateR2ADatabasePreflight(fakeDatabase({ integrity: "corrupt" }))).toThrow(
