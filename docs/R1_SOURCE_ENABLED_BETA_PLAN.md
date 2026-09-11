@@ -1,10 +1,10 @@
 # R1 source-enabled Personal Beta implementation blueprint
 
-Status: `PLAN_ONLY_WAITING_FOR_APPROVED_TENANT`
+Status: `R1A_OFFLINE_READY_R1B_LEVER_FIXTURE_READY_WAITING_FOR_APPROVED_TENANT`
 
 Reviewed evidence date: 2026-09-08
 
-Current authority: documentation research and fictional transport tests only. No real source request or tenant activation is authorised.
+Current authority: the versioned R1A enforcement layer, fictional Lever R1B reader, durable checkpoints, and source-to-R2 queue wiring are implemented offline. No real source request or tenant activation is authorised. The first real GET still requires the exact owner approval in `OFFLINE_GO_LIVE_ENABLEMENT.md`.
 
 ## Scope and non-goals
 
@@ -58,7 +58,7 @@ The ignored local capability file is the authority presented to runtime. The dur
 - `pageSizeCap`: per-page requested/accepted records; first smoke `25`, hard maximum `100`.
 - `responseByteLimit`: decoded bytes per response; first smoke at most `2,000,000`, hard maximum `5,000,000`.
 - `requestTimeoutMs`: DNS/connect/headers/body deadline, at most `30,000`; `runTimeoutMs`: bounded whole-run deadline greater than the request timeout.
-- `maxRedirects`: first smoke `0`, later maximum `3` only after same-capability review; `maxRetries`: first smoke `0`, later at most `2` idempotent GET retries inside the same budget.
+- `maxRedirects`: literal `0` for Lever so a redirect can never alter approved list/detail request semantics; `maxRetries`: first smoke `0`, later at most `2` idempotent GET retries inside the same budget.
 - `maxConcurrency`: literal `1` per tenant for Personal Beta.
 - `parserVersion`: exact parser version persisted with observations.
 - `createdAt` and `updatedAt`: ISO local configuration timestamps.
@@ -111,14 +111,14 @@ Approving a family never fills `TENANT` and never authorises all tenants. A miss
 - The request budget counts initial requests, redirects, retries, details, and pages. Byte caps apply to decoded streamed bytes even when `Content-Length` is missing or compressed. Require an allowed JSON content type and UTF-8/JSON parse within schema/depth/string/array bounds.
 - One abort signal covers DNS/connection, headers, and complete body consumption. A separate run deadline and owner cancellation signal stop the active body read and mark the run `STOPPED`, never silently complete it later.
 - First smoke has no automatic retry. Later, only idempotent GET may retry a bounded transient network/5xx failure with capped exponential backoff and jitter while capability/run deadlines and request budgets remain current. Never retry 400/401/403/404/409/429, policy/security/schema/size failures, or an unknown response outcome automatically. `Retry-After` is recorded as a safe bounded delay suggestion, not automatic authority.
-- Lever cursor/offset progress stores every requested page key and rejects repeats, reversals, gaps outside policy, or a page that exceeds caps. Greenhouse is one list response and fails closed if record/byte caps are exceeded; it does not fetch details to work around the cap.
+- Lever cursor/offset progress stores every requested page key and rejects repeats, reversals, gaps outside policy, or a page that exceeds caps. A list request has exactly one lowercase `mode=json`, one canonical nonnegative `skip`, and one canonical positive `limit`; values must remain within the immutable record/page caps. On a later owner restart, a completed run reconciles current jobs across all earlier runs under the same capability ID, so successfully committed pages from a stopped run cannot be stranded before R2 evaluation/queue. Greenhouse is one list response and fails closed if record/byte caps are exceeded; it does not fetch details to work around the cap.
 - Persist `RUNNING` before network access and checkpoint request/page counts transactionally with observation writes. Crash leaves `PARTIAL/UNKNOWN`; there is no startup resume. Owner-requested resume revalidates current capability/policy and uses idempotency keys so accepted observations are not duplicated.
 
 ### Tenant isolation, logging, and storage
 
 - Tenant identity is `(source, region, tenant)` throughout capability, run, page, observation, uniqueness, and audit records. IDs never match across tenants by themselves.
 - Candidate profile, preferences, evaluation text, documents, answers, cookies, browser state, auth headers, referrer, and private paths are absent from request construction. Fetch uses GET, `credentials: omit`, no referrer, JSON accept header, and no source/apply API key.
-- Raw response snapshots are untrusted private local data: bounded, hashed, immutable, never rendered as HTML, never logged, and never committed. Normalization receives parsed Zod data and treats all prose as inert.
+- Raw response snapshots are untrusted private local data: bounded, hashed, immutable, never rendered as HTML, never logged, and never committed. Lever's official `lists[]`, HTML description/additional fallbacks, and all mapped prose are converted with a parser to normalized inert text; script/style/form/media/embed content is discarded. Typed ordered sections retain requirements, responsibilities, benefits, and other evidence for R2 without treating benefits as mandatory. Normalization receives only parsed Zod data and inert mapped prose.
 - Audit/log schemas allow only capability/run IDs, source enum, safe tenant alias (not arbitrary URL), operation, versions, counts, timestamps, state, and stable error/stop codes. No response body, full URL/query, headers, DNS answers, tenant secret-like value, candidate content, or free-form exception string.
 - Persistent capability projections must match the active private file version exactly. A source/tenant mismatch, multiple active versions, or stale policy/capability expiry stops before DNS.
 

@@ -9,6 +9,8 @@ import {
   BetaRepository,
   JobImportRepository,
   R2Repository,
+  RunnerEnablementRepository,
+  SourceEnablementRepository,
   openApplyPilotDatabase,
 } from "@applypilot/database";
 import { resolveLocalDataDirectory } from "./local-data-directory";
@@ -71,4 +73,23 @@ export function getR2Repository(): R2Repository | null {
   if (!local) return null;
   const repository = new R2Repository(local.sqlite);
   return repository.available() ? repository : null;
+}
+
+export function getSourceEnablementRepository(): SourceEnablementRepository | null {
+  const local = getLocalDatabase();
+  if (!local) return null;
+  const repository = new SourceEnablementRepository(local.sqlite);
+  return repository.available() ? repository : null;
+}
+
+export function getRunnerEnablementRepository(): RunnerEnablementRepository | null {
+  const local = getLocalDatabase();
+  if (
+    !local ||
+    !local.sqlite
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='runner_run_bindings'")
+      .get()
+  )
+    return null;
+  return new RunnerEnablementRepository(local.sqlite);
 }

@@ -1,6 +1,6 @@
 # Personal go-live gates and test matrix
 
-Status: **MANUAL-INTAKE PERSONAL BETA READY**. PR #10 was reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. Source-enabled Personal Beta is `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production are `NOT_READY`; the real runner is `TARGET_APPROVAL_REQUIRED`. Exact implementation evidence is in [PROJECT_PLAN](../PROJECT_PLAN.md).
+Status: **OFFLINE PERSONAL LIVE V1 ENABLEMENT READY; EXTERNAL ACTIVATION BLOCKED**. Manual-intake Personal Beta and R2 are merged. R1A, fictional Lever R1B, source-to-R2 queue wiring, and the target-independent synthetic runner framework are implemented. Source-enabled Personal Beta is `WAITING_FOR_APPROVED_TENANT`; the real runner is `TARGET_APPROVAL_REQUIRED`; hosted production is `NOT_READY`. Exact activation approvals are in [OFFLINE_GO_LIVE_ENABLEMENT](OFFLINE_GO_LIVE_ENABLEMENT.md).
 
 R2A 3.1.0 is merged and `READY`. R2B/R2C/R2D software is hardened on unmerged PR #13 and awaits final exact-head CI/human review. Additive migration 0006 preserves the immutable 0000–0005 chain and the ignored database is schema v6 with zero pending migrations, integrity `PASS`, zero FK issues, preserved history, and zero qualification rows after verified v5 backup/migration. Calibration remains `UNCALIBRATED`; this does not expand Manual-intake Personal Beta authority or enable a source/runner.
 
@@ -45,11 +45,12 @@ Superseding R2 status: PR #12 is merged; R2A is `READY`, R2B and R2C are `READY`
 - [x] R2B legal/employer/preference outcomes and verified-only scoring/recommendation gates pass.
 - [x] R2C cross-source suggestions, owner link/reject/split, version-bound queue freshness, typed corrections, and audit schemas are durable.
 - [x] R2D fictional golden corpus, content-derived private calibration assessment, truthful `UNCALIBRATED`/`CALIBRATION_PENDING`/`CALIBRATED` gates, uncertainty UX, safe v6 qualification aggregates, and local validation pass. Exact-head PR CI remains pending; no private performance threshold or promotion approval exists.
-- [ ] R1A exact capability approval/revocation/expiry, connection-time DNS pinning, full-body cancellation, and network/tenant threat gates pass without real calls.
-- [ ] R1B selected source-family fictional integration passes; current recommendation is Lever.
+- [x] R1A exact capability approval/revocation/expiry, connection-time DNS pinning, full-body cancellation, bounded checkpoint/recovery, and network/tenant threat gates pass without real calls.
+- [x] R1B Lever fictional list/detail mapping, pagination, tenant-scoped identity, repeated/changed observations, immutable payloads, cross-source suggestions, R2 evaluation and review-queue handoff pass without real calls.
 - [ ] Owner separately identifies and approves one exact tenant and the bounded R1C smoke.
 - [ ] R1C makes exactly the approved read-only call(s), passes private/data/integrity/idempotency checks, and receives a separate post-smoke source-enabled Beta release decision.
-- [ ] A real application target/runner is separately planned, policy-reviewed, implemented, tested, and explicitly approved before any real form operation.
+- [x] Target-independent runner infrastructure, frozen packet/version/document/answer/disclosure bindings, protection stops, durable recovery, one-use consent, and lost-response no-retry pass with synthetic fixtures.
+- [ ] A real application target and adapter are separately selected, policy-reviewed, tested, and explicitly approved before any real form operation.
 
 ## Test matrix
 
@@ -70,9 +71,9 @@ U = unit/domain; I = integration/persistence; B = fictional browser; S = securit
 | CV and cover letter                    | U/I/B/S/M | Verified claims, ten templates, optional tri-state letter, PDF/DOCX parity/path/digest/approval                               | Beta complete for Manual-intake Personal Beta                                               |
 | Packet/answers                         | U/I/B/S/M | Current tuple, tri-state unknowns, document/expiry/duplicate checks, owner review                                             | Packet requires exact current R2 PREPARING; profile is re-resolved before persistence       |
 | Browser/final action                   | U/I/B/S   | Every access/auth/bot/rate/change stop; frozen review; exactly one synthetic click; unknown outcome no retry                  | Synthetic Beta proof complete; real target remains unapproved/disabled                      |
-| Source capability/network              | U/I/B/S/P | Exact tenant/GET, approval/expiry/revocation, pinned public destination, bounded/cancelled/idempotent run, no private payload | Strong reader foundation; R1A/R1B and owner-approved R1C remain                             |
+| Source capability/network              | U/I/B/S/P | Exact tenant/GET, approval/expiry/revocation, pinned public destination, bounded/cancelled/idempotent run, no private payload | R1A/R1B offline gates pass; owner-approved R1C remains                                      |
 | Tracking/recovery                      | U/I/B/S/M | Append-only valid transitions, paused/unknown recovery, no inferred/replayed submit                                           | Manual Beta complete; future real-run recovery needs target gate                            |
-| Database/privacy/publication           | I/B/S/M/P | Additive backup/migration/restore, counts/schema/FKs/integrity; no private Git/history/build/CI data                          | Schema v6 backup/migration/history/privacy verification passes                              |
+| Database/privacy/publication           | I/B/S/M/P | Additive backup/migration/restore, counts/schema/FKs/integrity; no private Git/history/build/CI data                          | Schema v7 backup/migration/history/privacy verification passes                              |
 | UX/a11y/mobile                         | B/M       | Keyboard/focus/labels/contrast/zoom/narrow/long/empty/error states                                                            | Manual Beta route gates pass; R2 evidence/dedup UI and cosmetic separator remain            |
 
 Every implementation head requires formatting, lint, typecheck, unit/integration/browser tests, production build, full and production dependency audits, diff check, privacy audit, database/migration tests where applicable, and exact-head CI. Failed or unavailable checks are reported exactly, not waived. Green fictional CI never replaces source permission, private owner acceptance, or real-target approval.

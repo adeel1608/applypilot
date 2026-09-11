@@ -120,6 +120,7 @@ export const ApplicationRunStateSchema = z.enum([
   "PAUSED",
   "READY_FOR_FINAL_REVIEW",
   "SYNTHETIC_SUBMITTED",
+  "SUBMITTED",
   "OUTCOME_UNKNOWN",
 ]);
 
