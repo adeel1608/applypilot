@@ -3207,3 +3207,59 @@ Focused validation passed: 26 tests across the source contract/security and sour
 The real local database remains schema v7 with zero pending migrations, integrity `PASS`, and zero foreign-key issues. No real source capability or target is configured. Real source GETs, employer-form visits, external uploads, and submissions in this hardening pass are exactly `0/0/0/0`. No private candidate value or real source body entered Git, logs, tests, screenshots, build output, or documentation.
 
 Final handoff requires the clean committed head to repeat the complete release check, immutable-migration diff, staged privacy/scope checks, `git diff --check`, and `git fsck --strict`; then only this same branch is pushed and PR #14's push and pull-request workflows must succeed on the identical SHA. PR #14 remains unmerged for review regardless of CI success. The next task is human/ChatGPT review of this exact focused delta, not live activation.
+
+# First live source preflight compatibility fix - 2026-09-11
+
+Status: `IN_PROGRESS / LIVE_ACTION_BLOCKED / OFFLINE_FIX_ONLY`. PR #14 merged as
+`4bf6b18e75312a59fc1d85a47bc7d8580e556c38`. The owner supplied one exact Shield AI/Global
+Lever capability, but the mandatory preflight rejected its schema-v2 private allowlist before any
+network call because `scripts/preflight-summary.ts` still loads the legacy schema-v1 format from
+the same filename. Real source GETs, employer-form visits, external uploads and submissions remain
+`0/0/0/0`. This run must not attempt the live request after fixing the preflight; a new exact owner
+gate is required after review and merge.
+
+## Objective, assumptions, and requirements
+
+Make operational preflight and release reporting use the same strict `SourceAllowlistV2` authority
+contract as the merged `/sources` owner UI. Preserve the legacy loader for its older isolated public
+posting tests and make no source-transport, parser, pipeline, profile, target, runner, document,
+application or migration change. The private v2 capability remains ignored and must never be
+committed. The real database and approved capability may be read for local verification only; no
+real URL may be resolved or requested during this fix.
+
+## Architecture, files, and data flow
+
+Change only `scripts/preflight-summary.ts`, `scripts/release-summary.ts`, focused synthetic tests,
+and safe documentation/plan records. Both operational scripts will load
+`loadPrivateSourceAllowlistV2`, derive readiness with `sourceCapabilityReadiness`, report active
+approved capability count separately from configured versions, and fail closed when an allowlist
+is malformed or contains no currently enabled capability. Data flow becomes:
+
+`ignored source-allowlist.json -> strict v2 parser -> current approval/policy/capability expiry gate -> preflight/release status -> owner UI`.
+
+No transport or DNS function is imported or invoked by these checks.
+
+## Dependencies, risks, security/privacy, and rollback
+
+No dependency or schema change is required. Risks are treating an expired/revoked v2 record as live,
+silently accepting malformed authority, exposing tenant/private values in logs, breaking the safe
+zero-capability baseline, or accidentally invoking transport in a test. Controls are strict parsing,
+current-readiness filtering, aggregate-only output, fictional temporary allowlists, transport-free
+tests, ignored-path verification, and full privacy/release checks. Rollback is a focused revert of
+this branch; migrations `0000`-`0007` remain byte-for-byte immutable and migration `0008` is not
+needed.
+
+## Testing strategy, acceptance criteria, and steps
+
+Add synthetic process-level coverage for absent, valid approved, expired/revoked, and malformed v2
+allowlists, proving the operational scripts agree with the owner UI contract and make zero network
+calls. Acceptance requires the original real v2 file to pass locally without printing its contents,
+all full release gates to pass, schema v7/pending 0/integrity PASS/FKs 0, clean privacy and dependency
+audits, exact-head push and PR CI green, and all real-action counters still `0/0/0/0`.
+
+Implementation steps: commit this blueprint; add the focused synthetic regression first; switch both
+operational scripts to v2 readiness; run focused tests and local preflight; record actual results;
+run format, lint, strict typecheck, unit, integration, production build, serialized E2E,
+migration/backup/restore, security/privacy/dependency audits, doctor, preflight, release check,
+`git diff --check`, immutable-migration diff, and `git fsck --strict`; commit/push the same branch;
+open `fix: harden first live source smoke`; require exact-head push and PR CI green; stop unmerged.
