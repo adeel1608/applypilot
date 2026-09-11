@@ -3211,8 +3211,8 @@ Final handoff requires the clean committed head to repeat the complete release c
 # First live source preflight compatibility fix - 2026-09-11
 
 Status: `IN_PROGRESS / LIVE_ACTION_BLOCKED / OFFLINE_FIX_ONLY`. PR #14 merged as
-`4bf6b18e75312a59fc1d85a47bc7d8580e556c38`. The owner supplied one exact Shield AI/Global
-Lever capability, but the mandatory preflight rejected its schema-v2 private allowlist before any
+`4bf6b18e75312a59fc1d85a47bc7d8580e556c38`. The owner supplied one exact real Lever capability,
+but the mandatory preflight rejected its schema-v2 private allowlist before any
 network call because `scripts/preflight-summary.ts` still loads the legacy schema-v1 format from
 the same filename. Real source GETs, employer-form visits, external uploads and submissions remain
 `0/0/0/0`. This run must not attempt the live request after fixing the preflight; a new exact owner
@@ -3263,3 +3263,37 @@ run format, lint, strict typecheck, unit, integration, production build, seriali
 migration/backup/restore, security/privacy/dependency audits, doctor, preflight, release check,
 `git diff --check`, immutable-migration diff, and `git fsck --strict`; commit/push the same branch;
 open `fix: harden first live source smoke`; require exact-head push and PR CI green; stop unmerged.
+
+## First live source preflight compatibility implementation results - 2026-09-11
+
+Status: `IMPLEMENTED / OFFLINE_GATES_PASS / LIVE_REQUEST_NOT_ATTEMPTED`. Mandatory preflight
+blocked the authorized real capability before transport because the operational preflight and
+release scripts parsed the shared private filename with the legacy v1 loader while the merged owner
+UI required v2. The live authority was not consumed: real source GETs, employer-form visits,
+external uploads and submissions remain exactly `0/0/0/0`.
+
+The fix adds one transport-free operational readiness helper shared by preflight and release
+reporting. It strictly loads `SourceAllowlistV2`, counts only capabilities whose approval, policy
+window and capability window are currently enabled, and reports configured and active counts
+without tenant, URL, posting or candidate values. The legacy loader remains unchanged for its
+isolated older contract. Synthetic regressions prove absent, approved-current, expired,
+policy-expired, revoked and malformed cases; no DNS or HTTP dependency is present.
+
+Focused validation passed 25 tests across two files plus strict typecheck and lint. The complete
+offline release check passed formatting, lint, typecheck, 347 unit tests in 46 files, 21 integration
+tests in three files, a production build with 31 route units, 27 serialized E2E tests, privacy audit
+over 271 tracked files/731 history paths/732 history blobs/1,242 build artifacts/11 private canaries,
+and full plus production dependency audits with zero known vulnerabilities. Seventeen focused
+migration/schema/backup/restore tests passed. Migration preview remains schema v7 to v7 with zero
+pending changes; migrations `0000`-`0007` have no diff and no `0008` exists. Verified ignored
+backups `backup-2026-09-11T01-58-24.309Z-7d0070b2` and
+`backup-2026-09-11T02-03-58.579Z-600c4d8e` report schema v7/integrity PASS, and restore preview of
+the pre-action backup passed. The real database remains schema v7, pending zero, integrity PASS and
+foreign-key issues zero. Strict Git fsck completed with only pre-existing unreachable objects.
+
+The exact private capability file is ignored and not part of Git. Local preflight now reports one
+configured/current v2 capability without invoking transport, but this run remains offline after the
+initial preflight blocker. The implementation branch must be pushed and one PR titled
+`fix: harden first live source smoke` left unmerged with exact-head CI green. After that PR is
+reviewed and merged, the owner must issue a fresh exact first-GET authorization with a new execution
+window before any real source request; the expired or current private record alone is insufficient.
