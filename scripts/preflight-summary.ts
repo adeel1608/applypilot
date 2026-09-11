@@ -3,8 +3,6 @@ import { join } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 
-import { loadPrivateSourceAllowlist } from "@applypilot/job-sources";
-
 import {
   assertConfiguredLocalHost,
   configuredLocalPort,
@@ -12,12 +10,13 @@ import {
 } from "./lib/local-process";
 import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
+import { operationalSourceReadiness } from "./lib/source-readiness";
 import { validatePrivateProfileAtPath } from "./validate-private-profile";
 
 async function main(): Promise<void> {
   const root = repositoryRoot();
   const profile = await validatePrivateProfileAtPath(join(root, "data", "profile.private.json"));
-  const source = await loadPrivateSourceAllowlist(root);
+  const source = await operationalSourceReadiness(root);
   const databasePresent = existsSync(localDatabasePath());
   let databaseSchema = 0;
   let databaseIntegrity = "UNKNOWN";
@@ -60,7 +59,7 @@ async function main(): Promise<void> {
   console.log("PREFLIGHT_LOOPBACK host=127.0.0.1 status=PASS");
   console.log("PREFLIGHT_OUTPUT_ROOT status=PASS");
   console.log(
-    `PREFLIGHT_SOURCE state=${source.status} capability_count=${source.capabilities.length}`,
+    `PREFLIGHT_SOURCE state=${source.state} capability_count=${source.configuredCapabilityCount} active_capability_count=${source.activeCapabilityCount}`,
   );
   console.log("PREFLIGHT_RUNNER real_target=TARGET_APPROVAL_REQUIRED synthetic=TEST_MODE_ONLY");
   console.log(`PREFLIGHT_BACKUP readiness=${databasePresent ? "READY" : "WAITING_FOR_DATABASE"}`);
@@ -68,7 +67,7 @@ async function main(): Promise<void> {
     `PREFLIGHT_MANUAL_INTAKE_BETA state=${manualBetaBlockers.length === 0 && failures.length === 0 ? "READY" : "BLOCKED"}`,
   );
   console.log(
-    `PREFLIGHT_SOURCE_ENABLED_BETA state=${source.capabilities.length > 0 ? "APPROVED_CAPABILITY_PRESENT" : "WAITING_FOR_APPROVED_TENANT"}`,
+    `PREFLIGHT_SOURCE_ENABLED_BETA state=${source.activeCapabilityCount > 0 ? "APPROVED_CAPABILITY_PRESENT" : "WAITING_FOR_APPROVED_TENANT"}`,
   );
   console.log(
     `PREFLIGHT_RESULT status=${failures.length ? "BLOCKED" : manualBetaBlockers.length ? "PASS_WITH_MANUAL_BETA_BLOCKERS" : "PASS"} blockers=${failures.length ? failures.join(",") : manualBetaBlockers.length ? manualBetaBlockers.join(",") : "none"}`,
