@@ -4895,3 +4895,112 @@ this branch, open one offline PR, and require exact-head push plus pull-request 
 After a clean full-delta self-review, normal merge is permitted only under the owner's pre-approved
 conditions. Refresh `main` after merge and stop. No eighth source request or employer action is
 authorized.
+
+# Per-record Lever source accounting before eighth GET - 2026-09-12
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting
+`main` and `origin/main` are `0c709cee07dc4a953d6dda88eb2de2528fb4563c`; the implementation branch
+is `fix/lever-per-record-accounting`. The real action baseline is exactly seven source GETs, zero
+employer-form visits, zero uploads, and zero submissions. No network or employer interaction is
+authorized in this task.
+
+## Current state, objective, assumptions, and requirements
+
+PR #25 correctly moved ApplyPilot's local identity/title/location/description usability gate ahead
+of persistence, but `parseLeverPage` still maps the structurally valid provider array with a throwing
+per-record mapper. One locally unusable posting therefore aborts the whole otherwise valid page and
+discards accepted siblings. Provider-contract structure and local product usability need distinct
+failure semantics.
+
+The objective is to validate the complete Lever page structurally first, then classify every posting
+independently as `ACCEPTED` or `SOURCE_RECORD_UNUSABLE`. Provider structural failures remain
+page-fatal and permit no partial persistence. Local unusability is a per-record disposition and must
+not discard valid siblings. Provider/wire cardinality, rather than accepted cardinality, must drive
+the source record budget and next cursor. Only accepted records may enter observation persistence,
+normalization, job versioning, R2 evaluation, queueing, or target preparation.
+
+Safe unusable reasons are fixed to `UNUSABLE_IDENTITY`, `UNUSABLE_TITLE`,
+`MISSING_EFFECTIVE_LOCATION`, and `MISSING_USABLE_DESCRIPTION`. A diagnostic may contain only one of
+those reason codes and the bounded page-local record index. It may never contain a provider value,
+title, location, description, URL, arbitrary key, raw fragment, stack, or Zod message. Workplace
+drift behavior remains exact: official values retain semantics; absence is unknown without warning;
+null or an undocumented string becomes unknown plus a value-free warning; structural corruption is
+page-fatal.
+
+## Architecture, proposed files, data flow, and dependencies
+
+- `packages/job-sources/src/source-capability.ts`: add a strict fixed-enum per-record unusable
+  diagnostic and `source.record.unusable` audit metadata. Extend the existing page-persisted audit
+  with explicit provider, accepted, unusable, drift-warning, and persisted-observation aggregates
+  while retaining `recordCount` as the provider-count compatibility field.
+- `packages/job-sources/src/lever/v2-reader.ts`: keep whole-page Zod validation first; replace the
+  throwing page mapper with a disposition outcome; retain the throwing detail boundary; expose
+  provider count, accepted records, safe unusable diagnostics, and drift diagnostics. Build the page
+  digest from an ordered per-provider-record disposition sequence: accepted entries use their local
+  immutable identity/content digests, while unusable entries use only record index and fixed reason.
+  Advance the cursor and consume the record budget by provider count.
+- `packages/job-sources/src/source-runner.ts`: collect and return accepted records only while keeping
+  provider-count budget semantics and safe aggregate diagnostics.
+- `packages/database/src/source-enablement-repository.ts`: transactionally persist accepted records,
+  the provider-count page row, fixed unusable audits, fixed drift audits, and aggregate page audit.
+  Zero-accepted pages remain valid persisted pages and do not become `PERSISTENCE_FAILED`.
+- `apps/web/lib/source-workspace.ts` and `apps/web/app/sources/page.tsx`: recover and render only safe
+  aggregates for provider records, accepted records, unusable records, drift warnings, and persisted
+  observations. Existing historical rows remain readable without a migration.
+- `packages/job-sources/src/source-capability.test.ts` and
+  `packages/database/src/source-enablement-repository.test.ts`: add the complete synthetic matrix for
+  25 valid, mixed unusable position/reason/count cases, all unusable, documented fallbacks, accepted
+  and unusable drift, structural fatality, replay, cursor, provider-count budget, safe audits, and
+  downstream accepted-only processing.
+- `README.md`, `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, and this plan: document the policy and
+  readiness honestly without claiming the inaccessible seventh response's cause.
+
+The data flow becomes `bounded provider response -> full documented structural validation -> ordered
+per-record accepted/unusable disposition -> provider-count budget/cursor/digest -> one atomic page
+transaction containing accepted observations and value-free accounting -> accepted-only R2/queue`.
+No new package, dependency, lockfile, table, column, migration, external service, capability, or
+network authority is planned. Migrations `0000`-`0007` remain immutable.
+
+## Risks, security/privacy, testing, rollback, and acceptance
+
+Primary risks are accidentally allowing a structural failure to partially persist, advancing by the
+accepted count and replaying provider records, making unusable records free against source limits,
+building a digest that ignores unusable dispositions, leaking raw provider values through audits,
+or producing downstream state for rejected records. Controls are strict whole-page validation,
+ordered value-free disposition tokens, explicit provider/accepted count assertions, transaction
+tests, fixed diagnostic schemas, drift-on-unusable redaction checks, replay assertions, authority and
+migration diffs, and the existing privacy/showcase audits. Private profiles, vacancies, databases,
+backups, allowlists, source payloads, generated documents, packets, browser/session state, tokens,
+and credentials remain ignored and uncommitted.
+
+Testing must run focused reader/runner/repository tests, format check, zero-warning lint, strict
+typecheck, complete unit and integration suites, serialized E2E, local and showcase production
+builds, showcase boundary and privacy audits, full and production dependency audits, real database
+status, schema/integrity/FKs, synthetic migration/backup/restore tests and restore preview, migration
+immutability, aggregate preflight and release check, `git diff --check`, and `git fsck --strict`.
+
+Rollback is a normal revert of the branch or merge commit. Audit additions use the current generic
+append-only audit table, so no down-migration or private-data cleanup is required. Acceptance
+requires the fifteen-case synthetic matrix to pass; structural failures to remain page-fatal with no
+partial page; provider count to drive budget, cursor, page row, and run accounting; accepted-only
+downstream processing; deterministic digest differentiation for unusable dispositions; safe recovery
+aggregates; zero-accepted pages to persist and complete; unchanged workplace-drift and authority
+policy; schema v7/pending zero/integrity `PASS`/FKs zero; no migration; privacy `PASS`; exact-head
+local and GitHub CI green; and lifetime actions unchanged at `7/0/0/0`.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before changing application code.
+2. Add the strict unusable disposition/audit contract and refactor the reader around whole-page
+   structural validation followed by non-throwing per-record classification.
+3. Correct provider-count budget, pagination, and deterministic page-digest semantics.
+4. Persist accepted observations plus value-free unusable/drift accounting atomically, including
+   zero-accepted pages, and expose safe recovery/UI aggregates.
+5. Add the complete fictional synthetic matrix and update accurate source-policy documentation.
+6. Run focused checks, inspect authority/privacy/migration diffs, then run the full validation matrix
+   and record exact results here.
+7. Commit and push only this branch; open PR `fix: account for unusable Lever records individually`;
+   require exact-head push and pull-request CI green; self-review the complete base-to-head diff; and
+   merge normally only if every owner-preapproved condition still holds.
+8. Refresh clean `main`, confirm action counters remain `7/0/0/0`, and stop with an exact proposed
+   eighth-GET authority. Do not execute it.
