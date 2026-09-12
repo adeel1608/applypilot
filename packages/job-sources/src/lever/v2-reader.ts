@@ -6,6 +6,11 @@ import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
   type SourceCapabilityV2,
+  SourceSchemaDiagnosticFieldSchema,
+  SourceSchemaDiagnosticSchema,
+  type SourceSchemaDiagnostic,
+  type SourceSchemaDiagnosticField,
+  type SourceSchemaExpectedType,
 } from "../source-capability";
 import {
   SecureSourceError,
@@ -20,45 +25,171 @@ const LeverCategoriesV2Schema = z
     department: z.string().optional(),
     location: z.string().optional(),
     team: z.string().optional(),
-    allLocations: z.array(z.string()).max(100).optional(),
+    level: z.string().optional(),
+    allLocations: z.array(z.string()).optional(),
   })
   .passthrough();
 
 const LeverListV2Schema = z
   .object({
-    text: z.string().max(5_000).default(""),
-    content: z.string().max(500_000).default(""),
+    text: z.string(),
+    content: z.string(),
   })
   .passthrough();
 
 export const LeverPostingV2Schema = z
   .object({
-    id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
-    text: z.string().min(1).max(1_000),
+    id: z.string(),
+    text: z.string(),
     hostedUrl: z.url(),
     applyUrl: z.url(),
-    description: z.string().max(500_000).optional(),
-    descriptionPlain: z.string().max(500_000).default(""),
-    additional: z.string().max(500_000).optional(),
-    additionalPlain: z.string().max(500_000).optional(),
-    lists: z.array(LeverListV2Schema).max(100).default([]),
+    opening: z.string().optional(),
+    openingPlain: z.string().optional(),
+    description: z.string().optional(),
+    descriptionPlain: z.string().default(""),
+    descriptionBody: z.string().optional(),
+    descriptionBodyPlain: z.string().optional(),
+    additional: z.string().optional(),
+    additionalPlain: z.string().optional(),
+    lists: z.array(LeverListV2Schema).default([]),
     categories: LeverCategoriesV2Schema.optional(),
-    country: z.string().max(100).nullable().optional(),
+    country: z
+      .string()
+      .regex(/^[A-Za-z]{2}$/)
+      .nullable()
+      .optional(),
     workplaceType: z.enum(["on-site", "remote", "hybrid", "unspecified"]).optional(),
     salaryRange: z
       .object({
-        min: z.number().finite().nonnegative().optional(),
-        max: z.number().finite().nonnegative().optional(),
-        currency: z.string().max(10).optional(),
-        interval: z.string().max(50).optional(),
+        min: z.number().optional(),
+        max: z.number().optional(),
+        currency: z.string().optional(),
+        interval: z.string().optional(),
       })
       .passthrough()
       .optional(),
+    salaryDescription: z.string().optional(),
+    salaryDescriptionPlain: z.string().optional(),
   })
   .passthrough();
 
-const LeverPageV2Schema = z.array(LeverPostingV2Schema).max(100);
+const LeverPageV2Schema = z.array(LeverPostingV2Schema);
 export type LeverPostingV2 = z.infer<typeof LeverPostingV2Schema>;
+
+const expectedTypeByField = Object.freeze({
+  id: "string",
+  text: "string",
+  categories: "object",
+  "categories.location": "string",
+  "categories.commitment": "string",
+  "categories.team": "string",
+  "categories.department": "string",
+  "categories.level": "string",
+  "categories.allLocations": "array",
+  "categories.allLocations[]": "string",
+  country: "string|null",
+  opening: "string",
+  openingPlain: "string",
+  description: "string",
+  descriptionPlain: "string",
+  descriptionBody: "string",
+  descriptionBodyPlain: "string",
+  lists: "array",
+  "lists[]": "object",
+  "lists[].text": "string",
+  "lists[].content": "string",
+  additional: "string",
+  additionalPlain: "string",
+  hostedUrl: "url",
+  applyUrl: "url",
+  workplaceType: "enum",
+  salaryRange: "object",
+  "salaryRange.currency": "string",
+  "salaryRange.interval": "string",
+  "salaryRange.min": "number",
+  "salaryRange.max": "number",
+  salaryDescription: "string",
+  salaryDescriptionPlain: "string",
+}) satisfies Readonly<
+  Record<
+    Exclude<SourceSchemaDiagnosticField, "UNKNOWN_CONTRACT_BOUNDARY">,
+    SourceSchemaExpectedType
+  >
+>;
+
+function canonicalIssuePath(path: readonly PropertyKey[]): {
+  field: string;
+  recordIndex?: number;
+} {
+  const segments = [...path];
+  const first = segments[0];
+  const recordIndex = typeof first === "number" ? first : undefined;
+  if (recordIndex !== undefined) segments.shift();
+  const parts: string[] = [];
+  for (const segment of segments) {
+    if (typeof segment === "string") {
+      parts.push(segment);
+      continue;
+    }
+    if (typeof segment === "number" && parts.length > 0) {
+      parts[parts.length - 1] = `${parts[parts.length - 1]}[]`;
+      continue;
+    }
+    return { field: "UNKNOWN_CONTRACT_BOUNDARY", recordIndex };
+  }
+  return { field: parts.join("."), recordIndex };
+}
+
+function issuePathIsMissing(input: unknown, path: readonly PropertyKey[]): boolean {
+  let current = input;
+  for (const segment of path) {
+    if ((typeof segment !== "string" && typeof segment !== "number") || current === null) {
+      return false;
+    }
+    if (typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, segment)) {
+      return true;
+    }
+    current = (current as Record<PropertyKey, unknown>)[segment];
+  }
+  return current === undefined;
+}
+
+function redactedSchemaDiagnostic(error: z.ZodError, input: unknown): SourceSchemaDiagnostic {
+  const issue = error.issues[0];
+  if (!issue) {
+    return {
+      field: "UNKNOWN_CONTRACT_BOUNDARY",
+      expectedStructuralType: Array.isArray(input) ? "object" : "array",
+      issueCategory: "UNKNOWN_CONTRACT_BOUNDARY",
+    };
+  }
+  const canonical = canonicalIssuePath(issue.path);
+  const field = SourceSchemaDiagnosticFieldSchema.safeParse(canonical.field);
+  if (!field.success || field.data === "UNKNOWN_CONTRACT_BOUNDARY") {
+    return SourceSchemaDiagnosticSchema.parse({
+      field: "UNKNOWN_CONTRACT_BOUNDARY",
+      expectedStructuralType: Array.isArray(input) ? "object" : "array",
+      issueCategory: "UNKNOWN_CONTRACT_BOUNDARY",
+      ...(canonical.recordIndex === undefined ? {} : { recordIndex: canonical.recordIndex }),
+    });
+  }
+  const expectedStructuralType = expectedTypeByField[field.data] ?? "object";
+  const issueCategory = issuePathIsMissing(input, issue.path)
+    ? "MISSING_REQUIRED"
+    : expectedStructuralType === "url" && issue.code === "invalid_format"
+      ? "INVALID_URL"
+      : expectedStructuralType === "enum" && issue.code === "invalid_value"
+        ? "INVALID_ENUM"
+        : issue.code === "invalid_format"
+          ? "INVALID_FORMAT"
+          : "FIELD_TYPE_MISMATCH";
+  return SourceSchemaDiagnosticSchema.parse({
+    field: field.data,
+    expectedStructuralType,
+    issueCategory,
+    ...(canonical.recordIndex === undefined ? {} : { recordIndex: canonical.recordIndex }),
+  });
+}
 
 type DeepReadonly<T> = T extends (...args: never[]) => unknown
   ? T
@@ -119,7 +250,9 @@ function freezeDeep<T>(value: T): T {
 function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): LeverPostingRecordV2 {
   const raw = JSON.stringify(posting);
   const title = extractInertLeverText(posting.text);
-  if (!title) throw new SecureSourceError("SCHEMA_CHANGED");
+  if (!posting.id.trim() || !title) {
+    throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
+  }
   const sections = Object.freeze(
     posting.lists
       .map(({ text, content }) => {
@@ -181,20 +314,38 @@ function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): Le
   };
 }
 
-function responseBodyFailure(error: unknown): never {
+function responseBodyFailure(error: unknown, input: unknown): never {
   if (error instanceof SecureSourceError) {
     throw error.lifecycleStage
       ? error
-      : new SecureSourceError(error.code, error.retryAfter, "RESPONSE_BODY");
+      : new SecureSourceError(
+          error.code,
+          error.retryAfter,
+          "RESPONSE_BODY",
+          error.schemaDiagnostic,
+        );
   }
-  throw new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY");
+  throw new SecureSourceError(
+    "SCHEMA_CHANGED",
+    null,
+    "RESPONSE_BODY",
+    error instanceof z.ZodError ? redactedSchemaDiagnostic(error, input) : null,
+  );
 }
 
-function parseLeverPage(input: unknown, capability: SourceCapabilityV2): LeverPostingRecordV2[] {
+function parseLeverPage(
+  input: unknown,
+  capability: SourceCapabilityV2,
+  pageSize: number,
+): LeverPostingRecordV2[] {
   try {
-    return LeverPageV2Schema.parse(input).map((posting) => mapPosting(posting, capability));
+    const postings = LeverPageV2Schema.parse(input);
+    if (postings.length > pageSize) {
+      throw new SecureSourceError("PAGE_SIZE_EXCEEDED", null, "RESPONSE_BODY");
+    }
+    return postings.map((posting) => mapPosting(posting, capability));
   } catch (error) {
-    responseBodyFailure(error);
+    responseBodyFailure(error, input);
   }
 }
 
@@ -202,7 +353,7 @@ function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): Leve
   try {
     return mapPosting(LeverPostingV2Schema.parse(input), capability);
   } catch (error) {
-    responseBodyFailure(error);
+    responseBodyFailure(error, input);
   }
 }
 
@@ -257,10 +408,7 @@ export async function readLeverPageV2(input: {
     signal: input.signal,
     dependencies: input.dependencies,
   });
-  const records = parseLeverPage(response.body, capability);
-  if (records.length > pageSize) {
-    throw new SecureSourceError("PAGE_SIZE_EXCEEDED", null, "RESPONSE_BODY");
-  }
+  const records = parseLeverPage(response.body, capability, pageSize);
   const pageDigest = createHash("sha256")
     .update(
       records.map(({ externalId, contentDigest }) => `${externalId}:${contentDigest}`).join("\n"),

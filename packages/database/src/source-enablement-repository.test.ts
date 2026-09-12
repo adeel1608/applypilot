@@ -578,13 +578,60 @@ describe("offline source-to-R2 queue persistence", () => {
       status: "STOPPED",
       safeErrorCode: "SCHEMA_CHANGED",
       transportStage: "RESPONSE_BODY",
+      schemaDiagnostic: {
+        field: "hostedUrl",
+        expectedStructuralType: "url",
+        issueCategory: "INVALID_URL",
+        recordIndex: 0,
+      },
     });
-    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
-      "private malformed value",
+    const stoppedAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata
+         FROM audit_events WHERE event_type='source.run.stopped' AND entity_id=?`,
+      )
+      .get(result.runId) as { metadata: string };
+    expect(JSON.parse(stoppedAudit.metadata)).toEqual({
+      runId: result.runId,
+      code: "SCHEMA_CHANGED",
+      transportStage: "RESPONSE_BODY",
+      schemaDiagnostic: {
+        field: "hostedUrl",
+        expectedStructuralType: "url",
+        issueCategory: "INVALID_URL",
+        recordIndex: 0,
+      },
+      requestCount: 1,
+      recordCount: 0,
+    });
+    expect(stoppedAudit.metadata).not.toMatch(
+      /private malformed value|invalid_format|message|stack/i,
     );
     expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
       count: 0,
     });
+    sqlite
+      .prepare(
+        `UPDATE audit_events SET redacted_metadata_json=?
+         WHERE event_type='source.run.stopped' AND entity_id=?`,
+      )
+      .run(
+        JSON.stringify({
+          runId: result.runId,
+          code: "SCHEMA_CHANGED",
+          transportStage: "RESPONSE_BODY",
+          schemaDiagnostic: {
+            field: "arbitraryProviderKey",
+            expectedStructuralType: "string",
+            issueCategory: "FIELD_TYPE_MISMATCH",
+            recordIndex: 0,
+          },
+          requestCount: 1,
+          recordCount: 0,
+        }),
+        result.runId,
+      );
+    expect(repository.recovery(result.runId)).toMatchObject({ schemaDiagnostic: null });
     sqlite.close();
   });
 

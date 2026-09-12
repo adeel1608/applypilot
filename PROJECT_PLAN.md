@@ -4505,3 +4505,72 @@ Exact implementation sequence:
    self-review the complete base-to-head delta, and merge only if every pre-approved condition holds.
 7. Refresh clean `main`, confirm lifetime action counters remain `5/0/0/0`, and return the exact sixth-
    GET proposal without executing it.
+
+## Lever contract boundary implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD RELEASE AND PR CI PENDING`. The official
+field matrix is recorded in `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`. Every named provider member now
+has a documented structural rule, a separately identified local product semantic, or an independent
+resource/security control. The response parser no longer imposes the undocumented ID syntax/length,
+title/description/list text lengths, 100-element list/all-location limits, 100-character country
+limit, non-negative salary constraint, currency/interval lengths, or 100-record schema-array bound.
+Country instead follows the documented nullable ISO alpha-2 form. The approved page size and record
+cap still stop oversized pages as `PAGE_SIZE_EXCEEDED` before records are mapped; the production whole-
+response byte bound remains unchanged.
+
+Explicitly typed provider fields now include `opening`, `openingPlain`, `descriptionBody`,
+`descriptionBodyPlain`, `salaryDescription`, `salaryDescriptionPlain`, and `categories.level`. They are
+retained as deeply frozen raw provenance and do not become new eligibility or scoring evidence.
+Existing combined descriptions, lists, additional text, categories, salary range, URLs, country, and
+workplace type retain strict documented shapes and inert conversion. Unknown extensions remain
+passthrough raw provenance only. Empty or inert-empty local identity content now stops as
+`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY`, not provider `SCHEMA_CHANGED`.
+
+`SCHEMA_CHANGED / RESPONSE_BODY` errors now carry at most one strict diagnostic with a hardcoded
+documented field identifier (or `UNKNOWN_CONTRACT_BOUNDARY`), a fixed expected-structure enum, a fixed
+issue-category enum, and an optional bounded top-level record index. The `SecureSourceError`, source
+runner, stopped-run sink, existing redacted audit JSON, recovery query, server-side workspace, and
+owner recovery UI propagate only that validated tuple. Values, raw fragments, provider keys, Zod
+messages, stack traces, titles, URLs, descriptions, employers, and candidate data are never included.
+Invalid/tampered diagnostic members parse to null. Existing audits remain compatible and no migration
+is required.
+
+The changed implementation/docs set is `PROJECT_PLAN.md`, `README.md`,
+`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `packages/job-sources/src/source-capability.ts`,
+`packages/job-sources/src/secure-source-transport.ts`,
+`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
+`packages/job-sources/src/source-capability.test.ts`,
+`packages/database/src/source-enablement-repository.ts`,
+`packages/database/src/source-enablement-repository.test.ts`, `apps/web/lib/source-workspace.ts`, and
+`apps/web/app/sources/page.tsx`. No source request/URL/query/DNS/TLS/pinning/redirect/retry/concurrency,
+capability authority, page/request budget, target, runner, upload, submission, dependency, lockfile,
+schema, or migration file changed.
+
+Synthetic focused validation passes 98 tests across the source-contract and durable repository files.
+It covers long but two-megabyte-budget-valid title/description strings, 101 locations and lists,
+unusual opaque IDs, negative finite salaries, long currency/interval strings, nullable and absent
+country, all workplace values, documented opening/body/plain/salary-description fields, unknown
+extensions, every named malformed type family, missing required fields, invalid URL/enum/ISO format,
+unknown boundary collapse, product-unusable classification, exact diagnostic keys, invalid diagnostic
+rejection, durable audit storage, tamper-to-null recovery, and absence of fictional sentinel values.
+
+The complete pre-commit `npm.cmd run release:check` passed doctor, schema/status and aggregate
+preflight, format check, zero-warning lint, strict typecheck, 421 unit tests across 47 files, 21
+integration tests across three files, the local production build with 31 route units, the static
+showcase build with six pages, public-showcase audit across 19 source/config files plus the export, 31
+serialized Playwright tests, privacy audit, and full/production dependency audits with zero known
+vulnerabilities. Privacy checked 305 tracked files, 823 history paths, 821 history blobs, 1,289 build/
+test artifacts, and 11 private canaries. Fifteen focused database migration/schema/backup/restore and
+runtime-path tests across three files pass.
+
+The real database was read only and remains schema v7, zero pending migrations, integrity `PASS`, and
+zero foreign-key issues. Migrations `0000`-`0007` have an empty start-to-working-tree diff and no
+migration was added. `git diff --check` and `git fsck --strict` exit successfully; the latter reports
+only pre-existing unreachable objects. This task has made zero source requests, employer-form visits,
+uploads, or submissions, so lifetime counts remain exactly `5/0/0/0`.
+
+Remaining release mechanics are to commit the implementation and result record, rerun the complete
+release gate on that exact clean head, recheck migration/diff/fsck invariants, push only this branch,
+open the named PR, require exact-head push and PR workflows green, and self-review the full base-to-head
+delta. Normal merge is permitted only if every owner-preapproved condition remains satisfied. No live
+GET follows the merge in this task.

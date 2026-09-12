@@ -4,10 +4,12 @@ import { dirname } from "node:path";
 
 import {
   SourceCapabilityV2Schema,
+  SourceSchemaDiagnosticSchema,
   SourceTransportLifecycleStageSchema,
   loadPrivateSourceAllowlistV2,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
+  type SourceSchemaDiagnostic,
 } from "@applypilot/job-sources";
 import { runLeverSourceToQueue } from "@applypilot/database";
 
@@ -52,6 +54,7 @@ export interface SourceEnablementView {
     recordCount: number;
     safeErrorCode: string | null;
     transportStage: string | null;
+    schemaDiagnostic: SourceSchemaDiagnostic | null;
     retryAfter: string | null;
     startedAt: string;
     completedAt: string | null;
@@ -93,14 +96,54 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
      (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
         AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
+     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.field')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaField,
+     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.expectedStructuralType')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaExpectedType,
+     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.issueCategory')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaIssueCategory,
+     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex,
      r.retry_after AS retryAfter,r.owner_started_at AS startedAt,r.completed_at AS completedAt
      FROM source_run_checkpoints r JOIN source_capability_versions c ON c.id=r.capability_version_id
      ORDER BY r.owner_started_at DESC LIMIT 20`,
     )
-    .all() as Array<SourceEnablementView["recentRuns"][number] & { transportStage: unknown }>;
+    .all() as Array<
+    Omit<SourceEnablementView["recentRuns"][number], "transportStage" | "schemaDiagnostic"> & {
+      transportStage: unknown;
+      schemaField: unknown;
+      schemaExpectedType: unknown;
+      schemaIssueCategory: unknown;
+      schemaRecordIndex: unknown;
+    }
+  >;
   const recentRuns = recentRows.map((run) => {
     const stage = SourceTransportLifecycleStageSchema.safeParse(run.transportStage);
-    return { ...run, transportStage: stage.success ? stage.data : null };
+    const diagnostic = SourceSchemaDiagnosticSchema.safeParse({
+      field: run.schemaField,
+      expectedStructuralType: run.schemaExpectedType,
+      issueCategory: run.schemaIssueCategory,
+      ...(run.schemaRecordIndex === null ? {} : { recordIndex: run.schemaRecordIndex }),
+    });
+    return {
+      id: run.id,
+      status: run.status,
+      source: run.source,
+      alias: run.alias,
+      requestCount: run.requestCount,
+      pageCount: run.pageCount,
+      recordCount: run.recordCount,
+      safeErrorCode: run.safeErrorCode,
+      transportStage: stage.success ? stage.data : null,
+      schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+      retryAfter: run.retryAfter,
+      startedAt: run.startedAt,
+      completedAt: run.completedAt,
+    };
   });
   return { status: allowlist.status, capabilities, recentRuns };
 }

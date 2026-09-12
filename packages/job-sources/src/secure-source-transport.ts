@@ -5,19 +5,26 @@ import { isIP, SocketAddress, type LookupFunction } from "node:net";
 import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
+  SourceSchemaDiagnosticSchema,
   type SourceCapabilityV2,
   type SourceOperation,
+  type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
 } from "./source-capability";
 import { isBlockedNetworkAddress } from "./public-postings";
 
 export class SecureSourceError extends Error {
+  readonly schemaDiagnostic: SourceSchemaDiagnostic | null;
+
   constructor(
     readonly code: string,
     readonly retryAfter: string | null = null,
     readonly lifecycleStage: SourceTransportLifecycleStage | null = null,
+    schemaDiagnostic: SourceSchemaDiagnostic | null = null,
   ) {
     super(code);
+    const parsed = SourceSchemaDiagnosticSchema.safeParse(schemaDiagnostic);
+    this.schemaDiagnostic = schemaDiagnostic === null ? null : parsed.success ? parsed.data : null;
   }
 }
 
@@ -51,7 +58,7 @@ export function classifySecureSourceTransportError(
   if (error instanceof SecureSourceError) {
     return error.lifecycleStage
       ? error
-      : new SecureSourceError(error.code, error.retryAfter, stage);
+      : new SecureSourceError(error.code, error.retryAfter, stage, error.schemaDiagnostic);
   }
   const code = nodeErrorCode(error);
   if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_FAIL") {

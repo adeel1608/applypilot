@@ -4,6 +4,7 @@ import {
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
+  type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
 } from "./source-capability";
 import {
@@ -43,6 +44,7 @@ export interface SourceRunSink {
     code: string;
     retryAfter: string | null;
     transportStage: SourceTransportLifecycleStage | null;
+    schemaDiagnostic: SourceSchemaDiagnostic | null;
     stoppedAt: string;
   }): Promise<void> | void;
 }
@@ -147,6 +149,7 @@ export async function runLeverSourceDiscovery(input: {
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
       transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
+      schemaDiagnostic: error instanceof SecureSourceError ? error.schemaDiagnostic : null,
       stoppedAt: now().toISOString(),
     });
     return {
