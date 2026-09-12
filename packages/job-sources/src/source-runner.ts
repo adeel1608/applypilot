@@ -4,6 +4,7 @@ import {
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
+  type SourceProviderDriftDiagnostic,
   type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
 } from "./source-capability";
@@ -57,6 +58,7 @@ export interface LeverSourceRunResult {
   pageCount: number;
   recordCount: number;
   stopCode: string | null;
+  providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
 }
 
 function safeStopCode(error: unknown): string {
@@ -91,6 +93,7 @@ export async function runLeverSourceDiscovery(input: {
     startedAt: now().toISOString(),
   });
   const records: LeverPostingRecordV2[] = [];
+  const providerDriftDiagnostics: SourceProviderDriftDiagnostic[] = [];
   let cursor = input.startCursor ?? 0;
   try {
     while (true) {
@@ -122,6 +125,7 @@ export async function runLeverSourceDiscovery(input: {
         throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
       }
       records.push(...page.records);
+      providerDriftDiagnostics.push(...page.providerDriftDiagnostics);
       if (page.nextCursor === null) break;
       if (page.nextCursor <= cursor) throw new SecureSourceError("CURSOR_REVERSED");
       cursor = page.nextCursor;
@@ -140,6 +144,7 @@ export async function runLeverSourceDiscovery(input: {
       pageCount: budget.pages,
       recordCount: budget.records,
       stopCode: null,
+      providerDriftDiagnostics,
     };
   } catch (error) {
     const code = safeStopCode(error);
@@ -160,6 +165,7 @@ export async function runLeverSourceDiscovery(input: {
       pageCount: budget.pages,
       recordCount: budget.records,
       stopCode: code,
+      providerDriftDiagnostics,
     };
   }
 }

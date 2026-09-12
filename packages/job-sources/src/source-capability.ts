@@ -295,6 +295,16 @@ export const SourceSchemaDiagnosticSchema = z
   .strict();
 export type SourceSchemaDiagnostic = z.infer<typeof SourceSchemaDiagnosticSchema>;
 
+export const SourceProviderDriftDiagnosticSchema = z
+  .object({
+    issueCategory: z.literal("PROVIDER_ENUM_DRIFT"),
+    field: z.literal("workplaceType"),
+    expectedStructuralType: z.literal("enum"),
+    recordIndex: z.number().int().nonnegative().max(1_000_000).optional(),
+  })
+  .strict();
+export type SourceProviderDriftDiagnostic = z.infer<typeof SourceProviderDriftDiagnosticSchema>;
+
 export const SourceStopCodeSchema = z.enum([
   "OWNER_CANCELLED",
   "CAPABILITY_CHANGED",
@@ -369,6 +379,7 @@ export const SourceAuditMetadataSchemas = {
       byteCount: z.number().int().nonnegative(),
     })
     .strict(),
+  "source.provider.drift": SourceProviderDriftDiagnosticSchema,
   "source.run.stopped": z
     .object({
       runId: z.string().min(1),

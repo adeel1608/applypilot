@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type BetterSqlite3 from "better-sqlite3";
 import {
   SourceCapabilityV2Schema,
+  SourceProviderDriftDiagnosticSchema,
   runLeverSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
@@ -377,6 +378,11 @@ export class SourceEnablementRepository implements SourceRunSink {
         byteCount: input.page.byteCount,
       });
       this.audit("source.page.persisted", "source_run", input.runId, audit);
+      for (const diagnostic of input.page.providerDriftDiagnostics) {
+        const safeDiagnostic = SourceProviderDriftDiagnosticSchema.parse(diagnostic);
+        const driftAudit = validateSourceAuditMetadata("source.provider.drift", safeDiagnostic);
+        this.audit("source.provider.drift", "source_run", input.runId, driftAudit);
+      }
       return { createdJobIds, duplicateObservationCount };
     })();
     void result;

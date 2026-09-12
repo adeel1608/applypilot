@@ -635,6 +635,132 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("persists non-fatal workplace enum drift and continues R2 queue processing idempotently", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const nextId = () => `drift:${++id}`;
+    const repository = new SourceEnablementRepository(sqlite, () => instant, nextId);
+    const approved = capability();
+    repository.persistCapabilityVersion(approved);
+    const pipeline = fixturePipeline(sqlite, profile, nextId);
+    const drifted = { ...posting(1), workplaceType: "fictional-provider-mode" };
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from(JSON.stringify([drifted])),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+
+    const first = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(first).toMatchObject({
+      status: "COMPLETE",
+      stopCode: null,
+      recordCount: 1,
+      queuedJobIds: [expect.any(String)],
+      providerDriftDiagnostics: [
+        {
+          issueCategory: "PROVIDER_ENUM_DRIFT",
+          field: "workplaceType",
+          expectedStructuralType: "enum",
+          recordIndex: 0,
+        },
+      ],
+    });
+    const raw = JSON.parse(
+      sqlite.prepare("SELECT raw_payload_json FROM job_source_records").pluck().get() as string,
+    ) as Record<string, unknown>;
+    expect(raw.workplaceType).toBe("fictional-provider-mode");
+
+    const driftAudits = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.provider.drift' ORDER BY rowid`,
+      )
+      .all() as Array<{ metadata: string }>;
+    expect(driftAudits).toHaveLength(1);
+    expect(JSON.parse(driftAudits[0]!.metadata)).toEqual({
+      issueCategory: "PROVIDER_ENUM_DRIFT",
+      field: "workplaceType",
+      expectedStructuralType: "enum",
+      recordIndex: 0,
+    });
+    expect(driftAudits[0]!.metadata).not.toMatch(/fictional-provider-mode|value|title|url/i);
+
+    const jobVersion = sqlite
+      .prepare("SELECT id FROM job_versions ORDER BY rowid LIMIT 1")
+      .get() as { id: string };
+    const normalization = new R2ARepository(sqlite).getNormalization(jobVersion.id);
+    expect(normalization).not.toBeNull();
+    const locationEvidence = normalization!.fieldEvidence.filter(
+      ({ normalizedValue }) => normalizedValue.kind === "LOCATION",
+    );
+    expect(locationEvidence.length).toBeGreaterThan(0);
+    expect(
+      locationEvidence.every(
+        ({ normalizedValue }) =>
+          normalizedValue.kind === "LOCATION" && normalizedValue.value.workplaceType === "UNKNOWN",
+      ),
+    ).toBe(true);
+
+    const stableCounts = {
+      observations: Number(
+        sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get(),
+      ),
+      versions: Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get()),
+      evaluations: Number(
+        sqlite.prepare("SELECT count(*) FROM r2_evaluation_versions").pluck().get(),
+      ),
+      queues: Number(
+        sqlite.prepare("SELECT count(*) FROM r2_queue_decision_versions").pluck().get(),
+      ),
+    };
+    expect(stableCounts).toEqual({ observations: 1, versions: 1, evaluations: 1, queues: 1 });
+
+    const replay = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(replay).toMatchObject({ status: "COMPLETE", queuedJobIds: [] });
+    expect({
+      observations: Number(
+        sqlite.prepare("SELECT count(*) FROM source_observations").pluck().get(),
+      ),
+      versions: Number(sqlite.prepare("SELECT count(*) FROM job_versions").pluck().get()),
+      evaluations: Number(
+        sqlite.prepare("SELECT count(*) FROM r2_evaluation_versions").pluck().get(),
+      ),
+      queues: Number(
+        sqlite.prepare("SELECT count(*) FROM r2_queue_decision_versions").pluck().get(),
+      ),
+    }).toEqual(stableCounts);
+    expect(pipeline.evaluated).toHaveLength(1);
+    expect(pipeline.queued).toHaveLength(1);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM audit_events WHERE event_type='source.provider.drift'",
+        )
+        .get(),
+    ).toEqual({ count: 2 });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("reconciles page-one records after page-two failure, restart, and exact replay", async () => {
     const sqlite = database();
     const profile = installFixtureProfile(sqlite);
