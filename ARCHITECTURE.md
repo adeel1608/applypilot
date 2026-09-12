@@ -44,6 +44,8 @@ Job source fixture / local user content / future adapter
 
 `apps/web` renders local fixture, import, real-job queue/detail, document, packet, application-timeline, and source-status views with Next.js server components. Mutating server actions require an exact loopback Host and matching Origin plus an HttpOnly, SameSite=Strict local session and an expiring, one-use, action-bound nonce. Domain parsing, identity, persistence, eligibility, scoring, and truth rules remain outside presentation code. A fixed-path server-only provider reads the ignored private profile and exposes only safe derived state to the UI.
 
+`apps/showcase` is a separate presentation and deployment boundary. It is a static Next.js export built only from committed fictional demo data and framework assets. It imports no domain package or local application module, exposes no route handler or server action, and has no filesystem, database, environment, candidate-profile, source, target, or network access. The public audit verifies its source graph and emitted `out` directory before deployment. It must never be used as a deployment entry point for `apps/web`.
+
 ### Domain
 
 - `candidate-profile`: Zod validation, fact verification states, forbidden claims, and verified-fact selectors.
@@ -82,6 +84,8 @@ Candidate profile versions are immutable snapshots. Job source records preserve 
 ## Runtime topology
 
 Manual-intake Beta remains one owned loopback Next.js process plus local SQLite and optional local Chromium for generated PDF rendering. Paste/upload parsing, private-profile evaluation, documents, packets, and tracking are local. Source readers stay disabled without private approval, and the real runner stays target-approval-required. Future deployment needs a separate approved architecture. See `docs/DEPLOYMENT_STRATEGY.md`.
+
+The public showcase has a different topology: immutable static HTML, CSS, JavaScript, and images served by a commodity static host. It has no relationship to the local SQLite process and cannot activate a product capability. Only `apps/showcase/out` may cross that hosting boundary.
 
 ## Deliberate constraints
 

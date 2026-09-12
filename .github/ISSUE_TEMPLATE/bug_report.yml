@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible ApplyPilot defect without private data.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include real candidate data, credentials, cookies, database files, generated documents, or employer-form contents."
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Observed behaviour
+      description: Describe safe, fictional reproduction steps and the result.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      placeholder: Exact 40-character Git commit, if known
+  - type: dropdown
+    id: data-safe
+    attributes:
+      label: Does this report exclude private data and secrets?
+      options:
+        - "Yes"
+        - "No — I will report privately instead"
+    validations:
+      required: true

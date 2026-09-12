@@ -14,10 +14,18 @@ export default defineConfig({
     trace: "on-first-retry",
     ...devices["Desktop Chrome"],
   },
-  webServer: {
-    command: "npm run start:e2e",
-    url: "http://127.0.0.1:3100/dashboard",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "npm run start:e2e",
+      url: "http://127.0.0.1:3100/dashboard",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: "npm run dev:showcase -- --hostname 127.0.0.1 --port 3200",
+      url: "http://127.0.0.1:3200/",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });

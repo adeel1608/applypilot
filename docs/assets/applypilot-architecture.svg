@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title desc">
+  <title id="title">ApplyPilot local-first architecture</title>
+  <desc id="desc">Bounded job sources feed immutable observations, deterministic evidence evaluation, an owner-controlled local database, frozen application packets, and separately approved target interactions.</desc>
+  <defs>
+    <marker id="arrow" markerHeight="10" markerWidth="10" orient="auto" refX="7" refY="3"><path d="M0,0 L0,6 L8,3 z" fill="#b9f94a"/></marker>
+    <style>
+      .bg{fill:#101415}.grid{stroke:#252b2c;stroke-width:1}.box{fill:#171c1d;stroke:#596062;stroke-width:2}.gate{fill:#1b2017;stroke:#b9f94a;stroke-width:2}.label{fill:#f4f3ed;font:700 22px ui-sans-serif,system-ui,sans-serif}.small{fill:#adb4b1;font:500 14px ui-monospace,SFMono-Regular,monospace;letter-spacing:1px}.line{fill:none;stroke:#b9f94a;stroke-width:2;marker-end:url(#arrow)}.muted{fill:none;stroke:#596062;stroke-width:2;marker-end:url(#arrow)}
+    </style>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" class="grid" fill="none"/></pattern>
+  </defs>
+  <rect width="1280" height="440" class="bg"/><rect width="1280" height="440" fill="url(#grid)"/>
+  <text x="55" y="58" class="small">APPLYPILOT / AUTHORITY-NARROWING DATA FLOW</text>
+  <g transform="translate(55 110)"><rect width="185" height="118" rx="4" class="gate"/><text x="20" y="40" class="small">BOUNDED READ</text><text x="20" y="76" class="label">Job sources</text><text x="20" y="99" class="small">owner approval</text></g>
+  <path d="M240 169H290" class="line"/>
+  <g transform="translate(290 110)"><rect width="185" height="118" rx="4" class="box"/><text x="20" y="40" class="small">IMMUTABLE</text><text x="20" y="76" class="label">Observations</text><text x="20" y="99" class="small">raw + versioned</text></g>
+  <path d="M475 169H525" class="line"/>
+  <g transform="translate(525 110)"><rect width="210" height="118" rx="4" class="box"/><text x="20" y="40" class="small">DETERMINISTIC</text><text x="20" y="76" class="label">Evidence engine</text><text x="20" y="99" class="small">unknown stays unknown</text></g>
+  <path d="M735 169H785" class="line"/>
+  <g transform="translate(785 110)"><rect width="185" height="118" rx="4" class="gate"/><text x="20" y="40" class="small">LOCAL ONLY</text><text x="20" y="76" class="label">Truth store</text><text x="20" y="99" class="small">candidate controlled</text></g>
+  <path d="M970 169H1020" class="line"/>
+  <g transform="translate(1020 110)"><rect width="205" height="118" rx="4" class="box"/><text x="20" y="40" class="small">VERSION BOUND</text><text x="20" y="76" class="label">Frozen packet</text><text x="20" y="99" class="small">facts + documents</text></g>
+  <path d="M1122 228V286H877" class="muted"/>
+  <g transform="translate(735 286)"><rect width="285" height="100" rx="4" class="gate"/><text x="20" y="36" class="small">SEPARATE AUTHORITY</text><text x="20" y="70" class="label">Target interaction</text><text x="20" y="91" class="small">fresh one-use final consent</text></g>
+  <g transform="translate(55 294)"><text x="0" y="0" class="small">FAIL-CLOSED STOPS</text><text x="0" y="35" class="label">auth · CAPTCHA · drift · ambiguity</text><text x="0" y="65" class="small">never bypass / never blind retry</text></g>
+</svg>

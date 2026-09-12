@@ -17,7 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@applypilot/*": ["packages/*/src/index.ts"],
-      "@web/*": ["apps/web/*"]
+      "@web/*": ["apps/web/*"],
+      "@showcase/*": ["apps/showcase/*"]
     }
   },
   "include": [

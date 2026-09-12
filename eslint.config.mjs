@@ -8,7 +8,7 @@ export default defineConfig([
   {
     settings: {
       next: {
-        rootDir: "apps/web/",
+        rootDir: ["apps/web/", "apps/showcase/"],
       },
     },
   },

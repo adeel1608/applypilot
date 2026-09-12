@@ -63,6 +63,8 @@ Final application submission always requires explicit human confirmation. The ta
 
 No deployment is approved in Phase 0/1. Before deployment, complete data classification, threat modeling, encryption design, authentication/authorization, audit retention, backup/restore, incident response, dependency policy, and local-runner pairing review. The cloud component must not receive browser credentials or personal documents by default.
 
+The independently built public showcase is exempt only from the private-application deployment restriction: it is a static fictional surface, not a hosted ApplyPilot runtime. Its build audit rejects private/runtime imports, server entry points, browser network calls, unexpected routes, and selected private-profile canaries. A host may receive only the audited `apps/showcase/out` directory. Publishing the local application, workspace root, `data/`, `.next`, environment files, databases, generated documents, or browser state remains prohibited.
+
 ## Reporting a vulnerability
 
 Do not open a public issue containing sensitive details. Contact the repository owner privately with the affected component, reproduction steps, impact, and suggested mitigation. Do not include real candidate data or credentials in the report.

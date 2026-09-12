@@ -41,6 +41,8 @@ Never rewrite or discard another contributor's work without agreement.
 
 Bug fixes need regression tests. Eligibility and truth-store changes need positive, negative, and ambiguous cases. Adapter changes require contract tests and captured fictional/redacted fixtures. Document changes require content provenance checks, PDF structural checks, and visual review.
 
+Public-showcase changes require `npm run build:showcase`, `npm run showcase:audit`, browser coverage at desktop and mobile sizes, keyboard/no-JavaScript checks, and visual inspection of any updated screenshot. Showcase fixtures must be invented from scratch; never copy, anonymise, or transform private candidate/runtime records for public display.
+
 ## Sensitive data
 
 Never commit real personal profiles, CVs, cover letters, referee contacts, identity documents, credentials, cookies, browser storage, or databases. Stop and notify the owner if sensitive data appears in Git history.
