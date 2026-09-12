@@ -748,7 +748,7 @@ describe("R1A source capability and transport", () => {
     expect(page.records[0]?.country).toBeNull();
   });
 
-  it("accepts documented empty optional textual fields", async () => {
+  it("treats documented but wholly empty descriptive text as product-unusable", async () => {
     const value = {
       ...posting(1),
       description: "",
@@ -759,13 +759,18 @@ describe("R1A source capability and transport", () => {
       salaryDescriptionPlain: "",
       lists: [],
     };
-    const page = await readLeverPageV2({
+    const failure = await readLeverPageV2({
       capability: capability(),
       budget: new SourceRunBudget(capability(), instant),
       now: () => instant,
       dependencies: transport([value]),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect(failure).toMatchObject({
+      code: "SOURCE_RECORD_UNUSABLE",
+      lifecycleStage: "RESPONSE_BODY",
+      schemaDiagnostic: null,
     });
-    expect(page.records[0]).toMatchObject({ country: "AU", description: "", sections: [] });
   });
 
   it("accepts documented values without undocumented per-field or collection bounds", async () => {
@@ -1117,6 +1122,20 @@ describe("R1A source capability and transport", () => {
   it.each([
     ["empty id", { id: "" }],
     ["inert-empty title", { text: "<script>PRIVATE_FIXTURE_VALUE_NEVER_PERSIST</script>" }],
+    [
+      "missing effective location",
+      { categories: { commitment: "Full-time", department: "Fictional Engineering" } },
+    ],
+    [
+      "inert-empty description",
+      {
+        description: "",
+        descriptionPlain: "",
+        additional: "",
+        additionalPlain: "",
+        lists: [],
+      },
+    ],
   ] as const)(
     "separates product-unusable %s from provider schema drift",
     async (_label, override) => {
@@ -1135,6 +1154,34 @@ describe("R1A source capability and transport", () => {
       expect(String(failure)).not.toMatch(/PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|script/i);
     },
   );
+
+  it("preserves all-locations and list-content usability fallbacks", async () => {
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([
+        {
+          ...posting(1),
+          description: "",
+          descriptionPlain: "",
+          additional: "",
+          additionalPlain: "",
+          categories: {
+            ...posting(1).categories,
+            location: "",
+            allLocations: ["Remote Australia"],
+          },
+          lists: [{ text: "Requirements", content: "<p>Fictional systems evidence.</p>" }],
+        },
+      ]),
+    });
+    expect(page.records[0]).toMatchObject({
+      location: null,
+      allLocations: ["Remote Australia"],
+      description: "Requirements\nFictional systems evidence.",
+    });
+  });
 
   it("converts Lever list HTML to inert ordered text while freezing the raw payload", async () => {
     const value = {

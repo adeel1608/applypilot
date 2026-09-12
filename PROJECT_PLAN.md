@@ -4743,3 +4743,155 @@ on the exact clean commit, recheck scope/privacy/migration/fsck invariants, push
 the named PR, and require exact-head push and pull-request CI green. Then self-review the complete
 base-to-head delta and use the owner's normal-merge pre-approval only if every stated condition still
 holds. No seventh request follows the merge; a separately specified fresh authority remains required.
+
+# Seventh bounded source verification and persistence-boundary correction - 2026-09-12
+
+Status: `LIVE AUTHORITY SPENT / FAILED CLOSED / OFFLINE CORRECTION PLANNED / NO EIGHTH GET`.
+The exact clean starting `main` and `origin/main` were
+`96ce246d743e128b562f49ac1803ef6260e9a6c7`. Preflight passed with schema v7, zero pending
+migrations, integrity `PASS`, zero foreign-key issues, unchanged migrations `0000`-`0007`, a valid
+private profile, seven historical source capabilities and zero enabled capabilities, zero approved
+real runner targets, privacy `PASS`, and lifetime real actions `6/0/0/0`. Ignored backup
+`backup-2026-09-12T07-51-38.473Z-c9d72f44` and its exact restore preview passed before activation.
+
+Fresh deterministic ignored capability `lever_a7308e8f9d1855f1801b81d5` was derived from the approved
+source, tenant, region, exact URL, seventh-verification purpose and T0. It passed the strict
+`SourceCapabilityV2` schema with parser version
+`lever-v2:96ce246d743e128b562f49ac1803ef6260e9a6c7`, one request, 25 records/page, 2 MB response,
+30-second request and 60-second run limits, concurrency one, and zero redirects/retries. The real
+owner `/sources` workflow was submitted once through the approved headless Chromium fallback.
+Exactly one GET reached an accepted 25-record, 370311-byte response and the persistence boundary,
+then stopped durably as `PERSISTENCE_FAILED / PERSISTENCE`. Request/page-budget counters are
+`1/1/25`, retries and redirects are zero, and the page transaction committed no page, observation,
+payload, job version, R2 evaluation or queue decision. No schema diagnostic or provider-drift warning
+survived because persistence rolled back before either page or warning audit. The private response
+was not read, reconstructed or inferred. Candidate data outbound, employer visits, form actions,
+uploads and submissions were zero. The capability was revoked once through the owner UI, recorded as
+immutable version 2 in the database and ignored allowlist, and enabled capability count returned to
+zero. Lifetime real actions are now exactly `7/0/0/0`; no eighth GET is authorized.
+
+## Deterministic defect, objective, assumptions, and requirements
+
+Offline validation against a private clone of the real schema proved that a normal 25-record
+fictional page persists completely, including 25 observations, one page, value-free workplace drift
+audits, integrity `PASS`, and zero foreign-key issues. The real database state and page cardinality
+therefore do not reproduce the stop. The live provider value that triggered the transaction remains
+unknown and unavailable by design.
+
+A deterministic parser-to-persistence defect is nevertheless established from current code and a
+synthetic input: `mapPosting` treats non-empty ID/title as sufficient local record usability, while
+`persistLeverObservation` later also requires a usable inert description and either primary or
+all-locations evidence. A documented, structurally valid posting lacking either local field crosses
+the response parser as accepted, consumes the page budget, reaches the transaction, and is collapsed
+to generic `PERSISTENCE_FAILED`; any earlier valid records in that page roll back. This violates the
+existing distinction between provider contract failure and local `SOURCE_RECORD_UNUSABLE`. It is not
+claimed to prove which private record or field caused the seventh stop.
+
+The objective is narrow: make the already-required local location/description semantics fail closed
+as `SOURCE_RECORD_UNUSABLE / RESPONSE_BODY` before page budget consumption or persistence begins.
+Official Lever structural validation, unknown extensions, the four official workplace values,
+non-critical null/unknown-string drift, value-free drift audits, inert conversion, immutable raw
+provenance, request authority and all downstream R2 behavior remain unchanged. No provider value,
+title, location, description, URL, arbitrary key, stack or Zod text may enter diagnostics or Git.
+
+## Architecture, files, data flow, and dependencies
+
+- `packages/job-sources/src/lever/v2-reader.ts`: compute inert description, primary location and
+  deduplicated all-locations before completing the mapped record. If ID/title, effective location, or
+  description is unusable, throw the existing closed `SOURCE_RECORD_UNUSABLE` at `RESPONSE_BODY`.
+  Preserve all valid fallbacks: an all-locations entry satisfies location, and inert `lists[]` or
+  additional text may satisfy description. Do not add undocumented schema constraints or expose
+  which private field failed.
+- `packages/job-sources/src/source-capability.test.ts`: reproduce locationless and descriptionless
+  documented-valid postings, prove the closed product-semantic stop, and prove all-locations and
+  lists-only fallbacks remain accepted. Keep structural and workplace drift matrices unchanged.
+- `packages/database/src/source-enablement-repository.test.ts`: prove a page containing an earlier
+  valid fictional record plus a later unusable record never enters persistence and stops as
+  `SOURCE_RECORD_UNUSABLE`, not `PERSISTENCE_FAILED`; no partial page, observation or downstream work
+  is committed.
+- `README.md` and this plan: record the seventh attempt accurately without private response content
+  or a claim that the correction is the private root cause.
+
+Data flow becomes `bounded JSON -> documented structural parse -> inert mapping -> local required-
+field usability gate -> SOURCE_RECORD_UNUSABLE stop OR immutable page transaction -> R2/queue`.
+There is no new package, dependency, lockfile, table or migration. Source host/path/query, DNS,
+TLS/SNI, pinning, request/record/page/byte/time caps, capability expiry, redirects, retries,
+concurrency, candidate outbound, target, runner, form, upload and submission authority are unchanged.
+
+## Risks, privacy/security, tests, rollback, acceptance, and exact steps
+
+Risks are misclassifying provider structure as local usability, rejecting a valid fallback, claiming
+causality from inaccessible data, or broadening authority. Controls are fictional fixtures, the
+existing closed stop code, a no-field diagnostic, explicit fallback tests, authority/migration diffs,
+privacy and showcase audits, and a permanent no-eighth-request boundary. Private profile, vacancy,
+database, backups, allowlist, source payloads, generated documents, packets, session state, tokens
+and credentials remain ignored and uncommitted.
+
+Acceptance requires the exact synthetic regression and fallback matrix to pass; structural failures
+and provider-drift behavior to remain unchanged; no persistence attempt or partial record from an
+unusable page; complete format, lint, strict typecheck, unit, integration, E2E, local/showcase build,
+showcase boundary, privacy, dependency, database/backup/restore, migration immutability, preflight,
+release, diff and strict fsck gates; schema v7/pending 0/integrity `PASS`/FKs 0; no migration; and one
+offline PR with exact-head push and PR CI green. Rollback is a normal revert of the branch/merge; no
+database rollback is required. The exact sequence is: commit this blueprint; add the failing
+fictional regression; implement the narrow pre-persistence usability gate; update safe readiness
+docs; run focused and full gates; commit/push one branch; open one PR; self-review the full delta; and
+use the owner's conditional normal-merge authority only if scope, privacy, migration and exact-head
+CI conditions all remain satisfied. After merge, refresh clean `main` and stop without a source or
+employer request.
+
+## Offline correction implementation and pre-commit verification
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The focused synthetic
+regression first reproduced the defect: documented-valid records with wholly empty inert description
+or no effective location crossed the parser, and a mixed two-record page stopped only after budget
+consumption as `PERSISTENCE_FAILED` with page/record counters `1/2`. The implementation now computes
+the inert description plus primary/deduplicated fallback locations before returning a mapped record.
+Missing ID/title, description, or effective location stops as the existing value-free
+`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY`; an all-locations value still satisfies location and inert
+list/additional content still satisfies description. A mixed page stops before `consumePage` or the
+transaction, so page, record, observation, evaluation and queue counts remain zero. No private field
+or record index is exposed, and no claim is made that this code gap was the inaccessible live cause.
+
+The actual implementation/documentation diff is limited to
+`packages/job-sources/src/lever/v2-reader.ts`,
+`packages/job-sources/src/source-capability.test.ts`,
+`packages/database/src/source-enablement-repository.test.ts`, `README.md`, and this plan. The full
+formatting check also reported four merged PR24 files as noncanonical; running Prettier produced no
+Git content diff for those files. There is no source capability, transport, network, budget, provider
+structural schema, drift policy, persistence schema, R2, runner, target, form, upload, submission,
+dependency or migration change.
+
+Focused source and durable-repository validation passes 109 tests across two files. The complete
+pre-commit `npm.cmd run release:check` passes doctor, database and aggregate preflight, formatting,
+zero-warning lint, strict typecheck, 432 unit tests across 47 files, 21 integration tests across three
+files, the 31-route local production build, the six-page showcase build, showcase boundary audit, 31
+serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
+vulnerabilities. Privacy checked 306 tracked files, 846 history paths, 844 history blobs, 1270 build/
+test artifacts, and 11 private canaries. Twenty-one focused database/schema/migration/backup/restore/
+runtime tests pass across four files.
+
+The verified pre-run ignored backup
+`backup-2026-09-12T07-51-38.473Z-c9d72f44` and post-run backup
+`backup-2026-09-12T08-09-22.333Z-98eec30f` are schema v7 with integrity `PASS`; both exact restore
+previews pass. The real database remains schema v7, pending migrations zero, integrity `PASS`, and
+foreign-key issues zero. Migrations `0000`-`0007` are unchanged and no migration exists beyond 0007.
+`git diff --check` and `git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
+
+The seventh and only live request in this train remains terminal `STOPPED / PERSISTENCE_FAILED /
+PERSISTENCE`, with one request, one in-memory accepted page, 25 records, 370311 bytes, zero retries,
+zero redirects, and no committed run page or real observation. Fatal field/type/index details are not
+durably available for persistence failures. Durable non-fatal provider-drift warning count is zero;
+the rolled-back in-memory page's warning count cannot safely be recovered. The capability is revoked
+as immutable version 2, active source capabilities are zero, and candidate data outbound is zero.
+This offline correction made no source/form/upload/submission action, so lifetime counts remain
+exactly `7/0/0/0`. No Melbourne/VIC match, real role ranking, or target-readiness packet exists.
+Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner framework remains
+ready only for synthetic targets with real target approval required.
+
+Remaining mechanics are to commit the coherent implementation/result record, rerun the complete
+release gate on the exact clean commit, verify authority/migration/privacy/diff/fsck invariants, push
+this branch, open one offline PR, and require exact-head push plus pull-request GitHub Actions green.
+After a clean full-delta self-review, normal merge is permitted only under the owner's pre-approved
+conditions. Refresh `main` after merge and stop. No eighth source request or employer action is
+authorized.

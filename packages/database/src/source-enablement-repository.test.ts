@@ -541,6 +541,65 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("stops a mixed page at response usability before any persistence or downstream work", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `unusable-page:${++id}`,
+    );
+    const approved = capability({ requestBudget: 1, recordCap: 2, pageSizeCap: 2 });
+    repository.persistCapabilityVersion(approved);
+    const evaluateJob = vi.fn();
+    const queueJob = vi.fn();
+    const unusable = {
+      ...posting(2),
+      description: "",
+      descriptionPlain: "",
+      additional: "",
+      additionalPlain: "",
+      lists: [],
+      categories: { commitment: "Full-time" },
+    };
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1), unusable])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob,
+      queueJob,
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "SOURCE_RECORD_UNUSABLE",
+      requestCount: 1,
+      pageCount: 0,
+      recordCount: 0,
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      safeErrorCode: "SOURCE_RECORD_UNUSABLE",
+      transportStage: "RESPONSE_BODY",
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 0,
+    });
+    expect(evaluateJob).not.toHaveBeenCalled();
+    expect(queueJob).not.toHaveBeenCalled();
+    sqlite.close();
+  });
+
   it("records response-contract drift separately from persistence without raw details", async () => {
     const sqlite = database();
     let id = 0;
