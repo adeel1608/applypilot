@@ -108,6 +108,25 @@ while the complete inert description and immutable raw private payload remain un
 local field/link bound therefore rejects only that record with a fixed reason; it does not turn a
 documented provider string into page-fatal schema drift or discard valid siblings.
 
+An accepted record also satisfies the deterministic construction boundary after that disposition:
+`ParsedJobFields`, the canonical job, observation identity, R2A normalization, every source-evidence
+pointer and normalized value, persistence, and the R2 queue handoff can be constructed from its
+provider-controlled values without a content-domain exception. Canonical job truth is not shortened
+to fit an evidence pointer. A long accepted title and the complete effective location remain intact
+in the canonical job; their R2 evidence uses an exact, surrogate-safe source excerpt of at most 1,000
+code units. Derived locality and suburb components use at most their declared 200-code-unit bounds
+while retaining the permitted raw location label. A recognized employment type uses only its exact
+supporting token, such as `Full-time`, rather than an arbitrarily long commitment field.
+
+Optional unsupported metadata does not make the record unusable. Negative, reversed, non-finite, or
+out-of-domain numeric claims are never clamped or repaired into a factual value. Unsupported salary
+semantics are omitted; safe minimum/maximum values can still be retained with null currency or an
+`UNKNOWN` period when the optional currency/interval wording itself is unsupported. Travel above
+100 percent and invalid commute/hours/experience numbers remain in immutable source provenance but
+do not create invalid R2 numeric evidence. Genuine repository, SQLite, integrity, or other
+operational failures remain page-fatal `PERSISTENCE_FAILED / PERSISTENCE`; this content policy does
+not catch or suppress programmer/infrastructure failures.
+
 Pagination and source budgets count provider/wire records, including locally unusable records. A
 25-record response therefore advances the cursor by 25 and consumes 25 records even when fewer are
 accepted. The private page digest is deterministic over the ordered provider dispositions: accepted

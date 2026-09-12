@@ -5366,7 +5366,75 @@ GitHub push/PR CI green; no ninth request; and lifetime actions exactly `8/0/0/0
 5. Run focused checks, update contract documentation and this plan with exact results, inspect the
    complete authority/privacy/migration delta, then run the full validation matrix.
 6. Commit and push only `fix/lever-persistence-closure`; open PR `fix: close Lever accepted-to-
-   persistence contract`; require exact-head push and pull-request CI green and self-review the full
+persistence contract`; require exact-head push and pull-request CI green and self-review the full
    base-to-head diff.
 7. Merge normally only if every owner-preapproved condition still holds, refresh clean `main`, verify
    lifetime action counts remain `8/0/0/0`, and stop. Do not execute request #9.
+
+## Implementation and pre-commit validation results
+
+Status: `IMPLEMENTED / DIRTY-TREE RELEASE PASS / EXACT-HEAD CI PENDING / NO NINTH GET`. The required
+regressions were added before the implementation and produced ten exact failures on the merged code:
+title lengths 1,001 and 4,096 exceeded the 1,000-code-unit evidence excerpt; delimiter-free location
+lengths 201 and 1,000 exceeded derived locality/suburb bounds; commitment lengths 999/1,000 used the
+whole optional field and 1,001/4,097 overflowed the pointer; travel 101/150 percent failed the R2
+numeric domain; and negative/long salary metadata reached invalid structured evidence. An additional
+reversed textual salary regression proved a safely constructible but semantically invalid range.
+These fictional failures independently establish closure gaps and do not identify request #8's
+unknown private cause.
+
+R2A pointer construction now takes a surrogate-safe exact excerpt of at most 1,000 code units from
+the immutable source for every field, requirement, and coverage pointer. Structured identity evidence
+uses the same bounded value, while the canonical job retains its complete accepted title. Derived
+location retains the accepted raw label and bounds only locality/suburb to 200 code units. Structured
+employment evidence points to the exact recognized token instead of the complete commitment field.
+Bullet normalization now requires whitespace after a marker, so a negative number is not silently
+turned positive by treating its minus sign as a list bullet.
+
+All numeric constructors validate before building an R2 value. Non-finite, negative, or reversed
+hours/experience/commute ranges are omitted rather than corrected; travel outside 0-100 is omitted;
+and reversed textual salary ranges are omitted. Structured salary accepts documented finite provider
+numbers at the provider boundary, records safe source components, and creates a salary semantic only
+when minimum/maximum are nonnegative and ordered. A long/unsupported currency or interval is omitted
+from component evidence; safe amounts can still become salary evidence with null currency or
+`UNKNOWN` period. `FORTNIGHT` is recognized. No canonical field, immutable raw payload, structural
+provider schema, or fixed unusable diagnostic was loosened, and no broad exception handler was added.
+
+The permanent mixed-page closure harness sends 25 fictional structurally valid Lever postings through
+the actual page reader, run budget, repository transaction, ParsedJobFields and Job schemas,
+observation identity, R2A schemas/persistence, evaluation, and queue. It combines title boundaries
+999/1,000/1,001/4,096; location 199/200/201/1,000; commitment 999/1,000/1,001/4,097; positive, zero,
+negative, extremely large, long-currency, recognized, undocumented, and long-interval salary cases;
+travel 0/100/101/150; zero/non-finite hours and experience; zero/negative commute; long requirements,
+workplace drift, optional department fallback, nullable country, unsafe link, and a surrogate-pair
+boundary. Results are provider/accepted/unusable `25/24/1`; all 24 accepted siblings create exactly 24
+observations, job versions, R2 evaluations, and queue decisions. The 4,096-character canonical title
+and 1,000-character canonical location remain exact. The unsafe link alone produces fixed
+`UNUSABLE_LINK_BOUNDARY` plus index 24, with no value in the audit. Provider count drives the one-page
+budget/cursor, all evidence pointers are bounded, and FKs are clean.
+
+Exact replay produces the same `25/24/1` disposition/accounting and zero additional observations, job
+versions, evaluations, or queue decisions. A separate actual SQLite abort trigger during observation
+insert leaves page/job/observation counts zero and returns `STOPPED / PERSISTENCE_FAILED / PERSISTENCE`;
+the SQLite message is absent from audit data. This proves content-domain omission did not weaken real
+operational failure handling.
+
+Focused source/normalization/repository validation passes 188 tests across three files; focused
+database/schema/migration/backup/restore validation passes 28 tests across three files. The complete
+dirty-tree `npm.cmd run release:check` passes doctor, database/aggregate preflight, format, zero-warning
+lint, strict typecheck, 461 unit tests across 47 files, 21 integration tests across three files, the
+31-route local production build, six-page showcase production build and showcase audit, all 31
+serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
+vulnerabilities. Privacy checked 306 tracked files, 874 reachable-history paths, 872 reachable-history
+blobs, 1,302 build/test artifacts, and 11 private canaries.
+
+The real database remains schema v7 with zero pending migrations, integrity `PASS`, and zero foreign-
+key issues. Migrations `0000`-`0007` remain unchanged and no migration was added. No transport,
+host/path/query, DNS, TLS/SNI, request/page/record/byte/time budget, redirect, retry, concurrency,
+capability, candidate-outbound, target, runner, upload, submission, dependency, or lockfile file is
+changed. `README.md` remains unchanged because readiness has not materially changed. No source GET,
+employer/form interaction, upload, or submission occurred; lifetime actions remain `8/0/0/0`.
+
+Remaining mechanics are final diff/migration/privacy review, the coherent implementation/results
+commit, an exact-head clean release rerun, branch push, one PR, exact-head push plus PR CI, full-delta
+self-review, conditional normal merge, and clean `main` refresh. Request #9 remains unauthorized.

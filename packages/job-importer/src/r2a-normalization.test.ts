@@ -657,4 +657,175 @@ describe("R2A evidence normalization", () => {
       result.fieldEvidence.find(({ family }) => family === "TRAINING")?.normalizedValue,
     ).toMatchObject({ value: { state: "NOT_PROVIDED" } });
   });
+
+  it.each([999, 1000, 1001, 4096])(
+    "bounds structured title evidence at the %i-character accepted boundary",
+    (length) => {
+      const title = `Fictional title ${"t".repeat(length - "Fictional title ".length)}`;
+      const structured = { title };
+      const result = normalizeR2AJobEvidence({
+        sourceText: JSON.stringify(structured),
+        sourceObservationId: `observation:structured-title:${length}`,
+        structured,
+      });
+      const evidence = result.fieldEvidence.find(
+        ({ canonicalField }) => canonicalField === "title",
+      );
+      expect(evidence?.source.excerpt.length).toBeLessThanOrEqual(1000);
+      expect(
+        evidence?.normalizedValue.kind === "TEXT" ? evidence.normalizedValue.value.length : null,
+      ).toBeLessThanOrEqual(1000);
+    },
+  );
+
+  it.each([199, 200, 201, 1000])(
+    "preserves a %i-character raw location while bounding derived locality and suburb",
+    (length) => {
+      const location = `Fictional ${"l".repeat(length - "Fictional ".length)}`;
+      const structured = { jobLocation: location };
+      const result = normalizeR2AJobEvidence({
+        sourceText: JSON.stringify(structured),
+        sourceObservationId: `observation:structured-location:${length}`,
+        structured,
+      });
+      const value = result.fieldEvidence.find(
+        ({ canonicalField }) => canonicalField === "location.alternative",
+      )?.normalizedValue;
+      expect(value?.kind).toBe("LOCATION");
+      if (value?.kind !== "LOCATION") throw new Error("TEST_LOCATION_EVIDENCE_REQUIRED");
+      expect(value.value.rawLabel).toBe(location);
+      expect(value.value.locality?.length ?? 0).toBeLessThanOrEqual(200);
+      expect(value.value.suburb?.length ?? 0).toBeLessThanOrEqual(200);
+    },
+  );
+
+  it.each([999, 1000, 1001, 4097])(
+    "uses the exact recognized token from a %i-character structured commitment",
+    (length) => {
+      const commitment = `Full-time ${"c".repeat(length - "Full-time ".length)}`;
+      const structured = { employmentType: commitment };
+      const result = normalizeR2AJobEvidence({
+        sourceText: JSON.stringify(structured),
+        sourceObservationId: `observation:structured-commitment:${length}`,
+        structured,
+      });
+      const evidence = result.fieldEvidence.find(
+        ({ canonicalField }) => canonicalField === "employment.type",
+      );
+      expect(evidence?.normalizedValue).toEqual({ kind: "EMPLOYMENT_TYPE", value: "FULL_TIME" });
+      expect(evidence?.source.excerpt).toBe("Full-time");
+    },
+  );
+
+  it("omits invalid numeric semantics instead of coercing or throwing", () => {
+    const travel100 = normalizeR2AJobEvidence({
+      sourceText: "Travel up to 100% may be required",
+      sourceObservationId: "observation:travel-100",
+    });
+    expect(
+      travel100.fieldEvidence.find(({ canonicalField }) => canonicalField === "travel.percentage")
+        ?.normalizedValue,
+    ).toMatchObject({ value: { percentage: 100 } });
+
+    for (const percentage of [101, 150]) {
+      const result = normalizeR2AJobEvidence({
+        sourceText: `Travel up to ${percentage}% may be required`,
+        sourceObservationId: `observation:travel-${percentage}`,
+      });
+      expect(
+        result.fieldEvidence.some(({ canonicalField }) => canonicalField === "travel.percentage"),
+      ).toBe(false);
+    }
+
+    const negative = normalizeR2AJobEvidence({
+      sourceText:
+        "Experience\n-5 years experience required\nHours\n-5 hours per week\nCommute -5 km or -10 minutes",
+      sourceObservationId: "observation:negative-numeric",
+    });
+    const experience = negative.requirementEvidence.find(
+      ({ normalizedValue }) => normalizedValue.kind === "EXPERIENCE",
+    )?.normalizedValue;
+    expect(experience?.kind).toBe("EXPERIENCE");
+    if (experience?.kind !== "EXPERIENCE") throw new Error("TEST_EXPERIENCE_REQUIRED");
+    expect(experience.value.minimum).toBeNull();
+    expect(negative.fieldEvidence.some(({ family }) => family === "HOURS")).toBe(false);
+    expect(
+      negative.fieldEvidence.some(({ canonicalField }) => canonicalField.startsWith("commute.")),
+    ).toBe(false);
+
+    const nonFiniteDigits = "9".repeat(400);
+    const nonFinite = normalizeR2AJobEvidence({
+      sourceText: `${nonFiniteDigits} hours per week\nCommute ${nonFiniteDigits} km\nCommute ${nonFiniteDigits} minutes`,
+      sourceObservationId: "observation:non-finite-numeric",
+    });
+    expect(
+      nonFinite.fieldEvidence.some(
+        ({ family, canonicalField }) => family === "HOURS" || canonicalField.startsWith("commute."),
+      ),
+    ).toBe(false);
+
+    const reversed = normalizeR2AJobEvidence({
+      sourceText: "20-10 hours per week\n5-2 years experience required\nSalary: AUD 50-10 per hour",
+      sourceObservationId: "observation:reversed-numeric",
+    });
+    expect(reversed.fieldEvidence.some(({ family }) => family === "HOURS")).toBe(false);
+    expect(
+      reversed.requirementEvidence.find(
+        ({ normalizedValue }) => normalizedValue.kind === "EXPERIENCE",
+      )?.normalizedValue,
+    ).toMatchObject({ value: { minimum: null, maximum: null } });
+    expect(reversed.fieldEvidence.some(({ canonicalField }) => canonicalField === "salary")).toBe(
+      false,
+    );
+  });
+
+  it("omits unsupported structured salary semantics while retaining safe supported values", () => {
+    const normalizeSalary = (baseSalary: Record<string, unknown>, id: string) => {
+      const structured = { baseSalary };
+      return normalizeR2AJobEvidence({
+        sourceText: JSON.stringify(structured),
+        sourceObservationId: `observation:salary-boundary:${id}`,
+        structured,
+      });
+    };
+    const zero = normalizeSalary(
+      { currency: "AUD", value: { minValue: 0, maxValue: 0, unitText: "hour" } },
+      "zero",
+    );
+    expect(
+      zero.fieldEvidence.find(({ canonicalField }) => canonicalField === "salary")?.normalizedValue,
+    ).toMatchObject({ value: { minimum: 0, maximum: 0, currency: "AUD", period: "HOUR" } });
+
+    for (const [id, baseSalary] of [
+      [
+        "negative-min",
+        { currency: "AUD", value: { minValue: -1, maxValue: 10, unitText: "hour" } },
+      ],
+      [
+        "negative-max",
+        { currency: "AUD", value: { minValue: 1, maxValue: -10, unitText: "hour" } },
+      ],
+      ["reverse", { currency: "AUD", value: { minValue: 10, maxValue: 1, unitText: "hour" } }],
+    ] as const) {
+      const result = normalizeSalary(baseSalary, id);
+      expect(result.fieldEvidence.some(({ canonicalField }) => canonicalField === "salary")).toBe(
+        false,
+      );
+    }
+
+    const longOptional = normalizeSalary(
+      {
+        currency: "C".repeat(4097),
+        value: { minValue: 1, maxValue: 2, unitText: "interval".repeat(600) },
+      },
+      "long-optional",
+    );
+    expect(
+      longOptional.fieldEvidence.find(({ canonicalField }) => canonicalField === "salary")
+        ?.normalizedValue,
+    ).toMatchObject({ value: { minimum: 1, maximum: 2, currency: null, period: "UNKNOWN" } });
+    expect(longOptional.fieldEvidence.some(({ source }) => source.excerpt.length > 1000)).toBe(
+      false,
+    );
+  });
 });
