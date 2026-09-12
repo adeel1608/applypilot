@@ -3522,6 +3522,14 @@ codes/messages, response content, tenant values, or candidate data. No real requ
 probe, source activation, runner action, employer interaction, migration, or private-data mutation is
 authorized on this branch.
 
+Node 24 contract inspection also established a pinned-lookup defect consistent with the observed
+boundary: the socket layer may call a custom `lookup` with `options.all=true` during family
+autoselection, while the current callback always returns the single-address `(address, family)` shape.
+That can reject a valid pin before socket assignment even when separate DNS/TCP/TLS diagnostics pass.
+The fix must set the already validated pinned address family explicitly and honor both Node callback
+shapes, returning the same single pin as a one-element array only when `options.all` requests it. This
+does not add address fallback, a second connection, or another HTTP attempt.
+
 ## Architecture, files, data flow, and dependencies
 
 - Move the closed lifecycle-stage schema/type into `source-capability.ts`, including `DNS`, request
@@ -3530,6 +3538,9 @@ authorized on this branch.
 - Extend `SecureSourceError` with an optional closed stage. Default transport classification attaches
   the deepest stage; DNS and timeout/cancellation preserve the known stage; pre-existing typed errors
   receive the current stage without exposing their raw cause.
+- Replace the inline pinned lookup with a pure tested helper that validates the pin once, sets the
+  explicit request family, honors Node's `options.all` callback contract, and can return only that
+  exact validated address. It must not re-resolve, race, or fall back.
 - Extend `SourceRunSink.stop` and the strict `source.run.stopped` audit metadata with nullable
   `transportStage`. The repository writes it to the existing JSON audit field. No table column or
   migration is needed. Recovery derives the latest allowlisted stage from that same-run typed audit
