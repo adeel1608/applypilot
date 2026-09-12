@@ -786,9 +786,9 @@ describe("R1A source capability and transport", () => {
     });
   });
 
-  it("accepts documented values without undocumented per-field or collection bounds", async () => {
+  it("accepts documented values within independent local persistence bounds", async () => {
     const longTitle = "T".repeat(1_250);
-    const longDescription = "D".repeat(600_000);
+    const longDescription = "D".repeat(120_000);
     const allLocations = Array.from({ length: 101 }, (_, index) => `Fixture location ${index}`);
     const lists = Array.from({ length: 101 }, (_, index) => ({
       text: `Fixture section ${index}`,
@@ -1178,6 +1178,48 @@ describe("R1A source capability and transport", () => {
       );
     },
   );
+
+  it("classifies provider-valid but locally unpersistable fields before page persistence", async () => {
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 6,
+      pageSizeCap: 6,
+      responseByteLimit: 500_000,
+    });
+    const privateMarker = "PRIVATE_FIXTURE_BOUNDARY_VALUE_NEVER_AUDIT";
+    const values = [
+      posting(1),
+      { ...posting(2), id: `id-${privateMarker.repeat(60)}` },
+      { ...posting(3), text: privateMarker.repeat(110) },
+      {
+        ...posting(4),
+        categories: { ...posting(4).categories, location: privateMarker.repeat(30) },
+      },
+      { ...posting(5), descriptionPlain: privateMarker.repeat(3_200), lists: [] },
+      { ...posting(6), applyUrl: "http://jobs.lever.co/fictional/private-fixture" },
+    ];
+    const budget = new SourceRunBudget(approved, instant);
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: transport(values),
+    });
+    expect(page).toMatchObject({
+      providerRecordCount: 6,
+      unusableRecordCount: 5,
+      safeUnusableDiagnostics: [
+        { reasonCode: "UNUSABLE_IDENTITY", recordIndex: 1 },
+        { reasonCode: "UNUSABLE_TITLE", recordIndex: 2 },
+        { reasonCode: "MISSING_EFFECTIVE_LOCATION", recordIndex: 3 },
+        { reasonCode: "MISSING_USABLE_DESCRIPTION", recordIndex: 4 },
+        { reasonCode: "UNUSABLE_LINK_BOUNDARY", recordIndex: 5 },
+      ],
+    });
+    expect(page.acceptedRecords).toHaveLength(1);
+    expect(budget).toMatchObject({ attempts: 1, pages: 1, records: 6 });
+    expect(JSON.stringify(page.safeUnusableDiagnostics)).not.toContain(privateMarker);
+  });
 
   it("accounts for 25 structurally valid provider records independently", async () => {
     const approved = capability({

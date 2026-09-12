@@ -5135,6 +5135,10 @@ remain unchanged.
 - `packages/database/src/source-enablement-repository.ts`: build requirement/responsibility evidence
   arrays from deterministic bounded chunks instead of whole arbitrary-length list sections. Raw
   payload, normalized description, and immutable observation provenance remain unmodified.
+- `packages/job-importer/src/r2a-normalization.ts`: cap derived normalized requirement values at the
+  already-declared evidence-schema limits so a bounded source pointer cannot construct an oversized
+  experience, licence, work-rights, physical, or general-text value. This is a defensive alignment
+  to existing R2 schemas, not a new semantic extractor or content claim.
 - `packages/job-sources/src/source-capability.test.ts` and
   `packages/database/src/source-enablement-repository.test.ts`: reproduce the 600-character
   experience failure, long single-line/list evidence, field/link boundary rejection, mixed sibling
@@ -5183,3 +5187,65 @@ GitHub CI green; no ninth request; and lifetime actions exactly `8/0/0/0`.
 5. Require exact-head push and PR CI green, self-review the complete base-to-head delta, and use the
    owner's normal-merge pre-approval only if scope is exact, privacy passes, no migration exists, and
    no ninth request occurred. Refresh clean `main` and stop.
+
+## Eighth source offline hardening implementation and local validation results
+
+Status: `IMPLEMENTED / LOCAL RELEASE PASS / EXACT-HEAD CI PENDING / NO NINTH GET`. The new reader
+boundary preserves the official provider schema first, then applies local persistence limits as per-
+record dispositions. Identity over 2,048 code units becomes `UNUSABLE_IDENTITY`; inert title over
+4,096 becomes `UNUSABLE_TITLE`; an absent or over-1,000-code-unit effective/alternate location becomes
+`MISSING_EFFECTIVE_LOCATION`; an empty or over-128-KiB combined inert description becomes
+`MISSING_USABLE_DESCRIPTION`; and a link that exceeds 2,048 code units, is not HTTPS, or contains URL
+credentials becomes `UNUSABLE_LINK_BOUNDARY`. Diagnostics retain only the fixed reason and record
+index. Provider count still drives the cursor, record budget, and disposition digest.
+
+Lever requirement and responsibility sections are now split deterministically at whitespace where
+possible into at most 500-code-unit evidence chunks before the existing 500-item ceiling. The full
+inert description, typed sections, and immutable raw private payload are unchanged. R2 normalized
+experience, recency, licence-alternative, work-rights, physical, and general-text values are capped
+only at their existing declared schema limits, preventing bounded source spans from constructing an
+oversized derived value. An over-bound optional department falls back to a bounded team or the
+existing `Unclassified` behavior instead of aborting an otherwise persistable record.
+
+The permanent fictional regressions first failed on the merged implementation: the local boundary
+matrix accepted all five non-persistable records, and one 600-character experience requirement made
+a two-record page stop with accepted count zero. After the change, 172 focused tests across source,
+repository, and R2 normalization files pass. The mixed three-record repository case completes with
+provider/accepted/unusable counts `3/2/1`, persists two observations and job versions, produces two R2
+evaluations and queue decisions, records only `UNUSABLE_LINK_BOUNDARY` plus index 2 for the rejected
+sibling, and has zero FK issues. It proves long list evidence and valid siblings no longer roll back,
+while an unsafe link never enters downstream state or audit text.
+
+The full dirty-tree `npm.cmd run release:check` passes doctor, database/aggregate preflight,
+formatting, zero-warning lint, strict typecheck, 445 unit tests across 47 files, 21 integration tests
+across three files, the 31-route local production build, the six-page showcase build, showcase
+boundary audit, all 31 serialized E2E tests, privacy audit, and full plus production dependency audits
+with zero known vulnerabilities. Privacy checked 306 tracked files, 864 reachable-history paths, 862
+reachable-history blobs, 1,285 build/test artifacts, and 11 private canaries. Twenty-eight focused
+database/schema/migration/backup/restore tests pass across three files.
+
+The post-run ignored backup `backup-2026-09-12T09-46-07.548Z-b4ce0b86` is schema v7 with integrity
+`PASS`, and its exact restore preview passes. The real database remains schema v7 with zero pending
+migrations, integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0007` have no starting-
+main-to-working-tree diff and no migration was added. `git diff --check` and `git fsck --strict` pass;
+fsck reports only pre-existing unreachable objects. The private capability is immutable matching
+version 2 `REVOKED` in the ignored allowlist and database, active source capability count is zero,
+real target capability versions and bindings are zero, and aggregate preflight passes.
+
+No live request occurred during diagnosis or implementation. Request #8 remains the sole request in
+this train and terminal `STOPPED / PERSISTENCE_FAILED / PERSISTENCE`; durable provider/request/retry/
+redirect counts are `25/1/0/0`. Because the page transaction rolled back, accepted/unusable/drift
+counts are not durably recoverable and must not be guessed; zero corresponding audits persisted. No
+page, observation, normalized job, duplicate result, evaluation, queue decision, Melbourne match,
+role ranking, or target-readiness packet exists. First real source ingestion remains unproven. No
+candidate data was sent, and lifetime source/form/upload/submission counts are exactly `8/0/0/0`.
+Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner framework remains
+ready only for synthetic targets with explicit real-target approval required.
+
+Remaining release mechanics are to commit this exact implementation/result record, rerun the full
+release gate on the exact clean commit, inspect the complete base-to-head authority/privacy/migration
+delta, push only this branch, open one offline PR, and require exact-head push plus PR CI green. A
+normal merge is pre-approved only if the delta remains this documented public-contract compatibility
+and local persistence hardening scope, privacy passes, no migration exists, and no ninth request
+occurs. After normal merge, refresh clean `main` and stop; any future live request needs a new exact
+owner approval.
