@@ -3,7 +3,7 @@
 Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `fix/post-second-live-source-hardening`
+Working branch: `fix/post-fix-live-source-response-diagnostics`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -3650,3 +3650,161 @@ framework remains offline `READY` but real operation is `TARGET_APPROVAL_REQUIRE
 remains `NOT_READY`. Remaining external blocker is that no known HTTP response or usable source job
 exists. Any future source request requires a completely new exact owner authorization after review of
 this fix; any later employer interaction separately requires one exact target capability and approval.
+
+# Post-fix live response diagnostic hardening - 2026-09-12
+
+Status: `IN_PROGRESS / OFFLINE_ONLY / NO_FURTHER_SOURCE_REQUEST_AUTHORITY`. The run started from clean
+`main` at `30ce9c30926545bed451e178bd2c6bd794d3c57e`, schema v7 with zero pending migrations, integrity
+`PASS`, zero foreign-key issues, no active source or real target capability, and passing privacy and
+preflight checks. A verified ignored database backup and restore preview passed before activation. One
+fresh short-lived capability was materialised in the ignored private allowlist with exactly the
+owner-approved Lever tenant, list operation, host/path/query, parser, expiry, one-request/25-record/
+2-MB limits, zero redirects/retries, and concurrency one. Candidate data outbound was zero fields.
+
+The first automated browser harness did not reach the server action because its browser-only route
+filter rejected local Next.js form traffic. The database contained no run for the capability, proving
+that no source request was issued. The corrected harness permitted only loopback aliases and observed
+exactly one local `/sources` action POST. The normal production owner action then consumed exactly one
+source request and no more. The terminal checkpoint is `STOPPED / PERSISTENCE_FAILED`, with one request,
+zero committed pages, zero records, zero observations, zero normalized jobs, zero R2 evaluations, and
+zero queue results. No employer page, upload, application submission, retry, second page, or detail GET
+occurred. Lifetime real source/form/upload/submission counts are now `3/0/0/0`.
+
+## Deterministic diagnosis and objective
+
+This is not an actual persistence-stage failure. A sink persistence exception is already caught and
+converted to `PERSISTENCE_FAILED` with lifecycle stage `PERSISTENCE`, and page consumption precedes the
+sink call. The real checkpoint instead has page count zero and no lifecycle stage. Network failures,
+timeouts, JSON decoding failures, HTTP/content-type failures, and policy failures are already typed as
+`SecureSourceError`. Therefore the only reachable boundary matching the durable evidence is an untyped
+exception while validating or mapping the accepted JSON response before `consumePage` and before
+`persistPage`. The transport accepted a pinned, identity-encoded, JSON, 2xx response; the exact status
+and response schema were intentionally not retained, so no more specific historical claim is safe.
+
+The deterministic software defect is that `readLeverPageV2` lets Zod response-contract failures and
+unexpected mapping exceptions escape untyped, while `safeStopCode` misleadingly maps any untyped
+exception to `PERSISTENCE_FAILED`. The objective is to make all response validation/mapping failures
+terminate as the closed `SCHEMA_CHANGED / RESPONSE_BODY` diagnostic without exposing Zod paths, raw
+values, response content, arbitrary messages, or transport details. Genuine sink/transaction failures
+must remain `PERSISTENCE_FAILED / PERSISTENCE`. The failed live payload is not available and must not be
+reconstructed, inferred, or fetched again; this branch does not broaden the accepted Lever schema.
+
+## Requirements, architecture, files, and data flow
+
+- Add a narrow response-boundary helper in `packages/job-sources/src/lever/v2-reader.ts` that executes
+  Zod page validation and record mapping, preserves an existing `SecureSourceError` while attaching
+  `RESPONSE_BODY` when needed, and maps all other exceptions to `SCHEMA_CHANGED / RESPONSE_BODY`.
+- Use that boundary for list pages and the detail parser. It must not change HTTP construction,
+  capability checks, DNS/address pinning, SNI/TLS verification, budgets, pagination, redirect/retry
+  behavior, raw-payload immutability, inert HTML conversion, or accepted response fields.
+- Extend fictional tests in `packages/job-sources/src/source-capability.test.ts` and the durable source
+  runner/repository tests to prove malformed-but-valid JSON, Zod contract drift, and mapper exceptions
+  preserve only `SCHEMA_CHANGED / RESPONSE_BODY`, while a synthetic sink failure remains
+  `PERSISTENCE_FAILED / PERSISTENCE` and no raw issue/message reaches audit data.
+- Update `SECURITY.md`, `docs/RELEASE_RUNBOOK.md`, and this plan only if needed to describe the verified
+  diagnostic boundary. No dependency, database, migration, UI, candidate profile, scoring, document,
+  runner, target, or application change is planned.
+
+The corrected failure flow is:
+
+`one approved GET -> pinned 2xx JSON response -> strict Lever validation/inert mapping -> closed
+SCHEMA_CHANGED + RESPONSE_BODY on any untrusted response-contract exception -> terminal checkpoint`.
+
+Only a successfully parsed page may proceed to page accounting and transactional persistence. Sink
+exceptions retain the distinct `PERSISTENCE_FAILED + PERSISTENCE` state.
+
+## Risks, privacy/security, testing, rollback, and acceptance
+
+Risks are masking a programming error as source drift, losing a pre-existing typed stop code, leaking
+validation paths or values, accidentally widening the source schema, or treating better diagnostics as
+retry authority. Controls are one closed error/stage pair, preservation of existing typed errors,
+fictional malformed fixtures, no arbitrary cause serialization, an unchanged schema and request path,
+and zero further network activity. Candidate/profile/document/answer data remains absent from source
+requests and tests; private allowlist, database, backup, response, and runtime files remain ignored.
+
+Rollback is a normal revert of this offline branch/PR. It changes no database row or migration and does
+not rewrite/delete the terminal run. The fresh capability expires independently and cannot authorize a
+new run under this task. No restoration or private-data deletion is part of rollback.
+
+Acceptance requires focused tests for both the corrected response boundary and genuine persistence
+failure, format/lint/typecheck/unit/integration/build/E2E, schema/status and backup/restore checks,
+security/privacy/dependency audits, doctor/preflight/release, immutable migration diff, `git diff
+--check`, and `git fsck --strict` to pass. The consolidated PR must contain fictional code/tests and safe
+documentation only. It remains unmerged unless separately authorized; no further real source request,
+form visit, upload, or submission may occur.
+
+Exact implementation sequence:
+
+1. Commit this blueprint before application code.
+2. Add the closed response validation/mapping boundary and focused fictional regressions.
+3. Run focused checks, inspect the diff for authority/privacy drift, then run the complete release gate.
+4. Record exact results, commit/push this branch, open one consolidated offline PR, verify exact-head CI,
+   and stop without another source request.
+
+## Post-fix live response diagnostic implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL_GATES_PASS / PR_19_OPEN / EXACT_HEAD_CI_PASS`. The run began from exact clean
+`main` at `30ce9c30926545bed451e178bd2c6bd794d3c57e`. Initial database state was schema v7, zero pending
+migrations, integrity `PASS`, and zero foreign-key issues; migrations `0000`-`0007` were unchanged.
+Initial preflight and privacy checks passed with zero active source capabilities and no approved real
+runner target. A verified ignored schema-v7 backup and restore preview passed before capability
+activation.
+
+One fresh immutable private capability used the established deterministic identifier method and the
+exact owner-authorized Shield AI Lever list scope, query, parser, validity window, and one-request/
+25-record/2-MB/30-second limits. The normal production owner action consumed exactly one request.
+It performed no retry, redirect, second page, detail request, employer-form visit, upload, or
+submission and sent no candidate data. The terminal durable result is `STOPPED /
+PERSISTENCE_FAILED`, request count one, page and record counts zero, and no observation, normalized
+job, R2 evaluation, recommendation, or queue result. Lifetime real source/form/upload/submission
+counts are `3/0/0/0`.
+
+The durable error is an historical misclassification, not evidence of a database write failure. A
+genuine sink exception can occur only after page accounting and is already converted to
+`PERSISTENCE_FAILED / PERSISTENCE`; this run instead retained page count zero and no lifecycle stage.
+All transport, policy, HTTP/content-type, timeout, and JSON-decoding failures are already typed. The
+deepest safely provable boundary is therefore an untyped strict-response validation or mapper
+exception after the transport accepted a pinned, identity-encoded JSON 2xx response and before page
+accounting. The exact HTTP status and response body were intentionally not retained. No fourth GET
+was made, and the unavailable payload was not inferred or reconstructed.
+
+The Lever reader now wraps only strict page validation and record mapping in a response-body
+boundary. Existing `SecureSourceError` values are preserved and gain `RESPONSE_BODY` only when their
+stage was absent; all other exceptions become the closed `SCHEMA_CHANGED / RESPONSE_BODY` result.
+Both list and detail parsing use this boundary. The accepted schema, inert-text mapping, raw-payload
+handling, request semantics, DNS/address pinning, budgets, pagination, redirects, retries, authority,
+and persistence behavior are unchanged. Synthetic regressions cover Zod URL drift and a mapper Date
+exception without retaining fixture values or arbitrary messages. A durable malformed-response test
+proves `STOPPED / SCHEMA_CHANGED`, one request, zero pages/records, `RESPONSE_BODY` recovery, no raw
+fixture in audit metadata, and no persisted source page. The existing sink-failure regression still
+proves the distinct `PERSISTENCE_FAILED / PERSISTENCE` behavior.
+
+Focused validation passed 47 tests across two source/repository files. The complete release check
+passed doctor/database/preflight, formatting, lint, strict typecheck, 368 unit tests in 46 files, 21
+integration tests in three files, a 31-route production build, 27 serialized fictional/local E2E
+tests, privacy audit over 273 tracked files, 765 history paths, 766 history blobs, 1,302 build/test
+artifacts, and 11 private canaries, plus full and production dependency audits with zero known
+vulnerabilities. Seventeen focused database schema/migration/backup/restore tests in three files pass.
+
+The post-run ignored backup `backup-2026-09-12T02-52-46.424Z-9fd3351c` is schema v7 with integrity
+`PASS`, and its exact restore preview passes. An initial command-wrapper preview supplied a truncated
+timestamp because its local output-extraction expression stopped at the colon; validation rejected
+that invalid backup identifier before any restore or database mutation. The immediate exact-ID rerun
+passed. Final database status and preflight pass at schema v7, pending zero, integrity `PASS`, and
+foreign keys zero. The private capability remains bounded by its original expiry and exhausted task
+authority; it does not authorize another request in this run. No real target capability is active.
+
+Migration is `NONE`; migrations `0000`-`0007` remain byte-for-byte unchanged and no `0008` exists.
+The base-to-head migration diff and `git diff --check` are clean. `git fsck --strict` exits zero; it
+reports only unreachable local objects and no repository corruption. The ignored diagnostic helper
+was removed. No private allowlist, database, backup, source response, candidate data, vacancy,
+document, packet, credential, runtime, or session material is tracked by this branch.
+
+The safe result record was committed, the exact-head release check passed, and the same branch was
+pushed as consolidated offline corrective PR #19. Both the push and pull-request `Quality checks`
+workflows passed against its exact head. The PR remains open and unmerged pending separate human
+review. Source-enabled Personal Beta remains `NOT_READY` because no usable source record exists and
+the observed response contract cannot safely be broadened without approved evidence. Personal Live
+V1 remains `NOT_READY`. Any further live source verification requires a new immutable capability and
+new exact owner authorization after this fix is reviewed and merged; any employer interaction
+separately requires an exact approved target.

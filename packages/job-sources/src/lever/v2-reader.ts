@@ -182,6 +182,31 @@ function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): Le
   };
 }
 
+function responseBodyFailure(error: unknown): never {
+  if (error instanceof SecureSourceError) {
+    throw error.lifecycleStage
+      ? error
+      : new SecureSourceError(error.code, error.retryAfter, "RESPONSE_BODY");
+  }
+  throw new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY");
+}
+
+function parseLeverPage(input: unknown, capability: SourceCapabilityV2): LeverPostingRecordV2[] {
+  try {
+    return LeverPageV2Schema.parse(input).map((posting) => mapPosting(posting, capability));
+  } catch (error) {
+    responseBodyFailure(error);
+  }
+}
+
+function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): LeverPostingRecordV2 {
+  try {
+    return mapPosting(LeverPostingV2Schema.parse(input), capability);
+  } catch (error) {
+    responseBodyFailure(error);
+  }
+}
+
 export interface LeverPageV2 {
   records: LeverPostingRecordV2[];
   cursor: number;
@@ -233,16 +258,17 @@ export async function readLeverPageV2(input: {
     signal: input.signal,
     dependencies: input.dependencies,
   });
-  const page = LeverPageV2Schema.parse(response.body);
-  if (page.length > pageSize) throw new SecureSourceError("PAGE_SIZE_EXCEEDED");
-  const records = page.map((posting) => mapPosting(posting, capability));
+  const records = parseLeverPage(response.body, capability);
+  if (records.length > pageSize) {
+    throw new SecureSourceError("PAGE_SIZE_EXCEEDED", null, "RESPONSE_BODY");
+  }
   const pageDigest = createHash("sha256")
     .update(
       records.map(({ externalId, contentDigest }) => `${externalId}:${contentDigest}`).join("\n"),
     )
     .digest("hex");
   input.budget.consumePage(String(cursor), records.length, response.byteCount);
-  const next = page.length === pageSize ? cursor + page.length : null;
+  const next = records.length === pageSize ? cursor + records.length : null;
   return {
     records,
     cursor,
@@ -282,5 +308,5 @@ export async function readLeverDetailV2(input: {
     signal: input.signal,
     dependencies: input.dependencies,
   });
-  return mapPosting(LeverPostingV2Schema.parse(response.body), capability);
+  return parseLeverPosting(response.body, capability);
 }

@@ -541,6 +541,53 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("records response-contract drift separately from persistence without raw details", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `schema-stop:${++id}`,
+    );
+    repository.persistCapabilityVersion(capability());
+    const malformed = { ...posting(1), hostedUrl: "private malformed value" };
+    const result = await runLeverSourceToQueue({
+      capability: capability(),
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([malformed])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "SCHEMA_CHANGED",
+      requestCount: 1,
+      pageCount: 0,
+      recordCount: 0,
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      status: "STOPPED",
+      safeErrorCode: "SCHEMA_CHANGED",
+      transportStage: "RESPONSE_BODY",
+    });
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
+      "private malformed value",
+    );
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 0,
+    });
+    sqlite.close();
+  });
+
   it("reconciles page-one records after page-two failure, restart, and exact replay", async () => {
     const sqlite = database();
     const profile = installFixtureProfile(sqlite);
