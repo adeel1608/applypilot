@@ -3,7 +3,7 @@
 Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/public-showcase`
+Working branch: `fix/lever-public-contract-alignment`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -4072,3 +4072,102 @@ the final pre-PR repository checks. The final task is to commit this result reco
 checks, push the same branch, open the one requested PR, require exact-head GitHub CI, self-review the
 complete public diff, merge only under the owner's listed conditions, refresh `main`, and verify the
 deployed showcase content still matches the merged `apps/showcase` tree.
+
+# Official Lever public v0 contract alignment - 2026-09-12
+
+Status: `IN_PROGRESS / OFFLINE_ONLY / NO_SOURCE_REQUEST_AUTHORITY`. The exact starting `main` and
+`origin/main` are `1c9d781278407130bca0c46502cc292ec53c59e4`; the worktree was clean and GitHub
+authentication was `adeel1608`. Initial release preflight passed with schema v7, zero pending
+migrations, integrity `PASS`, zero foreign-key issues, four historical source capability versions,
+zero active source capabilities, Manual-intake Personal Beta `READY`, Source-enabled Personal Beta
+`WAITING_FOR_APPROVED_TENANT`, and the real runner `TARGET_APPROVAL_REQUIRED`. This branch is
+`fix/lever-public-contract-alignment`. No real source request, employer interaction, upload, or
+submission is authorized.
+
+## Current state, official evidence, objective, and assumptions
+
+`LeverPostingV2Schema` validates the public v0 JSON list/detail boundary before inert mapping. It
+currently accepts a bounded string or absence for `country`, while the official Lever Postings API
+documentation says `country` is an ISO 3166-1 alpha-2 string or `null` when unknown. The mapper already
+normalizes an absent value to internal `null`, but Zod rejects the documented wire-level `null` before
+mapping. This is a deterministic public-contract mismatch and is the only compatibility change
+required by the present evidence.
+
+The official field table was reviewed on 2026-09-12 from Lever's public documentation repository at
+`https://github.com/lever/postings-api`. It also documents the existing workplace values
+`unspecified|on-site|remote|hybrid`, `lists[]` entries shaped as `text` plus HTML `content`, optional
+`salaryRange`, optional salary descriptions, and optional closing `additional`/`additionalPlain`
+strings that may be empty. Current ApplyPilot already accepts and safely maps the four workplace
+values, bounds and inertly converts list content, permits empty optional description/additional text,
+and accepts optional salary data. Other documented description/opening/salary-description fields are
+forward-compatible passthrough data and are not used to create stronger internal evidence. The docs
+do not state another nullable public-v0 field requiring a schema relaxation. Country absence is kept
+for backward compatibility because the current parser deliberately supports it; no behavior is
+inferred from the unavailable private response body.
+
+The objective is a narrow documentation-derived parser correction: accept `country: null`, retain
+string and absent behavior, normalize both null and absence to internal `null`, and lock the public
+contract with synthetic regression coverage. No network authority, URL construction, host/path/query
+validation, DNS/address pinning, TLS behavior, request/page/body/time budget, retry, redirect,
+pagination, capability, raw-payload, persistence, R2, queue, runner, document, target, or submission
+behavior changes.
+
+## Architecture, files, data flow, and dependencies
+
+- Update only `packages/job-sources/src/lever/v2-reader.ts` at the country wire boundary. Preserve the
+  bounded string contract and add `nullable()` before the existing optional behavior; do not broadly
+  loosen the object or any unrelated field.
+- Extend `packages/job-sources/src/source-capability.test.ts` with fictional synthetic variants for
+  country string/null/absence, all documented workplace values, `lists[]`, empty optional textual
+  fields, and malformed unsupported values producing the existing closed
+  `SCHEMA_CHANGED / RESPONSE_BODY` failure without raw Zod details.
+- Update `README.md` readiness wording to distinguish the first two attempts, which stopped before a
+  usable response, from the latest bounded attempt, which reached an accepted 2xx JSON response and
+  failed closed during strict response-contract parsing. State that no real job was persisted and
+  Source-enabled Personal Beta remains `NOT_READY`.
+- Update this plan before and after implementation with the exact contract decision and validation
+  evidence. No dependency or migration is expected; migrations `0000`-`0007` remain immutable and no
+  `0008` is permitted for this parser-only change.
+
+Data flow remains:
+
+`bounded public-v0 JSON -> strict LeverPostingV2Schema -> null/absent country -> internal null -> inert
+mapped source record`, with every malformed unsupported value still terminating as
+`SCHEMA_CHANGED / RESPONSE_BODY` before persistence.
+
+## Risks, security/privacy, rollback, testing, and acceptance
+
+Risks are over-loosening the response boundary, changing request authority while correcting a response
+contract, treating optional as nullable without documentation, leaking or encoding assumptions from
+the unavailable live body, weakening inert HTML handling, or overstating source readiness. Controls
+are a one-field documentation-backed schema delta, synthetic-only fixtures, exact failure-code tests,
+an authority/security diff review, immutable-migration verification, full privacy scans, and accurate
+readiness copy. Candidate/private profile, vacancy, database, backups, allowlist, response body,
+documents, packets, credentials, and runtime/session material remain local and ignored; none may be
+printed, committed, or sent externally.
+
+Rollback is a normal revert of the focused branch or pull request. No database row, capability,
+source run, observation, job, evaluation, queue, migration, deployment, or external state is changed.
+
+Acceptance requires: documented string, null, and supported absence variants parse and map correctly;
+all four workplace values and `lists[]` inert evidence remain green; empty documented optional text is
+accepted; malformed unsupported values still produce only `SCHEMA_CHANGED / RESPONSE_BODY`; README
+history/readiness is accurate; migrations remain unchanged; schema/status/integrity/FKs and privacy/
+dependency/security gates pass; full format, lint, typecheck, unit, integration, production build,
+serialized E2E, database/backup/restore, preflight/release, diff, and strict-fsck checks pass; one PR
+titled `fix: align Lever public posting contract` has exact-head push and pull-request CI green; and
+the final diff remains narrow enough for the owner's conditional merge approval. Only then may the PR
+be self-reviewed, normally merged, and local `main` refreshed. No live request follows in this task.
+
+Exact implementation sequence:
+
+1. Commit this blueprint before changing application code.
+2. Add the one-field nullable country boundary and the complete fictional contract regression matrix.
+3. Update README readiness wording without claiming successful ingestion.
+4. Run focused parser tests, strict typecheck, lint, and an authority/migration/privacy diff review.
+5. Run the complete release matrix, migration/backup/restore checks, dependency audits,
+   `git diff --check`, and `git fsck --strict`; record exact results here.
+6. Commit and push only this branch, open the named PR, require exact-head push and PR CI, self-review
+   the full delta, and merge only if every pre-approved condition remains satisfied.
+7. Refresh clean `main`, report the merge and final SHA, and provide the next bounded live-verification
+   proposal as a proposal only. Stop before any network request.
