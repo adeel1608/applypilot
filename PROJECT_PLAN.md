@@ -3,7 +3,7 @@
 Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `fix/post-fix-live-source-response-diagnostics`
+Working branch: `feat/public-showcase`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -3808,3 +3808,180 @@ the observed response contract cannot safely be broadened without approved evide
 V1 remains `NOT_READY`. Any further live source verification requires a new immutable capability and
 new exact owner authorization after this fix is reviewed and merged; any employer interaction
 separately requires an exact approved target.
+
+# Public showcase and repository presentation - 2026-09-12
+
+Status: `IN_PROGRESS / PUBLIC_FICTIONAL_DATA_ONLY`. PR #19 was reverified at the owner-approved exact
+head `e3ccfda40c99c3253faa2913c5d5dbf52f7bfaf6`: it was open, non-draft, cleanly mergeable, and both
+exact-head quality checks were successful. Its diff remained limited to response-diagnostic handling,
+fictional regressions, and safe plan evidence; migrations `0000`-`0007` were unchanged, no private/live
+payload was present, and no source authority was broadened. It merged normally as
+`56aa96691d6aa52cd8c78a3f770d4e5fc66cf16d`. Refreshed local `main` exactly matched `origin/main`, and
+this branch, `feat/public-showcase`, was created from that clean merge. No additional source request,
+employer-form visit, upload, or submission is authorized or planned.
+
+## Current state, objective, and assumptions
+
+`apps/web` is the local/private product surface. Its dynamic routes deliberately read the ignored
+SQLite database, resolve the server-only private profile, expose local import/document/packet flows,
+and render source/runner approval controls. Reusing or deploying that app would create an unnecessary
+private-runtime boundary and could misrepresent operational readiness. The repository currently has
+an engineering-heavy README, no showcase screenshots, no architecture asset, no repository topics or
+homepage, no hosting configuration, and no installed/authenticated Vercel CLI. The repository itself
+is public by prior explicit owner authorization; npm publication remains disabled and no open-source
+licence has been selected.
+
+The objective is a premium public explanation and safe interactive demonstration of ApplyPilot using
+only committed fictional data. It must communicate: local-first candidate control, evidence-backed
+matching, explainable ranking, unknown-as-review, immutable application packets, bounded source and
+target authority, and human control of every external action. It must accurately label Manual-intake
+Personal Beta as locally available, source-enabled Beta as under validation, Personal Live V1 as not
+ready, and the public experience as a fictional demonstration.
+
+Assumptions are that a fully static export is sufficient; no authentication, server state, database,
+upload, source reader, runner, API, paid dependency, remote font, analytics, or form is needed. Client
+state is presentation-only and may support filters, sorting, job selection, evidence inspection,
+packet inspection, and pipeline-stage views. Core content remains useful in prerendered HTML without
+hydration. Deployment may proceed only for this isolated export after its source and built output pass
+the dedicated privacy boundary. Vercel is not currently configured; the implementation will remain
+platform-neutral and may use the available Sites static-hosting path if it requires no account,
+billing, secret, or private-data access. No custom domain will be purchased.
+
+## Architecture, routes, visual system, and data flow
+
+Choose a separate `apps/showcase` Next.js App Router workspace with `output: "export"`. It imports only
+files beneath `apps/showcase` plus `next`, `react`, and `react-dom`; it has no server action, route
+handler, dynamic server API, workspace-domain package, environment access, filesystem access, or
+network fetch. The generated `out/` directory is the sole deployable root. `apps/web` and every local
+runtime route remain unchanged and excluded from the public artifact.
+
+Public routes:
+
+- `/`: narrative product home with the exact public-demo label, hero, workflow, differentiators,
+  truthful status, demo preview, safety model, real inspected tech stack, and architecture diagram.
+- `/demo`: prerendered fictional dashboard with 8 roles, four requested metrics, filters, fit sorting,
+  role selection, evidence/eligibility/recommendation/queue inspection, and pipeline-stage controls.
+- `/demo/evidence`: focused evidence ledger showing `C++ experience -> verified robotics project ->
+  MATCH` beside `Australian citizenship required -> UNKNOWN -> REVIEW REQUIRED`, emphasizing
+  `Unknown never means yes`.
+- `/demo/application-packet`: fictional frozen packet with CV version, cover-letter state, typed
+  answers, disclosure decisions, target binding, stale/version checks, and human approval state; no
+  file or action exists.
+
+The visual thesis is a restrained graphite engineering console: near-black layered surfaces, crisp
+off-white type, thin steel borders, a single electric-lime signal colour, monospaced evidence labels,
+large editorial product typography, and a subtle technical grid. Motion is limited to short hover/
+focus transitions and honors reduced-motion preference. Main body text remains at least 16px, labels
+at least 14px where routinely used, focus rings are conspicuous, contrast is accessible, layouts
+remain usable at 200% zoom, and every interaction has a semantic control and non-colour label.
+
+All public data lives in an immutable local TypeScript fixture module owned by the showcase. The flow
+is `fictional fixture -> static HTML dashboard -> optional client-only view state`; it never reaches a
+server, browser storage, or external destination. The explanatory architecture flow is `approved job
+source -> secure bounded transport -> immutable observation -> normalization/deduplication -> evidence
+and fit evaluation -> review queue -> frozen packet -> controlled runner -> fresh human approval`.
+
+## Proposed files, documentation, assets, and repository metadata
+
+- Create `apps/showcase/{package.json,tsconfig.json,next.config.ts}` and App Router source for the four
+  routes, shared layout/navigation/footer, fictional fixtures, static architecture component, and one
+  client-only demo workspace. Use CSS and semantic HTML; add no UI/runtime dependency.
+- Create `scripts/audit-public-showcase.ts` to fail on forbidden imports, runtime capabilities,
+  private-path names, SQLite/database markers, source/target allowlists, candidate canaries, network
+  calls, server actions/routes, and unexpected built artifacts. Add root commands that build both the
+  local app and static showcase and audit the export.
+- Create `tests/security/public-showcase-boundary.test.ts` for the source graph/package/config and
+  fictional-only contract. Extend Playwright with an isolated loopback showcase server and browser
+  coverage for desktop/mobile, keyboard navigation, filtering/sorting/selection, evidence, packet,
+  broken internal links, console/page errors, and horizontal overflow.
+- Create public-safe `docs/assets/landing.png`, `dashboard.png`, `evidence.png`, and
+  `application-packet.png` from the built fictional showcase, plus a requested branded social preview
+  if it can be generated and visually verified without personal data. Create
+  `docs/assets/applypilot-architecture.svg` as a functional static diagram and
+  `docs/PUBLIC_SHOWCASE.md` as the boundary/deployment record.
+- Rebuild `README.md` into a concise public landing page with truthful badges, screenshots, workflow,
+  features, demo status, architecture, safety/privacy, inspected stack, quick start, testing, current
+  status, roadmap, contribution link, and accurate all-rights-reserved licence wording. Add a Live
+  Demo link only after a deployment succeeds.
+- Add a focused pull-request template and issue forms only when they reinforce privacy/reproduction
+  boundaries. Update `ARCHITECTURE.md`, `SECURITY.md`, and `CONTRIBUTING.md` navigation as required.
+- Update the GitHub description and topics only after code/docs pass publication audit. Set the GitHub
+  homepage only after a verified public deployment. Do not change repository visibility, workflow
+  permissions, npm publication guards, branch policy, or licence.
+- Add `.openai/hosting.json` only if the selected Sites deployment path is used, with static output
+  metadata and no secrets, capabilities, D1/R2 binding, or runtime values. Do not add Vercel secrets or
+  fabricate a Vercel project.
+
+## Dependencies, risks, security/privacy, and rollback
+
+No package is added. The existing exact versions of Next.js 16.3.4, React 19.2.8, TypeScript 5.9.3,
+Vitest 4.1.11, and Playwright 1.63.0 are sufficient. The static export uses no paid API and no build-
+time fetch. The actual stack may mention SQLite, Drizzle, Zod, DOCX/PDF tooling, Vitest, Playwright,
+and GitHub Actions only as repository capabilities verified from manifests and code; the hosted demo
+must distinguish these from its own zero-backend artifact.
+
+Principal risks are accidentally bundling the private app, candidate fixture, source/runner controls,
+or local path; publishing a real screenshot; presenting fictional metrics as personal results;
+overstating live readiness; broken static navigation; inaccessible dark styling; a deployment archive
+that includes the repository rather than `out/`; and changing legal/licence terms. Controls are a
+separate workspace/import graph, literal fictional banner, invented company/role/contact-free data,
+static export, source plus built-output denylist/canary audit, local-only screenshot capture from the
+showcase port, no traces containing private routes, no external images/fonts/scripts, truthful status
+copy, exact deploy-root packaging, and no licence change.
+
+The public application must not contain or reference `profile.private.json`, `data/private`, SQLite,
+source/target allowlists, generated private documents, source activation, imports/uploads, local
+sessions, runner authority, real vacancy/application data, credentials, tokens, cookies, or candidate
+values. It must make zero source/employer/upload/submission calls. The four screenshots and social card
+must be visually inspected before Git staging; only fictional public content may appear. Build output,
+Git diff, tracked tree, reachable history, screenshots, deployment archive, and served routes are all
+audited without printing private needles.
+
+Rollback is closing the showcase PR or normally reverting its commits. The separate static app can be
+removed without changing `apps/web`, migrations, local data, capabilities, or runner state. A deployed
+version can be left undeployed/disabled through the hosting provider without deleting local/private
+data. Repository metadata can be restored to its previous safe values. No database migration or data
+rollback exists.
+
+## Testing strategy and acceptance criteria
+
+Required gates are formatting, lint, strict typecheck, all unit/integration tests, both production
+builds, serialized E2E, full privacy audit, public-showcase source/export audit, full/production
+dependency audit, database/schema/backup/restore checks, preflight/release, immutable migration diff,
+`git diff --check`, and `git fsck --strict`. Browser validation must cover 1440px desktop, 390px mobile,
+keyboard access, visible focus, filters/sort/role selection, evidence and packet routes, internal links,
+hydration-disabled core content, no console/page error, and no horizontal overflow.
+
+Acceptance requires the four routes and 8 fictional roles; exact four dashboard metrics; requested
+workflow/difference/evidence/packet/safety/stack/architecture content; public-demo labels; accurate
+readiness claims; four optimized screenshots; architecture asset; a visually valid social preview when
+practical; a concise repository-quality README; safe metadata/topics; no migration/dependency/licence/
+private-runtime change; source/export/deployment privacy checks passing; exact-head local and GitHub CI
+green; one PR titled `feat: launch ApplyPilot public showcase`; owner-pre-approved self-review/merge
+only if every listed condition remains true; and clean refreshed `main` after merge. A deployment is
+successful only when the merged static export is served publicly, its home/demo/routes and metadata
+are verified, no private/local route or marker is exposed, and the GitHub homepage/README link point to
+that URL.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before application code.
+2. Build the isolated static workspace, fictional fixture model, shared shell, landing page, and the
+   smallest recognizable demo dashboard slice; verify it compiles before expanding.
+3. Complete evidence, packet, safety, stack, architecture, responsive, keyboard, and client-only demo
+   interactions without a network/runtime boundary.
+4. Add the source/export boundary audit and its security tests; integrate both application builds into
+   root quality without weakening the existing local product gate.
+5. Run the built showcase locally, complete browser/accessibility/link/overflow/error checks, capture
+   and visually inspect the four requested public screenshots, generate/verify the requested social
+   card, and wire only safe assets/metadata.
+6. Rebuild README and safe supporting docs/templates; run the publication privacy audit. Only then
+   update repository description/topics.
+7. Run the full exact-head release matrix, update this section with actual results, commit by concern,
+   push only `feat/public-showcase`, and open the one showcase PR.
+8. Require both exact-head push and pull-request CI. Self-review the entire public artifact/diff. Merge
+   only under the owner's pre-approved conditions, refresh clean `main`, and record the merge SHA.
+9. If a no-login/no-billing static host is available, package and deploy only the merged showcase
+   export, verify public routes/metadata/privacy against the merged commit, then add the verified Live
+   Demo/homepage URL through a safe documentation/metadata update if possible. If hosting requires
+   account interaction, stop only deployment and report the exact minimum owner action.
