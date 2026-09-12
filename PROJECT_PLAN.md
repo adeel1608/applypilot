@@ -3862,7 +3862,7 @@ Public routes:
 - `/demo`: prerendered fictional dashboard with 8 roles, four requested metrics, filters, fit sorting,
   role selection, evidence/eligibility/recommendation/queue inspection, and pipeline-stage controls.
 - `/demo/evidence`: focused evidence ledger showing `C++ experience -> verified robotics project ->
-  MATCH` beside `Australian citizenship required -> UNKNOWN -> REVIEW REQUIRED`, emphasizing
+MATCH` beside `Australian citizenship required -> UNKNOWN -> REVIEW REQUIRED`, emphasizing
   `Unknown never means yes`.
 - `/demo/application-packet`: fictional frozen packet with CV version, cover-letter state, typed
   answers, disclosure decisions, target binding, stale/version checks, and human approval state; no
