@@ -3740,3 +3740,70 @@ Exact implementation sequence:
 3. Run focused checks, inspect the diff for authority/privacy drift, then run the complete release gate.
 4. Record exact results, commit/push this branch, open one consolidated offline PR, verify exact-head CI,
    and stop without another source request.
+
+## Post-fix live response diagnostic implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL_GATES_PASS / AWAITING_EXACT_HEAD_CI`. The run began from exact clean
+`main` at `30ce9c30926545bed451e178bd2c6bd794d3c57e`. Initial database state was schema v7, zero pending
+migrations, integrity `PASS`, and zero foreign-key issues; migrations `0000`-`0007` were unchanged.
+Initial preflight and privacy checks passed with zero active source capabilities and no approved real
+runner target. A verified ignored schema-v7 backup and restore preview passed before capability
+activation.
+
+One fresh immutable private capability used the established deterministic identifier method and the
+exact owner-authorized Shield AI Lever list scope, query, parser, validity window, and one-request/
+25-record/2-MB/30-second limits. The normal production owner action consumed exactly one request.
+It performed no retry, redirect, second page, detail request, employer-form visit, upload, or
+submission and sent no candidate data. The terminal durable result is `STOPPED /
+PERSISTENCE_FAILED`, request count one, page and record counts zero, and no observation, normalized
+job, R2 evaluation, recommendation, or queue result. Lifetime real source/form/upload/submission
+counts are `3/0/0/0`.
+
+The durable error is an historical misclassification, not evidence of a database write failure. A
+genuine sink exception can occur only after page accounting and is already converted to
+`PERSISTENCE_FAILED / PERSISTENCE`; this run instead retained page count zero and no lifecycle stage.
+All transport, policy, HTTP/content-type, timeout, and JSON-decoding failures are already typed. The
+deepest safely provable boundary is therefore an untyped strict-response validation or mapper
+exception after the transport accepted a pinned, identity-encoded JSON 2xx response and before page
+accounting. The exact HTTP status and response body were intentionally not retained. No fourth GET
+was made, and the unavailable payload was not inferred or reconstructed.
+
+The Lever reader now wraps only strict page validation and record mapping in a response-body
+boundary. Existing `SecureSourceError` values are preserved and gain `RESPONSE_BODY` only when their
+stage was absent; all other exceptions become the closed `SCHEMA_CHANGED / RESPONSE_BODY` result.
+Both list and detail parsing use this boundary. The accepted schema, inert-text mapping, raw-payload
+handling, request semantics, DNS/address pinning, budgets, pagination, redirects, retries, authority,
+and persistence behavior are unchanged. Synthetic regressions cover Zod URL drift and a mapper Date
+exception without retaining fixture values or arbitrary messages. A durable malformed-response test
+proves `STOPPED / SCHEMA_CHANGED`, one request, zero pages/records, `RESPONSE_BODY` recovery, no raw
+fixture in audit metadata, and no persisted source page. The existing sink-failure regression still
+proves the distinct `PERSISTENCE_FAILED / PERSISTENCE` behavior.
+
+Focused validation passed 47 tests across two source/repository files. The complete release check
+passed doctor/database/preflight, formatting, lint, strict typecheck, 368 unit tests in 46 files, 21
+integration tests in three files, a 31-route production build, 27 serialized fictional/local E2E
+tests, privacy audit over 273 tracked files, 765 history paths, 766 history blobs, 1,302 build/test
+artifacts, and 11 private canaries, plus full and production dependency audits with zero known
+vulnerabilities. Seventeen focused database schema/migration/backup/restore tests in three files pass.
+
+The post-run ignored backup `backup-2026-09-12T02-52-46.424Z-9fd3351c` is schema v7 with integrity
+`PASS`, and its exact restore preview passes. An initial command-wrapper preview supplied a truncated
+timestamp because its local output-extraction expression stopped at the colon; validation rejected
+that invalid backup identifier before any restore or database mutation. The immediate exact-ID rerun
+passed. Final database status and preflight pass at schema v7, pending zero, integrity `PASS`, and
+foreign keys zero. The private capability remains bounded by its original expiry and exhausted task
+authority; it does not authorize another request in this run. No real target capability is active.
+
+Migration is `NONE`; migrations `0000`-`0007` remain byte-for-byte unchanged and no `0008` exists.
+The base-to-head migration diff and `git diff --check` are clean. `git fsck --strict` exits zero; it
+reports only unreachable local objects and no repository corruption. The ignored diagnostic helper
+was removed. No private allowlist, database, backup, source response, candidate data, vacancy,
+document, packet, credential, runtime, or session material is tracked by this branch.
+
+Remaining steps are to commit this safe result record, rerun the exact-head release check, push this
+same branch, open one consolidated offline corrective PR, and require both exact-head push and PR CI
+to pass. The PR remains unmerged pending separate human review. Source-enabled Personal Beta remains
+`NOT_READY` because no usable source record exists and the observed response contract cannot safely be
+broadened without approved evidence. Personal Live V1 remains `NOT_READY`. Any further live source
+verification requires a new immutable capability and new exact owner authorization after this fix is
+reviewed and merged; any employer interaction separately requires an exact approved target.
