@@ -213,6 +213,19 @@ export const SourceRunStatusSchema = z.enum([
   "OUTCOME_UNKNOWN",
 ]);
 
+export const SourceTransportLifecycleStageSchema = z.enum([
+  "DNS",
+  "REQUEST_CREATED",
+  "SOCKET_ASSIGNED",
+  "TCP_CONNECTED",
+  "TLS_ESTABLISHED",
+  "REQUEST_FLUSHED",
+  "RESPONSE_HEADERS",
+  "RESPONSE_BODY",
+  "PERSISTENCE",
+]);
+export type SourceTransportLifecycleStage = z.infer<typeof SourceTransportLifecycleStageSchema>;
+
 export const SourceStopCodeSchema = z.enum([
   "OWNER_CANCELLED",
   "CAPABILITY_CHANGED",
@@ -290,6 +303,7 @@ export const SourceAuditMetadataSchemas = {
     .object({
       runId: z.string().min(1),
       code: SourceStopCodeSchema,
+      transportStage: SourceTransportLifecycleStageSchema.nullable().optional(),
       requestCount: z.number().int().nonnegative(),
       recordCount: z.number().int().nonnegative(),
     })

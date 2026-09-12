@@ -3592,3 +3592,61 @@ Exact implementation sequence:
 5. Record exact results, commit/push only `fix/post-second-live-source-hardening`, open one consolidated
    PR, require exact-head push and PR CI green, self-review/merge only within the owner-approved
    offline scope, refresh clean `main`, and stop with no further source request.
+
+## Post-second lifecycle hardening implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL_GATES_PASS / AWAITING_EXACT_HEAD_CI`. The second and final authorized
+request remains durably stopped with one request, zero pages, zero records, zero observations, and
+zero queue work. Across both attempts the database contains two capability versions, two stopped
+runs, zero source pages, and zero Lever observations. The deepest provable second-attempt stage is
+`REQUEST_CREATED`: the hardened DNS branches did not fire, every resolved address passed validation,
+and the default request path was entered; historical code did not retain evidence for socket
+assignment or any later stage. No third GET or post-second connectivity probe occurred.
+
+Offline contract inspection established that Node 24 may ask a custom lookup for `all=true` during
+family autoselection while the old pinned callback always used the single-address shape. The corrected
+helper sets the validated pin's explicit IPv4/IPv6 family and returns exactly the same pin either as a
+single address or a one-element array according to Node's callback contract. It never re-resolves,
+races addresses, falls back, or creates another connection/HTTP attempt. This is the strongest
+deterministic explanation available for the two otherwise ambiguous failures; the discarded historical
+raw errors prevent claiming it as proven runtime causation.
+
+The transport now carries a closed deepest lifecycle enum on `SecureSourceError`; DNS, request/socket,
+TCP, TLS, flush, response-header/body, timeout/cancellation, and persistence paths preserve only that
+enum. `source.run.stopped` strict audit metadata accepts an optional nullable stage for backward
+compatibility, rejects arbitrary values, and stores no network values. Repository recovery derives the
+stage from the existing same-run audit JSON, so no schema column/migration is needed. The owner source
+recovery UI displays the safe stage when present; old real attempts correctly display no invented
+stage. Persistence exceptions become `PERSISTENCE_FAILED / PERSISTENCE` and discard raw details.
+
+Focused validation passed 44 tests across the source transport/capability and source repository files.
+It covers every safe class/stage, DNS throw/empty/forbidden answers, Node single/`all=true` pinned lookup
+shapes, canonical IPv6 pin equality, actual-address mismatch, TLS-before/after-secure distinction,
+timeout/cancellation, response reset, no blind retry, audit-stage rejection, historical null, durable
+transport stage, persistence stage, and raw-message absence. Strict typecheck and lint pass. A local
+production `/sources` read returned HTTP 200 and rendered the durable unknown outcome without invoking
+a source action.
+
+The complete local release check passed doctor/database/preflight, formatting, lint, strict typecheck,
+365 unit tests in 46 files, 21 integration tests in three files, a 31-route production build, 27
+serialized fictional/local E2E tests, privacy audit over 273 tracked files, 747 history paths, 748
+history blobs, 1,288 build/test artifacts and 11 private canaries, plus full and production dependency
+audits with zero known vulnerabilities. Fifteen focused schema/migration/backup/restore tests pass.
+Verified ignored post-attempt backup `backup-2026-09-12T02-06-29.303Z-4cfb0016` is schema v7/integrity
+`PASS` and its restore preview passes. The real database remains schema v7, pending zero, integrity
+`PASS`, and foreign keys zero.
+
+Migration is `NONE`; migrations `0000`-`0007` are unchanged and no `0008` exists. Post-second real
+source GETs, employer-form visits, uploads, and submissions are exactly `0/0/0/0`. Total lifetime real
+actions are source/form/upload/submission `2/0/0/0`. Candidate data outbound remains zero fields. No
+private capability content, candidate/profile/document/answer data, live response body, DNS address,
+certificate, raw network error, or runtime artifact entered Git, tests, logs, build output, docs, PR
+content, or CI.
+
+Remaining steps are final scope/privacy/diff/fsck checks, commit/push on this same branch, one
+consolidated offline PR, exact-head push and pull-request CI, owner-pre-approved self-review/merge if
+unchanged and green, and clean main refresh. Source-enabled Personal Beta remains `NOT_READY`; runner
+framework remains offline `READY` but real operation is `TARGET_APPROVAL_REQUIRED`; Personal Live V1
+remains `NOT_READY`. Remaining external blocker is that no known HTTP response or usable source job
+exists. Any future source request requires a completely new exact owner authorization after review of
+this fix; any later employer interaction separately requires one exact target capability and approval.

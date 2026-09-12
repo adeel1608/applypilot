@@ -426,6 +426,7 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(repository.recovery(result.runId)).toMatchObject({
       status: "STOPPED",
       safeErrorCode: "RATE_LIMITED",
+      transportStage: null,
     });
     expect(evaluation).not.toHaveBeenCalled();
     expect(queue).not.toHaveBeenCalled();
@@ -468,12 +469,75 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(repository.recovery(result.runId)).toMatchObject({
       status: "STOPPED",
       safeErrorCode: "CONNECTION_REFUSED",
+      transportStage: "REQUEST_CREATED",
     });
     expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
       "private arbitrary",
     );
+    sqlite
+      .prepare(
+        `UPDATE audit_events SET redacted_metadata_json=?
+         WHERE event_type='source.run.stopped' AND entity_id=?`,
+      )
+      .run(
+        JSON.stringify({
+          runId: result.runId,
+          code: "CONNECTION_REFUSED",
+          transportStage: "SOCKET_AT_UNTRUSTED_VALUE",
+          requestCount: 1,
+          recordCount: 0,
+        }),
+        result.runId,
+      );
+    expect(repository.recovery(result.runId)).toMatchObject({ transportStage: null });
     expect(evaluation).not.toHaveBeenCalled();
     expect(queue).not.toHaveBeenCalled();
+    sqlite.close();
+  });
+
+  it("records persistence as the deepest safe stage without leaking its exception", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `persist-stop:${++id}`,
+    );
+    repository.persistCapabilityVersion(capability());
+    vi.spyOn(repository, "persistPage").mockImplementation(() => {
+      throw new Error("private database implementation detail");
+    });
+    const result = await runLeverSourceToQueue({
+      capability: capability(),
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1)])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "PERSISTENCE_FAILED",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      status: "STOPPED",
+      safeErrorCode: "PERSISTENCE_FAILED",
+      transportStage: "PERSISTENCE",
+    });
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
+      "private database",
+    );
     sqlite.close();
   });
 

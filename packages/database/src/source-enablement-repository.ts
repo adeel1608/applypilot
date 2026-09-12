@@ -7,12 +7,14 @@ import {
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   SourceStopCodeSchema,
+  SourceTransportLifecycleStageSchema,
   validateSourceAuditMetadata,
   type LeverPageV2,
   type LeverPostingRecordV2,
   type SourceCapabilityV2,
   type SourceRunBudget,
   type SourceRunSink,
+  type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
 } from "@applypilot/job-sources";
 import { ParsedJobFieldsSchema, normalizeR2AJobEvidence } from "@applypilot/job-importer";
@@ -379,7 +381,7 @@ export class SourceEnablementRepository implements SourceRunSink {
   }
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
-    this.finish(input.runId, "COMPLETE", input.budget, null, null, input.completedAt);
+    this.finish(input.runId, "COMPLETE", input.budget, null, null, null, input.completedAt);
   }
 
   stop(input: {
@@ -387,6 +389,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     budget: SourceRunBudget;
     code: string;
     retryAfter: string | null;
+    transportStage: SourceTransportLifecycleStage | null;
     stoppedAt: string;
   }): void {
     this.finish(
@@ -395,6 +398,7 @@ export class SourceEnablementRepository implements SourceRunSink {
       input.budget,
       input.code,
       input.retryAfter,
+      input.transportStage,
       input.stoppedAt,
     );
   }
@@ -465,14 +469,22 @@ export class SourceEnablementRepository implements SourceRunSink {
   }
 
   recovery(runId: string) {
-    return this.sqlite
+    const row = this.sqlite
       .prepare(
         `SELECT status, operation, request_count AS requestCount, page_count AS pageCount,
                 record_count AS recordCount, next_cursor AS nextCursor,
-                safe_error_code AS safeErrorCode, retry_after AS retryAfter
+                safe_error_code AS safeErrorCode, retry_after AS retryAfter,
+                (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
+                 FROM audit_events a
+                 WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+                   AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage
          FROM source_run_checkpoints WHERE id = ?`,
       )
-      .get(runId);
+      .get(runId) as (Record<string, unknown> & { transportStage: unknown }) | undefined;
+    if (!row) return undefined;
+    const stage = SourceTransportLifecycleStageSchema.safeParse(row.transportStage);
+    return { ...row, transportStage: stage.success ? stage.data : null };
   }
 
   cancel(runId: string, cancelledAt = this.now().toISOString()): void {
@@ -494,6 +506,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     const audit = validateSourceAuditMetadata("source.run.stopped", {
       runId,
       code: "OWNER_CANCELLED",
+      transportStage: null,
       requestCount: run.requestCount,
       recordCount: run.recordCount,
     });
@@ -779,6 +792,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     budget: SourceRunBudget,
     code: string | null,
     retryAfter: string | null,
+    transportStage: SourceTransportLifecycleStage | null,
     completedAt: string,
   ): void {
     const result = this.sqlite
@@ -812,6 +826,7 @@ export class SourceEnablementRepository implements SourceRunSink {
       const audit = validateSourceAuditMetadata("source.run.stopped", {
         runId,
         code: SourceStopCodeSchema.safeParse(code).success ? code : "PERSISTENCE_FAILED",
+        transportStage,
         requestCount: budget.attempts,
         recordCount: budget.records,
       });
