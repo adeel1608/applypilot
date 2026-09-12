@@ -4227,3 +4227,152 @@ that exact unchanged head, verify the migration diff plus `git diff --check` and
 push only this branch, open the named PR, and require both exact-head push and pull-request quality
 workflows to pass. Then self-review the complete base-to-head diff and merge only under the owner's
 pre-approved narrow-scope conditions. No source request follows the merge in this task.
+
+# Post-contract live source verification and offline hardening - 2026-09-12
+
+Status: `LIVE_REQUEST_SPENT / FAILED_CLOSED / OFFLINE_FIX_IN_PROGRESS / NO_FURTHER_SOURCE_AUTHORITY`.
+The exact starting `main` and `origin/main` were
+`e25171aa32db5e8b12f6501b968b5ecbb17403e2`, the worktree was clean, and GitHub authentication was
+`adeel1608`. Preflight passed with schema v7, zero pending migrations, integrity `PASS`, zero foreign-
+key issues, a valid private profile, four expired historical capabilities, no active source
+capability, no approved real runner target, and a clean privacy audit. Migrations `0000`-`0007` are
+unchanged from the Personal Live V1 foundation. Ignored backup
+`backup-2026-09-12T05-26-53.954Z-0496ae96` and its exact restore preview passed before activation.
+
+Fresh ignored/private capability `lever_b2195ee303962aac722b420d` was generated deterministically from
+the approved source, tenant, region, exact URL, purpose, and T0. Its complete `SourceCapabilityV2`
+authority matched the prompt: Shield AI global Lever list only, exact host/path/query, one request,
+25 records/page, 2 MB response, 30-second request and 60-second run limits, zero redirects/retries,
+concurrency one, 24-hour policy expiry, 30-minute capability expiry, and parser version bound to the
+starting merge. Candidate data outbound was zero. The computer-use inventory and in-app browser were
+unavailable; a direct import probe then failed at the framework's `server-only` module boundary before
+capability persistence, run creation, or transport. Durable counters proved that probe consumed no
+authority. The actual owner action used the merged local `/sources` UI through a one-use headless local
+browser harness and the production nonce, confirmation phrase, server action, capability checks,
+transport, repository, and pipeline. The harness was removed immediately afterward.
+
+Exactly one real GET was attempted. The durable terminal state is `STOPPED / SCHEMA_CHANGED` at
+`RESPONSE_BODY`, request count 1, page count 0, record count 0, retries 0, redirects 0, and no persisted
+observation, normalized job, R2 evaluation, queue decision, target packet, employer-form visit,
+upload, or submission. Reaching response-body contract validation establishes an accepted JSON
+response after transport/status/content controls, but the exact HTTP status is deliberately not
+retained. No retry, second page, detail request, fifth source request, or private response-body
+inspection is permitted. Lifetime source/form/upload/submission counts are now `4/0/0/0`.
+
+## Current state, official evidence, objective, and assumptions
+
+The private response and raw validation paths remain unavailable by design, so this work does not
+guess which member caused the live stop. The official Lever v0 public-postings field table was audited
+again from `https://github.com/lever/postings-api`. Its documented posting members include `id`,
+`text`, `categories`, nullable `country`, opening/description variants, `lists`, optional additional
+text, `hostedUrl`, `applyUrl`, the four `workplaceType` values, optional `salaryRange`, and optional
+salary descriptions. It does not document `createdAt`. ApplyPilot nevertheless names, type-validates,
+and converts `createdAt` into `postedAt`; an otherwise documented posting can therefore fail because
+of an undocumented extension, and an undocumented timestamp can become first-class evidence. This is
+a deterministic contract-boundary defect proven from public documentation, independent of the private
+body. It is not claimed to be the observed body's specific mismatch.
+
+The objective is one narrow offline hardening change: stop assigning validation/evidence semantics to
+the undocumented `createdAt` extension. Unknown response members remain response-size-bounded,
+immutable passthrough data, while `postedAt` remains conservatively `null`. All officially documented
+fields retain their existing types, bounds, inert HTML conversion, and closed malformed-value
+behavior. No network authority, URL, query, DNS, TLS, destination, pagination, budget, retry,
+redirect, capability, persistence, R2, queue, runner, document, packet, target, upload, submission, or
+migration behavior may change.
+
+## Architecture, proposed files, data flow, and dependencies
+
+- In `packages/job-sources/src/lever/v2-reader.ts`, remove the undocumented typed `createdAt` member
+  and its `Date` conversion. Leave the posting object in bounded passthrough mode and map `postedAt`
+  to `null` because the official contract supplies no trustworthy posting timestamp.
+- In `packages/job-sources/src/source-capability.test.ts`, replace the timestamp-conversion/failure
+  assumption with fictional regression variants proving undocumented extension values are retained
+  only in the deeply frozen raw payload, never promoted to `postedAt`, and never relax documented
+  malformed values. Keep country, workplace, lists, inert-text, and closed response-body coverage.
+- Update `README.md` with the fourth bounded attempt: the country-compatible parser still failed
+  closed at response-body validation, no real job was persisted, and source-enabled Beta remains not
+  ready. Do not speculate about the private body or imply successful ingestion.
+- Record actual offline validation and PR state in this plan. No new dependency or database migration
+  is expected; migrations `0000`-`0007` remain immutable and `0008` is not needed.
+
+Data flow after the fix remains:
+
+`bounded public JSON -> documented Lever field validation -> inert mapping -> undocumented extensions
+kept only in immutable raw payload -> postedAt unknown/null -> persistence/R2 only after a wholly valid
+page`.
+
+## Risks, privacy/security, testing, rollback, and acceptance criteria
+
+Risks are using an undocumented field as evidence, over-loosening a documented field, pretending this
+offline fix proves the private live mismatch, leaking response/profile values, or accidentally spending
+another request. Controls are removal of semantics from only the undocumented member, synthetic-only
+tests, no raw response access, authority/migration diff review, privacy audits, and a permanent zero-
+request boundary for the rest of this task. Candidate/profile, response, vacancy, database, backup,
+allowlist, document, packet, credential, and session material remain ignored and uncommitted. Final
+application submission remains owner-confirmed and no real target is approved.
+
+Rollback is a normal revert or closing the offline PR. No migration or data rollback is required. The
+spent source request and durable failed-closed audit remain immutable local evidence; the private
+database can be recovered from the verified pre-run backup if an unrelated integrity problem appears.
+
+Acceptance requires focused tests proving documented fields retain strict behavior and undocumented
+`createdAt` variants cannot become evidence; all format, lint, typecheck, unit, integration, production
+build, serialized E2E, database/schema/backup/restore, privacy/security, full and production dependency
+audits, preflight/release, immutable-migration diff, `git diff --check`, and `git fsck --strict` gates
+pass. Only the reader, fictional regression tests, accurate README status, and this plan may change.
+One PR from `fix/post-contract-live-hardening` must receive exact-head push and PR CI. It stays unmerged
+because this prompt grants no merge authority. Real action counts for this task must end at exactly
+`1/0/0/0`, lifetime `4/0/0/0`, with no further source call.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before application code.
+2. Remove typed/evidentiary use of the undocumented extension and add the fictional regression matrix.
+3. Update README with the exact failed-closed fourth attempt and conservative readiness.
+4. Run focused source tests plus lint/typecheck and inspect the authority/privacy/migration diff.
+5. Run the complete release matrix, focused database backup/restore tests, exact real DB status and
+   restore preview, dependency/security/privacy audits, diff check, and strict fsck.
+6. Record exact results here, commit and push only this branch, open one offline hardening PR, and
+   require exact-head push plus PR GitHub Actions green. Do not merge it and do not make another request.
+
+## Post-contract offline hardening implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD RELEASE AND PR CI PENDING`. The code delta
+removes `createdAt` from the named Lever response schema and maps `postedAt` to `null`. The documented
+v0 fields and every existing host/path/query/transport/budget/pagination control are unchanged.
+Undocumented extension values remain accepted only through the existing response-size-bounded
+passthrough, are retained in the deeply frozen raw payload, and cannot become posting-date evidence.
+The synthetic matrix covers number, null, string, and object extension forms; country,
+`workplaceType`, lists, inert HTML, URLs, and malformed documented values retain their existing tests.
+
+Focused source and durable-repository validation passed 57 tests across two files. The first focused
+run found one test-only assumption that Zod would freeze the caller's original nested fixture object;
+the assertion now correctly checks the stored cloned raw extension, and the rerun passed. Formatting,
+zero-warning lint, and strict typecheck pass. The implementation diff is limited to
+`packages/job-sources/src/lever/v2-reader.ts`,
+`packages/job-sources/src/source-capability.test.ts`, `README.md`, and this plan. There is no network,
+authority, dependency, schema, or migration delta.
+
+The complete pre-commit `npm.cmd run release:check` passed doctor, schema/status, aggregate preflight,
+formatting, lint, typecheck, 380 unit tests across 47 files, 21 integration tests across three files,
+the 31-route local production build, the six-page showcase build, the showcase source/export audit,
+31 serialized Playwright tests, repository privacy audit, and full plus production dependency audits
+with zero known vulnerabilities. The privacy scan covered all 305 tracked files and 11 private
+canaries without exposing private values. Seventeen focused database schema/migration/backup/restore
+tests across three files also pass.
+
+The post-run ignored backup `backup-2026-09-12T05-44-39.678Z-cfb2b824` is schema v7 with integrity
+`PASS`; its exact restore preview passes. The real database remains schema v7, pending migrations 0,
+integrity `PASS`, and foreign-key issues 0. Migrations `0000`-`0007` are unchanged and no migration was
+added. The single live run remains terminal `STOPPED / SCHEMA_CHANGED / RESPONSE_BODY` with one
+request and zero pages/records. This task made `1/0/0/0` source/form/upload/submission actions and the
+lifetime totals are `4/0/0/0`; candidate data outbound remained zero. No target packet exists because
+no source record was accepted. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`;
+the runner remains `TARGET_APPROVAL_REQUIRED`.
+
+Before push, the completed tree must be committed, the complete release gate rerun on that exact
+unchanged commit, and migration/diff/fsck checks must pass. Then one PR from
+`fix/post-contract-live-hardening` may be opened and must receive exact-head push plus PR CI green. It
+must remain unmerged. A future live verification is not authorized by this task and requires a new
+owner-approved, short-lived, immutable capability and one exact bounded request after human review of
+the offline PR.

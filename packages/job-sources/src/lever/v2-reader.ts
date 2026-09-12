@@ -54,7 +54,6 @@ export const LeverPostingV2Schema = z
       })
       .passthrough()
       .optional(),
-    createdAt: z.number().int().nonnegative().optional(),
   })
   .passthrough();
 
@@ -176,7 +175,7 @@ function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): Le
       : null,
     sourceUrl: posting.hostedUrl,
     applicationUrl: posting.applyUrl,
-    postedAt: posting.createdAt ? new Date(posting.createdAt).toISOString() : null,
+    postedAt: null,
     contentDigest: createHash("sha256").update(raw).digest("hex"),
     rawPayload: freezeDeep(posting),
   };
