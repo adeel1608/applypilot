@@ -5249,3 +5249,192 @@ normal merge is pre-approved only if the delta remains this documented public-co
 and local persistence hardening scope, privacy passes, no migration exists, and no ninth request
 occurs. After normal merge, refresh clean `main` and stop; any future live request needs a new exact
 owner approval.
+
+# Lever accepted-to-persistence closure - 2026-09-12
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY / NO NINTH GET`. The exact clean
+starting `main` and `origin/main` are `f1d9c70eb477e9b16f60a4431c70b00255cc527e`; work is isolated on
+`fix/lever-persistence-closure`. The real database starts at schema v7 with zero pending migrations,
+integrity `PASS`, zero foreign-key issues, aggregate preflight and privacy `PASS`, zero active source
+capabilities, and zero active real-target capabilities. Lifetime real source/form/upload/submission
+counts are `8/0/0/0` and must remain unchanged. No live source request, employer interaction, form
+interaction, upload, or submission is authorized.
+
+## Current state, objective, assumptions, and requirements
+
+PR #27 moved several product bounds before persistence and bounded long requirement evidence, but an
+`ACCEPTED` record has not yet been proven safe through every deterministic constructor. Static review
+shows that structured values longer than the 1,000-code-unit `SourceEvidencePointer.excerpt` limit can
+still form full-length evidence spans; a provider-valid 1,001-character title is the required first
+failing regression. A delimiter-free location between 201 and 1,000 characters can preserve an
+allowed raw label while exceeding the 200-character derived locality/suburb limits. A long commitment
+can create an oversized structured employment evidence span even when only a short recognized token
+supports the employment type. Optional salary strings can exceed pointer or normalized-text limits,
+and negative structured salary values can reach a nonnegative R2 salary schema. Travel above 100%,
+negative numeric text that is accidentally reparsed as positive, and non-finite numeric conversions
+are further content-domain boundaries that must be omitted rather than coerced. These are synthetic,
+independently demonstrated risks; no claim is made that any one caused private request #8.
+
+The objective is the invariant: **A Lever record classified `ACCEPTED` has passed every deterministic
+provider-controlled boundary necessary to construct local job and R2 evidence models; optional
+unsupported derived metadata is omitted safely rather than causing transaction rollback.** Provider
+structural validation remains unchanged and page-fatal. Core identity/title/effective-location/
+description/link failures retain fixed, value-free per-record `SOURCE_RECORD_UNUSABLE` accounting.
+Canonical job title, location, description, links, and immutable raw provenance remain intact within
+their existing local limits. Evidence pointers remain bounded; no global evidence schema limit is
+raised. Database, integrity, and operational failures remain `PERSISTENCE_FAILED / PERSISTENCE`.
+
+## Architecture, proposed files, data flow, and dependencies
+
+- `packages/job-importer/src/r2a-normalization.ts`: introduce one surrogate-safe exact source-span
+  bound used by field, requirement, and coverage pointers; retain source offsets/hashes against the
+  immutable source. Bound only the R2 identity evidence value when the canonical persisted title is
+  longer, bound derived locality/suburb to their declared limits while preserving `rawLabel`, and use
+  the exact recognized substring for structured employment evidence. Validate all extracted numeric
+  values against their declared semantic domains before constructing R2 values: omit invalid travel,
+  commute, hours, experience, and structured salary semantics without inventing a replacement.
+  Optional oversized salary components are skipped; recognized safe salary components and provenance
+  remain available.
+- `packages/database/src/source-enablement-repository.test.ts`: add the permanent end-to-end closure
+  harness through the actual Lever reader, source runner, page transaction, parsed job, normalization,
+  R2 persistence, and queue path. Cover title 999/1000/1001/4096; location 199/200/201/1000;
+  commitment 999/1000/1001/4096+; salary signs/currency/interval edges; numeric-domain edges; textual
+  R2 limits; structured field edges; Unicode boundaries; a mixed 25-record page; operational failure;
+  and exact replay.
+- `packages/job-importer/src/r2a-normalization.test.ts` and, only if needed,
+  `packages/job-sources/src/source-capability.test.ts`: add focused constructor and disposition
+  regressions that identify the exact failing boundaries before the implementation is changed.
+- `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md` and this plan: document the closure invariant, core versus
+  optional policy, bounded exact evidence, numeric omission policy, synthetic results, and release
+  evidence. `README.md` changes only if readiness wording materially changes; no live-ingestion claim
+  is permitted.
+
+The data flow remains `whole-page provider schema -> inert Lever mapping -> core local usability
+disposition -> provider-count budget/digest -> atomic accepted-only page persistence -> ParsedJobFields
+and Job construction -> bounded exact R2 evidence/semantic-domain validation -> R2 persistence ->
+evaluation/queue`. No new package, fuzzing dependency, transport, host, path, query, DNS, TLS/SNI,
+request, page/record/byte/time budget, redirect, retry, concurrency, capability, target, runner,
+upload, submission, table, column, schema, or migration change is planned. Migrations `0000`-`0007`
+remain immutable.
+
+## Risks, privacy/security, testing, rollback, and acceptance
+
+Primary risks are truncating canonical job truth instead of only evidence, producing an evidence hash
+that does not match the exact immutable source span, splitting a Unicode surrogate pair, silently
+clamping invalid numeric claims, swallowing programmer/database faults, turning optional metadata
+into a core unusable reason, weakening provider validation, or leaking synthetic/provider values via
+diagnostics. Controls are exact source slicing with surrogate-safe bounds, canonical-field preservation
+assertions, schema parsing of every constructed normalization, explicit semantic-domain predicates,
+fixed value-free diagnostics, injected operational failure, base-to-head authority/migration review,
+and full privacy/security audits. No request #8 body, private provider value, reconstructed live job,
+candidate data, secret, session, database, backup, allowlist, document, or packet may enter tests or
+Git.
+
+Testing begins with failing synthetic regressions for the 1,001-character title and all additionally
+confirmed deterministic gaps. The closure matrix must send every case through `readLeverPageV2` and
+the real isolated-database persistence/R2/queue path. Every structurally valid record must finish as
+either pre-persistence `SOURCE_RECORD_UNUSABLE` with a fixed reason/index or `ACCEPTED` with successful
+downstream persistence. The mixed page must account for 25 provider records, persist every accepted
+sibling, retain provider-count cursor/budget semantics, and expose no values in diagnostics. Replay
+must add no observation, job version, evaluation, or queue duplicate. An injected SQLite/repository
+fault must remain page-fatal `PERSISTENCE_FAILED / PERSISTENCE`.
+
+Validation must run focused source/persistence/R2 closure tests, format, zero-warning lint, strict
+typecheck, complete unit and integration suites, serialized E2E, local and showcase production
+builds, showcase boundary audit, privacy audit, full and production dependency audits, real database
+status, schema/integrity/FKs, synthetic migration/backup/restore tests plus safe restore preview,
+migration immutability, aggregate preflight and release check, `git diff --check`, and `git fsck
+--strict`. Rollback is a normal revert of the offline code/test/docs commits; there is no database or
+private-data rollback because no migration or live mutation is allowed.
+
+Acceptance requires the closure matrix and mixed 25-record test to pass; optional invalid metadata to
+remain accepted with unsupported derivations omitted; canonical title/location/provenance to remain
+unchanged; every pointer/hash/schema to validate; operational failures to remain page-fatal; replay to
+be idempotent; provider validation and all authority controls to be unchanged; schema v7/pending zero/
+integrity `PASS`/FKs zero; no migration; privacy and dependency audits `PASS`; exact-head local and
+GitHub push/PR CI green; no ninth request; and lifetime actions exactly `8/0/0/0`.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before changing application code or tests.
+2. Add the failing deterministic closure regressions, including the required 1,001-character title,
+   and record the exact pre-fix failures without reading any private payload.
+3. Implement bounded exact evidence construction, derived location bounds, exact employment-token
+   spans, and numeric/salary omission at the narrow normalization boundary; do not add a broad catch.
+4. Complete the generated boundary matrix, mixed 25-record path, operational-failure control, replay,
+   and value-free diagnostic assertions using fictional data only.
+5. Run focused checks, update contract documentation and this plan with exact results, inspect the
+   complete authority/privacy/migration delta, then run the full validation matrix.
+6. Commit and push only `fix/lever-persistence-closure`; open PR `fix: close Lever accepted-to-
+persistence contract`; require exact-head push and pull-request CI green and self-review the full
+   base-to-head diff.
+7. Merge normally only if every owner-preapproved condition still holds, refresh clean `main`, verify
+   lifetime action counts remain `8/0/0/0`, and stop. Do not execute request #9.
+
+## Implementation and pre-commit validation results
+
+Status: `IMPLEMENTED / DIRTY-TREE RELEASE PASS / EXACT-HEAD CI PENDING / NO NINTH GET`. The required
+regressions were added before the implementation and produced ten exact failures on the merged code:
+title lengths 1,001 and 4,096 exceeded the 1,000-code-unit evidence excerpt; delimiter-free location
+lengths 201 and 1,000 exceeded derived locality/suburb bounds; commitment lengths 999/1,000 used the
+whole optional field and 1,001/4,097 overflowed the pointer; travel 101/150 percent failed the R2
+numeric domain; and negative/long salary metadata reached invalid structured evidence. An additional
+reversed textual salary regression proved a safely constructible but semantically invalid range.
+These fictional failures independently establish closure gaps and do not identify request #8's
+unknown private cause.
+
+R2A pointer construction now takes a surrogate-safe exact excerpt of at most 1,000 code units from
+the immutable source for every field, requirement, and coverage pointer. Structured identity evidence
+uses the same bounded value, while the canonical job retains its complete accepted title. Derived
+location retains the accepted raw label and bounds only locality/suburb to 200 code units. Structured
+employment evidence points to the exact recognized token instead of the complete commitment field.
+Bullet normalization now requires whitespace after a marker, so a negative number is not silently
+turned positive by treating its minus sign as a list bullet.
+
+All numeric constructors validate before building an R2 value. Non-finite, negative, or reversed
+hours/experience/commute ranges are omitted rather than corrected; travel outside 0-100 is omitted;
+and reversed textual salary ranges are omitted. Structured salary accepts documented finite provider
+numbers at the provider boundary, records safe source components, and creates a salary semantic only
+when minimum/maximum are nonnegative and ordered. A long/unsupported currency or interval is omitted
+from component evidence; safe amounts can still become salary evidence with null currency or
+`UNKNOWN` period. `FORTNIGHT` is recognized. No canonical field, immutable raw payload, structural
+provider schema, or fixed unusable diagnostic was loosened, and no broad exception handler was added.
+
+The permanent mixed-page closure harness sends 25 fictional structurally valid Lever postings through
+the actual page reader, run budget, repository transaction, ParsedJobFields and Job schemas,
+observation identity, R2A schemas/persistence, evaluation, and queue. It combines title boundaries
+999/1,000/1,001/4,096; location 199/200/201/1,000; commitment 999/1,000/1,001/4,097; positive, zero,
+negative, extremely large, long-currency, recognized, undocumented, and long-interval salary cases;
+travel 0/100/101/150; zero/non-finite hours and experience; zero/negative commute; long requirements,
+workplace drift, optional department fallback, nullable country, unsafe link, and a surrogate-pair
+boundary. Results are provider/accepted/unusable `25/24/1`; all 24 accepted siblings create exactly 24
+observations, job versions, R2 evaluations, and queue decisions. The 4,096-character canonical title
+and 1,000-character canonical location remain exact. The unsafe link alone produces fixed
+`UNUSABLE_LINK_BOUNDARY` plus index 24, with no value in the audit. Provider count drives the one-page
+budget/cursor, all evidence pointers are bounded, and FKs are clean.
+
+Exact replay produces the same `25/24/1` disposition/accounting and zero additional observations, job
+versions, evaluations, or queue decisions. A separate actual SQLite abort trigger during observation
+insert leaves page/job/observation counts zero and returns `STOPPED / PERSISTENCE_FAILED / PERSISTENCE`;
+the SQLite message is absent from audit data. This proves content-domain omission did not weaken real
+operational failure handling.
+
+Focused source/normalization/repository validation passes 188 tests across three files; focused
+database/schema/migration/backup/restore validation passes 28 tests across three files. The complete
+dirty-tree `npm.cmd run release:check` passes doctor, database/aggregate preflight, format, zero-warning
+lint, strict typecheck, 461 unit tests across 47 files, 21 integration tests across three files, the
+31-route local production build, six-page showcase production build and showcase audit, all 31
+serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
+vulnerabilities. Privacy checked 306 tracked files, 874 reachable-history paths, 872 reachable-history
+blobs, 1,302 build/test artifacts, and 11 private canaries.
+
+The real database remains schema v7 with zero pending migrations, integrity `PASS`, and zero foreign-
+key issues. Migrations `0000`-`0007` remain unchanged and no migration was added. No transport,
+host/path/query, DNS, TLS/SNI, request/page/record/byte/time budget, redirect, retry, concurrency,
+capability, candidate-outbound, target, runner, upload, submission, dependency, or lockfile file is
+changed. `README.md` remains unchanged because readiness has not materially changed. No source GET,
+employer/form interaction, upload, or submission occurred; lifetime actions remain `8/0/0/0`.
+
+Remaining mechanics are final diff/migration/privacy review, the coherent implementation/results
+commit, an exact-head clean release rerun, branch push, one PR, exact-head push plus PR CI, full-delta
+self-review, conditional normal merge, and clean `main` refresh. Request #9 remains unauthorized.

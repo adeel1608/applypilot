@@ -101,6 +101,11 @@ function posting(id: number) {
   };
 }
 
+function fixedLength(prefix: string, length: number, fill: string): string {
+  if (prefix.length > length) throw new Error("TEST_PREFIX_EXCEEDS_LENGTH");
+  return `${prefix}${fill.repeat(length - prefix.length)}`;
+}
+
 function pagedTransport(): SecureSourceTransportDependencies {
   return {
     resolveHost: vi.fn(async () => ["8.8.8.8"]),
@@ -541,6 +546,61 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("keeps an injected SQLite write failure page-fatal and rolls back the page", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `sqlite-stop:${++id}`,
+    );
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    sqlite.exec(`CREATE TRIGGER synthetic_source_observation_failure
+      BEFORE INSERT ON source_observations
+      BEGIN SELECT RAISE(ABORT, 'synthetic private sqlite detail'); END`);
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1)])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "PERSISTENCE_FAILED",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      status: "STOPPED",
+      safeErrorCode: "PERSISTENCE_FAILED",
+      transportStage: "PERSISTENCE",
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM jobs").get()).toEqual({ count: 0 });
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
+      "synthetic private sqlite detail",
+    );
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("persists all 25 accepted records from a structurally valid provider page", async () => {
     const sqlite = database();
     let id = 0;
@@ -673,6 +733,352 @@ describe("offline source-to-R2 queue persistence", () => {
       recordIndex: 2,
     });
     expect(unusableAudit.metadata).not.toMatch(/jobs\.lever|private-fixture|http/i);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("closes every accepted provider-controlled boundary across a mixed 25-record page and replay", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const nextId = () => `closure:${++id}`;
+    const repository = new SourceEnablementRepository(sqlite, () => instant, nextId);
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
+    repository.persistCapabilityVersion(approved);
+    const pipeline = fixturePipeline(sqlite, profile, nextId);
+    const titled = (id: number, length: number) => ({
+      ...posting(id),
+      text: fixedLength(`Fictional title ${id} `, length, "t"),
+    });
+    const located = (id: number, length: number) => {
+      const location = fixedLength(`Fictional location ${id} `, length, "l");
+      return {
+        ...posting(id),
+        categories: { ...posting(id).categories, location, allLocations: [location] },
+      };
+    };
+    const committed = (id: number, length: number) => ({
+      ...posting(id),
+      categories: {
+        ...posting(id).categories,
+        commitment: fixedLength("Full-time ", length, "c"),
+      },
+    });
+    const requirement = (id: number, content: string) => ({
+      ...posting(id),
+      lists: [{ text: "Requirements", content: `<p>${content}</p>` }],
+    });
+    const values = [
+      { ...titled(1, 999), salaryRange: { min: 30, max: 40, currency: "AUD", interval: "hour" } },
+      { ...titled(2, 1000), salaryRange: { min: 0, max: 0, currency: "AUD", interval: "hour" } },
+      { ...titled(3, 1001), salaryRange: { min: -1, max: 10, currency: "AUD", interval: "hour" } },
+      { ...titled(4, 4096), salaryRange: { min: 1, max: -10, currency: "AUD", interval: "hour" } },
+      {
+        ...located(5, 199),
+        salaryRange: { min: 1e100, max: 1e101, currency: "AUD", interval: "year" },
+      },
+      {
+        ...located(6, 200),
+        salaryRange: { min: 1, max: 2, currency: "USD", interval: "fortnight" },
+      },
+      {
+        ...located(7, 201),
+        salaryRange: { min: 1, max: 2, currency: "C".repeat(4097), interval: "hour" },
+      },
+      {
+        ...located(8, 1000),
+        salaryRange: { min: 1, max: 2, currency: "AUD", interval: "undocumented" },
+      },
+      {
+        ...committed(9, 999),
+        salaryRange: { min: 1, max: 2, currency: "AUD", interval: "i".repeat(4097) },
+      },
+      {
+        ...committed(10, 1000),
+        lists: [
+          { text: "Requirements", content: `<p>Five years experience ${"x".repeat(580)}</p>` },
+        ],
+      },
+      { ...committed(11, 1001), workplaceType: "unspecified" },
+      { ...committed(12, 4097), workplaceType: null },
+      requirement(13, "Travel up to 0% may be required"),
+      requirement(14, "Travel up to 100% may be required"),
+      requirement(15, "Travel up to 101% may be required"),
+      requirement(16, "Travel up to 150% may be required"),
+      requirement(17, "0 hours per week may be required"),
+      requirement(18, `${"9".repeat(400)} hours per week may be required`),
+      requirement(19, "0 years experience required"),
+      requirement(20, `${"9".repeat(400)} years experience required`),
+      requirement(21, "Commute 0 km or 0 minutes"),
+      requirement(22, "Commute -5 km or -10 minutes"),
+      { ...posting(23), text: `${"u".repeat(999)}😀` },
+      {
+        ...posting(24),
+        categories: {
+          ...posting(24).categories,
+          department: "d".repeat(128 * 1024 + 1),
+          team: "Fictional bounded team",
+        },
+        country: null,
+        workplaceType: "hybrid",
+      },
+      { ...posting(25), applyUrl: "http://jobs.lever.co/fictional/rejected-fixture" },
+    ];
+    const body = Buffer.from(JSON.stringify(values));
+    expect(body.byteLength).toBeLessThanOrEqual(approved.responseByteLimit);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body,
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const first = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(first).toMatchObject({
+      status: "COMPLETE",
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      safeUnusableDiagnostics: [{ reasonCode: "UNUSABLE_LINK_BOUNDARY", recordIndex: 24 }],
+    });
+    expect(first.acceptedRecordCount + first.unusableRecordCount).toBe(25);
+    expect(first.records.map(({ externalId }) => externalId)).toEqual(
+      values.slice(0, 24).map(({ id }) => id),
+    );
+    expect(first.queuedJobIds).toHaveLength(24);
+    expect(pipeline.evaluated).toHaveLength(24);
+    expect(pipeline.queued).toHaveLength(24);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get(),
+    ).toEqual({ count: 24 });
+    expect(
+      sqlite.prepare("SELECT max(length(excerpt)) AS maximum FROM job_field_evidence_v2").get(),
+    ).toEqual({ maximum: 1000 });
+    expect(
+      sqlite.prepare("SELECT max(length(excerpt)) AS maximum FROM requirement_evidence_v2").get(),
+    ).toMatchObject({ maximum: expect.any(Number) });
+    const title4096 = JSON.parse(
+      (
+        sqlite
+          .prepare(
+            `SELECT j.normalized_json AS normalizedJson FROM jobs j
+             JOIN job_source_records r ON r.job_id=j.id WHERE r.external_id='fictional-4'`,
+          )
+          .get() as { normalizedJson: string }
+      ).normalizedJson,
+    ) as { title: string };
+    expect(title4096.title).toBe(values[3]!.text);
+    expect(title4096.title).toHaveLength(4096);
+    const location1000 = JSON.parse(
+      (
+        sqlite
+          .prepare(
+            `SELECT j.normalized_json AS normalizedJson FROM jobs j
+             JOIN job_source_records r ON r.job_id=j.id WHERE r.external_id='fictional-8'`,
+          )
+          .get() as { normalizedJson: string }
+      ).normalizedJson,
+    ) as { location: string };
+    expect(location1000.location).toBe(values[7]!.categories.location);
+    expect(location1000.location).toHaveLength(1000);
+    const fieldEvidence = (externalId: string, canonicalField: string) =>
+      (
+        sqlite
+          .prepare(
+            `SELECT e.excerpt,e.normalized_value_json AS normalizedValueJson
+             FROM job_source_records r JOIN job_versions v ON v.job_id=r.job_id
+             JOIN job_field_evidence_v2 e ON e.job_version_id=v.id
+             WHERE r.external_id=? AND e.canonical_field=? ORDER BY e.rowid`,
+          )
+          .all(externalId, canonicalField) as Array<{
+          excerpt: string;
+          normalizedValueJson: string;
+        }>
+      ).map((row) => ({ excerpt: row.excerpt, value: JSON.parse(row.normalizedValueJson) }));
+    const requirementEvidence = (externalId: string, canonicalKind: string) =>
+      (
+        sqlite
+          .prepare(
+            `SELECT e.normalized_value_json AS normalizedValueJson
+             FROM job_source_records r JOIN job_versions v ON v.job_id=r.job_id
+             JOIN requirement_evidence_v2 e ON e.job_version_id=v.id
+             WHERE r.external_id=? AND e.canonical_kind=? ORDER BY e.rowid`,
+          )
+          .all(externalId, canonicalKind) as Array<{ normalizedValueJson: string }>
+      ).map(({ normalizedValueJson }) => JSON.parse(normalizedValueJson));
+    for (const externalId of ["fictional-9", "fictional-10", "fictional-11", "fictional-12"]) {
+      expect(fieldEvidence(externalId, "employment.type")).toEqual([
+        { excerpt: "Full-time", value: { kind: "EMPLOYMENT_TYPE", value: "FULL_TIME" } },
+      ]);
+    }
+    for (const [index, externalId] of [
+      [4, "fictional-5"],
+      [5, "fictional-6"],
+      [6, "fictional-7"],
+      [7, "fictional-8"],
+    ] as const) {
+      const locationEvidence = fieldEvidence(externalId, "location.alternative")[0]?.value;
+      expect(locationEvidence).toMatchObject({
+        kind: "LOCATION",
+        value: { rawLabel: values[index]!.categories.location },
+      });
+      expect(locationEvidence.value.locality.length).toBeLessThanOrEqual(200);
+      expect(locationEvidence.value.suburb.length).toBeLessThanOrEqual(200);
+    }
+    expect(fieldEvidence("fictional-1", "salary")[0]?.value).toMatchObject({
+      value: { minimum: 30, maximum: 40, currency: "AUD", period: "HOUR" },
+    });
+    expect(fieldEvidence("fictional-2", "salary")[0]?.value).toMatchObject({
+      value: { minimum: 0, maximum: 0, currency: "AUD", period: "HOUR" },
+    });
+    expect(fieldEvidence("fictional-3", "salary")).toEqual([]);
+    expect(fieldEvidence("fictional-4", "salary")).toEqual([]);
+    expect(fieldEvidence("fictional-7", "salary")[0]?.value).toMatchObject({
+      value: { minimum: 1, maximum: 2, currency: null, period: "HOUR" },
+    });
+    expect(fieldEvidence("fictional-8", "salary")[0]?.value).toMatchObject({
+      value: { minimum: 1, maximum: 2, currency: "AUD", period: "UNKNOWN" },
+    });
+    expect(fieldEvidence("fictional-9", "salary")[0]?.value).toMatchObject({
+      value: { minimum: 1, maximum: 2, currency: "AUD", period: "UNKNOWN" },
+    });
+    expect(fieldEvidence("fictional-13", "travel.percentage")[0]?.value).toMatchObject({
+      value: { percentage: 0 },
+    });
+    expect(fieldEvidence("fictional-14", "travel.percentage")[0]?.value).toMatchObject({
+      value: { percentage: 100 },
+    });
+    expect(fieldEvidence("fictional-15", "travel.percentage")).toEqual([]);
+    expect(fieldEvidence("fictional-16", "travel.percentage")).toEqual([]);
+    expect(fieldEvidence("fictional-17", "hours.week")[0]?.value).toMatchObject({
+      value: { minimum: 0, maximum: 0 },
+    });
+    expect(fieldEvidence("fictional-18", "hours.week")).toEqual([]);
+    expect(requirementEvidence("fictional-19", "EXPERIENCE")[0]).toMatchObject({
+      value: { minimum: 0 },
+    });
+    expect(requirementEvidence("fictional-20", "EXPERIENCE")[0]).toMatchObject({
+      value: { minimum: null, maximum: null },
+    });
+    expect(fieldEvidence("fictional-21", "commute.distance")[0]?.value).toMatchObject({
+      value: { distanceKm: 0 },
+    });
+    expect(fieldEvidence("fictional-22", "commute.distance")).toEqual([]);
+    const unicodeTitle = fieldEvidence("fictional-23", "title")[0];
+    expect(unicodeTitle?.excerpt).toHaveLength(999);
+    expect(unicodeTitle?.excerpt).not.toMatch(/[\uD800-\uDFFF]$/);
+    expect(
+      JSON.parse(
+        (
+          sqlite
+            .prepare(
+              "SELECT raw_payload_json AS payload FROM job_source_records WHERE external_id='fictional-12'",
+            )
+            .get() as { payload: string }
+        ).payload,
+      ),
+    ).toEqual(values[11]);
+    expect(repository.recovery(first.runId)).toMatchObject({
+      requestCount: 1,
+      pageCount: 1,
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      providerDriftWarningCount: 1,
+      persistedObservationCount: 24,
+      nextCursor: null,
+    });
+    const rejectedAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.record.unusable' AND entity_id=?`,
+      )
+      .get(first.runId) as { metadata: string };
+    expect(JSON.parse(rejectedAudit.metadata)).toEqual({
+      reasonCode: "UNUSABLE_LINK_BOUNDARY",
+      recordIndex: 24,
+    });
+    expect(rejectedAudit.metadata).not.toMatch(/jobs\.lever|rejected-fixture|http/i);
+    const stableCounts = {
+      observations: (
+        sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
+          count: number;
+        }
+      ).count,
+      versions: (
+        sqlite.prepare("SELECT count(*) AS count FROM job_versions").get() as { count: number }
+      ).count,
+      evaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      queues: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get() as {
+          count: number;
+        }
+      ).count,
+    };
+    const replay = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(replay).toMatchObject({
+      status: "COMPLETE",
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      queuedJobIds: [],
+    });
+    expect({
+      observations: (
+        sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
+          count: number;
+        }
+      ).count,
+      versions: (
+        sqlite.prepare("SELECT count(*) AS count FROM job_versions").get() as { count: number }
+      ).count,
+      evaluations: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get() as {
+          count: number;
+        }
+      ).count,
+      queues: (
+        sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get() as {
+          count: number;
+        }
+      ).count,
+    }).toEqual(stableCounts);
+    expect(pipeline.evaluated).toHaveLength(24);
+    expect(pipeline.queued).toHaveLength(24);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

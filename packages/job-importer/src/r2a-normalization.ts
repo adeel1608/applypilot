@@ -65,12 +65,53 @@ function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function pointer(source: string, span: Span): SourceEvidencePointer {
-  const excerpt = source.slice(span.start, span.end);
+const sourceEvidenceExcerptLimit = 1000;
+
+function boundedCodeUnits(value: string, maximum: number): string {
+  let end = Math.min(value.length, maximum);
+  if (
+    end > 0 &&
+    end < value.length &&
+    value.charCodeAt(end - 1) >= 0xd800 &&
+    value.charCodeAt(end - 1) <= 0xdbff &&
+    value.charCodeAt(end) >= 0xdc00 &&
+    value.charCodeAt(end) <= 0xdfff
+  ) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+function boundedSourceSpan(source: string, span: Span): Span {
+  if (span.end - span.start <= sourceEvidenceExcerptLimit) return span;
+  const excerpt = boundedCodeUnits(source.slice(span.start, span.end), sourceEvidenceExcerptLimit);
   return {
-    sourcePath: span.sourcePath,
+    text: excerpt,
     start: span.start,
-    end: span.end,
+    end: span.start + excerpt.length,
+    sourcePath: span.sourcePath,
+  };
+}
+
+function exactChildSpan(source: string, parent: Span, value: string): Span | null {
+  const start = source.indexOf(value, parent.start);
+  if (start < parent.start || start + value.length > parent.end) return null;
+  return { text: value, start, end: start + value.length, sourcePath: parent.sourcePath };
+}
+
+function finiteNonnegative(value: string | undefined, maximum = Number.MAX_VALUE): number | null {
+  if (value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= maximum ? parsed : null;
+}
+
+function pointer(source: string, span: Span): SourceEvidencePointer {
+  const bounded = boundedSourceSpan(source, span);
+  const excerpt = source.slice(bounded.start, bounded.end);
+  return {
+    sourcePath: bounded.sourcePath,
+    start: bounded.start,
+    end: bounded.end,
     sourceLength: source.length,
     excerpt,
     excerptHash: digest(excerpt),
@@ -117,7 +158,7 @@ export function parseR2ASections(source: string): Section[] {
       continue;
     }
     if (current) {
-      const text = span.text.replace(/^[-*•]\s*/, "").trim();
+      const text = span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim();
       const offset = span.text.indexOf(text);
       current.items.push({
         text,
@@ -425,13 +466,19 @@ function experienceValue(text: string): R2NormalizedValue {
     /\b(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(years?|months?)\b/i,
   );
   const minimum = range ?? text.match(/\b(\d+(?:\.\d+)?)\+?\s*(years?|months?)\b/i);
+  const negativeMinimum = minimum?.index !== undefined && text[minimum.index - 1] === "-";
+  const minimumValue = negativeMinimum ? null : finiteNonnegative(minimum?.[1]);
+  const maximumValue = finiteNonnegative(range?.[2]);
+  const validRange =
+    range === null ||
+    (minimumValue !== null && maximumValue !== null && maximumValue >= minimumValue);
   const noExperience = /\bno experience (?:required|necessary)\b/i.test(text);
   return {
     kind: "EXPERIENCE",
     value: {
       domain: text.slice(0, 500),
-      minimum: noExperience ? 0 : minimum?.[1] ? Number(minimum[1]) : null,
-      maximum: range?.[2] ? Number(range[2]) : null,
+      minimum: noExperience ? 0 : validRange ? minimumValue : null,
+      maximum: range && validRange ? maximumValue : null,
       unit: /months?/i.test(range?.[3] ?? minimum?.[2] ?? "")
         ? "MONTH"
         : /years?/i.test(range?.[3] ?? minimum?.[2] ?? "")
@@ -652,10 +699,13 @@ function parseLocation(label: string) {
       .split(new RegExp(`,|\\b(?:${statePattern})\\b|\\b\\d{4}\\b`, "i"))[0]
       ?.replace(/\b(?:location|based in|located in)\s*:?\s*/i, "")
       .trim() ?? "";
+  const boundedLocality = boundedCodeUnits(beforeState, 200);
   return {
-    rawLabel: label,
-    locality: beforeState && !/remote|australia|national/i.test(beforeState) ? beforeState : null,
-    suburb: beforeState && !/remote|australia|national/i.test(beforeState) ? beforeState : null,
+    rawLabel: boundedCodeUnits(label, 1000),
+    locality:
+      boundedLocality && !/remote|australia|national/i.test(beforeState) ? boundedLocality : null,
+    suburb:
+      boundedLocality && !/remote|australia|national/i.test(beforeState) ? boundedLocality : null,
     stateOrTerritory,
     postcode,
     countryCode:
@@ -740,12 +790,16 @@ function hoursValues(
     /\b(\d+(?:\.\d+)?)\s*(?:-|–|to)?\s*(\d+(?:\.\d+)?)?\s*(?:hours?|hrs?)\s*(?:per|a|\/)\s*(day|week|fortnight|month)\b/gi;
   for (const match of text.matchAll(pattern)) {
     if (!match[1] || !match[3]) continue;
+    const minimum = finiteNonnegative(match[1]);
+    const maximum = finiteNonnegative(match[2] ?? match[1]);
+    const startsWithNegative = (match.index ?? 0) > 0 && text[(match.index ?? 0) - 1] === "-";
+    if (startsWithNegative || minimum === null || maximum === null || maximum < minimum) continue;
     result.push({
       value: {
         kind: "HOURS",
         value: {
-          minimum: Number(match[1]),
-          maximum: Number(match[2] ?? match[1]),
+          minimum,
+          maximum,
           unit: match[3].toUpperCase() as "DAY" | "WEEK" | "FORTNIGHT" | "MONTH",
         },
       },
@@ -770,6 +824,7 @@ function salaryValue(text: string): R2NormalizedValue | null {
     parseAmount(amount?.[1], amount?.[2]),
     parseAmount(amount?.[3], amount?.[4]),
   ].filter((value): value is number => value !== null);
+  if (numbers.length >= 2 && numbers[1]! < numbers[0]!) return null;
   const shape = /\bfrom\b/i.test(text)
     ? "FROM"
     : /\bup to\b/i.test(text)
@@ -974,51 +1029,65 @@ function vehicleTravelValues(text: string): Array<{
   const values: Array<{ field: string; value: R2NormalizedValue }> = [];
   const duration = text.match(/\bcommut(?:e|ing)\b[^.\n\d]{0,40}(\d+(?:\.\d+)?)\s*minutes?\b/i);
   if (duration?.[1]) {
-    values.push({
-      field: "commute.duration",
-      value: {
-        kind: "VEHICLE_TRAVEL",
+    const value = finiteNonnegative(duration[1]);
+    const valueIndex =
+      duration.index === undefined ? -1 : text.indexOf(duration[1], duration.index);
+    const isNegative = valueIndex > 0 && text[valueIndex - 1] === "-";
+    if (value !== null && !isNegative)
+      values.push({
+        field: "commute.duration",
         value: {
-          kind: "COMMUTE",
-          percentage: null,
-          location: null,
-          distanceKm: null,
-          durationMinutes: Number(duration[1]),
+          kind: "VEHICLE_TRAVEL",
+          value: {
+            kind: "COMMUTE",
+            percentage: null,
+            location: null,
+            distanceKm: null,
+            durationMinutes: value,
+          },
         },
-      },
-    });
+      });
   }
   const distance = text.match(/\bcommut(?:e|ing)\b[^.\n\d]{0,40}(\d+(?:\.\d+)?)\s*km\b/i);
   if (distance?.[1]) {
-    values.push({
-      field: "commute.distance",
-      value: {
-        kind: "VEHICLE_TRAVEL",
+    const value = finiteNonnegative(distance[1]);
+    const valueIndex =
+      distance.index === undefined ? -1 : text.indexOf(distance[1], distance.index);
+    const isNegative = valueIndex > 0 && text[valueIndex - 1] === "-";
+    if (value !== null && !isNegative)
+      values.push({
+        field: "commute.distance",
         value: {
-          kind: "COMMUTE",
-          percentage: null,
-          location: null,
-          distanceKm: Number(distance[1]),
-          durationMinutes: null,
+          kind: "VEHICLE_TRAVEL",
+          value: {
+            kind: "COMMUTE",
+            percentage: null,
+            location: null,
+            distanceKm: value,
+            durationMinutes: null,
+          },
         },
-      },
-    });
+      });
   }
   const travel = text.match(/\btravel\b[^.\n]{0,40}?\b(?:up to\s*)?(\d+(?:\.\d+)?)\s*%/i);
   if (travel?.[1]) {
-    values.push({
-      field: "travel.percentage",
-      value: {
-        kind: "VEHICLE_TRAVEL",
+    const percentage = finiteNonnegative(travel[1], 100);
+    const valueIndex = travel.index === undefined ? -1 : text.indexOf(travel[1], travel.index);
+    const isNegative = valueIndex > 0 && text[valueIndex - 1] === "-";
+    if (percentage !== null && !isNegative)
+      values.push({
+        field: "travel.percentage",
         value: {
-          kind: "TRAVEL",
-          percentage: Number(travel[1]),
-          location: null,
-          distanceKm: null,
-          durationMinutes: null,
+          kind: "VEHICLE_TRAVEL",
+          value: {
+            kind: "TRAVEL",
+            percentage,
+            location: null,
+            distanceKm: null,
+            durationMinutes: null,
+          },
         },
-      },
-    });
+      });
   }
   return values;
 }
@@ -1039,7 +1108,7 @@ export function normalizeR2AJobEvidence(input: {
   const sections = isCanonicalStructuredSource ? [] : parseR2ASections(source);
   const standaloneSpans = (isCanonicalStructuredSource ? [] : lineSpans(source))
     .map((span) => {
-      const text = span.text.replace(/^[-*â€¢]\s*/, "").trim();
+      const text = span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim();
       const offset = span.text.indexOf(text);
       return {
         ...span,
@@ -1062,7 +1131,7 @@ export function normalizeR2AJobEvidence(input: {
           .filter((span) => isHeading(span) === undefined)
           .flatMap(clauseSpans)
           .map((span, index) => ({
-            text: span.text.replace(/^[-*•]\s*/, "").trim(),
+            text: span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim(),
             start: descriptionSource.start,
             end: descriptionSource.end,
             sourcePath: `structured.description.item.${index}`,
@@ -1114,6 +1183,7 @@ export function normalizeR2AJobEvidence(input: {
       paths.map((path) => structuredSpans.get(path)).find(Boolean) ??
       textSpan(source, value, paths[0]!);
     if (!span) continue;
+    const evidenceValue = boundedCodeUnits(value, sourceEvidenceExcerptLimit);
     fields.push(
       fieldEvidence({
         source,
@@ -1121,7 +1191,7 @@ export function normalizeR2AJobEvidence(input: {
         family,
         canonicalField,
         span,
-        normalizedValue: { kind: "TEXT", value },
+        normalizedValue: { kind: "TEXT", value: evidenceValue },
         ruleId: "R2A_STRUCTURED_FIELD",
       }),
     );
@@ -1258,8 +1328,11 @@ export function normalizeR2AJobEvidence(input: {
       salaryRecord.value && typeof salaryRecord.value === "object"
         ? (salaryRecord.value as Record<string, unknown>)
         : salaryRecord;
-    const minimum = Number(valueRecord.minValue ?? valueRecord.value);
-    const maximum = Number(valueRecord.maxValue ?? valueRecord.value);
+    const minimumSource = valueRecord.minValue ?? valueRecord.value;
+    const maximumSource = valueRecord.maxValue ?? valueRecord.value;
+    const hasMaximum = maximumSource !== null && maximumSource !== undefined;
+    const minimum = Number(minimumSource);
+    const maximum = Number(maximumSource);
     const currency = structuredText(salaryRecord.currency);
     const unit = structuredText(valueRecord.unitText)?.toUpperCase();
     const components = [
@@ -1269,25 +1342,43 @@ export function normalizeR2AJobEvidence(input: {
       ["salary.period", "structured.baseSalary.value.unitText", unit],
     ] as const;
     const inputs = components.flatMap(([canonicalField, path, value]) => {
+      const componentText = String(value);
       const span = structuredSpans.get(path) ?? textSpan(source, String(value), path);
-      if (!span || value === null || value === undefined || Number.isNaN(value)) return [];
+      if (
+        !span ||
+        value === null ||
+        value === undefined ||
+        (typeof value === "number" && !Number.isFinite(value)) ||
+        componentText.length > sourceEvidenceExcerptLimit
+      )
+        return [];
       const evidence = fieldEvidence({
         source,
         observationId,
         family: "COMPENSATION",
         canonicalField,
         span,
-        normalizedValue: { kind: "TEXT", value: String(value) },
+        normalizedValue: { kind: "TEXT", value: componentText },
         ruleId: "R2A_STRUCTURED_SALARY_COMPONENT",
       });
       fields.push(evidence);
       return [evidence];
     });
-    if (inputs.length >= 2 && Number.isFinite(minimum)) {
+    const validSalarySemantics =
+      Number.isFinite(minimum) &&
+      minimum >= 0 &&
+      (!hasMaximum || (Number.isFinite(maximum) && maximum >= 0 && maximum >= minimum));
+    if (inputs.length >= 1 && validSalarySemantics) {
       const period =
-        unit === "HOUR" || unit === "DAY" || unit === "WEEK" || unit === "MONTH" || unit === "YEAR"
+        unit === "HOUR" ||
+        unit === "DAY" ||
+        unit === "WEEK" ||
+        unit === "FORTNIGHT" ||
+        unit === "MONTH" ||
+        unit === "YEAR"
           ? unit
           : "UNKNOWN";
+      const uppercaseCurrency = currency?.toUpperCase() ?? null;
       fields.push(
         fieldEvidence({
           source,
@@ -1303,10 +1394,13 @@ export function normalizeR2AJobEvidence(input: {
           normalizedValue: {
             kind: "SALARY",
             value: {
-              shape: Number.isFinite(maximum) && maximum !== minimum ? "RANGE" : "EXACT",
+              shape: hasMaximum && maximum !== minimum ? "RANGE" : "EXACT",
               minimum,
-              maximum: Number.isFinite(maximum) ? maximum : minimum,
-              currency: currency?.length === 3 ? currency.toUpperCase() : null,
+              maximum: hasMaximum ? maximum : minimum,
+              currency:
+                currency?.length === 3 && uppercaseCurrency?.length === 3
+                  ? uppercaseCurrency
+                  : null,
               period,
               superannuation: "UNKNOWN",
               commission: false,
@@ -1443,14 +1537,14 @@ export function normalizeR2AJobEvidence(input: {
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
-      const itemSpan = span.sourcePath.startsWith("structured")
-        ? span
-        : {
-            ...span,
-            text: item.match,
-            start: span.start + item.index,
-            end: span.start + item.index + item.match.length,
-          };
+      const itemSpan =
+        exactChildSpan(source, span, item.match) ??
+        ({
+          ...span,
+          text: item.match,
+          start: span.start + item.index,
+          end: span.start + item.index + item.match.length,
+        } satisfies Span);
       fields.push(
         fieldEvidence({
           source,
