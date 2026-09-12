@@ -141,7 +141,10 @@ export default async function SourcesPage() {
                 <strong>
                   {run.source} · {run.alias} · {display(run.status)}
                 </strong>{" "}
-                — {run.requestCount} requests, {run.pageCount} pages, {run.recordCount} records.
+                — {run.requestCount} requests, {run.pageCount} pages, {run.providerRecordCount}
+                provider records, {run.acceptedRecordCount} accepted, {run.unusableRecordCount}
+                unusable, {run.providerDriftWarningCount} drift warnings, and{" "}
+                {run.persistedObservationCount} persisted observations.
                 {run.safeErrorCode ? ` Safe stop: ${display(run.safeErrorCode)}.` : ""}
                 {run.transportStage
                   ? ` Deepest recorded transport stage: ${display(run.transportStage)}.`

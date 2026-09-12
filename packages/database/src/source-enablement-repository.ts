@@ -4,6 +4,7 @@ import type BetterSqlite3 from "better-sqlite3";
 import {
   SourceCapabilityV2Schema,
   SourceProviderDriftDiagnosticSchema,
+  SourceRecordUnusableDiagnosticSchema,
   runLeverSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
@@ -317,7 +318,7 @@ export class SourceEnablementRepository implements SourceRunSink {
       });
       const createdJobIds: string[] = [];
       let duplicateObservationCount = 0;
-      for (const record of input.page.records) {
+      for (const record of input.page.acceptedRecords) {
         const persisted = this.persistLeverObservation(
           record,
           capability,
@@ -343,7 +344,7 @@ export class SourceEnablementRepository implements SourceRunSink {
           input.page.nextCursor === null ? null : String(input.page.nextCursor),
           input.page.pageDigest,
           input.page.requestCount,
-          input.page.records.length,
+          input.page.providerRecordCount,
           input.page.byteCount,
           input.observedAt,
         );
@@ -374,10 +375,20 @@ export class SourceEnablementRepository implements SourceRunSink {
         runId: input.runId,
         pageNumber,
         requestCount: input.page.requestCount,
-        recordCount: input.page.records.length,
+        recordCount: input.page.providerRecordCount,
+        providerRecordCount: input.page.providerRecordCount,
+        acceptedRecordCount: input.page.acceptedRecords.length,
+        unusableRecordCount: input.page.unusableRecordCount,
+        providerDriftWarningCount: input.page.providerDriftDiagnostics.length,
+        persistedObservationCount: createdJobIds.length,
         byteCount: input.page.byteCount,
       });
       this.audit("source.page.persisted", "source_run", input.runId, audit);
+      for (const diagnostic of input.page.safeUnusableDiagnostics) {
+        const safeDiagnostic = SourceRecordUnusableDiagnosticSchema.parse(diagnostic);
+        const unusableAudit = validateSourceAuditMetadata("source.record.unusable", safeDiagnostic);
+        this.audit("source.record.unusable", "source_run", input.runId, unusableAudit);
+      }
       for (const diagnostic of input.page.providerDriftDiagnostics) {
         const safeDiagnostic = SourceProviderDriftDiagnosticSchema.parse(diagnostic);
         const driftAudit = validateSourceAuditMetadata("source.provider.drift", safeDiagnostic);
@@ -484,6 +495,16 @@ export class SourceEnablementRepository implements SourceRunSink {
         `SELECT status, operation, request_count AS requestCount, page_count AS pageCount,
                 record_count AS recordCount, next_cursor AS nextCursor,
                 safe_error_code AS safeErrorCode, retry_after AS retryAfter,
+                (SELECT count(*) FROM audit_events a
+                 WHERE a.event_type='source.record.unusable' AND a.entity_type='source_run'
+                   AND a.entity_id=source_run_checkpoints.id) AS unusableRecordCount,
+                (SELECT count(*) FROM audit_events a
+                 WHERE a.event_type='source.provider.drift' AND a.entity_type='source_run'
+                   AND a.entity_id=source_run_checkpoints.id) AS providerDriftWarningCount,
+                (SELECT coalesce(sum(p.record_count),0) FROM source_run_pages p
+                 WHERE p.run_id=source_run_checkpoints.id) AS persistedPageProviderRecordCount,
+                (SELECT count(*) FROM source_observations o
+                 WHERE o.run_id=source_run_checkpoints.id) AS persistedObservationCount,
                 (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
                  FROM audit_events a
                  WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
@@ -530,6 +551,14 @@ export class SourceEnablementRepository implements SourceRunSink {
       requestCount: row.requestCount,
       pageCount: row.pageCount,
       recordCount: row.recordCount,
+      providerRecordCount: row.recordCount,
+      acceptedRecordCount: Math.max(
+        0,
+        Number(row.persistedPageProviderRecordCount) - Number(row.unusableRecordCount),
+      ),
+      unusableRecordCount: row.unusableRecordCount,
+      providerDriftWarningCount: row.providerDriftWarningCount,
+      persistedObservationCount: row.persistedObservationCount,
       nextCursor: row.nextCursor,
       safeErrorCode: row.safeErrorCode,
       retryAfter: row.retryAfter,

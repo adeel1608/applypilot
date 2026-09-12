@@ -541,27 +541,22 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
-  it("stops a mixed page at response usability before any persistence or downstream work", async () => {
+  it("persists all 25 accepted records from a structurally valid provider page", async () => {
     const sqlite = database();
     let id = 0;
     const repository = new SourceEnablementRepository(
       sqlite,
       () => instant,
-      () => `unusable-page:${++id}`,
+      () => `all-accepted:${++id}`,
     );
-    const approved = capability({ requestBudget: 1, recordCap: 2, pageSizeCap: 2 });
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
     repository.persistCapabilityVersion(approved);
-    const evaluateJob = vi.fn();
-    const queueJob = vi.fn();
-    const unusable = {
-      ...posting(2),
-      description: "",
-      descriptionPlain: "",
-      additional: "",
-      additionalPlain: "",
-      lists: [],
-      categories: { commitment: "Full-time" },
-    };
+    const evaluateJob = vi.fn(async () => null);
     const result = await runLeverSourceToQueue({
       capability: approved,
       repository,
@@ -571,32 +566,282 @@ describe("offline source-to-R2 queue persistence", () => {
         request: vi.fn(async ({ pinnedAddress }) => ({
           status: 200,
           headers: { "content-type": "application/json", "content-encoding": "identity" },
-          body: Buffer.from(JSON.stringify([posting(1), unusable])),
+          body: Buffer.from(
+            JSON.stringify(Array.from({ length: 25 }, (_, index) => posting(index + 1))),
+          ),
           connectedAddress: pinnedAddress,
         })),
       },
       evaluateJob,
-      queueJob,
+      queueJob: vi.fn(),
     });
     expect(result).toMatchObject({
-      status: "STOPPED",
-      stopCode: "SOURCE_RECORD_UNUSABLE",
-      requestCount: 1,
-      pageCount: 0,
-      recordCount: 0,
+      status: "COMPLETE",
+      providerRecordCount: 25,
+      acceptedRecordCount: 25,
+      unusableRecordCount: 0,
+    });
+    expect(result.records).toHaveLength(25);
+    expect(evaluateJob).toHaveBeenCalledTimes(25);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 25,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 25,
+    });
+    expect(sqlite.prepare("SELECT record_count AS count FROM source_run_pages").get()).toEqual({
+      count: 25,
     });
     expect(repository.recovery(result.runId)).toMatchObject({
-      safeErrorCode: "SOURCE_RECORD_UNUSABLE",
-      transportStage: "RESPONSE_BODY",
+      providerRecordCount: 25,
+      acceptedRecordCount: 25,
+      unusableRecordCount: 0,
+      persistedObservationCount: 25,
+    });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("persists 24 accepted siblings, accounts one unusable record, and replays idempotently", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const nextId = () => `unusable-page:${++id}`;
+    const repository = new SourceEnablementRepository(sqlite, () => instant, nextId);
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
+    repository.persistCapabilityVersion(approved);
+    const pipeline = fixturePipeline(sqlite, profile, nextId);
+    const unusable = {
+      ...posting(25),
+      description: "",
+      descriptionPlain: "",
+      additional: "",
+      additionalPlain: "",
+      lists: [],
+    };
+    const values = [...Array.from({ length: 24 }, (_, index) => posting(index + 1)), unusable];
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from(JSON.stringify(values)),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const first = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(first).toMatchObject({
+      status: "COMPLETE",
+      stopCode: null,
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 25,
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      safeUnusableDiagnostics: [{ reasonCode: "MISSING_USABLE_DESCRIPTION", recordIndex: 24 }],
+    });
+    expect(first.records).toHaveLength(24);
+    expect(first.queuedJobIds).toHaveLength(24);
+    expect(pipeline.evaluated).toHaveLength(24);
+    expect(pipeline.queued).toHaveLength(24);
+    expect(repository.recovery(first.runId)).toMatchObject({
+      status: "COMPLETE",
+      safeErrorCode: null,
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      providerDriftWarningCount: 0,
+      persistedObservationCount: 24,
     });
     expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
-      count: 0,
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get(),
+    ).toEqual({
+      count: 24,
+    });
+    const unusableAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.record.unusable' AND entity_id=?`,
+      )
+      .get(first.runId) as { metadata: string };
+    expect(JSON.parse(unusableAudit.metadata)).toEqual({
+      reasonCode: "MISSING_USABLE_DESCRIPTION",
+      recordIndex: 24,
+    });
+    expect(unusableAudit.metadata).not.toMatch(/Fictional Assistant|Melbourne VIC|jobs\.lever/i);
+    const pageAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.page.persisted' AND entity_id=?`,
+      )
+      .get(first.runId) as { metadata: string };
+    expect(JSON.parse(pageAudit.metadata)).toMatchObject({
+      recordCount: 25,
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      providerDriftWarningCount: 0,
+      persistedObservationCount: 24,
+    });
+
+    const firstDigest = sqlite
+      .prepare("SELECT page_digest FROM source_run_pages WHERE run_id=?")
+      .pluck()
+      .get(first.runId);
+    const replay = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(replay).toMatchObject({
+      status: "COMPLETE",
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      queuedJobIds: [],
+    });
+    expect(repository.recovery(replay.runId)).toMatchObject({
+      providerRecordCount: 25,
+      acceptedRecordCount: 24,
+      unusableRecordCount: 1,
+      persistedObservationCount: 0,
+    });
+    expect(
+      sqlite
+        .prepare("SELECT page_digest FROM source_run_pages WHERE run_id=?")
+        .pluck()
+        .get(replay.runId),
+    ).toBe(firstDigest);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 24,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get(),
+    ).toEqual({
+      count: 24,
+    });
+    expect(pipeline.evaluated).toHaveLength(24);
+    expect(pipeline.queued).toHaveLength(24);
+    sqlite.close();
+  });
+
+  it("persists page accounting and completes when all 25 provider records are unusable", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `all-unusable:${++id}`,
+    );
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
+    repository.persistCapabilityVersion(approved);
+    const values = Array.from({ length: 25 }, (_, index) => ({
+      ...posting(index + 1),
+      categories: { commitment: "Part-time" },
+      ...(index === 0 ? { workplaceType: "private-fictional-drift-value" } : {}),
+    }));
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify(values)),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      stopCode: null,
+      providerRecordCount: 25,
+      acceptedRecordCount: 0,
+      unusableRecordCount: 25,
+      queuedJobIds: [],
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      status: "COMPLETE",
+      safeErrorCode: null,
+      providerRecordCount: 25,
+      acceptedRecordCount: 0,
+      unusableRecordCount: 25,
+      providerDriftWarningCount: 1,
+      persistedObservationCount: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT record_count AS count FROM source_run_pages").get()).toEqual({
+      count: 25,
     });
     expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
       count: 0,
     });
-    expect(evaluateJob).not.toHaveBeenCalled();
-    expect(queueJob).not.toHaveBeenCalled();
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM audit_events WHERE event_type='source.record.unusable'",
+        )
+        .get(),
+    ).toEqual({ count: 25 });
+    const driftAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.provider.drift'`,
+      )
+      .get() as { metadata: string };
+    expect(JSON.parse(driftAudit.metadata)).toEqual({
+      issueCategory: "PROVIDER_ENUM_DRIFT",
+      field: "workplaceType",
+      expectedStructuralType: "enum",
+      recordIndex: 0,
+    });
+    expect(driftAudit.metadata).not.toContain("private-fictional-drift-value");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
 
@@ -619,7 +864,7 @@ describe("offline source-to-R2 queue persistence", () => {
         request: vi.fn(async ({ pinnedAddress }) => ({
           status: 200,
           headers: { "content-type": "application/json", "content-encoding": "identity" },
-          body: Buffer.from(JSON.stringify([malformed])),
+          body: Buffer.from(JSON.stringify([posting(2), malformed])),
           connectedAddress: pinnedAddress,
         })),
       },
@@ -641,7 +886,7 @@ describe("offline source-to-R2 queue persistence", () => {
         field: "hostedUrl",
         expectedStructuralType: "url",
         issueCategory: "INVALID_URL",
-        recordIndex: 0,
+        recordIndex: 1,
       },
     });
     const stoppedAudit = sqlite
@@ -658,7 +903,7 @@ describe("offline source-to-R2 queue persistence", () => {
         field: "hostedUrl",
         expectedStructuralType: "url",
         issueCategory: "INVALID_URL",
-        recordIndex: 0,
+        recordIndex: 1,
       },
       requestCount: 1,
       recordCount: 0,
@@ -667,6 +912,9 @@ describe("offline source-to-R2 queue persistence", () => {
       /private malformed value|invalid_format|message|stack/i,
     );
     expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
       count: 0,
     });
     sqlite

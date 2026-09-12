@@ -5004,3 +5004,74 @@ local and GitHub CI green; and lifetime actions unchanged at `7/0/0/0`.
    merge normally only if every owner-preapproved condition still holds.
 8. Refresh clean `main`, confirm action counters remain `7/0/0/0`, and stop with an exact proposed
    eighth-GET authority. Do not execute it.
+
+## Implementation and pre-commit validation results
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The Lever v2 reader now
+validates the complete provider array first, then creates an ordered disposition for every provider
+record. Accepted records retain immutable raw provenance and normal mapping. Locally unusable records
+produce only a strict `reasonCode` plus bounded `recordIndex`; they do not throw from page parsing and
+cannot discard accepted siblings. Single-record detail parsing retains its existing fail-closed
+`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY` behavior.
+
+The page result now exposes provider cardinality, accepted records, unusable cardinality and safe
+diagnostics, provider drift diagnostics, cursor, next cursor, page digest, byte count, and request
+count. Source budget consumption and pagination use provider cardinality: a 25-record wire page with
+24 accepted records consumes 25 and advances from cursor 0 to 25 when the capability permits another
+page. The page digest hashes an ordered disposition sequence. Accepted positions use a local hash of
+their immutable identity/content digest; unusable positions use only position and fixed reason, so
+the same accepted records with a different unusable disposition cannot collide by construction.
+
+The existing page transaction persists accepted observations only, records the page row with
+provider cardinality, writes one strict value-free `source.record.unusable` audit per rejected
+record, retains value-free `source.provider.drift` audits including for unusable records, and records
+provider/accepted/unusable/drift/persisted-observation aggregate counts. A 24/1 page completes and
+continues R2/queue for 24 jobs. A 0/25 page also persists its page/accounting and completes without
+`PERSISTENCE_FAILED`; it creates no observation, job version, evaluation, queue decision, or target.
+Recovery and `/sources` now distinguish provider records, accepted records, unusable records, drift
+warnings, and newly persisted observations. Historical page rows remain compatible and no schema
+change is required.
+
+The complete implementation/documentation diff is limited to `PROJECT_PLAN.md`, `README.md`,
+`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `packages/job-sources/src/source-capability.ts`,
+`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
+`packages/job-sources/src/source-capability.test.ts`,
+`packages/database/src/source-enablement-repository.ts`,
+`packages/database/src/source-enablement-repository.test.ts`, `apps/web/lib/source-workspace.ts`, and
+`apps/web/app/sources/page.tsx`. No transport, URL, host, path, query, DNS, TLS/SNI, pinning,
+response/request/page/record/time budget, redirect, retry, concurrency, capability approval,
+candidate-outbound, target, runner, upload, submission, dependency, lockfile, schema, or migration
+file changed.
+
+Focused reader/runner/repository validation passes 120 tests across two files. The synthetic matrix
+covers 25 accepted and persisted records; 24/1 description and location cases; first, last, multiple,
+and all-25 unusable records; all-locations plus list/additional text fallbacks; accepted and unusable
+workplace drift with no raw-value leak; mixed structural corruption remaining page-fatal without
+partial persistence; exact replay without duplicate observation/job/evaluation/queue state; provider-
+count cursor and budget semantics; deterministic digest differentiation; safe page/unusable audits;
+and recovery aggregates. The complete unit suite passes 443 tests across 47 files; integration passes
+21 tests across three files; and serialized Playwright E2E passes 31 tests.
+
+The pre-commit `npm.cmd run release:check` passes doctor, database/preflight, formatting, zero-warning
+lint, strict typecheck, the complete unit and integration suites, the local production build with 31
+route units, the static showcase build with six pages, showcase boundary audit across 19 source/config
+files plus the export, all 31 E2E tests, privacy audit, and full plus production dependency audits with
+zero known vulnerabilities. Privacy checked 306 tracked files, 852 reachable-history paths, 850
+reachable-history blobs, 1,276 build/test artifacts, and 11 private canaries.
+
+The real database was read only by application validation and backed up through the normal safe local
+maintenance path as ignored backup `backup-2026-09-12T08-57-59.538Z-956067ba`; its exact restore
+preview passed at schema v7 with integrity `PASS`. Fifteen focused database schema, migration,
+backup/restore, and local-runtime tests pass across three files. The real database remains schema v7,
+zero pending migrations, integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0007` have
+an empty baseline-to-working-tree diff and no migration was added. `git diff --check` and
+`git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
+
+This task made zero source requests, employer-form visits, uploads, or submissions. No private source
+response was read, reconstructed, inferred, logged, or committed. Lifetime real action counts remain
+exactly `7/0/0/0`. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; successful
+real ingestion is still unproven until a separately authorized run persists at least one real
+observation. Remaining mechanics are an exact-head clean release rerun, scope/privacy/migration diff
+review, branch push, one PR titled `fix: account for unusable Lever records individually`, exact-head
+push and pull-request CI, full-delta self-review, conditional normal merge, clean `main` refresh, and
+then stop without executing an eighth GET.
