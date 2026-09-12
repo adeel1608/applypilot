@@ -1,58 +1,129 @@
 # ApplyPilot
 
-ApplyPilot is a local-first job discovery, matching, document-preparation, assisted-application, and outcome-tracking platform. It is designed to improve application quality without inventing candidate facts or giving automation control over final submission.
+[![Quality checks](https://github.com/adeel1608/applypilot/actions/workflows/ci.yml/badge.svg)](https://github.com/adeel1608/applypilot/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
+![Next.js](https://img.shields.io/badge/Next.js-16-111111)
+![Local first](https://img.shields.io/badge/data-local--first-b9f94a)
+![Human controlled](https://img.shields.io/badge/final_action-human_controlled-b9f94a)
 
-## Current status
+**A local-first AI job discovery and application assistant that proves the fit with evidence and keeps people in control of external actions.**
 
-Phase 0/1, Phase 2, Phase 2.5, Phase 2.5A, and the Personal Live Beta Core are merged on `main`. PR #10 was human-reviewed at exact head `b7872fe5791f1baa88d9e95e2b7096926ea44813` and merged as `4a0462d24b9a8db79ec49ff64242405d8f96f40d`. **Manual-intake Personal Beta is ready** for local owner use: bounded paste/upload intake, immutable evidence and evaluation versions, conservative matching, corrections, private PDF/DOCX CV and optional cover-letter generation, digest-bound approvals, packet preparation, and durable application tracking are connected through the default UI. Unknown evidence remains unknown, fit is explainable rather than predictive, and the owner must review every generated artifact. No real private profile, vacancy, database, or generated document is committed.
+ApplyPilot turns a fragmented job search into a traceable workflow: discover opportunities, normalise them, test requirements against verified candidate facts, explain the ranking, prepare fact-bound documents, freeze an application packet, and stop at an explicit human approval boundary.
 
-GitHub repository `adeel1608/applypilot` is PUBLIC by explicit owner authorisation. Candidate/runtime data remains LOCAL and ignored. npm `"private": true` remains unchanged to prevent accidental package publication.
+> The repository is public; candidate data is not. Real profiles, databases, vacancy inputs, generated documents, credentials, browser state, and runtime packets stay in ignored local storage.
 
-R2A–R2D are merged, including content-qualified private calibration that remains `UNCALIBRATED` until its private safety gates and explicit threshold approval pass. The offline Personal Live V1 enablement train adds schema v7, R1A versioned source authority and pinned transport, fictional Lever R1B pagination, source-to-R2 queue wiring, and a target-independent runner framework with frozen bindings, protection stops, one-use consent and terminal unknown-outcome recovery. Two separately owner-authorized, one-request source smoke attempts ended before any response page with `NETWORK_OUTCOME_UNKNOWN`; no source observation or usable job was created. This adds no continuing source authority, real runner target, employer-form visit, upload, submission, or deployment authority.
+![ApplyPilot public showcase landing page](docs/assets/landing.png)
 
-The [Personal Live V1 blueprint](docs/PERSONAL_LIVE_V1.md) defines R0–R11, [go-live gates](docs/GO_LIVE_CHECKLIST.md), [source strategy](docs/SOURCE_CAPABILITY_MATRIX.md), [threat model](docs/THREAT_MODEL_V1.md), and [local runbook](docs/RELEASE_RUNBOOK.md). The Beta Core implements the manual local path and synthetic safety proofs. Source-enabled Beta remains `NOT_READY`: its bounded real smoke produced no known HTTP response or source record, and another request requires a new exact owner gate after the offline transport fix. Personal Live V1 and hosted production are not ready.
+## See the product
 
-There is no successful live job-board connection, deployment, real-target browser adapter, or application-submission capability. Source-enabled Personal Beta remains `NOT_READY / NETWORK_OUTCOME_UNKNOWN`; real target operation remains `TARGET_APPROVAL_REQUIRED`. The offline framework is ready for a separately reviewed future activation gate under the [exact owner approval protocol](docs/OFFLINE_GO_LIVE_ENABLEMENT.md). SEEK network modes remain disabled, LinkedIn remains assisted/manual only, and final submission always requires fresh exact human consent.
+- [Live public showcase](https://applypilot.qss-ai-robot-7121.chatgpt.site)
+- [Explore the static fictional demo](apps/showcase) locally with `npm run dev:showcase`
+- [Inspect the evidence model](docs/CANDIDATE_TRUTH_STORE.md)
+- [Read the architecture](ARCHITECTURE.md)
+- [Review the safety model](SECURITY.md)
 
-## Why ApplyPilot exists
+The public showcase is a separate static export with invented companies, roles, candidate evidence, and metrics. It has no database, server actions, source adapters, credentials, profile access, or application runner. See [docs/PUBLIC_SHOWCASE.md](docs/PUBLIC_SHOWCASE.md) for its boundary and validation model.
 
-Job searches are fragmented across sources, repeated applications are time-consuming, and generic generation tools can overstate a candidate's background. ApplyPilot creates a traceable path from source data to an eligibility decision, explainable score, fact-bound documents, human review, and later outcome tracking.
+## What makes ApplyPilot different
 
-## Architecture
+| Principle                   | Product behaviour                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Local-first candidate data  | Sensitive facts and generated artifacts remain in the owner-controlled workspace.                          |
+| Evidence-backed eligibility | Material decisions link stated requirements to verified facts; missing evidence becomes `REVIEW_REQUIRED`. |
+| Explainable matching        | Fit scores retain visible positive and negative contributions instead of hiding a prediction.              |
+| No invented experience      | Unknown, unverified, and forbidden claims never become application facts.                                  |
+| Narrow authority            | Source reads, target interactions, disclosures, and final submission use separate approvals.               |
+| Fail-closed automation      | Drift, authentication, CAPTCHA, MFA, rate limits, bot controls, and ambiguous outcomes stop the run.       |
 
-ApplyPilot uses npm workspaces:
+## Workflow
 
-- `apps/web` contains the Next.js App Router dashboard.
-- `packages/candidate-profile` owns the verified candidate schema and forbidden-claim rules.
-- `packages/job-model`, `job-sources`, `job-importer`, and `job-normalizer` own normalized vacancies, source boundaries, source-neutral local intake, provenance, and deterministic source identity. The SEEK implementation and Phase 2.5 importer never perform a network request.
-- `packages/eligibility-engine` and `fit-scorer` provide pure deterministic decisions.
-- `packages/resume-engine` and `cover-letter-engine` build documents from verified facts.
-- `packages/application-runner` and `application-tracker` keep preparation, confirmation, and lifecycle state explicit.
-- `packages/database` owns SQLite/Drizzle tables and migrations.
+```text
+Discover -> Normalise -> Evaluate -> Rank -> Prepare -> Review -> Apply
+   |                         |                    |          |
+bounded read          verified evidence      frozen     one-use human
+authority             + visible unknowns     packet     final consent
+```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) and [PROJECT_PLAN.md](PROJECT_PLAN.md) for the complete blueprint.
+![ApplyPilot authority-narrowing architecture](docs/assets/applypilot-architecture.svg)
 
-## Local setup
+The data path preserves immutable source observations and versioned decisions. Discovery authority never implies employer-form authority, and target authority never implies final-submit consent.
 
-Requirements: Node.js 24 or newer, npm, and Git. The browser test and PDF demonstration also require Playwright Chromium.
+## Fictional product tour
+
+| Opportunity dashboard                                         | Evidence decision                                    |
+| ------------------------------------------------------------- | ---------------------------------------------------- |
+| ![Fictional opportunity dashboard](docs/assets/dashboard.png) | ![Fictional evidence view](docs/assets/evidence.png) |
+
+![Fictional application packet awaiting human consent](docs/assets/application-packet.png)
+
+Every screenshot and value above is fictional. The showcase deliberately demonstrates both supported facts and unresolved evidence so the safety model is visible, not merely described.
+
+## Current readiness
+
+- **Manual-intake Personal Beta:** ready for supervised local owner use.
+- **Source-enabled Personal Beta:** not ready; earlier bounded live reads produced no known HTTP response or source record, and any new request requires a fresh exact owner approval.
+- **Real employer interaction:** target approval required; no real target is configured.
+- **Final submission:** always requires fresh exact human consent.
+- **Hosted production application:** not ready. The static fictional showcase is not the private application.
+
+Schema v7 and migrations `0000`–`0007` support immutable source capabilities, bounded source runs, evidence-aware matching, packet bindings, runner checkpoints, protection stops, and unknown-outcome recovery. The default mode remains deterministic and does not require a paid model or API.
+
+## Repository map
+
+```text
+apps/
+  showcase/                 static, fictional public product showcase
+  web/                      local Next.js owner dashboard
+packages/
+  candidate-profile/        validated facts and forbidden-claim rules
+  job-sources/              bounded adapters and source capabilities
+  job-importer/             inert extraction, identity, and provenance
+  eligibility-engine/       conservative blocker/review decisions
+  fit-scorer/               explainable weighted ranking
+  resume-engine/            fact-bound CV and DOCX/PDF generation
+  application-runner/       frozen bindings, stops, and consent gates
+  database/                 SQLite schema, repositories, migrations
+docs/                       runbooks, threat model, product blueprints
+tests/                      unit, integration, security, and browser gates
+```
+
+## Run the public showcase
+
+Requirements: Node.js 24+, npm, and Git.
+
+```bash
+npm install
+npm run dev:showcase
+```
+
+Open `http://localhost:3000`. Build and audit the deployable static files with:
+
+```bash
+npm run build:showcase
+npm run showcase:audit
+```
+
+Only `apps/showcase/out` is deployable as the public showcase. Do not deploy the local application or any workspace/runtime data.
+
+## Run the local application
+
+The private local workflow additionally uses SQLite and Playwright Chromium:
 
 ```bash
 npm install
 npx playwright install chromium
 npm run db:migrate
 npm run db:migrate -- --confirm
-npm run dev --workspace @applypilot/web -- --hostname 127.0.0.1
+npm run dev
 ```
 
-Open `http://localhost:3000`. Use `/import` for local paste/upload intake, `/jobs` for the real queue and document workflow, `/applications` for packet/application tracking, and `/sources` for safe capability status. The first migration command previews the path; the confirmed command creates and verifies a consistent ignored backup, applies pending additive migrations, and verifies integrity and foreign keys. The app does not auto-migrate at startup.
+Open `http://localhost:3000`. The first migration command previews the operation; the confirmed command creates and verifies an ignored backup before applying additive migrations. The server never auto-migrates a real database.
 
-Only the fictional `data/profile.example.json` is committed and rendered as demo content. A local `data/profile.private.json` with the same schema is Git-ignored, loaded only on the server, and required to evaluate real imported jobs. Without a valid private profile, imports remain usable but explicitly not evaluated.
-
-The schema-accurate, fictional setup reference for the later local activation checkpoint is [docs/PRIVATE_PROFILE_SETUP.md](docs/PRIVATE_PROFILE_SETUP.md). Do not add real candidate values to Git.
+Only the fictional `data/profile.example.json` is committed. A real `data/profile.private.json` is ignored, server-only, and required for real local evaluations. Never add candidate values to Git. See [private profile setup](docs/PRIVATE_PROFILE_SETUP.md) and the [release runbook](docs/RELEASE_RUNBOOK.md).
 
 On Windows PowerShell systems that block `npm.ps1`, use `npm.cmd` and `npx.cmd`.
 
-## Quality checks
+## Quality gates
 
 ```bash
 npm run format:check
@@ -62,38 +133,29 @@ npm test
 npm run test:integration
 npm run build
 npm run test:e2e
+npm run privacy:audit
+npm run release:check
 ```
 
-Generate the fictional ATS-friendly resume demonstration with:
+The root production build includes both the local application and the audited static showcase. Browser tests exercise the two surfaces separately.
 
-```bash
-npm run generate:example-resume
-```
+## Safety guarantees
 
-The generated PDF is a local ignored artifact under `data/private/generated/`.
+- Candidate-facing claims require verified truth-store provenance.
+- Unknown or ambiguous eligibility evidence never silently becomes eligible.
+- Private profiles, databases, generated documents, browser sessions, and credentials are excluded from Git.
+- Untrusted source content is bounded, validated, and converted to inert text before display.
+- CAPTCHA, MFA, authentication, access controls, rate limits, bot detection, and site drift are stop conditions.
+- A lost or ambiguous submission response becomes `OUTCOME_UNKNOWN`, never a blind retry.
+- Final application submission always requires fresh explicit human confirmation.
 
-## Security model
-
-- Candidate claims must have verified truth-store provenance.
-- Unknown or ambiguous eligibility inputs require review.
-- Private profiles, databases, generated documents, browser state, credentials, and identity material are ignored by Git.
-- Real authenticated browser automation remains disabled and would belong in a separately approved local runner.
-- CAPTCHA, MFA, access controls, rate limits, bot detection, and website restrictions are stop conditions.
-- Final submission always requires explicit human confirmation.
-
-Read [SECURITY.md](SECURITY.md) before handling any real candidate data.
-
-## Development roadmap
-
-The roadmap is maintained in [PROJECT_PLAN.md](PROJECT_PLAN.md). Phase 2.5 makes local real-world intake useful without enabling live source access. Phase 2.5A is validating one private local profile and one user-supplied vacancy under the approved local-only execution plan.
-
-## Screenshots
-
-Screenshots will be added after the foundation UI is accepted. The current dashboard is available locally at `/dashboard`.
+Read [SECURITY.md](SECURITY.md), the [threat model](docs/THREAT_MODEL_V1.md), and the [go-live checklist](docs/GO_LIVE_CHECKLIST.md) before handling real data or authority.
 
 ## Contributing
 
-Every material change is plan-first and must update `PROJECT_PLAN.md` before coding and after validation. Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Use feature branches, keep commits focused, and do not automatically merge pull requests.
+ApplyPilot is plan-first. Material changes begin in [PROJECT_PLAN.md](PROJECT_PLAN.md), use a focused branch, include proportional tests, and preserve every privacy and approval boundary. Start with [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Security reports must not include candidate data or secrets. Follow the private-reporting guidance in [SECURITY.md](SECURITY.md).
 
 ## Licence
 

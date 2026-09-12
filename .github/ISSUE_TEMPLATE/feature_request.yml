@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a plan-first improvement to ApplyPilot.
+title: "proposal: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What owner or contributor problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome
+      description: Describe the smallest useful result and how it would be verified.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and privacy impact
+      description: Note effects on candidate truth, data boundaries, source authority, target authority, or final consent.
+    validations:
+      required: true
