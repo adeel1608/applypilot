@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
-import { isIP } from "node:net";
+import { isIP, SocketAddress } from "node:net";
 
 import {
   SourceCapabilityV2Schema,
@@ -17,6 +17,76 @@ export class SecureSourceError extends Error {
   ) {
     super(code);
   }
+}
+
+export type SourceTransportLifecycleStage =
+  | "REQUEST_CREATED"
+  | "SOCKET_ASSIGNED"
+  | "TCP_CONNECTED"
+  | "TLS_ESTABLISHED"
+  | "REQUEST_FLUSHED"
+  | "RESPONSE_HEADERS"
+  | "RESPONSE_BODY";
+
+const transportStageRank: Record<SourceTransportLifecycleStage, number> = {
+  REQUEST_CREATED: 0,
+  SOCKET_ASSIGNED: 1,
+  TCP_CONNECTED: 2,
+  TLS_ESTABLISHED: 3,
+  REQUEST_FLUSHED: 4,
+  RESPONSE_HEADERS: 5,
+  RESPONSE_BODY: 6,
+};
+
+function nodeErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("code" in error)) return null;
+  const value = (error as { code?: unknown }).code;
+  return typeof value === "string" && /^[A-Z0-9_]{2,80}$/.test(value) ? value : null;
+}
+
+/**
+ * Classify only stable Node error codes and trusted local lifecycle state. The
+ * result is diagnostic, never a declaration that an HTTP attempt is safe to
+ * retry; the source capability's retry budget remains authoritative.
+ */
+export function classifySecureSourceTransportError(
+  error: unknown,
+  stage: SourceTransportLifecycleStage,
+): SecureSourceError {
+  if (error instanceof SecureSourceError) return error;
+  const code = nodeErrorCode(error);
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_FAIL") {
+    return new SecureSourceError("DNS_RESOLUTION_FAILED");
+  }
+  if (
+    code === "ENETUNREACH" ||
+    code === "EHOSTUNREACH" ||
+    code === "ENETDOWN" ||
+    code === "EHOSTDOWN" ||
+    code === "ENONET"
+  ) {
+    return new SecureSourceError("NETWORK_ROUTE_UNAVAILABLE");
+  }
+  if (code === "ECONNREFUSED") return new SecureSourceError("CONNECTION_REFUSED");
+  if (code === "ECONNRESET" || code === "ECONNABORTED" || code === "EPIPE") {
+    return new SecureSourceError("CONNECTION_RESET");
+  }
+  if (code === "ETIMEDOUT") return new SecureSourceError("REQUEST_TIMEOUT");
+  const beforeTlsEstablished = transportStageRank[stage] < transportStageRank.TLS_ESTABLISHED;
+  if (
+    beforeTlsEstablished &&
+    (code === "EPROTO" ||
+      code?.startsWith("ERR_TLS_") ||
+      code?.startsWith("ERR_SSL_") ||
+      code?.startsWith("ERR_OSSL_") ||
+      code?.startsWith("CERT_") ||
+      code === "DEPTH_ZERO_SELF_SIGNED_CERT" ||
+      code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+      code === "SELF_SIGNED_CERT_IN_CHAIN")
+  ) {
+    return new SecureSourceError("TLS_HANDSHAKE_FAILED");
+  }
+  return new SecureSourceError("NETWORK_OUTCOME_UNKNOWN");
 }
 
 export interface SecureSourceResponse {
@@ -40,11 +110,37 @@ function headerValue(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value.join(",") : (value ?? "");
 }
 
+function canonicalAddress(address: string): string | null {
+  const version = isIP(address);
+  if (version !== 4 && version !== 6) return null;
+  try {
+    return new SocketAddress({
+      address,
+      family: version === 4 ? "ipv4" : "ipv6",
+      port: 443,
+    }).address;
+  } catch {
+    return null;
+  }
+}
+
+function sameNetworkAddress(left: string, right: string): boolean {
+  const canonicalLeft = canonicalAddress(left);
+  const canonicalRight = canonicalAddress(right);
+  return canonicalLeft !== null && canonicalLeft === canonicalRight;
+}
+
 const defaultDependencies: SecureSourceTransportDependencies = {
   resolveHost: async (hostname) =>
     (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address),
   request: ({ url, pinnedAddress, signal, byteLimit }) =>
     new Promise((resolve, reject) => {
+      let lifecycleStage: SourceTransportLifecycleStage = "REQUEST_CREATED";
+      const advance = (next: SourceTransportLifecycleStage) => {
+        if (transportStageRank[next] > transportStageRank[lifecycleStage]) lifecycleStage = next;
+      };
+      const rejectSafely = (error: unknown) =>
+        reject(classifySecureSourceTransportError(error, lifecycleStage));
       const request = httpsRequest(
         url,
         {
@@ -66,9 +162,12 @@ const defaultDependencies: SecureSourceTransportDependencies = {
           },
         },
         (response) => {
+          advance("RESPONSE_HEADERS");
+          const connectedAddress = response.socket.remoteAddress ?? "";
           const chunks: Buffer[] = [];
           let total = 0;
           response.on("data", (chunk: Buffer) => {
+            advance("RESPONSE_BODY");
             total += chunk.byteLength;
             if (total > byteLimit) {
               response.destroy(new SecureSourceError("RESPONSE_TOO_LARGE"));
@@ -76,7 +175,6 @@ const defaultDependencies: SecureSourceTransportDependencies = {
             }
             chunks.push(chunk);
           });
-          response.on("error", reject);
           response.on("end", () => {
             const headers = Object.fromEntries(
               Object.entries(response.headers).map(([key, value]) => [key, headerValue(value)]),
@@ -85,12 +183,19 @@ const defaultDependencies: SecureSourceTransportDependencies = {
               status: response.statusCode ?? 0,
               headers,
               body: Buffer.concat(chunks),
-              connectedAddress: pinnedAddress,
+              connectedAddress,
             });
           });
+          response.on("error", rejectSafely);
         },
       );
-      request.on("error", reject);
+      request.on("socket", (socket) => {
+        advance("SOCKET_ASSIGNED");
+        socket.on("connect", () => advance("TCP_CONNECTED"));
+        socket.on("secureConnect", () => advance("TLS_ESTABLISHED"));
+      });
+      request.on("finish", () => advance("REQUEST_FLUSHED"));
+      request.on("error", rejectSafely);
       request.end();
     }),
 };
@@ -176,8 +281,15 @@ export async function validateSecureSourceUrl(
     throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
   }
   if (capability.source === "LEVER") validateLeverRequestSemantics(url, capability, operation);
-  const addresses = [...new Set(await resolveHost(url.hostname))];
-  if (addresses.length === 0 || addresses.some(isBlockedNetworkAddress)) {
+  let resolvedAddresses: string[];
+  try {
+    resolvedAddresses = await resolveHost(url.hostname);
+  } catch {
+    throw new SecureSourceError("DNS_RESOLUTION_FAILED");
+  }
+  const addresses = [...new Set(resolvedAddresses)];
+  if (addresses.length === 0) throw new SecureSourceError("DNS_RESOLUTION_FAILED");
+  if (addresses.some(isBlockedNetworkAddress)) {
     throw new SecureSourceError("DESTINATION_ADDRESS_FORBIDDEN");
   }
   return { url, pinnedAddress: addresses[0]! };
@@ -234,16 +346,11 @@ export async function boundedSecureJsonGet(input: {
     } catch (error) {
       if (input.signal?.aborted) throw new SecureSourceError("OWNER_CANCELLED");
       if (signal.aborted) throw new SecureSourceError("REQUEST_TIMEOUT");
-      if (retries < capability.maxRetries) {
-        retries += 1;
-        input.budget.retries += 1;
-        continue;
-      }
-      throw error instanceof SecureSourceError
-        ? error
-        : new SecureSourceError("NETWORK_OUTCOME_UNKNOWN");
+      // Socket/TLS outcomes can be ambiguous after request creation. A safe
+      // diagnostic code must never be treated as permission for a blind retry.
+      throw classifySecureSourceTransportError(error, "REQUEST_CREATED");
     }
-    if (response.connectedAddress !== pinnedAddress) {
+    if (!sameNetworkAddress(response.connectedAddress, pinnedAddress)) {
       throw new SecureSourceError("PINNED_ADDRESS_MISMATCH");
     }
     if ([301, 302, 303, 307, 308].includes(response.status)) {

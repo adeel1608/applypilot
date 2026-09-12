@@ -3,7 +3,7 @@
 Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `fix/post-first-live-source-hardening`
+Working branch: `fix/live-source-transport-diagnostics`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -3440,3 +3440,52 @@ Exact implementation sequence:
    and make exactly one owner-authorized GET. Do not retry or request a second page/detail.
 7. If successful, complete persistence/R2/queue and all useful offline validation; if the result is
    again unknown, make no third GET and report the deepest safe lifecycle evidence and blocker.
+
+## Transport hardening implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL_GATES_PASS / AWAITING_EXACT_HEAD_CI`. The implementation adds only the
+approved closed diagnostics and supporting tests/docs. `DNS_RESOLUTION_FAILED`,
+`NETWORK_ROUTE_UNAVAILABLE`, `CONNECTION_REFUSED`, `CONNECTION_RESET`, and
+`TLS_HANDSHAKE_FAILED` join the existing timeout, forbidden-address, pin-mismatch, and unknown codes.
+Resolver exceptions and empty answers now terminate as DNS failure; generic Node failures are mapped
+only from a closed code allowlist and trusted socket lifecycle state; arbitrary exception text is
+discarded. TLS-like errors after a secure connection remain unknown instead of being mislabelled.
+Network exceptions are terminal even if a broader capability retry ceiling exists, so a diagnostic
+label never creates blind-retry authority.
+
+The default HTTPS transport records socket assignment, TCP connection, TLS establishment, request
+flush, response headers, and body locally for classification; no lifecycle detail is logged. It reads
+the actual response socket address and compares a canonical IP representation to the validated pin,
+while retaining the original hostname for SNI/certificate verification. All resolved addresses still
+must be public; the first validated address remains deterministic because diagnostics did not
+demonstrate an IPv6-first defect. Host, path, query, method, redirects, credentials, candidate-blind
+request data, response byte cap, and time budgets are unchanged or stricter.
+
+Focused validation passed 42 tests across the source capability/transport and durable source
+repository files. It covers resolver throw/empty results, every new code, residual unknown outcome,
+TLS lifecycle qualification, safe message redaction, canonical IPv6 pin comparison, actual pin
+mismatch, timeout/cancellation precedence, no network retry despite a synthetic retry ceiling, and
+durable safe-code persistence with no evaluation/queue execution. Strict typecheck and lint pass.
+
+The complete local release check passed doctor, database/preflight, formatting, lint, strict
+typecheck, 363 unit tests in 46 files, 21 integration tests in three files, the 31-route production
+build, 27 serialized fictional/local E2E tests, privacy audit over 273 tracked files, 738 history paths,
+739 history blobs, 1,287 build/test artifacts and 11 private canaries, and both dependency audits with
+zero known vulnerabilities. Fifteen focused schema/migration/backup/restore tests pass. The verified
+ignored backup `backup-2026-09-12T01-35-17.826Z-04e67f6e` is schema v7/integrity `PASS`, and its restore
+preview passes. The real database remains schema v7 with zero pending migrations, integrity `PASS`,
+and zero foreign-key issues.
+
+Migration is `NONE`; migrations `0000`-`0007` remain unchanged and no `0008` exists. No source
+capability has been created during the fix: the private allowlist contains two configured historical
+versions and zero current capabilities. New real source GETs, employer-form visits, uploads, and
+submissions during diagnostics/fix remain `0/0/0/0`; lifetime application source attempts remain one.
+The three owner-authorized TCP/TLS diagnostic connections carried no HTTP or candidate data. No raw
+DNS address, certificate, exception, private capability, candidate value, or live payload entered
+Git, logs, tests, screenshots, documentation, or CI.
+
+Remaining exact-scope publication steps are staged privacy/diff checks, strict Git fsck, commit/push,
+one PR titled `fix: harden live source transport diagnostics`, and exact-head push/PR CI. The owner's
+pre-approved merge applies only if those checks pass and the diff remains this scope. After the merge,
+refresh clean `main`, create an additional verified ignored backup, materialise the new short-lived
+capability, run clean preflight, and use its single request budget exactly once.
