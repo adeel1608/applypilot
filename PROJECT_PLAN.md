@@ -4171,3 +4171,59 @@ Exact implementation sequence:
    the full delta, and merge only if every pre-approved condition remains satisfied.
 7. Refresh clean `main`, report the merge and final SHA, and provide the next bounded live-verification
    proposal as a proposal only. Stop before any network request.
+
+## Official contract alignment implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL RELEASE PASS / PR AND EXACT-HEAD CI PENDING`. The only parser change is
+`country: z.string().max(100).nullable().optional()`. Documented country strings remain unchanged;
+documented `null` and the deliberately supported absent field both map to internal `null`. No other
+field was relaxed. The official audit found no additional documented nullable-versus-optional
+incompatibility: current handling already accepts the four workplace values, bounded `lists[]`, empty
+optional additional/description text, optional salary data, and inertly ignores unused forward-
+compatible fields. No unavailable private response body was inspected or inferred.
+
+Synthetic coverage now explicitly passes country string/null/absence, every workplace value, inert
+ordered lists, empty optional description/additional/salary-description strings, and malformed country,
+workplace, and list values. Unsupported values terminate only as `SCHEMA_CHANGED / RESPONSE_BODY`,
+without raw Zod paths or fixture values. The focused source contract file passes 44 tests. README now
+truthfully says the first two attempts stopped before a usable response, the latest bounded attempt
+reached an accepted 2xx JSON response and failed closed during strict response-contract parsing, no
+real job was persisted, and Source-enabled Personal Beta is not ready.
+
+Changed files are `PROJECT_PLAN.md`, `README.md`,
+`packages/job-sources/src/lever/v2-reader.ts`, and
+`packages/job-sources/src/source-capability.test.ts`. No capability, transport, URL/query, DNS, TLS,
+budget, pagination, persistence, evaluation, queue, runner, target, application, dependency, lockfile,
+or migration file changed. Migrations `0000`-`0007` have an empty start-to-head diff and no `0008`
+exists.
+
+Validation results:
+
+- Focused contract: 44/44 tests passed.
+- Formatting, zero-warning lint, and strict typecheck passed. The first formatting check reported 33
+  freshly merged showcase files with Windows line-ending-only working-copy differences; repository
+  formatting normalized them and Git content comparison retained only the intended three implementation
+  files. The first lint run reported one unused destructured test binding; the test was rewritten without
+  an unused binding, and the complete lint rerun passed. No failure was skipped.
+- `npm.cmd run release:check` passed doctor, schema/status, aggregate preflight, formatting, lint,
+  typecheck, 377 unit tests across 47 files, 21 integration tests across three files, the local
+  production build with 31 route units, the separate static showcase build with six generated pages,
+  the public showcase audit across 19 source/config files and the full export, and 31 serialized
+  Playwright tests.
+- Privacy audit passed across 305 tracked files, 816 history paths, 814 history blobs, 1,338 build/test
+  artifacts, and 11 private canaries. Full and production dependency audits each reported zero known
+  vulnerabilities.
+- Fifteen focused database schema/migration/backup/restore/runtime-path tests across three files passed.
+  The real database was read only and remains schema v7, pending migrations 0, integrity `PASS`, and
+  foreign-key issues 0. No backup or migration was applied to it.
+- Release reporting remains Manual-intake Personal Beta `READY`, Source-enabled Personal Beta
+  `WAITING_FOR_APPROVED_TENANT`, Personal Live V1 `NOT_READY`, and real runner
+  `TARGET_APPROVAL_REQUIRED`; four historical source capability versions exist and zero are active.
+- Real source requests, employer-form interactions, uploads, and submissions in this task remain
+  `0/0/0/0`; lifetime real action counts remain `3/0/0/0`.
+
+The remaining release mechanics are to commit this result record, rerun the complete release check on
+that exact unchanged head, verify the migration diff plus `git diff --check` and `git fsck --strict`,
+push only this branch, open the named PR, and require both exact-head push and pull-request quality
+workflows to pass. Then self-review the complete base-to-head diff and merge only under the owner's
+pre-approved narrow-scope conditions. No source request follows the merge in this task.
