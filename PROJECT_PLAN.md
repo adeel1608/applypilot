@@ -4376,3 +4376,132 @@ unchanged commit, and migration/diff/fsck checks must pass. Then one PR from
 must remain unmerged. A future live verification is not authorized by this task and requires a new
 owner-approved, short-lived, immutable capability and one exact bounded request after human review of
 the offline PR.
+
+# Lever documented-contract boundary hardening and redacted diagnostics - 2026-09-12
+
+Status: `BLUEPRINT APPROVED BY OWNER / IMPLEMENTATION PENDING`. The exact clean starting `main` and
+`origin/main` are `b8ca101ab411d95d8ad91947dc0fdbf013a0d0d6`; implementation branch is
+`fix/lever-contract-boundary-hardening`. The real local database is schema v7 with zero pending
+migrations, integrity `PASS`, and zero foreign-key issues. Lifetime real source requests are exactly
+five and this task authorizes none; employer-form visits, uploads, and submissions remain zero. No
+active source or employer-target capability may be used by this offline task.
+
+## Current state, objective, official basis, and assumptions
+
+The existing `LeverPostingV2Schema` validates the documented JSON posting boundary but also rejects
+values using limits Lever's current public Postings API documentation does not state: a restricted
+job-ID regex and length, a non-empty and 1,000-character title rule, 500,000-character description
+and list-content limits, 5,000-character list headings, 100-element list and all-location limits, a
+100-character country limit, non-negative salary values, and currency/interval length limits. The
+page schema also has an arbitrary 100-record bound even though the approved capability and requested
+page size already impose the actual record budget. These rules are contract assumptions, not evidence
+about any private response and are not claimed to have caused the fifth failed-closed run.
+
+The sole contract authority for this work is Lever's current public Postings API documentation at
+`https://github.com/lever/postings-api`. It documents JSON posting strings for `id` and `text`; a
+`categories` object with location, commitment, team, department, and all-locations strings; nullable
+ISO alpha-2 `country`; styled/plain opening and description variants; `lists[]` objects containing
+string `text` and `content`; optional additional text; URL-valued `hostedUrl` and `applyUrl`; the exact
+four-value workplace enum; an optional salary-range object with string currency/interval and numeric
+minimum/maximum; and optional styled/plain salary descriptions. The documentation also exposes a
+`level` category filter; this run explicitly models `categories.level` as a string passthrough member
+without turning it into matching or eligibility evidence. Unknown extensions remain accepted only as
+immutable raw provenance and cannot become evidence.
+
+The objective is to align the parser with those documented types and shapes, preserve the existing
+global two-megabyte transport limit as the resource/security bound, separate provider structure from
+ApplyPilot record usability, and persist one privacy-safe diagnostic for response-contract failures.
+The diagnostic may contain only a hardcoded documented field identifier (or
+`UNKNOWN_CONTRACT_BOUNDARY`), a fixed expected-type enum, a fixed issue-category enum, and an optional
+bounded top-level record index. It must never contain a value, raw fragment, arbitrary key, Zod
+message/path serialization, title, employer text, URL value, description, stack, profile, or other
+private content.
+
+## Requirements, architecture, proposed files, and data flow
+
+- `packages/job-sources/src/lever/v2-reader.ts`: model the documented opening/body/plain,
+  salary-description, and category-level members; retain documented type/object/array checks, URL
+  validation, nullable country, exact workplace enum, inert conversion, deep-frozen raw payload, and
+  fail-closed parsing. Remove undocumented per-field/array/value limits and the page-level duplicate
+  bound. Convert Zod issues through a hardcoded path/type map into one redacted diagnostic. A
+  structurally valid but locally unusable title/location/description is a product-semantic stop, not
+  `SCHEMA_CHANGED`.
+- `packages/job-sources/src/source-capability.ts` and
+  `packages/job-sources/src/secure-source-transport.ts`: define/export strict fixed-enum diagnostic
+  schemas and an explicit product-unusable stop code, and allow `SecureSourceError` to carry only a
+  validated redacted diagnostic.
+- `packages/job-sources/src/source-runner.ts` and
+  `packages/database/src/source-enablement-repository.ts`: propagate the validated diagnostic only on
+  a stopped run and place it in existing `source.run.stopped` redacted audit JSON. The existing audit
+  JSON column avoids a database migration. Recovery parses invalid/tampered diagnostic data to null.
+- `apps/web/lib/source-workspace.ts` and `apps/web/app/sources/page.tsx`: expose and render only the
+  parsed fixed-enum diagnostic so the owner can understand a future contract boundary without access
+  to provider values. No raw metadata reaches the view.
+- `packages/job-sources/src/source-capability.test.ts` and
+  `packages/database/src/source-enablement-repository.test.ts`: use fictional fixtures for official
+  fields, long response-budget-valid values, more than 100 locations/lists, unusual string IDs,
+  signed finite salaries, all workplace variants, nullable country, unknown extensions, malformed
+  types/shapes/URLs/enums, diagnostic allowlisting/redaction, product-unusable classification, and
+  durable stopped-run audit/recovery behavior.
+- `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `README.md`, and this plan: record the field-by-field
+  A/B/C/D matrix and accurate five-attempt readiness without private/live payload content or causal
+  speculation.
+
+The bounded data flow is:
+
+`approved synthetic JSON bytes -> existing 2 MB transport cap -> documented Zod shapes -> either
+inert mapped record + immutable raw provenance, product-semantic unusable stop, or fixed-enum redacted
+schema diagnostic -> existing stopped-run audit JSON -> validated recovery/UI rendering`.
+
+No source host, path, query, DNS, TLS/SNI, IP pinning, redirect, retry, concurrency, request/page
+budget, capability expiry, persistence authority, candidate-outbound, employer-target, upload, or
+submission code may change. No new package, dependency, lockfile change, or database migration is
+expected. Migrations `0000`-`0007` remain immutable.
+
+## Risks, security/privacy, testing, rollback, and acceptance criteria
+
+Primary risks are accidentally weakening documented structural checks, serializing provider values in
+diagnostics, misclassifying a local usability decision as provider drift, promoting new fields into
+eligibility evidence, broadening live authority, or claiming the offline fix explains an unavailable
+private body. Controls are a hardcoded diagnostic allowlist, strict diagnostic schemas, one selected
+structural issue only, unknown-path collapse, synthetic adversarial fixtures, raw audit inspection,
+authority/migration diffs, public-showcase and privacy scans, and an exact zero-network boundary.
+Private profile, vacancy, database, backups, source allowlist, response data, generated documents,
+packets, browser/session state, tokens, and credentials remain ignored and must not be printed or
+committed.
+
+Rollback is a normal revert of this branch/PR. The change has no migration or external side effect;
+existing stopped audits remain compatible because the new diagnostic member is optional. No source
+capability or run is created or mutated.
+
+Testing must include formatting, zero-warning lint, strict typecheck, focused source and repository
+tests, complete unit and integration suites, serialized E2E, local production and showcase builds,
+public-showcase boundary audit, privacy audit, full and production dependency audits, real database
+status, schema/integrity/FKs, synthetic backup/restore and migration tests, migration immutability,
+preflight, release check, `git diff --check`, and `git fsck --strict`.
+
+Acceptance requires every documented-valid synthetic variant within the two-megabyte response budget
+to parse without an undocumented per-field rejection; malformed documented values to stop as
+`SCHEMA_CHANGED / RESPONSE_BODY`; each such stop to contain only the fixed diagnostic tuple; arbitrary
+unknown keys/values to remain inert raw provenance and never appear in diagnostics or evidence;
+product-semantic unusability to use a distinct stable stop classification; all authority and migration
+diffs to remain empty; README and contract docs to state five attempts, accepted JSON at the latest
+attempt, zero persisted real jobs, and Source-enabled Personal Beta `NOT_READY`; and one PR titled
+`fix: align Lever parser with documented contract` to have exact-head local and GitHub CI green. Only
+then may the owner's conditional normal-merge authorization be used, followed by a clean refresh of
+`main`. No sixth request is permitted before, during, or after merge in this task.
+
+Exact implementation sequence:
+
+1. Commit this blueprint before changing application code.
+2. Add strict diagnostic contracts and propagate them through errors, stopped-run audit persistence,
+   recovery, and owner-visible rendering.
+3. Align the Lever response schema, documented members, inert mapping, and product-unusable boundary.
+4. Add the synthetic field/boundary/redaction/durable-audit matrix and the official A/B/C/D contract
+   document; update README readiness conservatively.
+5. Run focused gates, inspect the full authority/privacy/migration diff, then run the complete release
+   matrix and record exact results here.
+6. Commit and push the same branch, open the named PR, require exact-head push and PR workflows green,
+   self-review the complete base-to-head delta, and merge only if every pre-approved condition holds.
+7. Refresh clean `main`, confirm lifetime action counters remain `5/0/0/0`, and return the exact sixth-
+   GET proposal without executing it.
