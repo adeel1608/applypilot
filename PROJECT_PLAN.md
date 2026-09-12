@@ -3,7 +3,7 @@
 Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `fix/live-source-transport-diagnostics`
+Working branch: `fix/post-second-live-source-hardening`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -3489,3 +3489,95 @@ one PR titled `fix: harden live source transport diagnostics`, and exact-head pu
 pre-approved merge applies only if those checks pass and the diff remains this scope. After the merge,
 refresh clean `main`, create an additional verified ignored backup, materialise the new short-lived
 capability, run clean preflight, and use its single request budget exactly once.
+
+# Post-second live source lifecycle hardening - 2026-09-12
+
+Status: `IN_PROGRESS / OFFLINE_ONLY / NO_FURTHER_REAL_REQUEST_AUTHORITY`. PR #17 passed both
+exact-head quality workflows and merged normally as `15264f324f797f80975ffce776da1ed0a3443c90`.
+Refreshed local `main` exactly matched `origin/main`, was clean, and passed aggregate preflight.
+A fresh deterministic owner-approved capability was created only in the ignored private allowlist
+after a verified ignored schema-v7 backup and restore preview. Exactly one GET was attempted. It
+terminated durably as `STOPPED / NETWORK_OUTCOME_UNKNOWN` with request count one, page count zero,
+record count zero, and queue count zero. No retry, redirect, second page, detail request, alternate
+tenant, employer-form visit, upload, submission, or candidate-data transmission occurred.
+
+## Forensic comparison, objective, and requirements
+
+Both real source attempts ended with one consumed request and no response page/observation. Attempt
+one used the legacy generic classifier, so its deepest durable stage is unknown. Attempt two used the
+closed classifier: a resolver exception or empty result would be `DNS_RESOLUTION_FAILED`, and a
+blocked answer would be `DESTINATION_ADDRESS_FORBIDDEN`. Its residual unknown code therefore proves
+that DNS completed, every resolved address passed public-address validation, and the default request
+path was entered. The request object was created; no durable evidence proves socket assignment, TCP
+connection, TLS establishment, request flush, response headers, response body, or persistence.
+Earlier separately authorized diagnostics proved direct TCP/TLS reachability for three resolved IPv4
+addresses at that time, but they cannot prove the later HTTPS request lifecycle.
+
+The deterministic remaining defect is that the hardened default transport tracks lifecycle state only
+in memory. `SecureSourceError` and the terminal audit/checkpoint interface retain the safe error code
+but discard the deepest safe stage. This branch will persist only a closed lifecycle enum in the
+existing redacted `source.run.stopped` audit metadata and expose it through recovery/UI as needed. It
+must not persist IP addresses, ports, DNS answers, certificates, URLs/queries, headers, raw error
+codes/messages, response content, tenant values, or candidate data. No real request, connectivity
+probe, source activation, runner action, employer interaction, migration, or private-data mutation is
+authorized on this branch.
+
+## Architecture, files, data flow, and dependencies
+
+- Move the closed lifecycle-stage schema/type into `source-capability.ts`, including `DNS`, request
+  creation, socket assignment, TCP connection, TLS establishment, request flush, response headers,
+  response body, and persistence.
+- Extend `SecureSourceError` with an optional closed stage. Default transport classification attaches
+  the deepest stage; DNS and timeout/cancellation preserve the known stage; pre-existing typed errors
+  receive the current stage without exposing their raw cause.
+- Extend `SourceRunSink.stop` and the strict `source.run.stopped` audit metadata with nullable
+  `transportStage`. The repository writes it to the existing JSON audit field. No table column or
+  migration is needed. Recovery derives the latest allowlisted stage from that same-run typed audit
+  event and treats absent historical metadata as `null`.
+- Expose the safe stage on the owner source-run recovery UI without host/address/error details.
+- Add synthetic default-transport lifecycle fixtures with a local TLS server or an injected
+  event-equivalent harness only if they make no external connection. Extend source-runner/repository/UI
+  tests for stage preservation, historical null compatibility, invalid-metadata rejection, timeout,
+  response-body reset, and persistence failure.
+
+Data flow becomes:
+
+`validated capability -> DNS/public-address validation -> one pinned HTTPS lifecycle -> closed error
+code + deepest closed stage -> terminal checkpoint + strict redacted audit -> owner recovery UI`.
+
+No dependency change is planned. Migration is `NONE`; migrations `0000`-`0007` stay byte-for-byte
+immutable and no `0008` is required because `audit_events.redacted_metadata_json` already stores
+strict typed event metadata.
+
+## Risks, security/privacy, testing, rollback, and acceptance
+
+Risks are overstating the stage, making stage labels retry authority, leaking network details through
+metadata/UI, breaking historical audit readers, changing transport semantics, or accidentally using
+the still-short-lived private capability. Controls are monotonic local stage tracking, a closed enum,
+strict metadata validation, null compatibility, no raw strings, no transport-policy change, injected
+or loopback synthetic tests, explicit zero-network assertions where practical, and no source-run UI
+action. A stage is diagnostic only and never changes retry, redirect, authority, or recovery rules.
+
+Rollback is a normal focused revert. Existing audit rows without the new optional field remain valid;
+no row, observation, capability, job, evaluation, queue, or private file is rewritten or deleted.
+
+Acceptance requires a future synthetic failure at each lifecycle boundary to persist/display only its
+deepest safe stage, historical attempt metadata to remain readable as null, arbitrary details to be
+rejected, all source/SSRF/pinning/retry tests to stay green, complete release gates and privacy audits
+to pass, migration/status/backup/restore/integrity/FKs to pass, the same branch PR to have exact-head
+CI green, and all post-second real action counters to remain `0/0/0/0`. Under the existing owner
+pre-approval, this offline-only PR may be self-reviewed and merged only when those conditions hold.
+
+Exact implementation sequence:
+
+1. Commit this blueprint before application code.
+2. Thread the closed stage through transport error, run sink, strict audit metadata, repository
+   recovery, and safe owner UI without changing request construction or authority.
+3. Add synthetic stage/redaction/historical-compatibility/persistence tests; run focused tests,
+   formatting, lint, and strict typecheck.
+4. Run complete unit, integration, production build, serialized E2E, migration/status,
+   backup/restore, doctor/preflight/release, privacy/security/dependency audits, immutable-migration
+   diff, `git diff --check`, and `git fsck --strict`.
+5. Record exact results, commit/push only `fix/post-second-live-source-hardening`, open one consolidated
+   PR, require exact-head push and PR CI green, self-review/merge only within the owner-approved
+   offline scope, refresh clean `main`, and stop with no further source request.
