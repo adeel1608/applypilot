@@ -5075,3 +5075,111 @@ observation. Remaining mechanics are an exact-head clean release rerun, scope/pr
 review, branch push, one PR titled `fix: account for unusable Lever records individually`, exact-head
 push and pull-request CI, full-delta self-review, conditional normal merge, clean `main` refresh, and
 then stop without executing an eighth GET.
+
+# Eighth source persistence-boundary hardening - 2026-09-12
+
+Status: `LIVE AUTHORITY SPENT / FAILED CLOSED / OFFLINE FIX PLANNED / NO NINTH GET`. The exact clean
+starting `main` and `origin/main` were `30aab1cf39e6cf3b284b4f3e6e32e44cf8c918ba` with schema v7,
+zero pending migrations, integrity `PASS`, zero foreign-key issues, migrations `0000`-`0007`
+unchanged, privacy and aggregate preflight `PASS`, zero active source capabilities, zero approved
+real targets, and lifetime actions `7/0/0/0`. Ignored backup
+`backup-2026-09-12T09-17-14.599Z-fb4f1091` and its exact restore preview passed before activation.
+
+One fresh deterministic ignored capability `lever_f5c85d8768d86bc8eaff1a15` used the exact owner-
+approved Shield AI host/path/query, one request, 25 provider records/page, 2 MB response, 30-second
+request and 60-second run limits, zero redirects/retries, concurrency one, and parser
+`lever-v2:30aab1cf39e6cf3b284b4f3e6e32e44cf8c918ba`. The production `/sources` owner workflow was
+submitted once. The eighth and only request in this train accepted one 25-record, 370311-byte page
+and then stopped durably as `PERSISTENCE_FAILED / PERSISTENCE`. Request/retry/redirect counts are
+`1/0/0`; the transaction committed no page, observation, job version, evaluation, queue decision, or
+private payload. The capability was revoked once through the owner UI and synchronized to immutable
+ignored version 2. No response body or provider value was read, reconstructed, inferred, or logged.
+Candidate outbound, employer visits, form actions, uploads, and submissions were zero; lifetime real
+actions are now `8/0/0/0`. No ninth request is authorized.
+
+## Deterministic defect, objective, assumptions, and requirements
+
+The real SQLite schema is structurally identical to a fresh 0000-0007 database, the existing legacy
+observation parses under the current `JobSchema`, and a normal fictional record persists against an
+ignored clone of the real database. The failure is therefore not generic schema, integrity, profile,
+or historical-observation corruption. The inaccessible private response remains unavailable and no
+claim is made about its exact member values.
+
+Fictional boundary tests prove a separate deterministic defect in the merged path. Provider-
+structurally valid records are classified `ACCEPTED` before the downstream import/R2 contracts are
+checked. A 600-character experience requirement then fails the R2 `ExperienceValue.domain` 500-
+character bound during the page transaction. Oversized identities, normalized fields, and inert link
+values likewise cross the source acceptance boundary and fail only during persistence. One such
+record rolls back all valid siblings and collapses to generic `PERSISTENCE_FAILED`, contradicting the
+accepted/unusable accounting guarantee.
+
+The objective is to make `ACCEPTED` mean locally persistence-safe without loosening the official
+Lever structural contract or any security/resource limit. Bounded source evidence will be split
+deterministically into safe chunks before R2 normalization, retaining all allowed content and source
+provenance. Values that cannot safely satisfy immutable local identity/title/location/description or
+HTTPS link limits will receive a fixed value-free per-record unusable reason before budget/digest and
+persistence. Provider count must continue to drive source budget and cursor; accepted-only records
+must continue downstream; valid siblings must never be rolled back by one locally unpersistable
+record. Existing workplace drift semantics, raw private payload immutability, and value-free audits
+remain unchanged.
+
+## Architecture, proposed files, data flow, and dependencies
+
+- `packages/job-sources/src/source-capability.ts`: extend only the closed local unusable-reason enum
+  for a link that cannot satisfy the HTTPS/length product boundary; no free-form diagnostic member.
+- `packages/job-sources/src/lever/v2-reader.ts`: after whole-page provider validation and inert
+  conversion, apply explicit local persistence bounds for identity, title, effective location,
+  description, and inert HTTPS links. Existing reason codes cover unusable identity/title/location/
+  description; a new fixed `UNUSABLE_LINK_BOUNDARY` covers link policy. These checks are product/
+  resource dispositions, not undocumented Lever schema restrictions.
+- `packages/database/src/source-enablement-repository.ts`: build requirement/responsibility evidence
+  arrays from deterministic bounded chunks instead of whole arbitrary-length list sections. Raw
+  payload, normalized description, and immutable observation provenance remain unmodified.
+- `packages/job-sources/src/source-capability.test.ts` and
+  `packages/database/src/source-enablement-repository.test.ts`: reproduce the 600-character
+  experience failure, long single-line/list evidence, field/link boundary rejection, mixed sibling
+  continuation, zero raw-value leakage, accepted/unusable accounting, replay, and downstream counts.
+- `README.md`, `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, and this plan: record the failed eighth run
+  and the local persistence guarantee without claiming the private response cause.
+
+The flow remains `bounded response -> official whole-page structural validation -> inert mapping ->
+local persistence-boundary disposition -> provider-count budget/cursor/digest -> atomic accepted-
+only page persistence -> bounded evidence normalization -> R2/queue`. No host, path, query, DNS, TLS,
+request, redirect, retry, page, record, byte, timeout, concurrency, approval, target, runner, upload,
+submission, package, dependency, lockfile, table, column, or migration change is planned.
+
+## Risks, privacy/security, testing, rollback, and acceptance
+
+Risks are accidentally treating product bounds as provider-contract failure, truncating candidate-
+facing job truth, losing requirement evidence, miscounting provider records, leaking rejected values,
+or broadening URL/network authority. Controls are whole-page structural validation first, fixed reason
+codes plus record index only, deterministic bounded evidence chunks with raw/description preservation,
+mixed-page/replay assertions, unchanged capability/transport diffs, ignored private runtime files,
+and full privacy/security audits. Candidate/profile/document/answer data remains absent from source
+requests and Git. No response fixture may contain or derive from the private live body.
+
+Testing must include focused source/repository regressions, format, lint, strict typecheck, unit,
+integration, serialized E2E, local and showcase builds, showcase boundary audit, privacy and both
+dependency audits, schema/status/integrity/FKs, migration/backup/restore tests and exact restore
+preview, migration immutability, aggregate preflight and release check, `git diff --check`, and `git
+fsck --strict`. Rollback is a normal revert of the offline code/docs commit; no database rollback or
+private evidence deletion is permitted.
+
+Acceptance requires every provider record to have exactly one accepted/unusable disposition; fixed
+diagnostics to contain only reason/index; a 600+ character fictional requirement and bounded long-list
+case to persist without R2 failure; unsafe local field/link cases to become per-record unusable while
+valid siblings persist and continue R2/queue; provider count to remain the budget/cursor basis; schema
+v7/pending zero/integrity `PASS`/FKs zero; migrations unchanged; privacy `PASS`; exact-head local and
+GitHub CI green; no ninth request; and lifetime actions exactly `8/0/0/0`.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before changing application code.
+2. Add the closed persistence-boundary disposition and deterministic evidence chunking with fictional
+   regressions that first reproduce the current transaction failure.
+3. Run focused source/repository tests and inspect the complete authority/privacy/migration diff.
+4. Run the full validation matrix, record exact results here, commit and push the same branch, and
+   open one offline PR.
+5. Require exact-head push and PR CI green, self-review the complete base-to-head delta, and use the
+   owner's normal-merge pre-approval only if scope is exact, privacy passes, no migration exists, and
+   no ninth request occurred. Refresh clean `main` and stop.
