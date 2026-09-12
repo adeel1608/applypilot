@@ -4,6 +4,7 @@ import {
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
+  type SourceTransportLifecycleStage,
 } from "./source-capability";
 import {
   SecureSourceError,
@@ -41,6 +42,7 @@ export interface SourceRunSink {
     budget: SourceRunBudget;
     code: string;
     retryAfter: string | null;
+    transportStage: SourceTransportLifecycleStage | null;
     stoppedAt: string;
   }): Promise<void> | void;
 }
@@ -106,20 +108,28 @@ export async function runLeverSourceDiscovery(input: {
         signal: input.signal,
         dependencies: input.dependencies,
       });
-      await input.sink.persistPage({
-        runId,
-        capability,
-        page,
-        budget,
-        observedAt: now().toISOString(),
-      });
+      try {
+        await input.sink.persistPage({
+          runId,
+          capability,
+          page,
+          budget,
+          observedAt: now().toISOString(),
+        });
+      } catch {
+        throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
+      }
       records.push(...page.records);
       if (page.nextCursor === null) break;
       if (page.nextCursor <= cursor) throw new SecureSourceError("CURSOR_REVERSED");
       cursor = page.nextCursor;
     }
     budget.assertCurrent(now());
-    await input.sink.complete({ runId, budget, completedAt: now().toISOString() });
+    try {
+      await input.sink.complete({ runId, budget, completedAt: now().toISOString() });
+    } catch {
+      throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
+    }
     return {
       runId,
       status: "COMPLETE",
@@ -136,6 +146,7 @@ export async function runLeverSourceDiscovery(input: {
       budget,
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
+      transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
       stoppedAt: now().toISOString(),
     });
     return {

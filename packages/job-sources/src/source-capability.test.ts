@@ -10,6 +10,7 @@ import {
   SourceRunBudget,
   boundedSecureJsonGet,
   classifySecureSourceTransportError,
+  createPinnedSourceLookup,
   loadPrivateSourceAllowlistV2,
   readLeverDetailV2,
   readLeverPageV2,
@@ -202,10 +203,10 @@ describe("R1A source capability and transport", () => {
       validateSecureSourceUrl(requestUrl, approved, "LIST_JOBS", async () => {
         throw new Error("arbitrary resolver details must remain private");
       }),
-    ).rejects.toThrow("DNS_RESOLUTION_FAILED");
+    ).rejects.toMatchObject({ code: "DNS_RESOLUTION_FAILED", lifecycleStage: "DNS" });
     await expect(
       validateSecureSourceUrl(requestUrl, approved, "LIST_JOBS", async () => []),
-    ).rejects.toThrow("DNS_RESOLUTION_FAILED");
+    ).rejects.toMatchObject({ code: "DNS_RESOLUTION_FAILED", lifecycleStage: "DNS" });
   });
 
   it.each([
@@ -226,6 +227,7 @@ describe("R1A source capability and transport", () => {
       stage,
     );
     expect(classified.code).toBe(expected);
+    expect(classified.lifecycleStage).toBe(stage);
     expect(classified.message).toBe(expected);
     expect(classified.message).not.toContain("untrusted");
   });
@@ -235,8 +237,8 @@ describe("R1A source capability and transport", () => {
       classifySecureSourceTransportError(
         Object.assign(new Error("not retained"), { code: "ERR_TLS_PROTOCOL_VERSION_CONFLICT" }),
         "TLS_ESTABLISHED",
-      ).code,
-    ).toBe("NETWORK_OUTCOME_UNKNOWN");
+      ),
+    ).toMatchObject({ code: "NETWORK_OUTCOME_UNKNOWN", lifecycleStage: "TLS_ESTABLISHED" });
   });
 
   it("requires exact canonical Lever list and detail query semantics", async () => {
@@ -358,6 +360,30 @@ describe("R1A source capability and transport", () => {
     ).resolves.toMatchObject({ requestCount: 1 });
   });
 
+  it("honours both Node pinned lookup callback shapes without resolving or falling back", async () => {
+    const pinned = createPinnedSourceLookup("8.8.8.8");
+    expect(pinned.family).toBe(4);
+    const invoke = (all: boolean) =>
+      new Promise<{
+        address: string | Array<{ address: string; family: number }>;
+        family?: number;
+      }>((resolve, reject) => {
+        pinned.lookup("ignored.example.test", { all }, (error, address, family) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve({ address, family });
+        });
+      });
+    await expect(invoke(false)).resolves.toEqual({ address: "8.8.8.8", family: 4 });
+    await expect(invoke(true)).resolves.toEqual({
+      address: [{ address: "8.8.8.8", family: 4 }],
+      family: undefined,
+    });
+    expect(() => createPinnedSourceLookup("not-an-ip")).toThrow("PINNED_ADDRESS_INVALID");
+  });
+
   it("stops on authentication, rate, HTML interstitial, redirect, and unknown network outcome", async () => {
     for (const [status, code] of [
       [401, "AUTHENTICATION_REQUIRED"],
@@ -442,10 +468,20 @@ describe("R1A source capability and transport", () => {
       validateSourceAuditMetadata("source.run.stopped", {
         runId: "run:transport-classification",
         code: "CONNECTION_REFUSED",
+        transportStage: "SOCKET_ASSIGNED",
         requestCount: 1,
         recordCount: 0,
       }),
     ).toBeDefined();
+    expect(() =>
+      validateSourceAuditMetadata("source.run.stopped", {
+        runId: "run:transport-classification",
+        code: "CONNECTION_REFUSED",
+        transportStage: "SOCKET_ASSIGNED_AT_PRIVATE_ADDRESS",
+        requestCount: 1,
+        recordCount: 0,
+      }),
+    ).toThrow();
   });
 
   it("honours owner cancellation before transport and distinguishes it from timeout", async () => {

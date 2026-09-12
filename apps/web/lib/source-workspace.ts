@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 
 import {
   SourceCapabilityV2Schema,
+  SourceTransportLifecycleStageSchema,
   loadPrivateSourceAllowlistV2,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
@@ -50,6 +51,7 @@ export interface SourceEnablementView {
     pageCount: number;
     recordCount: number;
     safeErrorCode: string | null;
+    transportStage: string | null;
     retryAfter: string | null;
     startedAt: string;
     completedAt: string | null;
@@ -84,15 +86,22 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
     pageSizeCap: capability.pageSizeCap,
     responseByteLimit: capability.responseByteLimit,
   }));
-  const recentRuns = local.sqlite
+  const recentRows = local.sqlite
     .prepare(
       `SELECT r.id,r.status,c.source,c.alias,r.request_count AS requestCount,
      r.page_count AS pageCount,r.record_count AS recordCount,r.safe_error_code AS safeErrorCode,
+     (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
      r.retry_after AS retryAfter,r.owner_started_at AS startedAt,r.completed_at AS completedAt
      FROM source_run_checkpoints r JOIN source_capability_versions c ON c.id=r.capability_version_id
      ORDER BY r.owner_started_at DESC LIMIT 20`,
     )
-    .all() as SourceEnablementView["recentRuns"];
+    .all() as Array<SourceEnablementView["recentRuns"][number] & { transportStage: unknown }>;
+  const recentRuns = recentRows.map((run) => {
+    const stage = SourceTransportLifecycleStageSchema.safeParse(run.transportStage);
+    return { ...run, transportStage: stage.success ? stage.data : null };
+  });
   return { status: allowlist.status, capabilities, recentRuns };
 }
 

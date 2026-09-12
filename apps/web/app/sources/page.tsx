@@ -143,6 +143,9 @@ export default async function SourcesPage() {
                 </strong>{" "}
                 — {run.requestCount} requests, {run.pageCount} pages, {run.recordCount} records.
                 {run.safeErrorCode ? ` Safe stop: ${display(run.safeErrorCode)}.` : ""}
+                {run.transportStage
+                  ? ` Deepest recorded transport stage: ${display(run.transportStage)}.`
+                  : ""}
                 {run.retryAfter ? ` Earliest owner-reviewed retry: ${run.retryAfter}.` : ""}
                 {run.status === "RUNNING" ? (
                   <form action={cancelSourceRunAction} className="import-form">

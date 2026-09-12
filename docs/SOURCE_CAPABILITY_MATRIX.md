@@ -2,6 +2,8 @@
 
 Reviewed 2026-09-08 using official vendor documentation only. No real listing, search endpoint, authenticated account, or application URL was fetched for this review. Documentation access is not live discovery. The implementation has bounded Greenhouse and Lever GET readers but **zero enabled production capabilities**. The exact R1 design is in [R1 source-enabled Beta plan](R1_SOURCE_ENABLED_BETA_PLAN.md).
 
+Current activation evidence supersedes the historical zero-call statement below: two separately owner-authorized one-request source smokes terminated before response headers/pages as `NETWORK_OUTCOME_UNKNOWN`, with zero observations or jobs. No retry/detail/alternate source, candidate-data transmission, employer-form visit, upload, or submission occurred. The offline follow-up corrects the Node pinned-lookup callback contract and persists only a closed deepest lifecycle stage for future diagnosis. It does not authorize another request; source-enabled Personal Beta remains `NOT_READY`.
+
 ## Beta Core implementation state — 2026-09-08
 
 Greenhouse list/detail and Lever paged list/detail are implemented behind one ignored `data/private/source-allowlist.json` boundary. Configuration binds source, tenant, operation, exact HTTPS host/path, approval/policy version, expiry, and request/record budgets. DNS/address/redirect, credential URL, timeout, size, loop, 401/403/429, and capability checks fail closed in fictional injected-transport tests. Discovery runs and observations have durable safe metadata. No private allowlist is present and no real tenant call is authorised or made, so the owner-facing release state remains `WAITING_FOR_APPROVED_TENANT` (the current internal compatibility code is `SOURCE_READY_AWAITING_TENANT`).

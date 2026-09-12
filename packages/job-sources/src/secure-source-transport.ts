@@ -1,12 +1,13 @@
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
-import { isIP, SocketAddress } from "node:net";
+import { isIP, SocketAddress, type LookupFunction } from "node:net";
 
 import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
   type SourceCapabilityV2,
   type SourceOperation,
+  type SourceTransportLifecycleStage,
 } from "./source-capability";
 import { isBlockedNetworkAddress } from "./public-postings";
 
@@ -14,21 +15,14 @@ export class SecureSourceError extends Error {
   constructor(
     readonly code: string,
     readonly retryAfter: string | null = null,
+    readonly lifecycleStage: SourceTransportLifecycleStage | null = null,
   ) {
     super(code);
   }
 }
 
-export type SourceTransportLifecycleStage =
-  | "REQUEST_CREATED"
-  | "SOCKET_ASSIGNED"
-  | "TCP_CONNECTED"
-  | "TLS_ESTABLISHED"
-  | "REQUEST_FLUSHED"
-  | "RESPONSE_HEADERS"
-  | "RESPONSE_BODY";
-
 const transportStageRank: Record<SourceTransportLifecycleStage, number> = {
+  DNS: -1,
   REQUEST_CREATED: 0,
   SOCKET_ASSIGNED: 1,
   TCP_CONNECTED: 2,
@@ -36,6 +30,7 @@ const transportStageRank: Record<SourceTransportLifecycleStage, number> = {
   REQUEST_FLUSHED: 4,
   RESPONSE_HEADERS: 5,
   RESPONSE_BODY: 6,
+  PERSISTENCE: 7,
 };
 
 function nodeErrorCode(error: unknown): string | null {
@@ -53,10 +48,14 @@ export function classifySecureSourceTransportError(
   error: unknown,
   stage: SourceTransportLifecycleStage,
 ): SecureSourceError {
-  if (error instanceof SecureSourceError) return error;
+  if (error instanceof SecureSourceError) {
+    return error.lifecycleStage
+      ? error
+      : new SecureSourceError(error.code, error.retryAfter, stage);
+  }
   const code = nodeErrorCode(error);
   if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_FAIL") {
-    return new SecureSourceError("DNS_RESOLUTION_FAILED");
+    return new SecureSourceError("DNS_RESOLUTION_FAILED", null, stage);
   }
   if (
     code === "ENETUNREACH" ||
@@ -65,13 +64,13 @@ export function classifySecureSourceTransportError(
     code === "EHOSTDOWN" ||
     code === "ENONET"
   ) {
-    return new SecureSourceError("NETWORK_ROUTE_UNAVAILABLE");
+    return new SecureSourceError("NETWORK_ROUTE_UNAVAILABLE", null, stage);
   }
-  if (code === "ECONNREFUSED") return new SecureSourceError("CONNECTION_REFUSED");
+  if (code === "ECONNREFUSED") return new SecureSourceError("CONNECTION_REFUSED", null, stage);
   if (code === "ECONNRESET" || code === "ECONNABORTED" || code === "EPIPE") {
-    return new SecureSourceError("CONNECTION_RESET");
+    return new SecureSourceError("CONNECTION_RESET", null, stage);
   }
-  if (code === "ETIMEDOUT") return new SecureSourceError("REQUEST_TIMEOUT");
+  if (code === "ETIMEDOUT") return new SecureSourceError("REQUEST_TIMEOUT", null, stage);
   const beforeTlsEstablished = transportStageRank[stage] < transportStageRank.TLS_ESTABLISHED;
   if (
     beforeTlsEstablished &&
@@ -84,9 +83,9 @@ export function classifySecureSourceTransportError(
       code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
       code === "SELF_SIGNED_CERT_IN_CHAIN")
   ) {
-    return new SecureSourceError("TLS_HANDSHAKE_FAILED");
+    return new SecureSourceError("TLS_HANDSHAKE_FAILED", null, stage);
   }
-  return new SecureSourceError("NETWORK_OUTCOME_UNKNOWN");
+  return new SecureSourceError("NETWORK_OUTCOME_UNKNOWN", null, stage);
 }
 
 export interface SecureSourceResponse {
@@ -130,11 +129,30 @@ function sameNetworkAddress(left: string, right: string): boolean {
   return canonicalLeft !== null && canonicalLeft === canonicalRight;
 }
 
+export function createPinnedSourceLookup(pinnedAddress: string): {
+  family: 4 | 6;
+  lookup: LookupFunction;
+} {
+  const family = isIP(pinnedAddress);
+  if (family !== 4 && family !== 6) throw new SecureSourceError("PINNED_ADDRESS_INVALID");
+  return {
+    family,
+    lookup: (_hostname, options, callback) => {
+      if (options.all) {
+        callback(null, [{ address: pinnedAddress, family }]);
+        return;
+      }
+      callback(null, pinnedAddress, family);
+    },
+  };
+}
+
 const defaultDependencies: SecureSourceTransportDependencies = {
   resolveHost: async (hostname) =>
     (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address),
   request: ({ url, pinnedAddress, signal, byteLimit }) =>
     new Promise((resolve, reject) => {
+      const pinned = createPinnedSourceLookup(pinnedAddress);
       let lifecycleStage: SourceTransportLifecycleStage = "REQUEST_CREATED";
       const advance = (next: SourceTransportLifecycleStage) => {
         if (transportStageRank[next] > transportStageRank[lifecycleStage]) lifecycleStage = next;
@@ -147,19 +165,13 @@ const defaultDependencies: SecureSourceTransportDependencies = {
           method: "GET",
           signal,
           servername: url.hostname,
+          family: pinned.family,
           headers: {
             accept: "application/json",
             "accept-encoding": "identity",
             "user-agent": "ApplyPilot/0.1 read-only owner-started source client",
           },
-          lookup: (_hostname, _options, callback) => {
-            const family = isIP(pinnedAddress);
-            if (family !== 4 && family !== 6) {
-              callback(new Error("PINNED_ADDRESS_INVALID"), pinnedAddress, 0);
-              return;
-            }
-            callback(null, pinnedAddress, family);
-          },
+          lookup: pinned.lookup,
         },
         (response) => {
           advance("RESPONSE_HEADERS");
@@ -285,12 +297,12 @@ export async function validateSecureSourceUrl(
   try {
     resolvedAddresses = await resolveHost(url.hostname);
   } catch {
-    throw new SecureSourceError("DNS_RESOLUTION_FAILED");
+    throw new SecureSourceError("DNS_RESOLUTION_FAILED", null, "DNS");
   }
   const addresses = [...new Set(resolvedAddresses)];
-  if (addresses.length === 0) throw new SecureSourceError("DNS_RESOLUTION_FAILED");
+  if (addresses.length === 0) throw new SecureSourceError("DNS_RESOLUTION_FAILED", null, "DNS");
   if (addresses.some(isBlockedNetworkAddress)) {
-    throw new SecureSourceError("DESTINATION_ADDRESS_FORBIDDEN");
+    throw new SecureSourceError("DESTINATION_ADDRESS_FORBIDDEN", null, "DNS");
   }
   return { url, pinnedAddress: addresses[0]! };
 }
@@ -344,8 +356,11 @@ export async function boundedSecureJsonGet(input: {
         byteLimit: capability.responseByteLimit,
       });
     } catch (error) {
-      if (input.signal?.aborted) throw new SecureSourceError("OWNER_CANCELLED");
-      if (signal.aborted) throw new SecureSourceError("REQUEST_TIMEOUT");
+      const lifecycleStage =
+        error instanceof SecureSourceError ? error.lifecycleStage : "REQUEST_CREATED";
+      if (input.signal?.aborted)
+        throw new SecureSourceError("OWNER_CANCELLED", null, lifecycleStage);
+      if (signal.aborted) throw new SecureSourceError("REQUEST_TIMEOUT", null, lifecycleStage);
       // Socket/TLS outcomes can be ambiguous after request creation. A safe
       // diagnostic code must never be treated as permission for a blind retry.
       throw classifySecureSourceTransportError(error, "REQUEST_CREATED");

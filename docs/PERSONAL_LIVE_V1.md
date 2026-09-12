@@ -1,6 +1,6 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **OFFLINE PERSONAL LIVE V1 ENABLEMENT READY; EXTERNAL ACTIVATION BLOCKED.** Manual-intake Personal Beta and R2 are merged. R1A, fictional Lever R1B, the source-to-R2 queue pipeline, and the target-independent synthetic runner framework are implemented offline. Source-enabled Personal Beta remains **WAITING_FOR_APPROVED_TENANT** and real-target operation remains **TARGET_APPROVAL_REQUIRED**. No live source tenant, real browser target, scheduling, hosting, upload, or submission is enabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
+Status: **OFFLINE PERSONAL LIVE V1 ENABLEMENT READY; EXTERNAL ACTIVATION BLOCKED.** Manual-intake Personal Beta and R2 are merged. R1A, fictional Lever R1B, the source-to-R2 queue pipeline, and the target-independent synthetic runner framework are implemented offline. Two separately owner-authorized, one-request source smokes stopped before any response page as `NETWORK_OUTCOME_UNKNOWN`; source-enabled Personal Beta therefore remains **NOT_READY**, and the consolidated offline transport fix does not authorize another request. Real-target operation remains **TARGET_APPROVAL_REQUIRED**. No real browser target, scheduling, hosting, upload, or submission is enabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
 
 ## Beta Core implementation snapshot — 2026-09-08
 
