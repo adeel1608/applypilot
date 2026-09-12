@@ -4334,3 +4334,45 @@ because this prompt grants no merge authority. Real action counts for this task 
    restore preview, dependency/security/privacy audits, diff check, and strict fsck.
 6. Record exact results here, commit and push only this branch, open one offline hardening PR, and
    require exact-head push plus PR GitHub Actions green. Do not merge it and do not make another request.
+
+## Post-contract offline hardening implementation results - 2026-09-12
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD RELEASE AND PR CI PENDING`. The code delta
+removes `createdAt` from the named Lever response schema and maps `postedAt` to `null`. The documented
+v0 fields and every existing host/path/query/transport/budget/pagination control are unchanged.
+Undocumented extension values remain accepted only through the existing response-size-bounded
+passthrough, are retained in the deeply frozen raw payload, and cannot become posting-date evidence.
+The synthetic matrix covers number, null, string, and object extension forms; country,
+`workplaceType`, lists, inert HTML, URLs, and malformed documented values retain their existing tests.
+
+Focused source and durable-repository validation passed 57 tests across two files. The first focused
+run found one test-only assumption that Zod would freeze the caller's original nested fixture object;
+the assertion now correctly checks the stored cloned raw extension, and the rerun passed. Formatting,
+zero-warning lint, and strict typecheck pass. The implementation diff is limited to
+`packages/job-sources/src/lever/v2-reader.ts`,
+`packages/job-sources/src/source-capability.test.ts`, `README.md`, and this plan. There is no network,
+authority, dependency, schema, or migration delta.
+
+The complete pre-commit `npm.cmd run release:check` passed doctor, schema/status, aggregate preflight,
+formatting, lint, typecheck, 380 unit tests across 47 files, 21 integration tests across three files,
+the 31-route local production build, the six-page showcase build, the showcase source/export audit,
+31 serialized Playwright tests, repository privacy audit, and full plus production dependency audits
+with zero known vulnerabilities. The privacy scan covered all 305 tracked files and 11 private
+canaries without exposing private values. Seventeen focused database schema/migration/backup/restore
+tests across three files also pass.
+
+The post-run ignored backup `backup-2026-09-12T05-44-39.678Z-cfb2b824` is schema v7 with integrity
+`PASS`; its exact restore preview passes. The real database remains schema v7, pending migrations 0,
+integrity `PASS`, and foreign-key issues 0. Migrations `0000`-`0007` are unchanged and no migration was
+added. The single live run remains terminal `STOPPED / SCHEMA_CHANGED / RESPONSE_BODY` with one
+request and zero pages/records. This task made `1/0/0/0` source/form/upload/submission actions and the
+lifetime totals are `4/0/0/0`; candidate data outbound remained zero. No target packet exists because
+no source record was accepted. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`;
+the runner remains `TARGET_APPROVAL_REQUIRED`.
+
+Before push, the completed tree must be committed, the complete release gate rerun on that exact
+unchanged commit, and migration/diff/fsck checks must pass. Then one PR from
+`fix/post-contract-live-hardening` may be opened and must receive exact-head push plus PR CI green. It
+must remain unmerged. A future live verification is not authorized by this task and requires a new
+owner-approved, short-lived, immutable capability and one exact bounded request after human review of
+the offline PR.

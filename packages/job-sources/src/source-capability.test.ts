@@ -556,21 +556,26 @@ describe("R1A source capability and transport", () => {
     expect(String(failure)).not.toMatch(/hostedUrl|invalid_format|not-a-url/i);
   });
 
-  it("classifies an unexpected mapper failure at the response-body boundary", async () => {
-    const invalidTimestamp = { ...posting(1), createdAt: Number.MAX_SAFE_INTEGER };
-    const failure = await readLeverPageV2({
+  it.each([
+    ["number", 1_788_998_400_000],
+    ["null", null],
+    ["string", "undocumented timestamp extension"],
+    ["object", { fictional: true }],
+  ])("keeps undocumented createdAt %s inert and out of posting evidence", async (_label, value) => {
+    const page = await readLeverPageV2({
       capability: capability(),
       budget: new SourceRunBudget(capability(), instant),
       now: () => instant,
-      dependencies: transport([invalidTimestamp]),
-    }).catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(SecureSourceError);
-    expect(failure).toMatchObject({
-      code: "SCHEMA_CHANGED",
-      lifecycleStage: "RESPONSE_BODY",
-      message: "SCHEMA_CHANGED",
+      dependencies: transport([{ ...posting(1), createdAt: value }]),
     });
-    expect(String(failure)).not.toMatch(/invalid time|createdAt|range/i);
+    const record = page.records[0]!;
+    expect(record.postedAt).toBeNull();
+    const rawCreatedAt = (record.rawPayload as Record<string, unknown>).createdAt;
+    expect(rawCreatedAt).toEqual(value);
+    expect(Object.isFrozen(record.rawPayload)).toBe(true);
+    if (rawCreatedAt && typeof rawCreatedAt === "object") {
+      expect(Object.isFrozen(rawCreatedAt)).toBe(true);
+    }
   });
 
   it.each([
