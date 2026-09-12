@@ -3344,3 +3344,99 @@ external gates are a fresh exact owner approval for any new source request, foll
 successful source result by separate approval for one exact employer-target interaction. Final
 application submission continues to require a separate fresh one-use confirmation immediately
 before the irreversible action.
+
+# Live source transport diagnosis and one bounded retry - 2026-09-12
+
+Status: `IN_PROGRESS / OFFLINE_FIX_BEFORE_FRESH_AUTHORITY`. The exact starting `main` and
+`origin/main` are `a61b9d97ce10c566e0065dbc2eaf95f87a76bf5c`; GitHub is authenticated as
+`adeel1608`; the worktree was clean; and schema v7 reports zero pending migrations, integrity
+`PASS`, and zero foreign-key issues. The earlier Shield AI run remains durably `STOPPED` with one
+request attempt, zero pages, zero records, and `NETWORK_OUTCOME_UNKNOWN`. No response observation,
+runner target, employer-form visit, upload, or submission exists from that attempt.
+
+## Current state, objective, assumptions, and requirements
+
+Offline forensics found that the owner UI awaited the backend run and its browser automation timeout
+did not cancel the server-side source request; the backend subsequently committed a terminal run
+checkpoint. Page persistence is transactional and was never entered because no response page crossed
+the transport boundary. The secure transport validates HTTPS, exact host/path/query semantics and all
+resolved addresses, preserves SNI/certificate verification, pins one address, uses an abort timeout,
+and permits no Lever redirects or retries. However, resolver failures are not converted to a safe
+source error and generic Node socket/TLS failures are collapsed to `NETWORK_OUTCOME_UNKNOWN`. The
+actual socket's remote address is also not verified independently of the requested pin.
+
+The objective is to add deterministic, redacted transport classifications for DNS resolution,
+unavailable routes, refused/reset connections, TLS handshakes, request timeouts, and residual unknown
+outcomes while remaining fail closed. Classification may inspect only trusted lifecycle state and a
+bounded Node error code; it must never persist arbitrary messages, host secrets, certificates,
+response content, candidate data, or credentials. A classification never means a request is safe to
+retry: request budget, redirect and retry behavior remain unchanged, and failures after request
+creation/transmission remain terminal under this one-attempt authority.
+
+One owner-authorized non-HTTP diagnostic used one DNS resolution and three distinct-address TCP/TLS
+attempts, each below ten seconds. DNS returned three IPv4 and zero IPv6 answers; the first family was
+IPv4. Every TCP connection, TLS 1.2 handshake, and certificate hostname check passed. No HTTP method,
+path, query, header, body, candidate field, credential, raw address, raw certificate, or arbitrary
+exception string was sent or retained. Therefore an avoidable IPv6-first failure was not demonstrated
+and address selection will not be changed speculatively.
+
+## Architecture, proposed files, and data flow
+
+- `packages/job-sources/src/secure-source-transport.ts`: add a closed lifecycle-stage model, pure
+  Node-code classifier, DNS exception handling, actual connected-address verification, and safe
+  default-transport errors. Preserve exact URL validation, all-address SSRF denial, the single pinned
+  address, SNI, certificate verification, response caps, zero redirects, and zero retries.
+- `packages/job-sources/src/source-capability.ts`: extend the closed stop-code schema only with the
+  approved diagnostic codes. No capability field, operation, host, path, query, budget, or authority
+  changes.
+- Focused synthetic tests under `packages/job-sources/src/`: cover every new classification, unknown
+  fallback, DNS failure, timeout/owner-cancel precedence, connected-address mismatch, and proof that
+  transport errors consume only the existing attempt without retry.
+- Safe documentation and this plan: record aggregate diagnostics, gates, and the later bounded source
+  result without private capability contents or live response data.
+
+Data flow remains:
+
+`strict private capability -> exact URL validation -> bounded DNS -> reject if any address blocked ->
+single pinned HTTPS request with SNI/certificate validation -> safe lifecycle/code classification ->
+terminal checkpoint OR bounded JSON -> immutable page/observation -> R2 evaluation -> queue`.
+
+No migration or dependency is planned. Migrations `0000`-`0007` remain immutable and migration `0008`
+must not be created for this observability-only change.
+
+## Risks, security/privacy, rollback, and testing
+
+Risks are leaking raw exceptions/addresses, mislabelling an ambiguous post-transmission outcome as
+retryable, weakening SSRF pinning, trusting a mocked connected address, expanding authority, consuming
+the fresh request before exact-head code is reviewed, or persisting live/private content in Git.
+Controls are closed safe codes, lifecycle-aware tests, actual socket remote-address capture, strict
+all-address rejection, zero automatic retries/redirects, fictional fixtures, ignored private runtime
+files, exact-head local/CI gates, and capability materialisation only after the fix is merged back to a
+clean main. Candidate/profile/document/answer data remains completely outside source requests.
+
+Rollback is a normal focused revert of this branch/merge. It changes no schema and does not rewrite or
+delete the earlier terminal run. The private allowlist and local database are backed up and remain
+ignored. A failed or unknown second GET is terminal; no third GET is authorized.
+
+Acceptance requires all new codes to be synthetically proven, generic messages to remain redacted,
+DNS/SSRF/pinning/SNI/timeout/redirect/retry protections to remain equal or stronger, no migration or
+private tracked artifact, complete local release gates, exact-head GitHub CI green, and an exact-scope
+self-review before the pre-approved merge. Only then may a new deterministic capability be
+materialised for one exact `GET` to
+`https://api.lever.co/v0/postings/shieldai?mode=json&skip=0&limit=25` with the owner-specified bounds.
+
+Exact implementation sequence:
+
+1. Commit this blueprint before application code.
+2. Add closed diagnostic codes and lifecycle-aware classification with focused synthetic tests.
+3. Run focused tests, format, lint, and strict typecheck; self-review security semantics.
+4. Run unit, integration, production build, serialized E2E, migration/status, backup/restore,
+   doctor/preflight/release, privacy/security/dependency audits, diff-check, immutable-migration diff,
+   and strict Git fsck.
+5. Record actual results, commit/push the same branch, open the named PR, require exact-head push and
+   pull-request CI green, self-review and merge only if every pre-approved condition holds, then refresh
+   clean `main`.
+6. Create a verified ignored backup, materialise one new short-lived bounded capability, run preflight,
+   and make exactly one owner-authorized GET. Do not retry or request a second page/detail.
+7. If successful, complete persistence/R2/queue and all useful offline validation; if the result is
+   again unknown, make no third GET and report the deepest safe lifecycle evidence and blocker.
