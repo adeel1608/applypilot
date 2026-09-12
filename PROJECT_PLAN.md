@@ -4839,3 +4839,59 @@ docs; run focused and full gates; commit/push one branch; open one PR; self-revi
 use the owner's conditional normal-merge authority only if scope, privacy, migration and exact-head
 CI conditions all remain satisfied. After merge, refresh clean `main` and stop without a source or
 employer request.
+
+## Offline correction implementation and pre-commit verification
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The focused synthetic
+regression first reproduced the defect: documented-valid records with wholly empty inert description
+or no effective location crossed the parser, and a mixed two-record page stopped only after budget
+consumption as `PERSISTENCE_FAILED` with page/record counters `1/2`. The implementation now computes
+the inert description plus primary/deduplicated fallback locations before returning a mapped record.
+Missing ID/title, description, or effective location stops as the existing value-free
+`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY`; an all-locations value still satisfies location and inert
+list/additional content still satisfies description. A mixed page stops before `consumePage` or the
+transaction, so page, record, observation, evaluation and queue counts remain zero. No private field
+or record index is exposed, and no claim is made that this code gap was the inaccessible live cause.
+
+The actual implementation/documentation diff is limited to
+`packages/job-sources/src/lever/v2-reader.ts`,
+`packages/job-sources/src/source-capability.test.ts`,
+`packages/database/src/source-enablement-repository.test.ts`, `README.md`, and this plan. The full
+formatting check also reported four merged PR24 files as noncanonical; running Prettier produced no
+Git content diff for those files. There is no source capability, transport, network, budget, provider
+structural schema, drift policy, persistence schema, R2, runner, target, form, upload, submission,
+dependency or migration change.
+
+Focused source and durable-repository validation passes 109 tests across two files. The complete
+pre-commit `npm.cmd run release:check` passes doctor, database and aggregate preflight, formatting,
+zero-warning lint, strict typecheck, 432 unit tests across 47 files, 21 integration tests across three
+files, the 31-route local production build, the six-page showcase build, showcase boundary audit, 31
+serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
+vulnerabilities. Privacy checked 306 tracked files, 846 history paths, 844 history blobs, 1270 build/
+test artifacts, and 11 private canaries. Twenty-one focused database/schema/migration/backup/restore/
+runtime tests pass across four files.
+
+The verified pre-run ignored backup
+`backup-2026-09-12T07-51-38.473Z-c9d72f44` and post-run backup
+`backup-2026-09-12T08-09-22.333Z-98eec30f` are schema v7 with integrity `PASS`; both exact restore
+previews pass. The real database remains schema v7, pending migrations zero, integrity `PASS`, and
+foreign-key issues zero. Migrations `0000`-`0007` are unchanged and no migration exists beyond 0007.
+`git diff --check` and `git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
+
+The seventh and only live request in this train remains terminal `STOPPED / PERSISTENCE_FAILED /
+PERSISTENCE`, with one request, one in-memory accepted page, 25 records, 370311 bytes, zero retries,
+zero redirects, and no committed run page or real observation. Fatal field/type/index details are not
+durably available for persistence failures. Durable non-fatal provider-drift warning count is zero;
+the rolled-back in-memory page's warning count cannot safely be recovered. The capability is revoked
+as immutable version 2, active source capabilities are zero, and candidate data outbound is zero.
+This offline correction made no source/form/upload/submission action, so lifetime counts remain
+exactly `7/0/0/0`. No Melbourne/VIC match, real role ranking, or target-readiness packet exists.
+Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner framework remains
+ready only for synthetic targets with real target approval required.
+
+Remaining mechanics are to commit the coherent implementation/result record, rerun the complete
+release gate on the exact clean commit, verify authority/migration/privacy/diff/fsck invariants, push
+this branch, open one offline PR, and require exact-head push plus pull-request GitHub Actions green.
+After a clean full-delta self-review, normal merge is permitted only under the owner's pre-approved
+conditions. Refresh `main` after merge and stop. No eighth source request or employer action is
+authorized.

@@ -264,9 +264,14 @@ function mapPosting(
 ): LeverPostingRecordV2 {
   const raw = JSON.stringify(posting);
   const title = extractInertLeverText(posting.text);
-  if (!posting.id.trim() || !title) {
-    throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
-  }
+  const location = extractInertLeverText(posting.categories?.location ?? "") || null;
+  const allLocations = [
+    ...new Set(
+      (posting.categories?.allLocations ?? [])
+        .map(extractInertLeverText)
+        .filter((value) => Boolean(value)),
+    ),
+  ];
   const sections = Object.freeze(
     posting.lists
       .map(({ text, content }) => {
@@ -287,6 +292,9 @@ function mapPosting(
   ]
     .filter(Boolean)
     .join("\n\n");
+  if (!posting.id.trim() || !title || !description || !(location ?? allLocations[0])) {
+    throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
+  }
   const officialWorkplaceType = LeverOfficialWorkplaceTypeV2Schema.safeParse(posting.workplaceType);
   const providerDriftDiagnostics = Object.freeze(
     posting.workplaceType === null ||
@@ -310,14 +318,8 @@ function mapPosting(
     externalId: posting.id,
     title,
     description,
-    location: extractInertLeverText(posting.categories?.location ?? "") || null,
-    allLocations: [
-      ...new Set(
-        (posting.categories?.allLocations ?? [])
-          .map(extractInertLeverText)
-          .filter((value) => Boolean(value)),
-      ),
-    ],
+    location,
+    allLocations,
     country: extractInertLeverText(posting.country ?? "") || null,
     commitment: extractInertLeverText(posting.categories?.commitment ?? "") || null,
     department: extractInertLeverText(posting.categories?.department ?? "") || null,
