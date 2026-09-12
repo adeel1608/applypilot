@@ -1,9 +1,9 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/personal-live-v1-enablement`
+Working branch: `fix/post-first-live-source-hardening`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -3297,3 +3297,50 @@ initial preflight blocker. The implementation branch must be pushed and one PR t
 `fix: harden first live source smoke` left unmerged with exact-head CI green. After that PR is
 reviewed and merged, the owner must issue a fresh exact first-GET authorization with a new execution
 window before any real source request; the expired or current private record alone is insufficient.
+
+# First live source attempt and post-smoke validation - 2026-09-12
+
+Status: `COMPLETE / NETWORK_OUTCOME_UNKNOWN / OFFLINE_VALIDATION_PASS`. PR #15 was verified at its
+approved exact head and merged normally as `4e041c97dc8c692859b03332c39099628e0def13` before any
+source action. Local `main` matched `origin/main`, schema v7 was current, integrity and foreign keys
+passed, migrations `0000`-`0007` were unchanged, the prior private authority was preserved, and a
+fresh exact owner-approved capability was materialised only in the ignored private allowlist.
+
+Operational preflight passed with one current approved capability. Exactly one owner-started,
+GET-only request was attempted with request budget one, page/record cap 25, two-megabyte response
+limit, 30-second request timeout, 60-second run timeout, concurrency one, redirects zero and retries
+zero. The transport did not establish a safely reportable HTTP response and the durable checkpoint
+terminated as `STOPPED / NETWORK_OUTCOME_UNKNOWN`: request count one, page count zero, record count
+zero. No retry, second page, detail request, alternate tenant, employer page, upload or submission
+occurred. Candidate/profile/document/answer data outbound remained zero fields.
+
+Because no usable response crossed the boundary, no raw body or HTML was received or persisted and
+the normalizer, deduper, R2 evaluator and queue had no real records to process. Counts are source
+capability versions one, source runs one, persisted pages zero and observation payloads zero. There
+were no real normalized jobs, evaluations, queue results or Melbourne matches, so no employer target
+candidate or application URL was selected, inspected or visited. A private ignored smoke report
+records only the safe counters and terminal classification.
+
+No parser, normalization, dedupe, evaluation, queue or runner defect is established by the ambiguous
+network outcome. Offline validation passed 55 focused source/restart/replay/authority/runner tests,
+347 unit tests in 46 files, 21 integration tests in three files, a production build with 31 route
+units, and 27 serialized E2E tests. Source query/host/path/DNS/SSRF/redirect/timeout/size/security-stop
+fixtures, immutable persistence/replay, capability expiry/revocation/version sequencing, frozen
+packet/document/answer/disclosure/target bindings, stale-version rejection, one-use consent,
+duplicate-submit prevention, CAPTCHA/MFA/auth/bot/rate/drift stops, lost-submit
+`OUTCOME_UNKNOWN`, owner recovery UI, and no-blind-retry behavior remain green. Privacy audit and
+full plus production dependency audits passed with zero known vulnerabilities.
+
+Migration preview remains v7 to v7 with zero pending changes and no migration was applied. Verified
+ignored pre-attempt backup `backup-2026-09-11T23-53-56.054Z-9916f2de` and post-attempt backup
+`backup-2026-09-12T00-11-30.430Z-9ecea11c` report schema v7 and integrity PASS; restore preview is
+valid. Database integrity remains PASS with zero foreign-key issues. Strict diff and Git fsck checks
+passed; unreachable historical objects are not corruption.
+
+Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`: the bounded source smoke did
+not produce a known successful response or any evaluable job, and the real runner still has no
+owner-approved target. Remaining software blockers are none established by this train. Remaining
+external gates are a fresh exact owner approval for any new source request, followed only after a
+successful source result by separate approval for one exact employer-target interaction. Final
+application submission continues to require a separate fresh one-use confirmation immediately
+before the irreversible action.
