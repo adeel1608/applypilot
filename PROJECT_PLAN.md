@@ -3985,3 +3985,90 @@ that URL.
    export, verify public routes/metadata/privacy against the merged commit, then add the verified Live
    Demo/homepage URL through a safe documentation/metadata update if possible. If hosting requires
    account interaction, stop only deployment and report the exact minimum owner action.
+
+## Public showcase implementation and validation results - 2026-09-12
+
+Status: `IMPLEMENTED / LOCAL_RELEASE_PASS / PUBLIC_STATIC_DEPLOYMENT_VERIFIED / PR_PENDING`. The work
+remained on `feat/public-showcase` from PR #19 merge
+`56aa96691d6aa52cd8c78a3f770d4e5fc66cf16d`. It added the independent `apps/showcase` static-export
+workspace and no application migration, domain capability, source/runner authority, local-data path,
+or application-code change under `apps/web`. Migrations `0000`-`0007` are unchanged. Lifetime real
+source/form/upload/submission counts remain `3/0/0/0`; this run made no source request, employer-form
+visit, upload, or submission.
+
+The public app contains `/`, `/demo`, `/demo/evidence`, and `/demo/application-packet` with eight
+explicitly fictional roles, the requested `24/7/5/3` fictional metrics, safe client-only filtering,
+sorting, role selection, evidence inspection, pipeline-stage explanation, and a non-actionable frozen
+packet. Core narrative/evidence/packet content is prerendered and remains available without client
+JavaScript. It uses only Next.js and React dependencies, makes no browser request, and has no route
+handler, server action, environment/filesystem/database import, candidate loader, source transport,
+capability materializer, document generator, or application runner.
+
+The source/export audit verifies static-export configuration; the closed dependency and import graph;
+the four expected HTML routes; absence of local/private routes; absence of network/runtime entry
+points; and absence of `profile.private`, `data/private`, source/runner allowlist filenames, SQLite
+markers, the real Lever host, and selected private-profile canaries in emitted assets. The final audit
+passed across 19 showcase source/config files and the complete export. The repository privacy audit
+passed across 305 tracked files, 811 historical paths, 809 history blobs, 1,326 build/test artifacts,
+and 11 private canaries. No secret, private candidate value, capability, database, backup, vacancy,
+generated personal document, packet, browser/session material, or real application state is tracked
+or hosted.
+
+The public design uses a graphite engineering-console system with off-white typography, steel rules,
+one lime signal colour, monospaced evidence labels, visible focus, reduced-motion handling, and
+responsive layouts. Four Playwright-captured fictional assets were visually inspected at 1440px:
+`landing.png`, `dashboard.png`, `evidence.png`, and `application-packet.png`. A functional
+`applypilot-architecture.svg` documents the authority-narrowing flow. Image generation produced the
+brand-safe `applypilot-social-preview.png` from a fresh text-led product-card prompt in generation
+mode; it contains only the ApplyPilot name, public tagline, abstract workflow, and no person or private
+data. The same safe card is the showcase Open Graph/Twitter asset.
+
+The README is now a public product landing page with factual CI/TypeScript/Next.js/local-first/human-
+control badges, positioning, public/private boundary, product tour, screenshots, workflow,
+differentiators, architecture, readiness, repository map, showcase/local setup, gates, safety,
+contributing, and accurate no-licence wording. `docs/PUBLIC_SHOWCASE.md`, architecture/security/
+contribution updates, a PR checklist, and privacy-forward issue forms complete the repository
+presentation. GitHub metadata now uses the exact product description; topics are `ai`, `ai-agents`,
+`automation`, `career-tools`, `human-in-the-loop`, `job-search`, `local-first`, `nextjs`, and
+`typescript`. Visibility remains `PUBLIC`, npm remains private, no licence changed, and the homepage
+points to the verified showcase URL.
+
+Sites was available without a new account, billing, custom domain, or repository secret. The checked-
+in manifest contains only the opaque project ID and `static.directory = out`. A clean standalone Site
+checkout committed the exact validated showcase source/export, pushed with an ephemeral per-command
+credential that was neither printed nor persisted, and packaged only the normalized static `dist`
+artifact. Saved version 1 deployed successfully with public access at
+`https://applypilot.qss-ai-robot-7121.chatgpt.site`. Direct post-deploy verification returned 200 for
+the home, demo, evidence, packet, and robots routes; `/profile`, `/sources`, `/applications`,
+`/documents`, and `/local-session` returned 404. Served HTML retained the fictional-data markers and
+none of the checked forbidden references. The in-app handoff browser surface was unavailable, so the
+deployment was verified with direct unauthenticated HTTPS reads instead.
+
+The staging path had two non-product setup corrections before the successful Site push. The first
+Windows package-helper invocation passed native paths to Git Bash and failed before writing an
+archive; POSIX paths then produced and validated the archive. A separate clean-checkout command was
+initially issued from its parent temporary directory and created Git metadata there; no commit or push
+succeeded, the exact metadata directory was immediately moved to a named temporary recovery folder,
+and the corrected command used explicit `git -C` scoping. Neither event touched the ApplyPilot
+workspace, user files, private data, deployment content, or GitHub history.
+
+Implementation validation exposed and resolved only test/configuration issues: typed Next routes
+needed canonical non-trailing-slash values; the root showcase launcher needed to invoke Next directly;
+one source-boundary assertion referenced the wrong fixture fields; and early E2E assertions used
+ambiguous text, an incorrect filtered count, and the wrong lowest-fit/stage copy. The corrected
+focused public test passed 2/2 unit cases and the showcase browser suite passed 4/4 cases. Visual
+inspection passed all four screenshots with no clipping, broken hierarchy, private content, or
+unlabelled demo state.
+
+The complete release check passed doctor, database status, preflight, formatting, lint, strict
+typecheck, 370 unit tests in 47 files, 21 integration tests in three files, both production builds,
+the public export audit, 31 serialized E2E tests, repository privacy audit, and full/production npm
+audits with zero known vulnerabilities. E2E includes desktop/mobile, keyboard focus, no horizontal
+overflow, filter/sort/selection, all internal routes, browser console/page errors, and core content
+without hydration. Database status remains schema v7, pending zero, integrity `PASS`, and foreign keys
+zero; the unit suite includes the isolated schema/migration/backup/restore safety tests and the real
+database was not mutated. `git diff --check`, immutable migration diff, and `git fsck --strict` remain
+the final pre-PR repository checks. The final task is to commit this result record, rerun exact-head
+checks, push the same branch, open the one requested PR, require exact-head GitHub CI, self-review the
+complete public diff, merge only under the owner's listed conditions, refresh `main`, and verify the
+deployed showcase content still matches the merged `apps/showcase` tree.
