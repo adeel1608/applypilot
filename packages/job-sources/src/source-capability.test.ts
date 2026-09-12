@@ -590,6 +590,72 @@ describe("R1A source capability and transport", () => {
     expect(page.records[0]?.workplaceType).toBe(internal);
   });
 
+  it.each([
+    ["string", "AU", "AU"],
+    ["null", null, null],
+  ] as const)("accepts documented Lever country %s", async (_label, wire, internal) => {
+    const value = { ...posting(1), country: wire };
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]?.country).toBe(internal);
+  });
+
+  it("retains supported absent country normalization", async () => {
+    const value: Record<string, unknown> = { ...posting(1) };
+    delete value.country;
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]?.country).toBeNull();
+  });
+
+  it("accepts documented empty optional textual fields", async () => {
+    const value = {
+      ...posting(1),
+      description: "",
+      descriptionPlain: "",
+      additional: "",
+      additionalPlain: "",
+      salaryDescription: "",
+      salaryDescriptionPlain: "",
+      lists: [],
+    };
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]).toMatchObject({ country: "AU", description: "", sections: [] });
+  });
+
+  it.each([
+    ["country number", { country: 7 }],
+    ["unsupported workplace type", { workplaceType: "office" }],
+    ["malformed list content", { lists: [{ text: "Requirements", content: null }] }],
+  ] as const)("fails closed for malformed Lever %s", async (_label, override) => {
+    const failure = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([{ ...posting(1), ...override }]),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect(failure).toMatchObject({
+      code: "SCHEMA_CHANGED",
+      lifecycleStage: "RESPONSE_BODY",
+      message: "SCHEMA_CHANGED",
+    });
+    expect(String(failure)).not.toMatch(/country|workplace|lists|requirements|received|expected/i);
+  });
+
   it("converts Lever list HTML to inert ordered text while freezing the raw payload", async () => {
     const value = {
       ...posting(1),
