@@ -539,6 +539,40 @@ describe("R1A source capability and transport", () => {
     ).rejects.toThrow(SecureSourceError);
   });
 
+  it("classifies response schema drift at the response-body boundary without Zod details", async () => {
+    const malformed = { ...posting(1), hostedUrl: "not-a-url" };
+    const failure = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([malformed]),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect(failure).toMatchObject({
+      code: "SCHEMA_CHANGED",
+      lifecycleStage: "RESPONSE_BODY",
+      message: "SCHEMA_CHANGED",
+    });
+    expect(String(failure)).not.toMatch(/hostedUrl|invalid_format|not-a-url/i);
+  });
+
+  it("classifies an unexpected mapper failure at the response-body boundary", async () => {
+    const invalidTimestamp = { ...posting(1), createdAt: Number.MAX_SAFE_INTEGER };
+    const failure = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([invalidTimestamp]),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect(failure).toMatchObject({
+      code: "SCHEMA_CHANGED",
+      lifecycleStage: "RESPONSE_BODY",
+      message: "SCHEMA_CHANGED",
+    });
+    expect(String(failure)).not.toMatch(/invalid time|createdAt|range/i);
+  });
+
   it.each([
     ["on-site", "onsite"],
     ["remote", "remote"],
