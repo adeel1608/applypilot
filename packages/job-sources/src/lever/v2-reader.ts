@@ -43,7 +43,7 @@ export const LeverPostingV2Schema = z
     additionalPlain: z.string().max(500_000).optional(),
     lists: z.array(LeverListV2Schema).max(100).default([]),
     categories: LeverCategoriesV2Schema.optional(),
-    country: z.string().max(100).optional(),
+    country: z.string().max(100).nullable().optional(),
     workplaceType: z.enum(["on-site", "remote", "hybrid", "unspecified"]).optional(),
     salaryRange: z
       .object({

@@ -61,7 +61,7 @@ Every screenshot and value above is fictional. The showcase deliberately demonst
 ## Current readiness
 
 - **Manual-intake Personal Beta:** ready for supervised local owner use.
-- **Source-enabled Personal Beta:** not ready; earlier bounded live reads produced no known HTTP response or source record, and any new request requires a fresh exact owner approval.
+- **Source-enabled Personal Beta:** not ready. The first and second bounded attempts stopped before a usable response. The latest bounded attempt reached an accepted 2xx JSON response, then failed closed at strict response-contract parsing. No real job was persisted, and any new request requires a fresh exact owner approval.
 - **Real employer interaction:** target approval required; no real target is configured.
 - **Final submission:** always requires fresh exact human consent.
 - **Hosted production application:** not ready. The static fictional showcase is not the private application.
