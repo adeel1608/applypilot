@@ -432,6 +432,51 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("stores a closed transport diagnostic without retaining raw network details", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `transport-stop:${++id}`,
+    );
+    repository.persistCapabilityVersion(capability());
+    const evaluation = vi.fn();
+    const queue = vi.fn();
+    const result = await runLeverSourceToQueue({
+      capability: capability(),
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: async () => ["8.8.8.8"],
+        request: async () => {
+          throw Object.assign(new Error("private arbitrary socket detail"), {
+            code: "ECONNREFUSED",
+          });
+        },
+      },
+      evaluateJob: evaluation,
+      queueJob: queue,
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "CONNECTION_REFUSED",
+      requestCount: 1,
+      pageCount: 0,
+      recordCount: 0,
+    });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      status: "STOPPED",
+      safeErrorCode: "CONNECTION_REFUSED",
+    });
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
+      "private arbitrary",
+    );
+    expect(evaluation).not.toHaveBeenCalled();
+    expect(queue).not.toHaveBeenCalled();
+    sqlite.close();
+  });
+
   it("reconciles page-one records after page-two failure, restart, and exact replay", async () => {
     const sqlite = database();
     const profile = installFixtureProfile(sqlite);

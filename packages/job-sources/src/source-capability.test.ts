@@ -9,6 +9,7 @@ import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
   boundedSecureJsonGet,
+  classifySecureSourceTransportError,
   loadPrivateSourceAllowlistV2,
   readLeverDetailV2,
   readLeverPageV2,
@@ -194,6 +195,50 @@ describe("R1A source capability and transport", () => {
     ).rejects.toThrow("DESTINATION_ADDRESS_FORBIDDEN");
   });
 
+  it("classifies DNS resolver failure and an empty answer without exposing resolver errors", async () => {
+    const approved = capability();
+    const requestUrl = "https://api.lever.co/v0/postings/fictional?mode=json&skip=0&limit=2";
+    await expect(
+      validateSecureSourceUrl(requestUrl, approved, "LIST_JOBS", async () => {
+        throw new Error("arbitrary resolver details must remain private");
+      }),
+    ).rejects.toThrow("DNS_RESOLUTION_FAILED");
+    await expect(
+      validateSecureSourceUrl(requestUrl, approved, "LIST_JOBS", async () => []),
+    ).rejects.toThrow("DNS_RESOLUTION_FAILED");
+  });
+
+  it.each([
+    ["ENOTFOUND", "REQUEST_CREATED", "DNS_RESOLUTION_FAILED"],
+    ["EAI_AGAIN", "REQUEST_CREATED", "DNS_RESOLUTION_FAILED"],
+    ["ENETUNREACH", "SOCKET_ASSIGNED", "NETWORK_ROUTE_UNAVAILABLE"],
+    ["EHOSTUNREACH", "SOCKET_ASSIGNED", "NETWORK_ROUTE_UNAVAILABLE"],
+    ["ECONNREFUSED", "SOCKET_ASSIGNED", "CONNECTION_REFUSED"],
+    ["ECONNRESET", "REQUEST_FLUSHED", "CONNECTION_RESET"],
+    ["EPIPE", "RESPONSE_BODY", "CONNECTION_RESET"],
+    ["ERR_TLS_CERT_ALTNAME_INVALID", "TCP_CONNECTED", "TLS_HANDSHAKE_FAILED"],
+    ["EPROTO", "TCP_CONNECTED", "TLS_HANDSHAKE_FAILED"],
+    ["ETIMEDOUT", "SOCKET_ASSIGNED", "REQUEST_TIMEOUT"],
+    ["PRIVATE_ARBITRARY_CODE", "REQUEST_FLUSHED", "NETWORK_OUTCOME_UNKNOWN"],
+  ] as const)("maps stable transport code %s at %s to %s", (code, stage, expected) => {
+    const classified = classifySecureSourceTransportError(
+      Object.assign(new Error("untrusted raw detail"), { code }),
+      stage,
+    );
+    expect(classified.code).toBe(expected);
+    expect(classified.message).toBe(expected);
+    expect(classified.message).not.toContain("untrusted");
+  });
+
+  it("does not relabel a TLS-like error after TLS was established", () => {
+    expect(
+      classifySecureSourceTransportError(
+        Object.assign(new Error("not retained"), { code: "ERR_TLS_PROTOCOL_VERSION_CONFLICT" }),
+        "TLS_ESTABLISHED",
+      ).code,
+    ).toBe("NETWORK_OUTCOME_UNKNOWN");
+  });
+
   it("requires exact canonical Lever list and detail query semantics", async () => {
     const approved = capability();
     const resolveHost = vi.fn(async () => ["8.8.8.8"]);
@@ -290,6 +335,29 @@ describe("R1A source capability and transport", () => {
     ).rejects.toThrow("PINNED_ADDRESS_MISMATCH");
   });
 
+  it("compares the actual connected IPv6 address canonically", async () => {
+    const approved = capability();
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["2001:4860:4860:0:0:0:0:8888"]),
+      request: vi.fn(async () => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from("[]"),
+        connectedAddress: "2001:4860:4860::8888",
+      })),
+    };
+    await expect(
+      boundedSecureJsonGet({
+        initialUrl: "https://api.lever.co/v0/postings/fictional?mode=json&skip=0&limit=2",
+        capability: approved,
+        operation: "LIST_JOBS",
+        budget: new SourceRunBudget(approved, instant),
+        now: () => instant,
+        dependencies,
+      }),
+    ).resolves.toMatchObject({ requestCount: 1 });
+  });
+
   it("stops on authentication, rate, HTML interstitial, redirect, and unknown network outcome", async () => {
     for (const [status, code] of [
       [401, "AUTHENTICATION_REQUIRED"],
@@ -347,6 +415,37 @@ describe("R1A source capability and transport", () => {
         dependencies: lost,
       }),
     ).rejects.toThrow("NETWORK_OUTCOME_UNKNOWN");
+  });
+
+  it("persists safe transport classification semantics without blindly retrying", async () => {
+    const approved = capability({ maxRetries: 2 });
+    const budget = new SourceRunBudget(approved, instant);
+    const refused = transport([]);
+    refused.request = vi.fn(async () => {
+      throw Object.assign(new Error("raw socket detail must not be retained"), {
+        code: "ECONNREFUSED",
+      });
+    });
+    await expect(
+      readLeverPageV2({
+        capability: approved,
+        budget,
+        now: () => instant,
+        dependencies: refused,
+      }),
+    ).rejects.toThrow("CONNECTION_REFUSED");
+    expect(refused.request).toHaveBeenCalledOnce();
+    expect(budget.attempts).toBe(1);
+    expect(budget.retries).toBe(0);
+
+    expect(
+      validateSourceAuditMetadata("source.run.stopped", {
+        runId: "run:transport-classification",
+        code: "CONNECTION_REFUSED",
+        requestCount: 1,
+        recordCount: 0,
+      }),
+    ).toBeDefined();
   });
 
   it("honours owner cancellation before transport and distinguishes it from timeout", async () => {

@@ -83,6 +83,8 @@ Schema mismatch/corruption/disk full: stop writes, preserve files, request revie
 
 For an owner-started source run that stops after one or more committed pages, never delete the stopped run or its observations and never resume automatically. A fresh owner restart begins a new bounded run. Only after that run completes, capability-scoped reconciliation includes current jobs from earlier stopped runs, reuses any current R2 evaluation, creates only missing evaluation/queue state, and leaves an exact replay unchanged. Lever requests remain exact canonical GETs with zero redirects throughout.
 
+For source transport failures, use only the persisted closed diagnostic code. `DNS_RESOLUTION_FAILED`, `NETWORK_ROUTE_UNAVAILABLE`, `CONNECTION_REFUSED`, `CONNECTION_RESET`, `TLS_HANDSHAKE_FAILED`, `REQUEST_TIMEOUT`, and `NETWORK_OUTCOME_UNKNOWN` deliberately omit raw network details. None proves that an HTTP request is safe to replay. A new attempt still requires fresh current capability authority and budget; an ambiguous outcome is never blindly retried. Connectivity-only DNS/TCP/TLS probes require separate explicit host-scoped owner authority and must not send HTTP content.
+
 ## Publication/release and incident boundaries
 
 Verify personal CLI identity, `adeel1608/applypilot`, exact branch/head and PUBLIC visibility. Audit new commits, index, tracked files, advertised refs/history, PR body and CI artifacts/logs. `.env.example` is allowed only as reviewed non-secret local defaults; all npm `private: true` guards stay unchanged. Stage explicit safe paths, inspect staged scope/diff, push feature branch and open PR; final-head CI and human review are separate gates. No private diagnostics in PRs.
