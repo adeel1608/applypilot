@@ -74,6 +74,37 @@ checks, zero redirects/retries, single concurrency, request/page/record budgets,
 HTML-like provider strings are parsed only into inert normalized text. Raw parsed postings are deeply
 frozen. None of these controls grants employer-form, upload, or submission authority.
 
+## Provider-page and local-record accounting
+
+Provider-contract failures are page-fatal. ApplyPilot validates the entire provider array against
+the documented structural contract before applying product semantics, so one malformed field shape,
+required URL, or structurally corrupt workplace value prevents partial persistence of that page.
+
+After that structural boundary succeeds, local product usability is a per-record disposition and
+does not discard valid sibling records. Each posting is either accepted or assigned one fixed,
+value-free reason:
+
+```json
+{
+  "reasonCode": "MISSING_EFFECTIVE_LOCATION",
+  "recordIndex": 0
+}
+```
+
+The allowed reasons are `UNUSABLE_IDENTITY`, `UNUSABLE_TITLE`, `MISSING_EFFECTIVE_LOCATION`, and
+`MISSING_USABLE_DESCRIPTION`. The diagnostic cannot contain a title, location value, description,
+URL, raw provider value, arbitrary key, stack, or parser message. Accepted records alone proceed to
+observation persistence, normalization, versioning, R2 evaluation, and queueing. The page transaction
+also records safe unusable and provider-drift audits; a structurally valid page with zero accepted
+records is still accounted as a completed page rather than a persistence failure.
+
+Pagination and source budgets count provider/wire records, including locally unusable records. A
+25-record response therefore advances the cursor by 25 and consumes 25 records even when fewer are
+accepted. The private page digest is deterministic over the ordered provider dispositions: accepted
+entries contribute hashed local identity/content material, while unusable entries contribute only
+their index and fixed reason. This prevents distinct unusable accounting from appearing identical
+without placing provider values in public diagnostics.
+
 ## Redacted schema diagnostic
 
 Only a stopped `SCHEMA_CHANGED / RESPONSE_BODY` run may carry this optional audit member:

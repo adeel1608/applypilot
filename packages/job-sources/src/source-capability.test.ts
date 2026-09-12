@@ -491,6 +491,19 @@ describe("R1A source capability and transport", () => {
       }),
     ).toThrow();
     expect(
+      validateSourceAuditMetadata("source.record.unusable", {
+        reasonCode: "MISSING_EFFECTIVE_LOCATION",
+        recordIndex: 4,
+      }),
+    ).toEqual({ reasonCode: "MISSING_EFFECTIVE_LOCATION", recordIndex: 4 });
+    expect(() =>
+      validateSourceAuditMetadata("source.record.unusable", {
+        reasonCode: "MISSING_EFFECTIVE_LOCATION",
+        recordIndex: 4,
+        location: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST",
+      }),
+    ).toThrow();
+    expect(
       validateSourceAuditMetadata("source.run.stopped", {
         runId: "run:schema-classification",
         code: "SCHEMA_CHANGED",
@@ -559,7 +572,7 @@ describe("R1A source capability and transport", () => {
       dependencies: transport([posting(1), posting(2)]),
     });
     expect(first).toMatchObject({ cursor: 0, nextCursor: 2, requestCount: 1 });
-    expect(first.records[0]).toMatchObject({
+    expect(first.acceptedRecords[0]).toMatchObject({
       country: "AU",
       workplaceType: "hybrid",
       allLocations: ["Melbourne VIC", "Remote Australia"],
@@ -621,7 +634,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([{ ...posting(1), createdAt: value }]),
     });
-    const record = page.records[0]!;
+    const record = page.acceptedRecords[0]!;
     expect(record.postedAt).toBeNull();
     const rawCreatedAt = (record.rawPayload as Record<string, unknown>).createdAt;
     expect(rawCreatedAt).toEqual(value);
@@ -645,8 +658,8 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    expect(page.records[0]?.workplaceType).toBe(internal);
-    expect(page.records[0]?.providerDriftDiagnostics).toEqual([]);
+    expect(page.acceptedRecords[0]?.workplaceType).toBe(internal);
+    expect(page.acceptedRecords[0]?.providerDriftDiagnostics).toEqual([]);
     expect(page.providerDriftDiagnostics).toEqual([]);
   });
 
@@ -659,7 +672,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    expect(page.records[0]?.workplaceType).toBeNull();
+    expect(page.acceptedRecords[0]?.workplaceType).toBeNull();
     expect(page.providerDriftDiagnostics).toEqual([]);
   });
 
@@ -675,7 +688,7 @@ describe("R1A source capability and transport", () => {
         now: () => instant,
         dependencies: transport([{ ...posting(1), workplaceType }]),
       });
-      const record = page.records[0]!;
+      const record = page.acceptedRecords[0]!;
       expect(record.workplaceType).toBeNull();
       expect(record.rawPayload.workplaceType).toBe(workplaceType);
       expect(Object.isFrozen(record.rawPayload)).toBe(true);
@@ -733,7 +746,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    expect(page.records[0]?.country).toBe(internal);
+    expect(page.acceptedRecords[0]?.country).toBe(internal);
   });
 
   it("retains supported absent country normalization", async () => {
@@ -745,7 +758,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    expect(page.records[0]?.country).toBeNull();
+    expect(page.acceptedRecords[0]?.country).toBeNull();
   });
 
   it("treats documented but wholly empty descriptive text as product-unusable", async () => {
@@ -759,17 +772,17 @@ describe("R1A source capability and transport", () => {
       salaryDescriptionPlain: "",
       lists: [],
     };
-    const failure = await readLeverPageV2({
+    const page = await readLeverPageV2({
       capability: capability(),
       budget: new SourceRunBudget(capability(), instant),
       now: () => instant,
       dependencies: transport([value]),
-    }).catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(SecureSourceError);
-    expect(failure).toMatchObject({
-      code: "SOURCE_RECORD_UNUSABLE",
-      lifecycleStage: "RESPONSE_BODY",
-      schemaDiagnostic: null,
+    });
+    expect(page).toMatchObject({
+      providerRecordCount: 1,
+      acceptedRecords: [],
+      unusableRecordCount: 1,
+      safeUnusableDiagnostics: [{ reasonCode: "MISSING_USABLE_DESCRIPTION", recordIndex: 0 }],
     });
   });
 
@@ -801,14 +814,14 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    expect(page.records[0]).toMatchObject({
+    expect(page.acceptedRecords[0]).toMatchObject({
       externalId: value.id,
       title: longTitle,
       allLocations,
       salaryRange: value.salaryRange,
     });
-    expect(page.records[0]?.description).toContain(longDescription);
-    expect(page.records[0]?.sections).toHaveLength(101);
+    expect(page.acceptedRecords[0]?.description).toContain(longDescription);
+    expect(page.acceptedRecords[0]?.sections).toHaveLength(101);
     expect(Buffer.byteLength(JSON.stringify([value]))).toBeLessThan(2_000_000);
   });
 
@@ -830,7 +843,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    const record = page.records[0]!;
+    const record = page.acceptedRecords[0]!;
     expect(record.description).toBe("Fictional evidence only.");
     expect(record.description).not.toMatch(/opening|body|salary|extension/i);
     expect(record.rawPayload).toMatchObject({
@@ -1120,11 +1133,16 @@ describe("R1A source capability and transport", () => {
   });
 
   it.each([
-    ["empty id", { id: "" }],
-    ["inert-empty title", { text: "<script>PRIVATE_FIXTURE_VALUE_NEVER_PERSIST</script>" }],
+    ["empty id", { id: "" }, "UNUSABLE_IDENTITY"],
+    [
+      "inert-empty title",
+      { text: "<script>PRIVATE_FIXTURE_VALUE_NEVER_PERSIST</script>" },
+      "UNUSABLE_TITLE",
+    ],
     [
       "missing effective location",
       { categories: { commitment: "Full-time", department: "Fictional Engineering" } },
+      "MISSING_EFFECTIVE_LOCATION",
     ],
     [
       "inert-empty description",
@@ -1135,25 +1153,236 @@ describe("R1A source capability and transport", () => {
         additionalPlain: "",
         lists: [],
       },
+      "MISSING_USABLE_DESCRIPTION",
     ],
   ] as const)(
     "separates product-unusable %s from provider schema drift",
-    async (_label, override) => {
-      const failure = await readLeverPageV2({
+    async (_label, override, reasonCode) => {
+      const page = await readLeverPageV2({
         capability: capability(),
         budget: new SourceRunBudget(capability(), instant),
         now: () => instant,
         dependencies: transport([{ ...posting(1), ...override }]),
-      }).catch((error: unknown) => error);
-      expect(failure).toBeInstanceOf(SecureSourceError);
-      expect(failure).toMatchObject({
-        code: "SOURCE_RECORD_UNUSABLE",
-        lifecycleStage: "RESPONSE_BODY",
-        schemaDiagnostic: null,
       });
-      expect(String(failure)).not.toMatch(/PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|script/i);
+      expect(page).toMatchObject({
+        providerRecordCount: 1,
+        acceptedRecords: [],
+        unusableRecordCount: 1,
+        safeUnusableDiagnostics: [{ reasonCode, recordIndex: 0 }],
+      });
+      expect(JSON.stringify(page.safeUnusableDiagnostics)).not.toMatch(
+        /PRIVATE_FIXTURE_VALUE_NEVER_PERSIST/i,
+      );
+      expect(Object.keys(page.safeUnusableDiagnostics[0] ?? {}).sort()).toEqual(
+        ["reasonCode", "recordIndex"].sort(),
+      );
     },
   );
+
+  it("accounts for 25 structurally valid provider records independently", async () => {
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
+    const budget = new SourceRunBudget(approved, instant);
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: transport(Array.from({ length: 25 }, (_, index) => posting(index + 1))),
+    });
+    expect(page).toMatchObject({
+      providerRecordCount: 25,
+      unusableRecordCount: 0,
+      safeUnusableDiagnostics: [],
+      nextCursor: null,
+    });
+    expect(page.acceptedRecords).toHaveLength(25);
+    expect(budget).toMatchObject({ attempts: 1, pages: 1, records: 25 });
+  });
+
+  it.each([
+    ["first descriptionless", 0, "description", "MISSING_USABLE_DESCRIPTION"],
+    ["last descriptionless", 24, "description", "MISSING_USABLE_DESCRIPTION"],
+    ["middle locationless", 12, "location", "MISSING_EFFECTIVE_LOCATION"],
+  ] as const)(
+    "keeps valid siblings when the %s provider record is unusable",
+    async (_label, unusableIndex, kind, reasonCode) => {
+      const approved = capability({
+        requestBudget: 2,
+        recordCap: 50,
+        pageSizeCap: 25,
+        responseByteLimit: 500_000,
+      });
+      const values: Record<string, unknown>[] = Array.from({ length: 25 }, (_, index) =>
+        posting(index + 1),
+      );
+      values[unusableIndex] =
+        kind === "description"
+          ? { ...values[unusableIndex]!, descriptionPlain: "", lists: [] }
+          : { ...values[unusableIndex]!, categories: { commitment: "Part-time" } };
+      const budget = new SourceRunBudget(approved, instant);
+      const page = await readLeverPageV2({
+        capability: approved,
+        budget,
+        now: () => instant,
+        dependencies: transport(values),
+      });
+      expect(page).toMatchObject({
+        providerRecordCount: 25,
+        unusableRecordCount: 1,
+        nextCursor: 25,
+        safeUnusableDiagnostics: [{ reasonCode, recordIndex: unusableIndex }],
+      });
+      expect(page.acceptedRecords).toHaveLength(24);
+      expect(page.acceptedRecords.map(({ externalId }) => externalId)).not.toContain(
+        `fixture-${unusableIndex + 1}`,
+      );
+      expect(budget).toMatchObject({ attempts: 1, pages: 1, records: 25 });
+    },
+  );
+
+  it("counts multiple and all-unusable records without treating them as page failures", async () => {
+    const approved = capability({
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 500_000,
+    });
+    const allUnusable = Array.from({ length: 25 }, (_, index) => ({
+      ...posting(index + 1),
+      categories: { commitment: "Part-time" },
+    }));
+    const budget = new SourceRunBudget(approved, instant);
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: transport(allUnusable),
+    });
+    expect(page).toMatchObject({
+      providerRecordCount: 25,
+      acceptedRecords: [],
+      unusableRecordCount: 25,
+      nextCursor: null,
+    });
+    expect(page.safeUnusableDiagnostics).toHaveLength(25);
+    expect(page.safeUnusableDiagnostics[0]).toEqual({
+      reasonCode: "MISSING_EFFECTIVE_LOCATION",
+      recordIndex: 0,
+    });
+    expect(page.safeUnusableDiagnostics[24]).toEqual({
+      reasonCode: "MISSING_EFFECTIVE_LOCATION",
+      recordIndex: 24,
+    });
+    expect(budget.records).toBe(25);
+  });
+
+  it("reports exact counts and fixed reasons for multiple unusable records", async () => {
+    const approved = capability({ requestBudget: 1, recordCap: 6, pageSizeCap: 6 });
+    const values: Record<string, unknown>[] = Array.from({ length: 6 }, (_, index) =>
+      posting(index + 1),
+    );
+    values[1] = { ...values[1]!, id: "" };
+    values[3] = { ...values[3]!, text: "<script>ignored</script>" };
+    values[5] = { ...values[5]!, categories: { commitment: "Part-time" } };
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget: new SourceRunBudget(approved, instant),
+      now: () => instant,
+      dependencies: transport(values),
+    });
+    expect(page.providerRecordCount).toBe(6);
+    expect(page.acceptedRecords).toHaveLength(3);
+    expect(page.unusableRecordCount).toBe(3);
+    expect(page.safeUnusableDiagnostics).toEqual([
+      { reasonCode: "UNUSABLE_IDENTITY", recordIndex: 1 },
+      { reasonCode: "UNUSABLE_TITLE", recordIndex: 3 },
+      { reasonCode: "MISSING_EFFECTIVE_LOCATION", recordIndex: 5 },
+    ]);
+  });
+
+  it("keeps page digests deterministic and sensitive to value-free unusable dispositions", async () => {
+    const approved = capability({ requestBudget: 1, recordCap: 2, pageSizeCap: 2 });
+    const descriptionUnusable = {
+      ...posting(2),
+      descriptionPlain: "",
+      lists: [],
+    };
+    const locationUnusable = {
+      ...posting(2),
+      categories: { commitment: "Part-time" },
+    };
+    const read = (unusable: Record<string, unknown>) =>
+      readLeverPageV2({
+        capability: approved,
+        budget: new SourceRunBudget(approved, instant),
+        now: () => instant,
+        dependencies: transport([posting(1), unusable]),
+      });
+    const first = await read(descriptionUnusable);
+    const replay = await read(descriptionUnusable);
+    const differentDisposition = await read(locationUnusable);
+    expect(first.pageDigest).toBe(replay.pageDigest);
+    expect(differentDisposition.pageDigest).not.toBe(first.pageDigest);
+    expect(first.acceptedRecords).toHaveLength(1);
+    expect(differentDisposition.acceptedRecords).toHaveLength(1);
+  });
+
+  it("keeps unknown workplace drift value-free even when the record is unusable", async () => {
+    const privateProviderValue = "PRIVATE_FIXTURE_DRIFT_VALUE_NEVER_AUDIT";
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([
+        {
+          ...posting(1),
+          workplaceType: privateProviderValue,
+          descriptionPlain: "",
+          lists: [],
+        },
+      ]),
+    });
+    expect(page).toMatchObject({
+      providerRecordCount: 1,
+      acceptedRecords: [],
+      unusableRecordCount: 1,
+      providerDriftDiagnostics: [
+        {
+          issueCategory: "PROVIDER_ENUM_DRIFT",
+          field: "workplaceType",
+          expectedStructuralType: "enum",
+          recordIndex: 0,
+        },
+      ],
+    });
+    expect(
+      JSON.stringify({
+        unusable: page.safeUnusableDiagnostics,
+        drift: page.providerDriftDiagnostics,
+      }),
+    ).not.toContain(privateProviderValue);
+  });
+
+  it("keeps one structurally invalid record page-fatal before budget accounting", async () => {
+    const approved = capability({ requestBudget: 1, recordCap: 2, pageSizeCap: 2 });
+    const budget = new SourceRunBudget(approved, instant);
+    const failure = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: transport([posting(1), { ...posting(2), hostedUrl: "not-a-url" }]),
+    }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({
+      code: "SCHEMA_CHANGED",
+      lifecycleStage: "RESPONSE_BODY",
+      schemaDiagnostic: { field: "hostedUrl", recordIndex: 1 },
+    });
+    expect(budget).toMatchObject({ attempts: 1, pages: 0, records: 0 });
+  });
 
   it("preserves all-locations and list-content usability fallbacks", async () => {
     const page = await readLeverPageV2({
@@ -1174,13 +1403,22 @@ describe("R1A source capability and transport", () => {
           },
           lists: [{ text: "Requirements", content: "<p>Fictional systems evidence.</p>" }],
         },
+        {
+          ...posting(2),
+          description: "",
+          descriptionPlain: "",
+          additional: "<p>Fictional additional evidence.</p>",
+          additionalPlain: "",
+          lists: [],
+        },
       ]),
     });
-    expect(page.records[0]).toMatchObject({
+    expect(page.acceptedRecords[0]).toMatchObject({
       location: null,
       allLocations: ["Remote Australia"],
       description: "Requirements\nFictional systems evidence.",
     });
+    expect(page.acceptedRecords[1]?.description).toBe("Fictional additional evidence.");
   });
 
   it("converts Lever list HTML to inert ordered text while freezing the raw payload", async () => {
@@ -1208,7 +1446,7 @@ describe("R1A source capability and transport", () => {
       now: () => instant,
       dependencies: transport([value]),
     });
-    const record = page.records[0]!;
+    const record = page.acceptedRecords[0]!;
     expect(record.workplaceType).toBe("onsite");
     expect(record.sections).toEqual([
       {

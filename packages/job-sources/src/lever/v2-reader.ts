@@ -5,9 +5,11 @@ import { z } from "zod";
 import {
   SourceCapabilityV2Schema,
   SourceProviderDriftDiagnosticSchema,
+  SourceRecordUnusableDiagnosticSchema,
   SourceRunBudget,
   type SourceCapabilityV2,
   type SourceProviderDriftDiagnostic,
+  type SourceRecordUnusableDiagnostic,
   SourceSchemaDiagnosticFieldSchema,
   SourceSchemaDiagnosticSchema,
   type SourceSchemaDiagnostic,
@@ -238,6 +240,18 @@ export interface LeverPostingRecordV2 {
   rawPayload: DeepReadonly<LeverPostingV2>;
 }
 
+type LeverPostingDispositionV2 =
+  | {
+      status: "ACCEPTED";
+      record: LeverPostingRecordV2;
+      providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
+    }
+  | {
+      status: "SOURCE_RECORD_UNUSABLE";
+      diagnostic: SourceRecordUnusableDiagnostic;
+      providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
+    };
+
 function sectionKind(heading: string): LeverSourceSectionV2["kind"] {
   if (/\b(requirements?|qualifications?|what you (?:bring|need)|skills?)\b/i.test(heading)) {
     return "REQUIREMENTS";
@@ -260,8 +274,8 @@ function freezeDeep<T>(value: T): T {
 function mapPosting(
   posting: LeverPostingV2,
   capability: SourceCapabilityV2,
-  recordIndex?: number,
-): LeverPostingRecordV2 {
+  recordIndex: number,
+): LeverPostingDispositionV2 {
   const raw = JSON.stringify(posting);
   const title = extractInertLeverText(posting.text);
   const location = extractInertLeverText(posting.categories?.location ?? "") || null;
@@ -292,9 +306,6 @@ function mapPosting(
   ]
     .filter(Boolean)
     .join("\n\n");
-  if (!posting.id.trim() || !title || !description || !(location ?? allLocations[0])) {
-    throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
-  }
   const officialWorkplaceType = LeverOfficialWorkplaceTypeV2Schema.safeParse(posting.workplaceType);
   const providerDriftDiagnostics = Object.freeze(
     posting.workplaceType === null ||
@@ -305,13 +316,29 @@ function mapPosting(
               issueCategory: "PROVIDER_ENUM_DRIFT",
               field: "workplaceType",
               expectedStructuralType: "enum",
-              ...(recordIndex === undefined ? {} : { recordIndex }),
+              recordIndex,
             }),
           ),
         ]
       : [],
   );
-  return {
+  const reasonCode = !posting.id.trim()
+    ? "UNUSABLE_IDENTITY"
+    : !title
+      ? "UNUSABLE_TITLE"
+      : !(location ?? allLocations[0])
+        ? "MISSING_EFFECTIVE_LOCATION"
+        : !description
+          ? "MISSING_USABLE_DESCRIPTION"
+          : null;
+  if (reasonCode) {
+    return {
+      status: "SOURCE_RECORD_UNUSABLE",
+      diagnostic: SourceRecordUnusableDiagnosticSchema.parse({ reasonCode, recordIndex }),
+      providerDriftDiagnostics,
+    };
+  }
+  const record: LeverPostingRecordV2 = {
     source: "LEVER",
     region: capability.region,
     tenant: capability.tenant,
@@ -349,6 +376,7 @@ function mapPosting(
     contentDigest: createHash("sha256").update(raw).digest("hex"),
     rawPayload: freezeDeep(posting),
   };
+  return { status: "ACCEPTED", record, providerDriftDiagnostics };
 }
 
 function responseBodyFailure(error: unknown, input: unknown): never {
@@ -374,13 +402,44 @@ function parseLeverPage(
   input: unknown,
   capability: SourceCapabilityV2,
   pageSize: number,
-): LeverPostingRecordV2[] {
+): {
+  providerRecordCount: number;
+  acceptedRecords: LeverPostingRecordV2[];
+  safeUnusableDiagnostics: SourceRecordUnusableDiagnostic[];
+  providerDriftDiagnostics: SourceProviderDriftDiagnostic[];
+  dispositionTokens: string[];
+} {
   try {
     const postings = LeverPageV2Schema.parse(input);
     if (postings.length > pageSize) {
       throw new SecureSourceError("PAGE_SIZE_EXCEEDED", null, "RESPONSE_BODY");
     }
-    return postings.map((posting, recordIndex) => mapPosting(posting, capability, recordIndex));
+    const outcomes = postings.map((posting, recordIndex) =>
+      mapPosting(posting, capability, recordIndex),
+    );
+    const acceptedRecords = outcomes.flatMap((outcome) =>
+      outcome.status === "ACCEPTED" ? [outcome.record] : [],
+    );
+    const safeUnusableDiagnostics = outcomes.flatMap((outcome) =>
+      outcome.status === "SOURCE_RECORD_UNUSABLE" ? [outcome.diagnostic] : [],
+    );
+    const providerDriftDiagnostics = outcomes.flatMap(
+      ({ providerDriftDiagnostics: diagnostics }) => diagnostics,
+    );
+    const dispositionTokens = outcomes.map((outcome, recordIndex) =>
+      outcome.status === "ACCEPTED"
+        ? `A:${recordIndex}:${createHash("sha256")
+            .update(`${outcome.record.externalId}\n${outcome.record.contentDigest}`)
+            .digest("hex")}`
+        : `U:${recordIndex}:${outcome.diagnostic.reasonCode}`,
+    );
+    return {
+      providerRecordCount: postings.length,
+      acceptedRecords,
+      safeUnusableDiagnostics,
+      providerDriftDiagnostics,
+      dispositionTokens,
+    };
   } catch (error) {
     responseBodyFailure(error, input);
   }
@@ -388,14 +447,21 @@ function parseLeverPage(
 
 function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): LeverPostingRecordV2 {
   try {
-    return mapPosting(LeverPostingV2Schema.parse(input), capability);
+    const outcome = mapPosting(LeverPostingV2Schema.parse(input), capability, 0);
+    if (outcome.status === "SOURCE_RECORD_UNUSABLE") {
+      throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
+    }
+    return outcome.record;
   } catch (error) {
     responseBodyFailure(error, input);
   }
 }
 
 export interface LeverPageV2 {
-  records: LeverPostingRecordV2[];
+  providerRecordCount: number;
+  acceptedRecords: LeverPostingRecordV2[];
+  unusableRecordCount: number;
+  safeUnusableDiagnostics: readonly SourceRecordUnusableDiagnostic[];
   providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
   cursor: number;
   nextCursor: number | null;
@@ -446,20 +512,19 @@ export async function readLeverPageV2(input: {
     signal: input.signal,
     dependencies: input.dependencies,
   });
-  const records = parseLeverPage(response.body, capability, pageSize);
-  const providerDriftDiagnostics = Object.freeze(
-    records.flatMap(({ providerDriftDiagnostics: diagnostics }) => diagnostics),
-  );
+  const parsedPage = parseLeverPage(response.body, capability, pageSize);
   const pageDigest = createHash("sha256")
-    .update(
-      records.map(({ externalId, contentDigest }) => `${externalId}:${contentDigest}`).join("\n"),
-    )
+    .update(parsedPage.dispositionTokens.join("\n"))
     .digest("hex");
-  input.budget.consumePage(String(cursor), records.length, response.byteCount);
-  const next = records.length === pageSize ? cursor + records.length : null;
+  input.budget.consumePage(String(cursor), parsedPage.providerRecordCount, response.byteCount);
+  const next =
+    parsedPage.providerRecordCount === pageSize ? cursor + parsedPage.providerRecordCount : null;
   return {
-    records,
-    providerDriftDiagnostics,
+    providerRecordCount: parsedPage.providerRecordCount,
+    acceptedRecords: parsedPage.acceptedRecords,
+    unusableRecordCount: parsedPage.safeUnusableDiagnostics.length,
+    safeUnusableDiagnostics: Object.freeze(parsedPage.safeUnusableDiagnostics),
+    providerDriftDiagnostics: Object.freeze(parsedPage.providerDriftDiagnostics),
     cursor,
     nextCursor: next !== null && next < capability.recordCap ? next : null,
     pageDigest,

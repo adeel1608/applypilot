@@ -52,6 +52,11 @@ export interface SourceEnablementView {
     requestCount: number;
     pageCount: number;
     recordCount: number;
+    providerRecordCount: number;
+    acceptedRecordCount: number;
+    unusableRecordCount: number;
+    providerDriftWarningCount: number;
+    persistedObservationCount: number;
     safeErrorCode: string | null;
     transportStage: string | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
@@ -93,6 +98,13 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
     .prepare(
       `SELECT r.id,r.status,c.source,c.alias,r.request_count AS requestCount,
      r.page_count AS pageCount,r.record_count AS recordCount,r.safe_error_code AS safeErrorCode,
+     (SELECT count(*) FROM audit_events a WHERE a.event_type='source.record.unusable'
+       AND a.entity_type='source_run' AND a.entity_id=r.id) AS unusableRecordCount,
+     (SELECT count(*) FROM audit_events a WHERE a.event_type='source.provider.drift'
+       AND a.entity_type='source_run' AND a.entity_id=r.id) AS providerDriftWarningCount,
+     (SELECT coalesce(sum(p.record_count),0) FROM source_run_pages p
+       WHERE p.run_id=r.id) AS persistedPageProviderRecordCount,
+     (SELECT count(*) FROM source_observations o WHERE o.run_id=r.id) AS persistedObservationCount,
      (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
         AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
@@ -113,8 +125,12 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
      ORDER BY r.owner_started_at DESC LIMIT 20`,
     )
     .all() as Array<
-    Omit<SourceEnablementView["recentRuns"][number], "transportStage" | "schemaDiagnostic"> & {
+    Omit<
+      SourceEnablementView["recentRuns"][number],
+      "transportStage" | "schemaDiagnostic" | "providerRecordCount" | "acceptedRecordCount"
+    > & {
       transportStage: unknown;
+      persistedPageProviderRecordCount: number;
       schemaField: unknown;
       schemaExpectedType: unknown;
       schemaIssueCategory: unknown;
@@ -137,6 +153,14 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       requestCount: run.requestCount,
       pageCount: run.pageCount,
       recordCount: run.recordCount,
+      providerRecordCount: run.recordCount,
+      acceptedRecordCount: Math.max(
+        0,
+        run.persistedPageProviderRecordCount - run.unusableRecordCount,
+      ),
+      unusableRecordCount: run.unusableRecordCount,
+      providerDriftWarningCount: run.providerDriftWarningCount,
+      persistedObservationCount: run.persistedObservationCount,
       safeErrorCode: run.safeErrorCode,
       transportStage: stage.success ? stage.data : null,
       schemaDiagnostic: diagnostic.success ? diagnostic.data : null,

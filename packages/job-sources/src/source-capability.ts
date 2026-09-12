@@ -305,6 +305,22 @@ export const SourceProviderDriftDiagnosticSchema = z
   .strict();
 export type SourceProviderDriftDiagnostic = z.infer<typeof SourceProviderDriftDiagnosticSchema>;
 
+export const SourceRecordUnusableReasonSchema = z.enum([
+  "UNUSABLE_IDENTITY",
+  "UNUSABLE_TITLE",
+  "MISSING_EFFECTIVE_LOCATION",
+  "MISSING_USABLE_DESCRIPTION",
+]);
+export type SourceRecordUnusableReason = z.infer<typeof SourceRecordUnusableReasonSchema>;
+
+export const SourceRecordUnusableDiagnosticSchema = z
+  .object({
+    reasonCode: SourceRecordUnusableReasonSchema,
+    recordIndex: z.number().int().nonnegative().max(1_000_000),
+  })
+  .strict();
+export type SourceRecordUnusableDiagnostic = z.infer<typeof SourceRecordUnusableDiagnosticSchema>;
+
 export const SourceStopCodeSchema = z.enum([
   "OWNER_CANCELLED",
   "CAPABILITY_CHANGED",
@@ -376,9 +392,15 @@ export const SourceAuditMetadataSchemas = {
       pageNumber: z.number().int().positive(),
       requestCount: z.number().int().nonnegative(),
       recordCount: z.number().int().nonnegative(),
+      providerRecordCount: z.number().int().nonnegative().optional(),
+      acceptedRecordCount: z.number().int().nonnegative().optional(),
+      unusableRecordCount: z.number().int().nonnegative().optional(),
+      providerDriftWarningCount: z.number().int().nonnegative().optional(),
+      persistedObservationCount: z.number().int().nonnegative().optional(),
       byteCount: z.number().int().nonnegative(),
     })
     .strict(),
+  "source.record.unusable": SourceRecordUnusableDiagnosticSchema,
   "source.provider.drift": SourceProviderDriftDiagnosticSchema,
   "source.run.stopped": z
     .object({

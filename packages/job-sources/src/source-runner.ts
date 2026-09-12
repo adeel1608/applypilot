@@ -5,6 +5,7 @@ import {
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
   type SourceProviderDriftDiagnostic,
+  type SourceRecordUnusableDiagnostic,
   type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
 } from "./source-capability";
@@ -57,7 +58,11 @@ export interface LeverSourceRunResult {
   requestCount: number;
   pageCount: number;
   recordCount: number;
+  providerRecordCount: number;
+  acceptedRecordCount: number;
+  unusableRecordCount: number;
   stopCode: string | null;
+  safeUnusableDiagnostics: readonly SourceRecordUnusableDiagnostic[];
   providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
 }
 
@@ -93,6 +98,7 @@ export async function runLeverSourceDiscovery(input: {
     startedAt: now().toISOString(),
   });
   const records: LeverPostingRecordV2[] = [];
+  const safeUnusableDiagnostics: SourceRecordUnusableDiagnostic[] = [];
   const providerDriftDiagnostics: SourceProviderDriftDiagnostic[] = [];
   let cursor = input.startCursor ?? 0;
   try {
@@ -124,7 +130,8 @@ export async function runLeverSourceDiscovery(input: {
       } catch {
         throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
       }
-      records.push(...page.records);
+      records.push(...page.acceptedRecords);
+      safeUnusableDiagnostics.push(...page.safeUnusableDiagnostics);
       providerDriftDiagnostics.push(...page.providerDriftDiagnostics);
       if (page.nextCursor === null) break;
       if (page.nextCursor <= cursor) throw new SecureSourceError("CURSOR_REVERSED");
@@ -143,7 +150,11 @@ export async function runLeverSourceDiscovery(input: {
       requestCount: budget.attempts,
       pageCount: budget.pages,
       recordCount: budget.records,
+      providerRecordCount: budget.records,
+      acceptedRecordCount: records.length,
+      unusableRecordCount: safeUnusableDiagnostics.length,
       stopCode: null,
+      safeUnusableDiagnostics,
       providerDriftDiagnostics,
     };
   } catch (error) {
@@ -164,7 +175,11 @@ export async function runLeverSourceDiscovery(input: {
       requestCount: budget.attempts,
       pageCount: budget.pages,
       recordCount: budget.records,
+      providerRecordCount: budget.records,
+      acceptedRecordCount: records.length,
+      unusableRecordCount: safeUnusableDiagnostics.length,
       stopCode: code,
+      safeUnusableDiagnostics,
       providerDriftDiagnostics,
     };
   }
