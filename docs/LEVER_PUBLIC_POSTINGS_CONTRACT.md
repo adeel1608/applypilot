@@ -16,41 +16,41 @@ or infer any private response.
 
 ## Current field matrix
 
-| JSON field                | Official public contract                        | ApplyPilot boundary and use                                                                                                         | Class |
-| ------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| posting response          | JSON array of posting objects                   | Array shape is validated; the approved capability/page budget separately caps persisted records                                     | A/C   |
-| `id`                      | String unique posting ID                        | Any string is accepted structurally; empty/whitespace-only identity stops as locally unusable                                       | A/B   |
-| `text`                    | String posting name                             | Any string is accepted structurally, converted to inert text, and must then be usable as a local title                              | A/B/C |
-| `categories`              | Object containing posting categories            | Object shape is checked when present; unknown extensions remain raw provenance only                                                 | A     |
-| `categories.location`     | String                                          | Optional compatible string; inert text when mapped                                                                                  | A/C   |
-| `categories.commitment`   | String                                          | Optional compatible string; inert text when mapped                                                                                  | A/C   |
-| `categories.team`         | String                                          | Optional compatible string; inert text when mapped                                                                                  | A/C   |
-| `categories.department`   | String                                          | Optional compatible string; inert text when mapped                                                                                  | A/C   |
-| `categories.level`        | Official category dimension/filter              | Optional string is modeled but is not promoted into eligibility or scoring                                                          | A/B   |
-| `categories.allLocations` | Array of strings                                | Array/member types are checked with no undocumented element limit; values become inert text                                         | A/C   |
-| `country`                 | ISO 3166-1 alpha-2 string or `null`             | Two-letter string format or null; absence remains compatibility-normalized to internal null                                         | A     |
-| `opening`                 | Styled HTML string                              | Optional string is typed and retained only in immutable raw provenance                                                              | A/B   |
-| `openingPlain`            | Plain-text string                               | Optional string is typed and retained only in immutable raw provenance                                                              | A/B   |
-| `description`             | Combined styled HTML string                     | Optional string; preferred only when plain combined description is absent, then converted to inert text                             | A/C   |
-| `descriptionPlain`        | Combined plain-text string                      | Optional-compatible string with empty default; converted to inert text                                                              | A/C   |
-| `descriptionBody`         | Styled HTML body string                         | Optional string is typed and retained only in immutable raw provenance                                                              | A/B   |
-| `descriptionBodyPlain`    | Plain-text body string                          | Optional string is typed and retained only in immutable raw provenance                                                              | A/B   |
-| `lists`                   | Array of list objects                           | Array shape is checked with no undocumented element limit; absence is accepted as empty                                             | A     |
-| `lists[].text`            | String list name                                | Required when a list item exists; converted to inert section heading                                                                | A/C   |
-| `lists[].content`         | String unstyled HTML content                    | Required when a list item exists; converted to inert section text and never rendered                                                | A/C   |
-| `additional`              | Optional styled HTML string; may be empty       | String when present; used only as inert closing text when plain text is absent                                                      | A/C   |
-| `additionalPlain`         | Optional plain-text string; may be empty        | String when present; converted to inert closing text                                                                                | A/C   |
-| `hostedUrl`               | URL string                                      | Required URL validation; the value remains inert and is never visited by discovery                                                  | A/C   |
-| `applyUrl`                | URL string                                      | Required URL validation; the value remains inert and grants no employer interaction authority                                       | A/C   |
-| `workplaceType`           | `on-site`, `remote`, `hybrid`, or `unspecified` | Exact enum; `on-site` normalizes to internal `onsite`                                                                               | A     |
-| `salaryRange`             | Optional object                                 | Object shape is checked when present; unknown extensions remain raw provenance only                                                 | A     |
-| `salaryRange.currency`    | String                                          | String when present, with no undocumented character limit; converted to inert text                                                  | A/C   |
-| `salaryRange.interval`    | String                                          | String when present, with no undocumented character limit; converted to inert text                                                  | A/C   |
-| `salaryRange.min`         | Number                                          | Number when present; no undocumented non-negative constraint                                                                        | A     |
-| `salaryRange.max`         | Number                                          | Number when present; no undocumented non-negative constraint                                                                        | A     |
-| `salaryDescription`       | Optional styled HTML string                     | String when present; retained only in immutable raw provenance                                                                      | A/B   |
-| `salaryDescriptionPlain`  | Optional plain-text string                      | String when present; retained only in immutable raw provenance                                                                      | A/B   |
-| unknown extension         | Not part of the named contract                  | Accepted through object passthrough, bounded by the whole response, deeply frozen in raw provenance, and never promoted to evidence | B/C   |
+| JSON field                | Official public contract                        | ApplyPilot boundary and use                                                                                                                                     | Class |
+| ------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| posting response          | JSON array of posting objects                   | Array shape is validated; the approved capability/page budget separately caps persisted records                                                                 | A/C   |
+| `id`                      | String unique posting ID                        | Any string is accepted structurally; empty/whitespace-only identity stops as locally unusable                                                                   | A/B   |
+| `text`                    | String posting name                             | Any string is accepted structurally, converted to inert text, and must then be usable as a local title                                                          | A/B/C |
+| `categories`              | Object containing posting categories            | Object shape is checked when present; unknown extensions remain raw provenance only                                                                             | A     |
+| `categories.location`     | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
+| `categories.commitment`   | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
+| `categories.team`         | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
+| `categories.department`   | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
+| `categories.level`        | Official category dimension/filter              | Optional string is modeled but is not promoted into eligibility or scoring                                                                                      | A/B   |
+| `categories.allLocations` | Array of strings                                | Array/member types are checked with no undocumented element limit; values become inert text                                                                     | A/C   |
+| `country`                 | ISO 3166-1 alpha-2 string or `null`             | Two-letter string format or null; absence remains compatibility-normalized to internal null                                                                     | A     |
+| `opening`                 | Styled HTML string                              | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
+| `openingPlain`            | Plain-text string                               | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
+| `description`             | Combined styled HTML string                     | Optional string; preferred only when plain combined description is absent, then converted to inert text                                                         | A/C   |
+| `descriptionPlain`        | Combined plain-text string                      | Optional-compatible string with empty default; converted to inert text                                                                                          | A/C   |
+| `descriptionBody`         | Styled HTML body string                         | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
+| `descriptionBodyPlain`    | Plain-text body string                          | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
+| `lists`                   | Array of list objects                           | Array shape is checked with no undocumented element limit; absence is accepted as empty                                                                         | A     |
+| `lists[].text`            | String list name                                | Required when a list item exists; converted to inert section heading                                                                                            | A/C   |
+| `lists[].content`         | String unstyled HTML content                    | Required when a list item exists; converted to inert section text and never rendered                                                                            | A/C   |
+| `additional`              | Optional styled HTML string; may be empty       | String when present; used only as inert closing text when plain text is absent                                                                                  | A/C   |
+| `additionalPlain`         | Optional plain-text string; may be empty        | String when present; converted to inert closing text                                                                                                            | A/C   |
+| `hostedUrl`               | URL string                                      | Required URL validation; the value remains inert and is never visited by discovery                                                                              | A/C   |
+| `applyUrl`                | URL string                                      | Required URL validation; the value remains inert and grants no employer interaction authority                                                                   | A/C   |
+| `workplaceType`           | `on-site`, `remote`, `hybrid`, or `unspecified` | Official values retain exact semantics; absence is unknown; null or an undocumented string is non-critical drift normalized to unknown; other types fail closed | A/B   |
+| `salaryRange`             | Optional object                                 | Object shape is checked when present; unknown extensions remain raw provenance only                                                                             | A     |
+| `salaryRange.currency`    | String                                          | String when present, with no undocumented character limit; converted to inert text                                                                              | A/C   |
+| `salaryRange.interval`    | String                                          | String when present, with no undocumented character limit; converted to inert text                                                                              | A/C   |
+| `salaryRange.min`         | Number                                          | Number when present; no undocumented non-negative constraint                                                                                                    | A     |
+| `salaryRange.max`         | Number                                          | Number when present; no undocumented non-negative constraint                                                                                                    | A     |
+| `salaryDescription`       | Optional styled HTML string                     | String when present; retained only in immutable raw provenance                                                                                                  | A/B   |
+| `salaryDescriptionPlain`  | Optional plain-text string                      | String when present; retained only in immutable raw provenance                                                                                                  | A/B   |
+| unknown extension         | Not part of the named contract                  | Accepted through object passthrough, bounded by the whole response, deeply frozen in raw provenance, and never promoted to evidence                             | B/C   |
 
 ## Removed undocumented rejection assumptions
 
@@ -92,3 +92,26 @@ identifiers come from a hardcoded documented-field allowlist. Unknown paths coll
 `UNKNOWN_CONTRACT_BOUNDARY`. Values, raw fragments, arbitrary provider keys, Zod messages, stack
 traces, titles, employer text, URLs, descriptions, candidate data, and private payloads cannot enter
 the diagnostic or owner view.
+
+## Non-fatal provider enum drift
+
+Unknown values in non-critical provider enums are treated as provider drift and normalized to
+unknown; they are never promoted to supported semantics. For `workplaceType`, the four official
+strings retain their existing mappings and documented `unspecified` remains distinct from unknown.
+An absent field becomes internal null without a warning. Provider null or an undocumented string
+becomes internal null and emits only this fixed value-free warning shape:
+
+```json
+{
+  "issueCategory": "PROVIDER_ENUM_DRIFT",
+  "field": "workplaceType",
+  "expectedStructuralType": "enum",
+  "recordIndex": 0
+}
+```
+
+Object, array, number, boolean, and other non-string/non-null values remain fatal structural contract
+errors. The private sixth response was not inspected and its actual value remains unknown. This
+policy is resilience against provider contract drift; it is not evidence that any guessed value
+exists. A drifted raw value remains only in the existing immutable private observation payload and
+cannot become eligibility or fit evidence, diagnostic content, public output, or supported semantics.

@@ -4687,3 +4687,59 @@ migration; exact-head local and GitHub CI green; and lifetime actions unchanged 
    exact-head push and pull-request CI green, and self-review the full base-to-head delta.
 7. Merge normally only if every owner-preapproved condition remains true, refresh clean `main`, and
    return an exact separately gated seventh-GET proposal without executing it.
+
+## Implementation and pre-commit validation results
+
+Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The parser now keeps
+`LeverOfficialWorkplaceTypeV2Schema` as the exact documented four-value enum while the provider shape
+admits only absent, string, or null. Official values retain their existing mapping; absent maps to
+internal null without warning; null and a fictional undocumented string map to internal null with a
+strict `PROVIDER_ENUM_DRIFT / workplaceType / enum / recordIndex` warning. Object, array, number, and
+boolean fixtures still stop as `SCHEMA_CHANGED / RESPONSE_BODY` with only the existing safe structural
+diagnostic. Unknown never becomes documented `unspecified`.
+
+Each mapped record and page carries only the fixed warning tuple. `runLeverSourceDiscovery` exposes
+the tuple without a provider value, and `SourceEnablementRepository.persistPage` validates and writes
+it as `source.provider.drift` in the existing `audit_events` table inside the page transaction. The
+synthetic durable test proves a drifted record completes, persists its immutable raw fictional value,
+normalizes every location workplace type to `UNKNOWN`, reaches R2 evaluation and queue, and replays
+without duplicate observations, job versions, evaluations, or queue decisions. A replay produces one
+run-scoped warning for its own audit trail; neither warning contains the fictional value or any value,
+title, or URL member.
+
+Changed implementation/documentation files are `packages/job-sources/src/source-capability.ts`,
+`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
+`packages/job-sources/src/source-capability.test.ts`,
+`packages/database/src/source-enablement-repository.ts`,
+`packages/database/src/source-enablement-repository.test.ts`,
+`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `README.md`, and this plan. No transport, URL, query, DNS,
+TLS/SNI, pinning, request/budget, capability approval, target, form, upload, submission, dependency,
+lockfile, schema, or migration file changed.
+
+Focused source/durable repository validation passes 105 tests across two files, including the full
+official/absent/null/unknown-string/structural-type matrix, strict diagnostic rejection, raw
+immutability, persistence, no evidence promotion, full pipeline continuation, and replay. Strict
+typecheck passes. The pre-commit `npm.cmd run release:check` passes doctor, database/preflight, format,
+zero-warning lint, strict typecheck, 428 unit tests across 47 files, 21 integration tests across three
+files, local production build, six-page showcase build and boundary audit, 31 serialized E2E tests,
+privacy audit, and full plus production dependency audits with zero vulnerabilities. Privacy checked
+306 tracked files, 836 history paths, 834 history blobs, 1,250 build/test artifacts, and 11 private
+canaries without exposing values.
+
+Fifteen focused database schema/migration/backup/restore/runtime tests pass. The ignored backup
+`backup-2026-09-12T07-37-37.897Z-6b114f6f` is schema v7 with integrity `PASS`, and its exact restore
+preview passes. The real database remains schema v7, pending migrations 0, integrity `PASS`, and zero
+foreign-key issues. Migrations `0000`-`0007` have an empty start-to-working-tree diff; no migration
+was added. Aggregate preflight passes with zero active source capabilities and no approved real target.
+`git diff --check` and `git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
+
+This task made zero source requests, employer-form visits, uploads, or submissions. The private sixth
+response was not read or exposed, candidate outbound is zero, and lifetime real action counts remain
+exactly `6/0/0/0`. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner
+framework remains synthetic-only with real target approval required.
+
+Remaining mechanics are to commit this implementation/result record, rerun the complete release gate
+on the exact clean commit, recheck scope/privacy/migration/fsck invariants, push only this branch, open
+the named PR, and require exact-head push and pull-request CI green. Then self-review the complete
+base-to-head delta and use the owner's normal-merge pre-approval only if every stated condition still
+holds. No seventh request follows the merge; a separately specified fresh authority remains required.

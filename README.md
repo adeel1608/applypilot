@@ -61,7 +61,7 @@ Every screenshot and value above is fictional. The showcase deliberately demonst
 ## Current readiness
 
 - **Manual-intake Personal Beta:** ready for supervised local owner use.
-- **Source-enabled Personal Beta:** not ready. Five bounded source requests have occurred. The first two stopped before a usable response; the third, fourth, and fifth reached accepted JSON and failed closed during strict response-contract processing. No real job was persisted. The offline public-contract audit identifies and removes undocumented parser assumptions but does not establish what private field caused a prior stop. Any later live verification requires a fresh exact owner approval.
+- **Source-enabled Personal Beta:** not ready. Six bounded source requests have occurred. The first two stopped before a usable response; the third through sixth reached accepted JSON and failed closed during strict response-contract processing. The sixth exposed only a value-free non-critical `workplaceType` enum-drift diagnostic; the private value was not inspected and remains unknown. No real job was persisted. The offline policy treats only null or undocumented strings in this descriptive field as unknown plus a safe warning, without inventing supported semantics or relaxing structural types. Any later live verification requires fresh exact owner approval.
 - **Real employer interaction:** target approval required; no real target is configured.
 - **Final submission:** always requires fresh exact human consent.
 - **Hosted production application:** not ready. The static fictional showcase is not the private application.

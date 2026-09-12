@@ -4,8 +4,10 @@ import { z } from "zod";
 
 import {
   SourceCapabilityV2Schema,
+  SourceProviderDriftDiagnosticSchema,
   SourceRunBudget,
   type SourceCapabilityV2,
+  type SourceProviderDriftDiagnostic,
   SourceSchemaDiagnosticFieldSchema,
   SourceSchemaDiagnosticSchema,
   type SourceSchemaDiagnostic,
@@ -37,6 +39,13 @@ const LeverListV2Schema = z
   })
   .passthrough();
 
+export const LeverOfficialWorkplaceTypeV2Schema = z.enum([
+  "on-site",
+  "remote",
+  "hybrid",
+  "unspecified",
+]);
+
 export const LeverPostingV2Schema = z
   .object({
     id: z.string(),
@@ -58,7 +67,7 @@ export const LeverPostingV2Schema = z
       .regex(/^[A-Za-z]{2}$/)
       .nullable()
       .optional(),
-    workplaceType: z.enum(["on-site", "remote", "hybrid", "unspecified"]).optional(),
+    workplaceType: z.string().nullable().optional(),
     salaryRange: z
       .object({
         min: z.number().optional(),
@@ -219,6 +228,7 @@ export interface LeverPostingRecordV2 {
   department: string | null;
   team: string | null;
   workplaceType: "onsite" | "remote" | "hybrid" | "unspecified" | null;
+  providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
   sections: readonly LeverSourceSectionV2[];
   salaryRange: LeverPostingV2["salaryRange"] | null;
   sourceUrl: string;
@@ -247,7 +257,11 @@ function freezeDeep<T>(value: T): T {
   return value;
 }
 
-function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): LeverPostingRecordV2 {
+function mapPosting(
+  posting: LeverPostingV2,
+  capability: SourceCapabilityV2,
+  recordIndex?: number,
+): LeverPostingRecordV2 {
   const raw = JSON.stringify(posting);
   const title = extractInertLeverText(posting.text);
   if (!posting.id.trim() || !title) {
@@ -273,6 +287,22 @@ function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): Le
   ]
     .filter(Boolean)
     .join("\n\n");
+  const officialWorkplaceType = LeverOfficialWorkplaceTypeV2Schema.safeParse(posting.workplaceType);
+  const providerDriftDiagnostics = Object.freeze(
+    posting.workplaceType === null ||
+      (typeof posting.workplaceType === "string" && !officialWorkplaceType.success)
+      ? [
+          Object.freeze(
+            SourceProviderDriftDiagnosticSchema.parse({
+              issueCategory: "PROVIDER_ENUM_DRIFT",
+              field: "workplaceType",
+              expectedStructuralType: "enum",
+              ...(recordIndex === undefined ? {} : { recordIndex }),
+            }),
+          ),
+        ]
+      : [],
+  );
   return {
     source: "LEVER",
     region: capability.region,
@@ -292,7 +322,12 @@ function mapPosting(posting: LeverPostingV2, capability: SourceCapabilityV2): Le
     commitment: extractInertLeverText(posting.categories?.commitment ?? "") || null,
     department: extractInertLeverText(posting.categories?.department ?? "") || null,
     team: extractInertLeverText(posting.categories?.team ?? "") || null,
-    workplaceType: posting.workplaceType === "on-site" ? "onsite" : (posting.workplaceType ?? null),
+    workplaceType: officialWorkplaceType.success
+      ? officialWorkplaceType.data === "on-site"
+        ? "onsite"
+        : officialWorkplaceType.data
+      : null,
+    providerDriftDiagnostics,
     sections,
     salaryRange: posting.salaryRange
       ? {
@@ -343,7 +378,7 @@ function parseLeverPage(
     if (postings.length > pageSize) {
       throw new SecureSourceError("PAGE_SIZE_EXCEEDED", null, "RESPONSE_BODY");
     }
-    return postings.map((posting) => mapPosting(posting, capability));
+    return postings.map((posting, recordIndex) => mapPosting(posting, capability, recordIndex));
   } catch (error) {
     responseBodyFailure(error, input);
   }
@@ -359,6 +394,7 @@ function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): Leve
 
 export interface LeverPageV2 {
   records: LeverPostingRecordV2[];
+  providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
   cursor: number;
   nextCursor: number | null;
   pageDigest: string;
@@ -409,6 +445,9 @@ export async function readLeverPageV2(input: {
     dependencies: input.dependencies,
   });
   const records = parseLeverPage(response.body, capability, pageSize);
+  const providerDriftDiagnostics = Object.freeze(
+    records.flatMap(({ providerDriftDiagnostics: diagnostics }) => diagnostics),
+  );
   const pageDigest = createHash("sha256")
     .update(
       records.map(({ externalId, contentDigest }) => `${externalId}:${contentDigest}`).join("\n"),
@@ -418,6 +457,7 @@ export async function readLeverPageV2(input: {
   const next = records.length === pageSize ? cursor + records.length : null;
   return {
     records,
+    providerDriftDiagnostics,
     cursor,
     nextCursor: next !== null && next < capability.recordCap ? next : null,
     pageDigest,

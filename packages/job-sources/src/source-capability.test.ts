@@ -474,6 +474,23 @@ describe("R1A source capability and transport", () => {
       }),
     ).toBeDefined();
     expect(
+      validateSourceAuditMetadata("source.provider.drift", {
+        issueCategory: "PROVIDER_ENUM_DRIFT",
+        field: "workplaceType",
+        expectedStructuralType: "enum",
+        recordIndex: 0,
+      }),
+    ).toBeDefined();
+    expect(() =>
+      validateSourceAuditMetadata("source.provider.drift", {
+        issueCategory: "PROVIDER_ENUM_DRIFT",
+        field: "workplaceType",
+        expectedStructuralType: "enum",
+        recordIndex: 0,
+        value: "fictional-provider-mode",
+      }),
+    ).toThrow();
+    expect(
       validateSourceAuditMetadata("source.run.stopped", {
         runId: "run:schema-classification",
         code: "SCHEMA_CHANGED",
@@ -629,6 +646,80 @@ describe("R1A source capability and transport", () => {
       dependencies: transport([value]),
     });
     expect(page.records[0]?.workplaceType).toBe(internal);
+    expect(page.records[0]?.providerDriftDiagnostics).toEqual([]);
+    expect(page.providerDriftDiagnostics).toEqual([]);
+  });
+
+  it("normalizes absent workplaceType to unknown without reporting provider drift", async () => {
+    const value: Record<string, unknown> = { ...posting(1) };
+    delete value.workplaceType;
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]?.workplaceType).toBeNull();
+    expect(page.providerDriftDiagnostics).toEqual([]);
+  });
+
+  it.each([
+    ["null", null],
+    ["unknown string", "fictional-provider-mode"],
+  ] as const)(
+    "normalizes workplaceType %s to unknown with a value-free non-fatal warning",
+    async (_label, workplaceType) => {
+      const page = await readLeverPageV2({
+        capability: capability(),
+        budget: new SourceRunBudget(capability(), instant),
+        now: () => instant,
+        dependencies: transport([{ ...posting(1), workplaceType }]),
+      });
+      const record = page.records[0]!;
+      expect(record.workplaceType).toBeNull();
+      expect(record.rawPayload.workplaceType).toBe(workplaceType);
+      expect(Object.isFrozen(record.rawPayload)).toBe(true);
+      expect(record.providerDriftDiagnostics).toEqual([
+        {
+          issueCategory: "PROVIDER_ENUM_DRIFT",
+          field: "workplaceType",
+          expectedStructuralType: "enum",
+          recordIndex: 0,
+        },
+      ]);
+      expect(page.providerDriftDiagnostics).toEqual(record.providerDriftDiagnostics);
+      expect(Object.keys(page.providerDriftDiagnostics[0] ?? {}).sort()).toEqual(
+        ["expectedStructuralType", "field", "issueCategory", "recordIndex"].sort(),
+      );
+      expect(JSON.stringify(page.providerDriftDiagnostics)).not.toContain(
+        "fictional-provider-mode",
+      );
+    },
+  );
+
+  it.each([
+    ["object", { fictional: true }],
+    ["array", ["fictional"]],
+    ["number", 7],
+    ["boolean", true],
+  ] as const)("fails closed for structural workplaceType %s", async (_label, workplaceType) => {
+    const failure = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([{ ...posting(1), workplaceType }]),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect(failure).toMatchObject({
+      code: "SCHEMA_CHANGED",
+      lifecycleStage: "RESPONSE_BODY",
+      schemaDiagnostic: {
+        field: "workplaceType",
+        expectedStructuralType: "enum",
+        issueCategory: "FIELD_TYPE_MISMATCH",
+        recordIndex: 0,
+      },
+    });
   });
 
   it.each([
@@ -752,7 +843,6 @@ describe("R1A source capability and transport", () => {
 
   it.each([
     ["country number", { country: 7 }],
-    ["unsupported workplace type", { workplaceType: "office" }],
     ["malformed list content", { lists: [{ text: "Requirements", content: null }] }],
   ] as const)("fails closed for malformed Lever %s", async (_label, override) => {
     const failure = await readLeverPageV2({
@@ -934,11 +1024,14 @@ describe("R1A source capability and transport", () => {
       mutate: (value) => ({ ...value, applyUrl: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
     },
     {
-      label: "workplace enum",
+      label: "workplace structural type",
       field: "workplaceType",
       expectedStructuralType: "enum",
-      issueCategory: "INVALID_ENUM",
-      mutate: (value) => ({ ...value, workplaceType: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({
+        ...value,
+        workplaceType: { secret: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" },
+      }),
     },
     {
       label: "salaryRange type",
