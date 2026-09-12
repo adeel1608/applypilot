@@ -602,6 +602,81 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("persists bounded long evidence and rejects an unsafe link without rolling back siblings", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const nextId = () => `bounded-evidence:${++id}`;
+    const repository = new SourceEnablementRepository(sqlite, () => instant, nextId);
+    const approved = capability({ requestBudget: 1, recordCap: 3, pageSizeCap: 3 });
+    repository.persistCapabilityVersion(approved);
+    const pipeline = fixturePipeline(sqlite, profile, nextId);
+    const longRequirement = `Five years experience ${"x".repeat(580)}`;
+    const values = [
+      {
+        ...posting(1),
+        lists: [{ text: "Requirements", content: `<p>${longRequirement}</p>` }],
+      },
+      posting(2),
+      { ...posting(3), applyUrl: "http://jobs.lever.co/fictional/private-fixture" },
+    ];
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify(values)),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      providerRecordCount: 3,
+      acceptedRecordCount: 2,
+      unusableRecordCount: 1,
+      safeUnusableDiagnostics: [{ reasonCode: "UNUSABLE_LINK_BOUNDARY", recordIndex: 2 }],
+    });
+    expect(result.queuedJobIds).toHaveLength(2);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 2,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM r2_queue_decision_versions").get(),
+    ).toEqual({ count: 2 });
+    expect(repository.recovery(result.runId)).toMatchObject({
+      providerRecordCount: 3,
+      acceptedRecordCount: 2,
+      unusableRecordCount: 1,
+      persistedObservationCount: 2,
+    });
+    const unusableAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE event_type='source.record.unusable' AND entity_id=?`,
+      )
+      .get(result.runId) as { metadata: string };
+    expect(JSON.parse(unusableAudit.metadata)).toEqual({
+      reasonCode: "UNUSABLE_LINK_BOUNDARY",
+      recordIndex: 2,
+    });
+    expect(unusableAudit.metadata).not.toMatch(/jobs\.lever|private-fixture|http/i);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("persists 24 accepted siblings, accounts one unusable record, and replays idempotently", async () => {
     const sqlite = database();
     const profile = installFixtureProfile(sqlite);

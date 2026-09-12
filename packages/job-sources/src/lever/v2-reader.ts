@@ -87,6 +87,24 @@ export const LeverPostingV2Schema = z
 const LeverPageV2Schema = z.array(LeverPostingV2Schema);
 export type LeverPostingV2 = z.infer<typeof LeverPostingV2Schema>;
 
+const localPersistenceLimits = Object.freeze({
+  identity: 2_048,
+  title: 4_096,
+  location: 1_000,
+  description: 128 * 1_024,
+  url: 2_048,
+});
+
+function isLocallyUsableLink(value: string): boolean {
+  if (value.length > localPersistenceLimits.url) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 const expectedTypeByField = Object.freeze({
   id: "string",
   text: "string",
@@ -322,15 +340,21 @@ function mapPosting(
         ]
       : [],
   );
-  const reasonCode = !posting.id.trim()
-    ? "UNUSABLE_IDENTITY"
-    : !title
-      ? "UNUSABLE_TITLE"
-      : !(location ?? allLocations[0])
-        ? "MISSING_EFFECTIVE_LOCATION"
-        : !description
-          ? "MISSING_USABLE_DESCRIPTION"
-          : null;
+  const effectiveLocation = location ?? allLocations[0] ?? null;
+  const reasonCode =
+    !posting.id.trim() || posting.id.length > localPersistenceLimits.identity
+      ? "UNUSABLE_IDENTITY"
+      : !title || title.length > localPersistenceLimits.title
+        ? "UNUSABLE_TITLE"
+        : !effectiveLocation ||
+            effectiveLocation.length > localPersistenceLimits.location ||
+            allLocations.some((value) => value.length > localPersistenceLimits.location)
+          ? "MISSING_EFFECTIVE_LOCATION"
+          : !description || description.length > localPersistenceLimits.description
+            ? "MISSING_USABLE_DESCRIPTION"
+            : !isLocallyUsableLink(posting.hostedUrl) || !isLocallyUsableLink(posting.applyUrl)
+              ? "UNUSABLE_LINK_BOUNDARY"
+              : null;
   if (reasonCode) {
     return {
       status: "SOURCE_RECORD_UNUSABLE",

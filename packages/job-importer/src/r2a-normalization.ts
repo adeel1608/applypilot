@@ -429,7 +429,7 @@ function experienceValue(text: string): R2NormalizedValue {
   return {
     kind: "EXPERIENCE",
     value: {
-      domain: text,
+      domain: text.slice(0, 500),
       minimum: noExperience ? 0 : minimum?.[1] ? Number(minimum[1]) : null,
       maximum: range?.[2] ? Number(range[2]) : null,
       unit: /months?/i.test(range?.[3] ?? minimum?.[2] ?? "")
@@ -437,7 +437,7 @@ function experienceValue(text: string): R2NormalizedValue {
         : /years?/i.test(range?.[3] ?? minimum?.[2] ?? "")
           ? "YEAR"
           : "UNKNOWN",
-      recency: text.match(/\b(?:within|in the last)\s+[^,.]+/i)?.[0] ?? null,
+      recency: text.match(/\b(?:within|in the last)\s+[^,.]+/i)?.[0]?.slice(0, 300) ?? null,
       alternatives: /\bor equivalent\b/i.test(text) ? ["EQUIVALENT"] : [],
       condition: modality(text).condition,
     },
@@ -468,7 +468,7 @@ function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2Normal
   const explicitName =
     text.match(
       /\b(?:RSA|responsible service of alcohol|first aid|food safety|WWCC|working with children check|police check|white card|forklift licence|driver'?s? licence|class\s+(?:C|LR|MR|HR|HC|MC) licence)\b/i,
-    )?.[0] ?? text;
+    )?.[0] ?? text.slice(0, 500);
   return {
     kind: "LICENCE_CERTIFICATION",
     value: {
@@ -485,6 +485,7 @@ function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2Normal
             .split(/\bor\b/i)
             .map((value) => value.trim())
             .filter(Boolean)
+            .map((value) => value.slice(0, 500))
         : [],
       condition: modality(text).condition,
     },
@@ -521,7 +522,7 @@ function workRightsValues(text: string): R2NormalizedValue[] {
   if (kinds.length === 0) kinds.push("UNKNOWN");
   return [...new Set(kinds)].map((kind) => ({
     kind: "WORK_RIGHTS" as const,
-    value: { kind, wording: text, condition: modality(text).condition },
+    value: { kind, wording: text.slice(0, 1000), condition: modality(text).condition },
   }));
 }
 
@@ -579,8 +580,9 @@ function normalizedRequirementValues(
       },
     ];
   }
-  if (kind === "PHYSICAL" || kind === "AGE") return [{ kind: "PHYSICAL", value: text }];
-  return [{ kind: "TEXT", value: text }];
+  if (kind === "PHYSICAL" || kind === "AGE")
+    return [{ kind: "PHYSICAL", value: text.slice(0, 4096) }];
+  return [{ kind: "TEXT", value: text.slice(0, 4096) }];
 }
 
 function requirementEvidence(

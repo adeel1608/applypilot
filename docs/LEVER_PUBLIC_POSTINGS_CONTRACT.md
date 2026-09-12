@@ -19,10 +19,10 @@ or infer any private response.
 | JSON field                | Official public contract                        | ApplyPilot boundary and use                                                                                                                                     | Class |
 | ------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | posting response          | JSON array of posting objects                   | Array shape is validated; the approved capability/page budget separately caps persisted records                                                                 | A/C   |
-| `id`                      | String unique posting ID                        | Any string is accepted structurally; empty/whitespace-only identity stops as locally unusable                                                                   | A/B   |
-| `text`                    | String posting name                             | Any string is accepted structurally, converted to inert text, and must then be usable as a local title                                                          | A/B/C |
+| `id`                      | String unique posting ID                        | Any string is accepted structurally; empty/whitespace-only or locally over-bound identity stops as locally unusable                                             | A/B/C |
+| `text`                    | String posting name                             | Any string is accepted structurally, converted to inert text, and must then satisfy the local title/evidence bound                                              | A/B/C |
 | `categories`              | Object containing posting categories            | Object shape is checked when present; unknown extensions remain raw provenance only                                                                             | A     |
-| `categories.location`     | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
+| `categories.location`     | String                                          | Optional compatible string; inert text when mapped and subject to the local effective-location evidence bound                                                   | A/C   |
 | `categories.commitment`   | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
 | `categories.team`         | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
 | `categories.department`   | String                                          | Optional compatible string; inert text when mapped                                                                                                              | A/C   |
@@ -31,8 +31,8 @@ or infer any private response.
 | `country`                 | ISO 3166-1 alpha-2 string or `null`             | Two-letter string format or null; absence remains compatibility-normalized to internal null                                                                     | A     |
 | `opening`                 | Styled HTML string                              | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
 | `openingPlain`            | Plain-text string                               | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
-| `description`             | Combined styled HTML string                     | Optional string; preferred only when plain combined description is absent, then converted to inert text                                                         | A/C   |
-| `descriptionPlain`        | Combined plain-text string                      | Optional-compatible string with empty default; converted to inert text                                                                                          | A/C   |
+| `description`             | Combined styled HTML string                     | Optional string; preferred only when plain combined description is absent, converted to inert text, then checked against the local normalized-description bound | A/C   |
+| `descriptionPlain`        | Combined plain-text string                      | Optional-compatible string with empty default; converted to inert text and checked against the local normalized-description bound                               | A/C   |
 | `descriptionBody`         | Styled HTML body string                         | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
 | `descriptionBodyPlain`    | Plain-text body string                          | Optional string is typed and retained only in immutable raw provenance                                                                                          | A/B   |
 | `lists`                   | Array of list objects                           | Array shape is checked with no undocumented element limit; absence is accepted as empty                                                                         | A     |
@@ -40,8 +40,8 @@ or infer any private response.
 | `lists[].content`         | String unstyled HTML content                    | Required when a list item exists; converted to inert section text and never rendered                                                                            | A/C   |
 | `additional`              | Optional styled HTML string; may be empty       | String when present; used only as inert closing text when plain text is absent                                                                                  | A/C   |
 | `additionalPlain`         | Optional plain-text string; may be empty        | String when present; converted to inert closing text                                                                                                            | A/C   |
-| `hostedUrl`               | URL string                                      | Required URL validation; the value remains inert and is never visited by discovery                                                                              | A/C   |
-| `applyUrl`                | URL string                                      | Required URL validation; the value remains inert and grants no employer interaction authority                                                                   | A/C   |
+| `hostedUrl`               | URL string                                      | Required URL validation; local use additionally requires bounded credential-free HTTPS; the value remains inert and is never visited by discovery               | A/C   |
+| `applyUrl`                | URL string                                      | Required URL validation; local use additionally requires bounded credential-free HTTPS; the value remains inert and grants no employer authority                | A/C   |
 | `workplaceType`           | `on-site`, `remote`, `hybrid`, or `unspecified` | Official values retain exact semantics; absence is unknown; null or an undocumented string is non-critical drift normalized to unknown; other types fail closed | A/B   |
 | `salaryRange`             | Optional object                                 | Object shape is checked when present; unknown extensions remain raw provenance only                                                                             | A     |
 | `salaryRange.currency`    | String                                          | String when present, with no undocumented character limit; converted to inert text                                                                              | A/C   |
@@ -91,12 +91,22 @@ value-free reason:
 }
 ```
 
-The allowed reasons are `UNUSABLE_IDENTITY`, `UNUSABLE_TITLE`, `MISSING_EFFECTIVE_LOCATION`, and
-`MISSING_USABLE_DESCRIPTION`. The diagnostic cannot contain a title, location value, description,
-URL, raw provider value, arbitrary key, stack, or parser message. Accepted records alone proceed to
-observation persistence, normalization, versioning, R2 evaluation, and queueing. The page transaction
-also records safe unusable and provider-drift audits; a structurally valid page with zero accepted
-records is still accounted as a completed page rather than a persistence failure.
+The allowed reasons are `UNUSABLE_IDENTITY`, `UNUSABLE_TITLE`, `MISSING_EFFECTIVE_LOCATION`,
+`MISSING_USABLE_DESCRIPTION`, and `UNUSABLE_LINK_BOUNDARY`. The diagnostic cannot contain a title,
+location value, description, URL, raw provider value, arbitrary key, stack, or parser message.
+Accepted records alone proceed to observation persistence, normalization, versioning, R2 evaluation,
+and queueing. The page transaction also records safe unusable and provider-drift audits; a
+structurally valid page with zero accepted records is still accounted as a completed page rather than
+a persistence failure.
+
+Local persistence limits are independent Class C controls, not undocumented provider-schema rules.
+The current accepted-record boundary is 2,048 code units for identity, 4,096 for inert title, 1,000
+for each effective location, 128 KiB for the combined inert description, and 2,048 for each
+credential-free HTTPS link. Requirements and responsibilities retained for R2 evidence are split
+deterministically into at most 500-character chunks (up to the existing 500-item evidence ceiling),
+while the complete inert description and immutable raw private payload remain unchanged. Crossing a
+local field/link bound therefore rejects only that record with a fixed reason; it does not turn a
+documented provider string into page-fatal schema drift or discard valid siblings.
 
 Pagination and source budgets count provider/wire records, including locally unusable records. A
 25-record response therefore advances the cursor by 25 and consumes 25 records even when fewer are

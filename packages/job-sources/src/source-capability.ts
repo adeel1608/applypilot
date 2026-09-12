@@ -310,6 +310,7 @@ export const SourceRecordUnusableReasonSchema = z.enum([
   "UNUSABLE_TITLE",
   "MISSING_EFFECTIVE_LOCATION",
   "MISSING_USABLE_DESCRIPTION",
+  "UNUSABLE_LINK_BOUNDARY",
 ]);
 export type SourceRecordUnusableReason = z.infer<typeof SourceRecordUnusableReasonSchema>;
 

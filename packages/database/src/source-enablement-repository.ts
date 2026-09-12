@@ -86,14 +86,32 @@ function structuredLeverRecord(
     team: record.team,
     country: record.country,
     sourceSections: sections,
-    requirementTexts: sections
-      .filter(({ kind }) => kind === "REQUIREMENTS")
-      .map(({ content }) => content),
-    responsibilities: sections
-      .filter(({ kind }) => kind === "RESPONSIBILITIES")
-      .map(({ content }) => content),
+    requirementTexts: evidenceLines(record, "REQUIREMENTS"),
+    responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
     benefitTexts: sections.filter(({ kind }) => kind === "BENEFITS").map(({ content }) => content),
   };
+}
+
+const evidenceChunkLength = 500;
+
+function boundedEvidenceChunks(value: string): string[] {
+  const chunks: string[] = [];
+  let remainder = value.trim();
+  while (remainder) {
+    if (remainder.length <= evidenceChunkLength) {
+      chunks.push(remainder);
+      break;
+    }
+    let end = evidenceChunkLength;
+    if (/^[\uDC00-\uDFFF]$/.test(remainder[end] ?? "")) end -= 1;
+    const candidate = remainder.slice(0, end);
+    const trailingWord = candidate.search(/\s+\S*$/);
+    const splitAt = trailingWord >= evidenceChunkLength / 2 ? trailingWord : end;
+    const chunk = remainder.slice(0, splitAt).trim();
+    if (chunk) chunks.push(chunk);
+    remainder = remainder.slice(splitAt).trimStart();
+  }
+  return chunks;
 }
 
 function evidenceLines(record: LeverPostingRecordV2, kind: "REQUIREMENTS" | "RESPONSIBILITIES") {
@@ -102,8 +120,9 @@ function evidenceLines(record: LeverPostingRecordV2, kind: "REQUIREMENTS" | "RES
     .flatMap(({ content }) => content.split("\n"))
     .map((line) => line.trim())
     .filter(Boolean)
+    .flatMap(boundedEvidenceChunks)
     .slice(0, 500)
-    .map((line) => line.slice(0, 4_096));
+    .map((line) => line.slice(0, evidenceChunkLength));
 }
 
 export interface PersistedSourcePageResult {
@@ -630,7 +649,10 @@ export class SourceEnablementRepository implements SourceRunSink {
       title: record.title,
       company: capability.alias,
       location,
-      category: record.department ?? record.team,
+      category:
+        [record.department, record.team].find(
+          (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
+        ) ?? null,
       description: record.description,
       salaryText: null,
       employmentType: employmentType(record.commitment),
