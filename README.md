@@ -61,7 +61,7 @@ Every screenshot and value above is fictional. The showcase deliberately demonst
 ## Current readiness
 
 - **Manual-intake Personal Beta:** ready for supervised local owner use.
-- **Source-enabled Personal Beta:** not ready. The first and second bounded attempts stopped before a usable response. The third and fourth bounded attempts reached accepted JSON responses, then failed closed at strict response-contract parsing; the fourth occurred after the documented nullable-country correction. No real job was persisted. The remaining deterministic offline hardening removes evidentiary semantics from an undocumented response extension, and any later live verification requires a fresh exact owner approval.
+- **Source-enabled Personal Beta:** not ready. Five bounded source requests have occurred. The first two stopped before a usable response; the third, fourth, and fifth reached accepted JSON and failed closed during strict response-contract processing. No real job was persisted. The offline public-contract audit identifies and removes undocumented parser assumptions but does not establish what private field caused a prior stop. Any later live verification requires a fresh exact owner approval.
 - **Real employer interaction:** target approval required; no real target is configured.
 - **Final submission:** always requires fresh exact human consent.
 - **Hosted production application:** not ready. The static fictional showcase is not the private application.

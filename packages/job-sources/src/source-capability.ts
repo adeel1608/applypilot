@@ -226,6 +226,75 @@ export const SourceTransportLifecycleStageSchema = z.enum([
 ]);
 export type SourceTransportLifecycleStage = z.infer<typeof SourceTransportLifecycleStageSchema>;
 
+export const SourceSchemaDiagnosticFieldSchema = z.enum([
+  "id",
+  "text",
+  "categories",
+  "categories.location",
+  "categories.commitment",
+  "categories.team",
+  "categories.department",
+  "categories.level",
+  "categories.allLocations",
+  "categories.allLocations[]",
+  "country",
+  "opening",
+  "openingPlain",
+  "description",
+  "descriptionPlain",
+  "descriptionBody",
+  "descriptionBodyPlain",
+  "lists",
+  "lists[]",
+  "lists[].text",
+  "lists[].content",
+  "additional",
+  "additionalPlain",
+  "hostedUrl",
+  "applyUrl",
+  "workplaceType",
+  "salaryRange",
+  "salaryRange.currency",
+  "salaryRange.interval",
+  "salaryRange.min",
+  "salaryRange.max",
+  "salaryDescription",
+  "salaryDescriptionPlain",
+  "UNKNOWN_CONTRACT_BOUNDARY",
+]);
+export type SourceSchemaDiagnosticField = z.infer<typeof SourceSchemaDiagnosticFieldSchema>;
+
+export const SourceSchemaExpectedTypeSchema = z.enum([
+  "array",
+  "enum",
+  "number",
+  "object",
+  "string",
+  "string|null",
+  "url",
+]);
+export type SourceSchemaExpectedType = z.infer<typeof SourceSchemaExpectedTypeSchema>;
+
+export const SourceSchemaIssueCategorySchema = z.enum([
+  "FIELD_TYPE_MISMATCH",
+  "INVALID_ENUM",
+  "INVALID_FORMAT",
+  "INVALID_URL",
+  "MISSING_REQUIRED",
+  "UNKNOWN_CONTRACT_BOUNDARY",
+]);
+export type SourceSchemaIssueCategory = z.infer<typeof SourceSchemaIssueCategorySchema>;
+
+export const SourceSchemaDiagnosticSchema = z
+  .object({
+    field: SourceSchemaDiagnosticFieldSchema,
+    expectedStructuralType: SourceSchemaExpectedTypeSchema,
+    issueCategory: SourceSchemaIssueCategorySchema,
+    recordIndex: z.number().int().nonnegative().max(1_000_000).optional(),
+  })
+  .strict();
+export type SourceSchemaDiagnostic = z.infer<typeof SourceSchemaDiagnosticSchema>;
+
 export const SourceStopCodeSchema = z.enum([
   "OWNER_CANCELLED",
   "CAPABILITY_CHANGED",
@@ -272,6 +341,7 @@ export const SourceStopCodeSchema = z.enum([
   "CONTENT_ENCODING_FORBIDDEN",
   "BOT_OR_ACCESS_INTERSTITIAL",
   "PAGE_SIZE_EXCEEDED",
+  "SOURCE_RECORD_UNUSABLE",
 ]);
 
 export const SourceAuditMetadataSchemas = {
@@ -304,6 +374,7 @@ export const SourceAuditMetadataSchemas = {
       runId: z.string().min(1),
       code: SourceStopCodeSchema,
       transportStage: SourceTransportLifecycleStageSchema.nullable().optional(),
+      schemaDiagnostic: SourceSchemaDiagnosticSchema.optional(),
       requestCount: z.number().int().nonnegative(),
       recordCount: z.number().int().nonnegative(),
     })

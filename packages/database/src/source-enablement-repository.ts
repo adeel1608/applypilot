@@ -6,6 +6,7 @@ import {
   runLeverSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
+  SourceSchemaDiagnosticSchema,
   SourceStopCodeSchema,
   SourceTransportLifecycleStageSchema,
   validateSourceAuditMetadata,
@@ -14,6 +15,7 @@ import {
   type SourceCapabilityV2,
   type SourceRunBudget,
   type SourceRunSink,
+  type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
 } from "@applypilot/job-sources";
@@ -381,7 +383,7 @@ export class SourceEnablementRepository implements SourceRunSink {
   }
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
-    this.finish(input.runId, "COMPLETE", input.budget, null, null, null, input.completedAt);
+    this.finish(input.runId, "COMPLETE", input.budget, null, null, null, null, input.completedAt);
   }
 
   stop(input: {
@@ -390,6 +392,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     code: string;
     retryAfter: string | null;
     transportStage: SourceTransportLifecycleStage | null;
+    schemaDiagnostic: SourceSchemaDiagnostic | null;
     stoppedAt: string;
   }): void {
     this.finish(
@@ -399,6 +402,7 @@ export class SourceEnablementRepository implements SourceRunSink {
       input.code,
       input.retryAfter,
       input.transportStage,
+      input.schemaDiagnostic,
       input.stoppedAt,
     );
   }
@@ -478,13 +482,54 @@ export class SourceEnablementRepository implements SourceRunSink {
                  FROM audit_events a
                  WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
                    AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
+                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.field')
+                 FROM audit_events a WHERE a.event_type='source.run.stopped'
+                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaField,
+                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.expectedStructuralType')
+                 FROM audit_events a WHERE a.event_type='source.run.stopped'
+                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaExpectedType,
+                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.issueCategory')
+                 FROM audit_events a WHERE a.event_type='source.run.stopped'
+                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaIssueCategory,
+                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
+                 FROM audit_events a WHERE a.event_type='source.run.stopped'
+                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex
          FROM source_run_checkpoints WHERE id = ?`,
       )
-      .get(runId) as (Record<string, unknown> & { transportStage: unknown }) | undefined;
+      .get(runId) as
+      | (Record<string, unknown> & {
+          transportStage: unknown;
+          schemaField: unknown;
+          schemaExpectedType: unknown;
+          schemaIssueCategory: unknown;
+          schemaRecordIndex: unknown;
+        })
+      | undefined;
     if (!row) return undefined;
     const stage = SourceTransportLifecycleStageSchema.safeParse(row.transportStage);
-    return { ...row, transportStage: stage.success ? stage.data : null };
+    const diagnostic = SourceSchemaDiagnosticSchema.safeParse({
+      field: row.schemaField,
+      expectedStructuralType: row.schemaExpectedType,
+      issueCategory: row.schemaIssueCategory,
+      ...(row.schemaRecordIndex === null ? {} : { recordIndex: row.schemaRecordIndex }),
+    });
+    return {
+      status: row.status,
+      operation: row.operation,
+      requestCount: row.requestCount,
+      pageCount: row.pageCount,
+      recordCount: row.recordCount,
+      nextCursor: row.nextCursor,
+      safeErrorCode: row.safeErrorCode,
+      retryAfter: row.retryAfter,
+      transportStage: stage.success ? stage.data : null,
+      schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+    };
   }
 
   cancel(runId: string, cancelledAt = this.now().toISOString()): void {
@@ -793,6 +838,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     code: string | null,
     retryAfter: string | null,
     transportStage: SourceTransportLifecycleStage | null,
+    schemaDiagnostic: SourceSchemaDiagnostic | null,
     completedAt: string,
   ): void {
     const result = this.sqlite
@@ -827,6 +873,7 @@ export class SourceEnablementRepository implements SourceRunSink {
         runId,
         code: SourceStopCodeSchema.safeParse(code).success ? code : "PERSISTENCE_FAILED",
         transportStage,
+        ...(code === "SCHEMA_CHANGED" && schemaDiagnostic ? { schemaDiagnostic } : {}),
         requestCount: budget.attempts,
         recordCount: budget.records,
       });

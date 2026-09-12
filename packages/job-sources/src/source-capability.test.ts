@@ -473,11 +473,41 @@ describe("R1A source capability and transport", () => {
         recordCount: 0,
       }),
     ).toBeDefined();
+    expect(
+      validateSourceAuditMetadata("source.run.stopped", {
+        runId: "run:schema-classification",
+        code: "SCHEMA_CHANGED",
+        transportStage: "RESPONSE_BODY",
+        schemaDiagnostic: {
+          field: "salaryRange.min",
+          expectedStructuralType: "number",
+          issueCategory: "FIELD_TYPE_MISMATCH",
+          recordIndex: 0,
+        },
+        requestCount: 1,
+        recordCount: 0,
+      }),
+    ).toBeDefined();
     expect(() =>
       validateSourceAuditMetadata("source.run.stopped", {
         runId: "run:transport-classification",
         code: "CONNECTION_REFUSED",
         transportStage: "SOCKET_ASSIGNED_AT_PRIVATE_ADDRESS",
+        requestCount: 1,
+        recordCount: 0,
+      }),
+    ).toThrow();
+    expect(() =>
+      validateSourceAuditMetadata("source.run.stopped", {
+        runId: "run:schema-classification",
+        code: "SCHEMA_CHANGED",
+        transportStage: "RESPONSE_BODY",
+        schemaDiagnostic: {
+          field: "arbitraryProviderKey",
+          expectedStructuralType: "string",
+          issueCategory: "FIELD_TYPE_MISMATCH",
+          value: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST",
+        },
         requestCount: 1,
         recordCount: 0,
       }),
@@ -552,6 +582,12 @@ describe("R1A source capability and transport", () => {
       code: "SCHEMA_CHANGED",
       lifecycleStage: "RESPONSE_BODY",
       message: "SCHEMA_CHANGED",
+      schemaDiagnostic: {
+        field: "hostedUrl",
+        expectedStructuralType: "url",
+        issueCategory: "INVALID_URL",
+        recordIndex: 0,
+      },
     });
     expect(String(failure)).not.toMatch(/hostedUrl|invalid_format|not-a-url/i);
   });
@@ -641,6 +677,79 @@ describe("R1A source capability and transport", () => {
     expect(page.records[0]).toMatchObject({ country: "AU", description: "", sections: [] });
   });
 
+  it("accepts documented values without undocumented per-field or collection bounds", async () => {
+    const longTitle = "T".repeat(1_250);
+    const longDescription = "D".repeat(600_000);
+    const allLocations = Array.from({ length: 101 }, (_, index) => `Fixture location ${index}`);
+    const lists = Array.from({ length: 101 }, (_, index) => ({
+      text: `Fixture section ${index}`,
+      content: `Fixture content ${index}`,
+    }));
+    const value = {
+      ...posting(1),
+      id: "urn:lever:fictional/job?ref=one#opaque",
+      text: longTitle,
+      descriptionPlain: longDescription,
+      categories: { ...posting(1).categories, allLocations },
+      lists,
+      salaryRange: {
+        min: -10.5,
+        max: -1,
+        currency: "FICTIONAL-CURRENCY-CODE-WITHOUT-A-LEVER-LIMIT",
+        interval: "fictional interval without a documented Lever character limit".repeat(2),
+      },
+    };
+    const page = await readLeverPageV2({
+      capability: capability({ responseByteLimit: 2_000_000 }),
+      budget: new SourceRunBudget(capability({ responseByteLimit: 2_000_000 }), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    expect(page.records[0]).toMatchObject({
+      externalId: value.id,
+      title: longTitle,
+      allLocations,
+      salaryRange: value.salaryRange,
+    });
+    expect(page.records[0]?.description).toContain(longDescription);
+    expect(page.records[0]?.sections).toHaveLength(101);
+    expect(Buffer.byteLength(JSON.stringify([value]))).toBeLessThan(2_000_000);
+  });
+
+  it("models documented passthrough fields without promoting them into job evidence", async () => {
+    const value = {
+      ...posting(1),
+      categories: { ...posting(1).categories, level: "Fixture level" },
+      opening: "<p>Fixture opening styled marker.</p>",
+      openingPlain: "Fixture opening plain marker.",
+      descriptionBody: "<p>Fixture body styled marker.</p>",
+      descriptionBodyPlain: "Fixture body plain marker.",
+      salaryDescription: "<p>Fixture salary styled marker.</p>",
+      salaryDescriptionPlain: "Fixture salary plain marker.",
+      providerExtension: { arbitraryProviderKey: "fixture-extension-value" },
+    };
+    const page = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport([value]),
+    });
+    const record = page.records[0]!;
+    expect(record.description).toBe("Fictional evidence only.");
+    expect(record.description).not.toMatch(/opening|body|salary|extension/i);
+    expect(record.rawPayload).toMatchObject({
+      opening: value.opening,
+      openingPlain: value.openingPlain,
+      descriptionBody: value.descriptionBody,
+      descriptionBodyPlain: value.descriptionBodyPlain,
+      salaryDescription: value.salaryDescription,
+      salaryDescriptionPlain: value.salaryDescriptionPlain,
+      categories: { level: "Fixture level" },
+      providerExtension: value.providerExtension,
+    });
+    expect(Object.isFrozen(record.rawPayload.providerExtension)).toBe(true);
+  });
+
   it.each([
     ["country number", { country: 7 }],
     ["unsupported workplace type", { workplaceType: "office" }],
@@ -660,6 +769,279 @@ describe("R1A source capability and transport", () => {
     });
     expect(String(failure)).not.toMatch(/country|workplace|lists|requirements|received|expected/i);
   });
+
+  const malformedContractCases: Array<{
+    label: string;
+    field: string;
+    expectedStructuralType: string;
+    issueCategory: string;
+    mutate: (value: Record<string, unknown>) => unknown;
+  }> = [
+    {
+      label: "id type",
+      field: "id",
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, id: { secret: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" } }),
+    },
+    {
+      label: "missing id",
+      field: "id",
+      expectedStructuralType: "string",
+      issueCategory: "MISSING_REQUIRED",
+      mutate: (value) => {
+        const { id: _removed, ...rest } = value;
+        void _removed;
+        return rest;
+      },
+    },
+    {
+      label: "text type",
+      field: "text",
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, text: 42 }),
+    },
+    {
+      label: "categories type",
+      field: "categories",
+      expectedStructuralType: "object",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, categories: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    ...["location", "commitment", "team", "department", "level"].map((member) => ({
+      label: `categories.${member} type`,
+      field: `categories.${member}`,
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value: Record<string, unknown>) => ({
+        ...value,
+        categories: {
+          ...(value.categories as Record<string, unknown>),
+          [member]: { secret: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" },
+        },
+      }),
+    })),
+    {
+      label: "allLocations type",
+      field: "categories.allLocations",
+      expectedStructuralType: "array",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({
+        ...value,
+        categories: {
+          ...(value.categories as Record<string, unknown>),
+          allLocations: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST",
+        },
+      }),
+    },
+    {
+      label: "allLocations member type",
+      field: "categories.allLocations[]",
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({
+        ...value,
+        categories: {
+          ...(value.categories as Record<string, unknown>),
+          allLocations: [{ secret: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }],
+        },
+      }),
+    },
+    {
+      label: "country type",
+      field: "country",
+      expectedStructuralType: "string|null",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, country: 42 }),
+    },
+    {
+      label: "country format",
+      field: "country",
+      expectedStructuralType: "string|null",
+      issueCategory: "INVALID_FORMAT",
+      mutate: (value) => ({ ...value, country: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    ...[
+      "opening",
+      "openingPlain",
+      "description",
+      "descriptionPlain",
+      "descriptionBody",
+      "descriptionBodyPlain",
+      "additional",
+      "additionalPlain",
+      "salaryDescription",
+      "salaryDescriptionPlain",
+    ].map((field) => ({
+      label: `${field} type`,
+      field,
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value: Record<string, unknown>) => ({ ...value, [field]: 42 }),
+    })),
+    {
+      label: "lists type",
+      field: "lists",
+      expectedStructuralType: "array",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, lists: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    {
+      label: "list member type",
+      field: "lists[]",
+      expectedStructuralType: "object",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, lists: ["PRIVATE_FIXTURE_VALUE_NEVER_PERSIST"] }),
+    },
+    {
+      label: "list text type",
+      field: "lists[].text",
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, lists: [{ text: 42, content: "Fixture content" }] }),
+    },
+    {
+      label: "missing list content",
+      field: "lists[].content",
+      expectedStructuralType: "string",
+      issueCategory: "MISSING_REQUIRED",
+      mutate: (value) => ({ ...value, lists: [{ text: "Fixture heading" }] }),
+    },
+    {
+      label: "missing hostedUrl",
+      field: "hostedUrl",
+      expectedStructuralType: "url",
+      issueCategory: "MISSING_REQUIRED",
+      mutate: (value) => {
+        const { hostedUrl: _removed, ...rest } = value;
+        void _removed;
+        return rest;
+      },
+    },
+    {
+      label: "hostedUrl format",
+      field: "hostedUrl",
+      expectedStructuralType: "url",
+      issueCategory: "INVALID_URL",
+      mutate: (value) => ({ ...value, hostedUrl: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    {
+      label: "applyUrl format",
+      field: "applyUrl",
+      expectedStructuralType: "url",
+      issueCategory: "INVALID_URL",
+      mutate: (value) => ({ ...value, applyUrl: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    {
+      label: "workplace enum",
+      field: "workplaceType",
+      expectedStructuralType: "enum",
+      issueCategory: "INVALID_ENUM",
+      mutate: (value) => ({ ...value, workplaceType: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    {
+      label: "salaryRange type",
+      field: "salaryRange",
+      expectedStructuralType: "object",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value) => ({ ...value, salaryRange: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    },
+    ...[
+      ["currency", "string"],
+      ["interval", "string"],
+      ["min", "number"],
+      ["max", "number"],
+    ].map(([member, expectedStructuralType]) => ({
+      label: `salaryRange.${member} type`,
+      field: `salaryRange.${member}`,
+      expectedStructuralType: expectedStructuralType!,
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      mutate: (value: Record<string, unknown>) => ({
+        ...value,
+        salaryRange: {
+          ...(value.salaryRange as Record<string, unknown>),
+          [member!]: { secret: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" },
+        },
+      }),
+    })),
+  ];
+
+  it.each(malformedContractCases)(
+    "records only allowlisted structural diagnostics for $label",
+    async ({ field, expectedStructuralType, issueCategory, mutate }) => {
+      const failure = await readLeverPageV2({
+        capability: capability(),
+        budget: new SourceRunBudget(capability(), instant),
+        now: () => instant,
+        dependencies: transport([mutate(posting(1) as unknown as Record<string, unknown>)]),
+      }).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(SecureSourceError);
+      const diagnostic = (failure as SecureSourceError).schemaDiagnostic;
+      expect(diagnostic).toEqual({
+        field,
+        expectedStructuralType,
+        issueCategory,
+        recordIndex: 0,
+      });
+      expect(Object.keys(diagnostic ?? {}).sort()).toEqual(
+        ["expectedStructuralType", "field", "issueCategory", "recordIndex"].sort(),
+      );
+      expect(JSON.stringify(diagnostic)).not.toMatch(
+        /PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|secret|arbitraryProviderKey/i,
+      );
+    },
+  );
+
+  it("collapses non-posting and unknown paths to a fixed contract boundary", async () => {
+    const failure = await readLeverPageV2({
+      capability: capability(),
+      budget: new SourceRunBudget(capability(), instant),
+      now: () => instant,
+      dependencies: transport({ arbitraryProviderKey: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST" }),
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecureSourceError);
+    expect((failure as SecureSourceError).schemaDiagnostic).toEqual({
+      field: "UNKNOWN_CONTRACT_BOUNDARY",
+      expectedStructuralType: "array",
+      issueCategory: "UNKNOWN_CONTRACT_BOUNDARY",
+    });
+    expect(JSON.stringify((failure as SecureSourceError).schemaDiagnostic)).not.toMatch(
+      /PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|arbitraryProviderKey/i,
+    );
+    const guarded = new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY", {
+      field: "arbitraryProviderKey",
+      expectedStructuralType: "string",
+      issueCategory: "FIELD_TYPE_MISMATCH",
+      value: "PRIVATE_FIXTURE_VALUE_NEVER_PERSIST",
+    } as never);
+    expect(guarded.schemaDiagnostic).toBeNull();
+    expect(JSON.stringify(guarded)).not.toMatch(
+      /PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|arbitraryProviderKey/i,
+    );
+  });
+
+  it.each([
+    ["empty id", { id: "" }],
+    ["inert-empty title", { text: "<script>PRIVATE_FIXTURE_VALUE_NEVER_PERSIST</script>" }],
+  ] as const)(
+    "separates product-unusable %s from provider schema drift",
+    async (_label, override) => {
+      const failure = await readLeverPageV2({
+        capability: capability(),
+        budget: new SourceRunBudget(capability(), instant),
+        now: () => instant,
+        dependencies: transport([{ ...posting(1), ...override }]),
+      }).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(SecureSourceError);
+      expect(failure).toMatchObject({
+        code: "SOURCE_RECORD_UNUSABLE",
+        lifecycleStage: "RESPONSE_BODY",
+        schemaDiagnostic: null,
+      });
+      expect(String(failure)).not.toMatch(/PRIVATE_FIXTURE_VALUE_NEVER_PERSIST|script/i);
+    },
+  );
 
   it("converts Lever list HTML to inert ordered text while freezing the raw payload", async () => {
     const value = {

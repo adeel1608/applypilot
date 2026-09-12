@@ -146,6 +146,9 @@ export default async function SourcesPage() {
                 {run.transportStage
                   ? ` Deepest recorded transport stage: ${display(run.transportStage)}.`
                   : ""}
+                {run.schemaDiagnostic
+                  ? ` Contract diagnostic: ${display(run.schemaDiagnostic.issueCategory)} / ${run.schemaDiagnostic.field} / expected ${run.schemaDiagnostic.expectedStructuralType}${run.schemaDiagnostic.recordIndex === undefined ? "" : ` / record ${run.schemaDiagnostic.recordIndex}`}.`
+                  : ""}
                 {run.retryAfter ? ` Earliest owner-reviewed retry: ${run.retryAfter}.` : ""}
                 {run.status === "RUNNING" ? (
                   <form action={cancelSourceRunAction} className="import-form">
