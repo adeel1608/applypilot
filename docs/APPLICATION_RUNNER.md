@@ -11,7 +11,16 @@ The separation is machine-enforced in the Zod capability contract, immutable cap
 
 ## Read-only Lever inspection contract
 
-`lever-real-inspection-v1` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
+`lever-real-inspection-v2` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
+
+The v2 adapter uses one passive DOM evaluation after one navigation. Each permitted control property,
+label, and computed-style read is isolated and bounded; a detached or individually unreadable control
+becomes unsupported rather than aborting the whole snapshot. Control-list mutation, more than 200
+controls, opaque interactive shadow DOM, or another incomplete page structure fails closed as an
+unsupported step. Main-frame navigation/reload/detach and page close/crash are observed as value-free
+lifecycle events. If the evaluation context is lost during one of those events, the internal category
+is `NAVIGATION_EXCEPTION`, not a stable-DOM defect. There is no sleep, second `goto`, automatic retry,
+or retained exception text.
 
 The inspection inventory classifies contact, document, work-authorisation, sponsorship, citizenship, export-control, clearance, location, relocation, education, experience, free-text, consent, unknown, and final-submit controls. The result records safe counts and classifications only. Browser writes, field changes, uploads, submissions, and candidate-data outbound counts must all remain exactly zero.
 
@@ -25,6 +34,11 @@ local audit and inspection summary. Exception messages, stack traces, response/s
 selectors, page content, headers, cookies, storage, and candidate values are not diagnostic metadata.
 The historical first real-target stop predates this instrumentation and therefore remains
 `UNKNOWN_SAFE_BOUNDARY`; it must not be relabelled as a form change.
+
+The second real-target attempt reached its exact approved destination but stopped before a valid
+inventory with `DOM_INSPECTION_EXCEPTION`. It retained no DOM content and does not prove the form
+contract. The v2 hardening is based only on fictional reproduction of the deterministic software
+boundaries; it does not retrospectively claim which expression failed on the real page.
 
 ## Frozen binding and persistence
 

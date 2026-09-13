@@ -19,6 +19,16 @@ const fixtureCases = [
   "hidden-step",
   "hidden-submit",
   "file-chooser",
+  "labels-absent",
+  "unusual-native",
+  "large-attributes",
+  "unicode",
+  "no-form",
+  "multiple-forms",
+  "over-200",
+  "dynamic-insert",
+  "shadow-dom",
+  "no-submit",
 ] as const;
 
 type FixtureCase = (typeof fixtureCases)[number];
@@ -52,6 +62,7 @@ export default async function SyntheticInspectionPage({
       ? "lever-application-inspection-v2"
       : "lever-application-inspection-v1";
   const signal = stopSignals[fixture];
+  const longAttribute = `firstName${"x".repeat(10_000)}`;
   return (
     <main
       className="page-stack"
@@ -72,86 +83,137 @@ export default async function SyntheticInspectionPage({
       {fixture === "hidden-step" ? (
         <div data-hidden-application-step>Fictional hidden interactive step</div>
       ) : null}
-      <form method="get">
-        <label>
-          First name
-          <input name="firstName" autoComplete="given-name" required />
-        </label>
-        <label>
-          Last name
-          <input name="lastName" autoComplete="family-name" required />
-        </label>
-        <label>
-          Email
-          <input name="email" type="email" autoComplete="email" required />
-        </label>
-        {fixture === "unknown-required" ? (
+      {fixture === "no-form" ? null : (
+        <form method="get">
+          {fixture === "labels-absent" ? (
+            <input name="firstName" autoComplete="given-name" required />
+          ) : (
+            <label>
+              {fixture === "unicode" ? "First name 🤖 𐐷" : "First name"}
+              <input
+                name={fixture === "large-attributes" ? longAttribute : "firstName"}
+                id={fixture === "large-attributes" ? longAttribute : undefined}
+                aria-label={fixture === "large-attributes" ? longAttribute : undefined}
+                autoComplete="given-name"
+                required
+              />
+            </label>
+          )}
           <label>
-            Fictional unknown required field
-            <input name="unknownRequired" required />
+            Last name
+            <input name="lastName" autoComplete="family-name" required />
           </label>
-        ) : null}
-        {["documents", "file-chooser"].includes(fixture) ? (
           <label>
-            Resume
-            <input name="resume" type="file" required />
+            Email
+            <input name="email" type="email" autoComplete="email" required />
           </label>
-        ) : null}
-        {fixture === "documents" ? (
-          <label>
-            Cover letter
-            <input name="coverLetter" type="file" />
-          </label>
-        ) : null}
-        {fixture === "eligibility" ? (
-          <fieldset>
-            <legend>Fictional eligibility questions</legend>
+          {fixture === "unknown-required" ? (
             <label>
-              Are you authorized to work in this location?
-              <select name="workAuthorization" required defaultValue="">
-                <option value="" disabled>
-                  Select
-                </option>
-                <option value="fictional-yes">Yes</option>
-                <option value="fictional-no">No</option>
-              </select>
+              Fictional unknown required field
+              <input name="unknownRequired" required />
             </label>
+          ) : null}
+          {["documents", "file-chooser"].includes(fixture) ? (
             <label>
-              Will you require sponsorship?
-              <select name="sponsorship" required defaultValue="">
-                <option value="" disabled>
-                  Select
-                </option>
-                <option value="fictional-yes">Yes</option>
-                <option value="fictional-no">No</option>
-              </select>
+              Resume
+              <input name="resume" type="file" required />
             </label>
+          ) : null}
+          {fixture === "documents" ? (
             <label>
-              Citizenship
-              <input name="citizenship" required />
+              Cover letter
+              <input name="coverLetter" type="file" />
             </label>
-            <label>
-              Export control status
-              <input name="exportControl" required />
-            </label>
-            <label>
-              Security clearance
-              <input name="securityClearance" required />
-            </label>
-          </fieldset>
-        ) : null}
-        {fixture === "unsupported" ? (
-          <div role="combobox-custom" data-unsupported-control>
-            <label>
-              Fictional custom widget
-              <input name="customWidget" required data-unsupported-control />
-            </label>
-          </div>
-        ) : null}
-        <button type="submit" hidden={fixture === "hidden-submit"}>
-          Submit fictional application
-        </button>
-      </form>
+          ) : null}
+          {fixture === "eligibility" ? (
+            <fieldset>
+              <legend>Fictional eligibility questions</legend>
+              <label>
+                Are you authorized to work in this location?
+                <select name="workAuthorization" required defaultValue="">
+                  <option value="" disabled>
+                    Select
+                  </option>
+                  <option value="fictional-yes">Yes</option>
+                  <option value="fictional-no">No</option>
+                </select>
+              </label>
+              <label>
+                Will you require sponsorship?
+                <select name="sponsorship" required defaultValue="">
+                  <option value="" disabled>
+                    Select
+                  </option>
+                  <option value="fictional-yes">Yes</option>
+                  <option value="fictional-no">No</option>
+                </select>
+              </label>
+              <label>
+                Citizenship
+                <input name="citizenship" required />
+              </label>
+              <label>
+                Export control status
+                <input name="exportControl" required />
+              </label>
+              <label>
+                Security clearance
+                <input name="securityClearance" required />
+              </label>
+            </fieldset>
+          ) : null}
+          {fixture === "unsupported" ? (
+            <div role="combobox-custom" data-unsupported-control>
+              <label>
+                Fictional custom widget
+                <input name="customWidget" required data-unsupported-control />
+              </label>
+            </div>
+          ) : null}
+          {fixture === "unusual-native" ? (
+            <>
+              <input name="colorPreference" type="color" />
+              <input name="rangePreference" type="range" />
+              <input name="monthAvailable" type="month" />
+              <input name="dateAvailable" type="datetime-local" />
+            </>
+          ) : null}
+          {fixture === "over-200"
+            ? Array.from({ length: 201 }, (_, index) => (
+                <input key={index} name={`boundedControl${index}`} />
+              ))
+            : null}
+          {fixture === "no-submit" ? null : (
+            <button type="submit" hidden={fixture === "hidden-submit"}>
+              Submit fictional application
+            </button>
+          )}
+        </form>
+      )}
+      {fixture === "multiple-forms" ? (
+        <form method="get">
+          <input name="secondaryOptionalField" />
+        </form>
+      ) : null}
+      {fixture === "dynamic-insert" ? (
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'document.addEventListener("DOMContentLoaded",()=>{const input=document.createElement("input");input.name="dynamicallyInsertedBeforeInspection";document.querySelector("form")?.append(input);},{once:true});',
+          }}
+        />
+      ) : null}
+      {fixture === "shadow-dom" ? (
+        <>
+          <div id="fictional-shadow-host" />
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                'document.addEventListener("DOMContentLoaded",()=>{const host=document.getElementById("fictional-shadow-host");const root=host?.attachShadow({mode:"open"});const input=document.createElement("input");input.name="shadowInteractiveControl";root?.append(input);},{once:true});',
+            }}
+          />
+        </>
+      ) : null}
     </main>
   );
 }

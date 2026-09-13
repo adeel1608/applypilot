@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { Download, Page, Route } from "playwright";
+import type { Download, Frame, Page, Route } from "playwright";
 import { z } from "zod";
 
 import {
@@ -24,7 +24,7 @@ import {
   type RunnerTargetCapability,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v1";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v2";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -274,6 +274,10 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
     let downloadAttempted = false;
     let blockedWriteRequest = false;
     let blockedDestination = false;
+    let mainFrameNavigationCount = 0;
+    let pageClosed = false;
+    let pageCrashed = false;
+    const inspectedMainFrame = this.page.mainFrame();
     const routeHandler = async (route: Route) => {
       const request = route.request();
       const method = request.method();
@@ -283,7 +287,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         return;
       }
       const mainNavigation =
-        request.isNavigationRequest() && request.frame() === this.page.mainFrame();
+        request.isNavigationRequest() && request.frame() === inspectedMainFrame;
       if (mainNavigation && !urlInScope(request.url(), binding)) {
         blockedDestination = true;
         await route.abort("blockedbyclient");
@@ -303,9 +307,25 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       downloadAttempted = true;
       void download.cancel();
     };
+    const frameNavigationHandler = (frame: Frame) => {
+      if (frame === inspectedMainFrame) mainFrameNavigationCount += 1;
+    };
+    const frameDetachedHandler = (frame: Frame) => {
+      if (frame === inspectedMainFrame) pageClosed = true;
+    };
+    const closeHandler = () => {
+      pageClosed = true;
+    };
+    const crashHandler = () => {
+      pageCrashed = true;
+    };
     await this.page.route("**/*", routeHandler);
     this.page.on("popup", popupHandler);
     this.page.on("download", downloadHandler);
+    this.page.on("framenavigated", frameNavigationHandler);
+    this.page.on("framedetached", frameDetachedHandler);
+    this.page.on("close", closeHandler);
+    this.page.on("crash", crashHandler);
     try {
       let response = null;
       try {
@@ -344,54 +364,190 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           hiddenInteractiveStep: false,
         });
       }
+      const navigationCountBeforeEvaluation = mainFrameNavigationCount;
+      const navigationBecameUnstable = () => {
+        let urlChanged = true;
+        let closed = pageClosed;
+        try {
+          urlChanged = this.page.url() !== binding.targetUrl;
+          if (typeof this.page.isClosed === "function") closed ||= this.page.isClosed();
+        } catch {
+          closed = true;
+        }
+        return (
+          closed ||
+          pageCrashed ||
+          urlChanged ||
+          mainFrameNavigationCount !== navigationCountBeforeEvaluation
+        );
+      };
       let dom;
       try {
         dom = await this.page.evaluate(() => {
-          const clean = (value: string | null | undefined, max: number) =>
-            (value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-          const controls = [...document.querySelectorAll("input, select, textarea, button")]
-            .slice(0, 200)
-            .map((element, index) => {
-              const input = element as HTMLInputElement;
-              const labels = "labels" in input && input.labels ? [...input.labels] : [];
-              const label = clean(
-                labels.map((item) => item.textContent).join(" ") ||
-                  element.getAttribute("aria-label") ||
-                  element.getAttribute("data-inspection-label"),
-                200,
-              );
-              const tag = element.tagName.toLowerCase() as
-                | "input"
-                | "select"
-                | "textarea"
-                | "button";
-              const type = clean(
-                element.getAttribute("type") || (tag === "button" ? "submit" : "text"),
-                40,
-              ).toLowerCase();
+          const bounded = (value: string, max: number) => {
+            const normalized = value
+              .slice(0, max * 4)
+              .replace(/\s+/g, " ")
+              .trim();
+            let result = normalized.slice(0, max);
+            const finalCodeUnit = result.charCodeAt(result.length - 1);
+            if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) result = result.slice(0, -1);
+            return result;
+          };
+          const readString = (
+            reader: () => string | null | undefined,
+            max: number,
+          ): { value: string; failed: boolean } => {
+            try {
+              const value = reader();
+              return typeof value === "string"
+                ? { value: bounded(value, max), failed: false }
+                : value === null || value === undefined
+                  ? { value: "", failed: false }
+                  : { value: "", failed: true };
+            } catch {
+              return { value: "", failed: true };
+            }
+          };
+          const readBoolean = (
+            reader: () => boolean,
+            fallback: boolean,
+          ): { value: boolean; failed: boolean } => {
+            try {
+              const value = reader();
+              return typeof value === "boolean"
+                ? { value, failed: false }
+                : { value: fallback, failed: true };
+            } catch {
+              return { value: fallback, failed: true };
+            }
+          };
+          const controlSelector = "input, select, textarea, button";
+          const initialControls = Array.from(document.querySelectorAll(controlSelector));
+          const controls = initialControls.slice(0, 200).map((element, index) => {
+            let unsupportedWidget = false;
+            const tagRead = readString(() => element.tagName, 20);
+            const normalizedTag = tagRead.value.toLowerCase();
+            const tag = ["input", "select", "textarea", "button"].includes(normalizedTag)
+              ? (normalizedTag as "input" | "select" | "textarea" | "button")
+              : "input";
+            unsupportedWidget ||= tagRead.failed || normalizedTag !== tag;
+            const attribute = (name: string, max: number) => {
+              const result = readString(() => element.getAttribute(name), max);
+              unsupportedWidget ||= result.failed;
+              return result.value;
+            };
+            const connected = readBoolean(() => element.isConnected, false);
+            unsupportedWidget ||= connected.failed || !connected.value;
+            const labels = (() => {
+              try {
+                const collection = (element as HTMLInputElement).labels;
+                if (!collection) return { value: "", failed: false };
+                const labelElements = Array.from(collection);
+                let failed = labelElements.length > 20;
+                const parts = labelElements.slice(0, 20).map((item) => {
+                  const text = readString(() => item.textContent, 200);
+                  failed ||= text.failed;
+                  return text.value;
+                });
+                return { value: bounded(parts.join(" "), 200), failed };
+              } catch {
+                return { value: "", failed: true };
+              }
+            })();
+            unsupportedWidget ||= labels.failed;
+            const ariaLabel = attribute("aria-label", 200);
+            const inspectionLabel = attribute("data-inspection-label", 200);
+            const label = labels.value || ariaLabel || inspectionLabel;
+            const rawType = attribute("type", 40);
+            const type = (rawType || (tag === "button" ? "submit" : "text")).toLowerCase();
+            const name = attribute("name", 200);
+            const idRead = readString(() => (element as HTMLElement).id, 200);
+            unsupportedWidget ||= idRead.failed;
+            const autocomplete = attribute("autocomplete", 100);
+            const required = readBoolean(() => element.hasAttribute("required"), false);
+            const hiddenAttribute = readBoolean(() => element.hasAttribute("hidden"), true);
+            unsupportedWidget ||= required.failed || hiddenAttribute.failed;
+            let display = "";
+            let visibility = "";
+            try {
               const style = window.getComputedStyle(element);
-              return {
-                index,
-                tag,
-                type,
-                name: clean(element.getAttribute("name"), 200),
-                id: clean(element.id, 200),
-                autocomplete: clean(element.getAttribute("autocomplete"), 100),
-                required: element.hasAttribute("required"),
-                hidden:
-                  type === "hidden" ||
-                  element.hasAttribute("hidden") ||
-                  style.display === "none" ||
-                  style.visibility === "hidden",
-                label,
-                unsupportedWidget:
-                  element.hasAttribute("data-unsupported-control") ||
-                  element.getAttribute("role") === "combobox-custom",
-              };
-            });
-          const explicitSignal = document
-            .querySelector("[data-stop-reason]")
-            ?.getAttribute("data-stop-reason");
+              const displayRead = readString(() => style.display, 40);
+              const visibilityRead = readString(() => style.visibility, 40);
+              display = displayRead.value;
+              visibility = visibilityRead.value;
+              unsupportedWidget ||= displayRead.failed || visibilityRead.failed;
+            } catch {
+              unsupportedWidget = true;
+            }
+            const unsupportedAttribute = readBoolean(
+              () => element.hasAttribute("data-unsupported-control"),
+              true,
+            );
+            unsupportedWidget ||= unsupportedAttribute.failed || unsupportedAttribute.value;
+            const role = attribute("role", 100);
+            unsupportedWidget ||= role === "combobox-custom";
+            return {
+              index,
+              tag,
+              type,
+              name,
+              id: idRead.value,
+              autocomplete,
+              required: required.value,
+              hidden:
+                type === "hidden" ||
+                hiddenAttribute.value ||
+                display === "none" ||
+                visibility === "hidden",
+              label,
+              unsupportedWidget,
+            };
+          });
+          let controlsStable = initialControls.length <= 200;
+          try {
+            const finalControls = Array.from(document.querySelectorAll(controlSelector));
+            controlsStable =
+              controlsStable &&
+              finalControls.length === initialControls.length &&
+              initialControls.every((element, index) =>
+                Boolean(element.isConnected && finalControls[index] === element),
+              );
+          } catch {
+            controlsStable = false;
+          }
+          let shadowInteractionPresent = false;
+          try {
+            const allElements = Array.from(document.querySelectorAll("*"));
+            shadowInteractionPresent = allElements.length > 1000;
+            for (const element of allElements.slice(0, 1000)) {
+              try {
+                if (element.shadowRoot?.querySelector(controlSelector)) {
+                  shadowInteractionPresent = true;
+                  break;
+                }
+              } catch {
+                shadowInteractionPresent = true;
+                break;
+              }
+            }
+          } catch {
+            shadowInteractionPresent = true;
+          }
+          let pageReadFailed = false;
+          const signalElement = (() => {
+            try {
+              return document.querySelector("[data-stop-reason]");
+            } catch {
+              pageReadFailed = true;
+              return null;
+            }
+          })();
+          const explicitSignalRead = signalElement
+            ? readString(() => signalElement.getAttribute("data-stop-reason"), 100)
+            : { value: "", failed: false };
+          pageReadFailed ||= explicitSignalRead.failed;
+          const explicitSignal = explicitSignalRead.value || null;
           const supportedSignals = [
             "CAPTCHA",
             "MFA",
@@ -407,23 +563,66 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           ];
           const protectionSignals =
             explicitSignal && supportedSignals.includes(explicitSignal) ? [explicitSignal] : [];
+          const declaredVersionElement = (() => {
+            try {
+              return document.querySelector("[data-form-version]");
+            } catch {
+              pageReadFailed = true;
+              return null;
+            }
+          })();
+          const declaredFormVersionRead = declaredVersionElement
+            ? readString(() => declaredVersionElement.getAttribute("data-form-version"), 100)
+            : { value: "", failed: false };
+          pageReadFailed ||= declaredFormVersionRead.failed;
+          const declaredFormVersion = declaredFormVersionRead.value || null;
+          let formCount = 0;
+          let formsReliable = true;
+          try {
+            const totalFormCount = document.forms.length;
+            formCount = Math.min(totalFormCount, 20);
+            formsReliable = totalFormCount <= 20;
+          } catch {
+            formsReliable = false;
+          }
+          let popupDeclared = false;
+          try {
+            popupDeclared = Boolean(
+              document.querySelector('a[target="_blank"], form[target="_blank"]'),
+            );
+          } catch {
+            popupDeclared = true;
+          }
+          let hiddenInteractiveStep = false;
+          try {
+            hiddenInteractiveStep = Boolean(
+              document.querySelector("[data-hidden-application-step]"),
+            );
+          } catch {
+            hiddenInteractiveStep = true;
+          }
           return {
-            declaredFormVersion:
-              document.querySelector("[data-form-version]")?.getAttribute("data-form-version") ??
-              null,
-            formCount: document.forms.length,
+            declaredFormVersion,
+            formCount,
             controls,
             protectionSignals,
-            popupDeclared: Boolean(
-              document.querySelector('a[target="_blank"], form[target="_blank"]'),
-            ),
-            hiddenInteractiveStep: Boolean(
-              document.querySelector("[data-hidden-application-step]"),
-            ),
+            popupDeclared,
+            hiddenInteractiveStep:
+              hiddenInteractiveStep ||
+              !controlsStable ||
+              !formsReliable ||
+              shadowInteractionPresent ||
+              pageReadFailed,
           };
         });
       } catch {
+        if (navigationBecameUnstable()) {
+          throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        }
         throw new InspectionDiagnosticError("DOM_INSPECTION_EXCEPTION");
+      }
+      if (navigationBecameUnstable()) {
+        throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
       }
       try {
         const { popupDeclared, ...safeDom } = dom;
@@ -441,9 +640,21 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         throw new InspectionDiagnosticError("SNAPSHOT_INVALID");
       }
     } finally {
-      this.page.off("popup", popupHandler);
-      this.page.off("download", downloadHandler);
-      await this.page.unroute("**/*", routeHandler);
+      try {
+        this.page.off("popup", popupHandler);
+        this.page.off("download", downloadHandler);
+        this.page.off("framenavigated", frameNavigationHandler);
+        this.page.off("framedetached", frameDetachedHandler);
+        this.page.off("close", closeHandler);
+        this.page.off("crash", crashHandler);
+      } catch {
+        // Page lifecycle failure is already represented by the safe terminal classification.
+      }
+      try {
+        await this.page.unroute("**/*", routeHandler);
+      } catch {
+        // A closed/crashed page cannot retain a live route handler.
+      }
     }
   }
 }

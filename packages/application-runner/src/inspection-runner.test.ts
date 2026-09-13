@@ -296,6 +296,56 @@ describe("read-only real target inspection", () => {
   );
 
   it.each([
+    ["execution-context destruction during main-frame navigation", "framenavigated"],
+    ["same-origin client-side navigation", "framenavigated"],
+    ["page reload", "framenavigated"],
+    ["main-frame detach", "framedetached"],
+    ["page close", "close"],
+    ["page crash", "crash"],
+  ] as const)(
+    "classifies %s during rejected DOM evaluation as navigation instability",
+    async (_caseName, eventName) => {
+      const targetUrl = packet().targetUrl!;
+      const mainFrame = {};
+      const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+      const page = {
+        route: async () => undefined,
+        unroute: async () => undefined,
+        on: (name: string, listener: (...args: unknown[]) => void) => {
+          const current = listeners.get(name) ?? new Set();
+          current.add(listener);
+          listeners.set(name, current);
+        },
+        off: (name: string, listener: (...args: unknown[]) => void) => {
+          listeners.get(name)?.delete(listener);
+        },
+        url: () => targetUrl,
+        mainFrame: () => mainFrame,
+        isClosed: () => eventName === "close" || eventName === "framedetached",
+        goto: async () => ({ status: () => 200 }),
+        evaluate: async () => {
+          for (const listener of listeners.get(eventName) ?? []) {
+            listener(
+              eventName === "framenavigated" || eventName === "framedetached"
+                ? mainFrame
+                : undefined,
+            );
+          }
+          throw new Error("fictional unstable context detail");
+        },
+      } as unknown as Page;
+      await expect(
+        new PlaywrightReadOnlyInspectionBrowser(page).inspect(
+          freezeInspectionBinding(packet(), capability()),
+        ),
+      ).rejects.toMatchObject({
+        category: "NAVIGATION_EXCEPTION",
+        message: "INSPECTION_DIAGNOSTIC",
+      });
+    },
+  );
+
+  it.each([
     ["browser navigation exception", "NAVIGATION_EXCEPTION"],
     ["DOM evaluation exception", "DOM_INSPECTION_EXCEPTION"],
   ] as const)("retains a fixed category for %s", async (_caseName, diagnosticCategory) => {

@@ -5910,3 +5910,63 @@ v6 is not approval or authority for employer visit 3.
 7. Refresh clean main, verify private history and current packet/version bindings, create ignored
    version-6 DRAFT with predecessor 5 and fresh 24-hour/30-minute expiries using production digest
    logic, keep it inactive, and stop for exact owner approval without any live request.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / DIRTY-TREE RELEASE PASS / EXACT-HEAD CI PENDING / OFFLINE ONLY`. Historical
+visit #2 remains immutable at `STOPPED / PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`; no content or
+cause detail was backfilled. The live destination, form, or exact throwing expression cannot be
+inferred from the retained enum. The deterministic software class is nevertheless reproduced:
+before the fix, a fictional `getComputedStyle` failure aborted the complete browser evaluation, and
+three new lifecycle tests showed main-frame navigation, close, and crash all misclassified as stable
+`DOM_INSPECTION_EXCEPTION` while 31 prior focused cases remained green.
+
+The static callback audit covered collection query/conversion/mapping; tag, attribute, ID,
+`hasAttribute`, connection, labels collection and label-text access; computed style and style
+properties; control detachment and list mutation; form and structural marker reads; navigation,
+reload, execution-context destruction, main-frame detach, page close/crash; unusual native controls;
+long/Unicode strings; control/form caps; dynamic controls; and open shadow interaction. Whole-page
+query/conversion failure still rejects as `DOM_INSPECTION_EXCEPTION`. Snapshot-schema rejection and
+final observation rejection remain `SNAPSHOT_INVALID` and `ADAPTER_OUTPUT_INVALID`.
+
+`lever-real-inspection-v2` performs the same single exact `goto` and one passive evaluation. Every
+individual control string/boolean/label/style read is isolated; retained strings are length bounded
+and do not end on a lone high surrogate. A failed read or detached control becomes an unsupported
+control. Changed control identity/order, more than 200 controls, more than 20 forms, unreadable page
+markers, opaque interactive shadow DOM, or another incomplete structure fails closed through the
+existing unsupported-control signal. Passive main-frame navigation/reload/detach and page close/
+crash events are counted without payloads around evaluation; an unstable context maps to
+`NAVIGATION_EXCEPTION`. There is no sleep, second `goto`, retry, error-text inspection, page content,
+field value, raw HTML, response body, cookie, storage, header, click, write, upload, submission, or
+candidate-data channel.
+
+The form contract remains `lever-application-inspection-v1`: semantic fields, structural acceptance,
+and protection behavior are unchanged. Only extraction robustness and safe lifecycle classification
+changed, so adapter v2 is the appropriate version boundary. Target origin/path, operation, packet,
+policy, request methods, and application authority remain unchanged. Inspection authority still
+cannot construct map/fill/upload/submit/final-consent operations.
+
+The fictional A-W matrix covers ordinary and multiple forms; labels present, absent, null, and
+throwing; detached and mutating controls; style failure; execution-context navigation, same-origin
+client navigation, reload, main-frame detach, page close/crash; unusual native inputs; 10,000-unit
+attributes; Unicode/surrogate boundaries; hidden and custom controls; no form; over 200 controls;
+dynamic insertion; interactive shadow DOM; and submit/no-submit structure. Five Playwright tests pass
+and assert zero non-GET/HEAD requests, unchanged empty control values, no retry, correct fail-closed
+signals, and bounded raw structural fields. Focused runner/adapter/database tests pass `64/64`.
+
+The complete dirty-tree release check passes format, zero-warning lint, strict typecheck, `507` unit
+tests across `49` files, `21` integration tests across `3` files, both production builds (`31` local
+routes and `6` showcase pages), the `19`-file showcase audit, all `36` serialized E2E tests, privacy
+audit, and full plus production dependency audits with zero vulnerabilities. Privacy checked `315`
+tracked files, `931` reachable-history paths, `929` reachable-history blobs, `1,417` build/test
+artifacts, and `11` private canaries. Schema is 8, pending migrations zero, integrity `PASS`, and FKs
+zero. No migration was added and `0000`-`0008` have no base-to-working-tree diff. The release summary
+remains Source-enabled Personal Beta `READY`, first real target validation unproven, and Personal Live
+V1 `NOT_READY`.
+
+Remaining mechanics are the final formatted focused rerun, complete diff/privacy/authority review,
+implementation/results commit, clean exact-head release rerun, `git diff --check`, `git fsck
+--strict`, branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean main
+refresh, current private binding verification, and inactive version-6 draft creation. No employer or
+source request, browser launch to an employer, form interaction, upload, submission, or candidate
+outbound field occurred; lifetime actions remain `9/2/0/0`.
