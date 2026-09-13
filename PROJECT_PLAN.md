@@ -5913,7 +5913,7 @@ v6 is not approval or authority for employer visit 3.
 
 ## Implementation and validation result
 
-Status: `IMPLEMENTED / DIRTY-TREE RELEASE PASS / EXACT-HEAD CI PENDING / OFFLINE ONLY`. Historical
+Status: `IMPLEMENTED / CLEAN COMMITTED-HEAD RELEASE PASS / EXACT-HEAD CI PENDING / OFFLINE ONLY`. Historical
 visit #2 remains immutable at `STOPPED / PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`; no content or
 cause detail was backfilled. The live destination, form, or exact throwing expression cannot be
 inferred from the retained enum. The deterministic software class is nevertheless reproduced:
@@ -5964,9 +5964,29 @@ zero. No migration was added and `0000`-`0008` have no base-to-working-tree diff
 remains Source-enabled Personal Beta `READY`, first real target validation unproven, and Personal Live
 V1 `NOT_READY`.
 
-Remaining mechanics are the final formatted focused rerun, complete diff/privacy/authority review,
-implementation/results commit, clean exact-head release rerun, `git diff --check`, `git fsck
---strict`, branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean main
-refresh, current private binding verification, and inactive version-6 draft creation. No employer or
-source request, browser launch to an employer, form interaction, upload, submission, or candidate
-outbound field occurred; lifetime actions remain `9/2/0/0`.
+The committed implementation head `360a4f22fcb553d8f0f6aba4f95da7f3886ad7f8` passed the complete clean
+release check: format, zero-warning lint, strict typecheck, 507/507 unit tests in 49 files, 21/21
+integration tests in 3 files, local production build with 31 generated pages, public-showcase build
+with 6 pages, showcase audit across 19 source files, and 36/36 serialized Playwright tests. The
+privacy audit passed across 315 tracked files, 938 historical paths, 936 historical blobs, 1,428
+build/test artifacts, and 11 private canaries. Full and production dependency audits reported zero
+vulnerabilities. Release state was schema 8, zero pending migrations, integrity `PASS`, zero foreign-
+key issues, zero active source capabilities, and runner `TARGET_APPROVAL_REQUIRED`. `git diff
+--check` passed and `git fsck --strict` exited successfully; its informational output listed only
+unreachable local objects and no repository corruption. The focused post-hardening runner/database
+set also passed 64/64 tests, and the expanded target-inspection Playwright file passed 5/5 tests.
+
+The complete A-W synthetic matrix now covers normal forms, labels present/absent, unusual native
+types, long/Unicode attributes, no/multiple forms, more than 200 controls, dynamic insertion, shadow
+interaction, no submit control, custom/hidden/document/eligibility/protection widgets, isolated
+style/label failures, detachment/list mutation, same-origin navigation, reload, and page close.
+Inventory tests assert bounded safe metadata, unchanged input values, and zero non-GET/HEAD browser
+requests. Lifecycle tests additionally cover execution-context destruction, main-frame detachment,
+and crash. Stable whole-snapshot failure remains `DOM_INSPECTION_EXCEPTION`; lifecycle instability
+is now `NAVIGATION_EXCEPTION`; invalid snapshot and invalid observation remain separately classified.
+
+Remaining mechanics are the plan-results commit, complete clean final-branch-head release rerun,
+branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean main refresh, current
+private binding verification, and inactive version-6 draft creation. No employer or source request,
+browser launch to an employer, form interaction, upload, submission, or candidate outbound field
+occurred; lifetime actions remain `9/2/0/0`.
