@@ -1,12 +1,12 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **OFFLINE PERSONAL LIVE V1 ENABLEMENT READY; EXTERNAL ACTIVATION BLOCKED.** Manual-intake Personal Beta and R2 are merged. R1A, fictional Lever R1B, the source-to-R2 queue pipeline, and the target-independent synthetic runner framework are implemented offline. Two separately owner-authorized, one-request source smokes stopped before any response page as `NETWORK_OUTCOME_UNKNOWN`; source-enabled Personal Beta therefore remains **NOT_READY**, and the consolidated offline transport fix does not authorize another request. Real-target operation remains **TARGET_APPROVAL_REQUIRED**. No real browser target, scheduling, hosting, upload, or submission is enabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
+Status: **SOURCE-ENABLED PERSONAL BETA READY; PERSONAL LIVE V1 NOT READY.** Manual-intake Personal Beta, R2, and the owner-reviewed request #9 source-ingestion proof are complete. The approved source capability is revoked and no new source request is authorised. A machine-separated `OPEN_AND_INSPECT_ONLY` real-target lane is implemented offline, but no employer page has been visited and no target capability is active. Real fill, upload, authentication, submission, scheduling, and hosting remain disabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
 
 ## Beta Core implementation snapshot — 2026-09-08
 
 The local manual path now covers immutable job/evidence/evaluation versions, conservative corrections and matching, private PDF/DOCX CV and optional cover-letter artifacts, digest-bound approvals, packet readiness, application timeline events, loopback session/nonce controls, consistent backup/restore, and synthetic-only runner stop/final-review proofs. The approved private local smoke passed after migration with two document artifacts, content parity, a review-required packet, clean database integrity/foreign keys, zero source calls, and zero application actions. Private values and paths were not published.
 
-Source-enabled Beta is separate and remains `WAITING_FOR_APPROVED_TENANT`: Greenhouse and Lever GET readers are implemented and fail closed without an ignored, exact owner-approved capability. Personal Live V1 remains blocked on a legitimate approved source and a separately reviewed real target/runner. The synthetic runner is not authority to operate an employer form.
+Source-enabled Personal Beta is `READY` only on the reviewed bounded request #9 evidence. Every later source run still fails closed without a fresh ignored exact owner-approved capability. Personal Live V1 remains blocked on a separately approved real-target inspection and later, separately reviewed application-operation support. Source success and synthetic application tests are not authority to operate an employer form.
 
 ## Product definition and release boundary
 

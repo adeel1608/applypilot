@@ -61,12 +61,12 @@ Every screenshot and value above is fictional. The showcase deliberately demonst
 ## Current readiness
 
 - **Manual-intake Personal Beta:** ready for supervised local owner use.
-- **Source-enabled Personal Beta:** not ready. Eight bounded source requests have occurred. The first two stopped before a usable response; later attempts reached accepted JSON and failed closed at response or persistence boundaries. The sixth exposed only a value-free non-critical `workplaceType` enum-drift diagnostic. The seventh and eighth each accepted a 25-record page and then rolled back atomically at persistence; no page or real job was persisted. No private provider value or payload was inspected. Offline hardening now keeps provider-contract failures page-fatal, applies the complete local persistence boundary before accepted/unusable accounting, and normalizes long list evidence in bounded deterministic chunks. This does not claim either inaccessible response's cause or prove live ingestion. Any later live verification requires fresh exact owner approval.
-- **Real employer interaction:** target approval required; no real target is configured.
+- **Source-enabled Personal Beta:** ready for supervised owner use. Owner-reviewed request #9 used one bounded Lever GET and persisted, normalized, evaluated, and queued all 25 accepted records with zero retries, redirects, unusable records, or candidate data outbound. The capability was revoked after the run. This release decision does not authorise another capability or request.
+- **Real employer interaction:** target approval required. The dedicated Lever inspection lane is offline-ready for exact `OPEN_AND_INSPECT_ONLY` authority; it has no fill, upload, authentication, or submit API. No real employer page has been visited.
 - **Final submission:** always requires fresh exact human consent.
 - **Hosted production application:** not ready. The static fictional showcase is not the private application.
 
-Schema v7 and migrations `0000`–`0007` support immutable source capabilities, bounded source runs, evidence-aware matching, packet bindings, runner checkpoints, protection stops, and unknown-outcome recovery. The default mode remains deterministic and does not require a paid model or API.
+Schema v8 and migrations `0000`–`0008` support immutable source capabilities, bounded source runs, evidence-aware matching, operation-scoped target authority, separate read-only inspection bindings, application runner checkpoints, protection stops, and unknown-outcome recovery. The default mode remains deterministic and does not require a paid model or API.
 
 ## Repository map
 

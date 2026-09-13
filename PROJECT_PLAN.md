@@ -1,9 +1,9 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `fix/lever-workplace-drift-policy`
+Working branch: `feat/real-target-inspection-runner`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -5438,3 +5438,214 @@ employer/form interaction, upload, or submission occurred; lifetime actions rema
 Remaining mechanics are final diff/migration/privacy review, the coherent implementation/results
 commit, an exact-head clean release rerun, branch push, one PR, exact-head push plus PR CI, full-delta
 self-review, conditional normal merge, and clean `main` refresh. Request #9 remains unauthorized.
+
+# Real-target read-only inspection runner - 2026-09-13
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting `main`
+and `origin/main` are `afde976438a564c0c397110ff357e986a78cce3a`; work is isolated on
+`feat/real-target-inspection-runner`. The owner has separately accepted the successful bounded source
+run as sufficient for Source-enabled Personal Beta `READY`. The runner framework is ready for
+controlled validation only with exact target approval, and Personal Live V1 remains `NOT_READY`.
+Lifetime real source/form/upload/submission counts start at `9/0/0/0` and must remain unchanged. No
+employer page visit, live target network action, form interaction, field entry, authentication,
+upload, submission, or candidate-data transmission is authorized during this implementation.
+
+## Current state, objective, assumptions, and requirements
+
+The merged `TargetIndependentApplicationRunner` is an application-execution lane. Its immutable
+binding already freezes packet, candidate/job/evaluation versions, target destination, adapter/form
+versions, documents, answers, disclosures, and unresolved count. It correctly pauses
+`PACKET_NOT_READY` when `binding.unresolvedCount > 0`, and its normal progression exposes map, fill,
+final review, consent, and submit operations only after readiness and stale-binding gates. Those
+protections must not be weakened.
+
+The existing `RunnerTargetCapability` and durable `runner_target_capability_versions` table bind a
+target kind, exact origin/path prefix, adapter/form versions, approval lifecycle, and expiry, but do
+not encode an allowed operation. The existing `FrozenRunnerBinding` and `runner_run_bindings` likewise
+do not bind operation scope. Alias, approval reference, adapter version, or form version cannot serve
+as a hidden authorization flag. Consequently, the current durable fields cannot prove that an
+approval is unusable for application operations; the smallest sound extension is an explicit
+operation set in capability version 2 plus a frozen operation in an inspection binding. Additive
+migration `0008` is therefore justified. Migrations `0000`-`0007` remain byte-for-byte immutable.
+
+The objective is a distinct, target-independent `TargetInspectionRunner` with one callable operation,
+`OPEN_AND_INSPECT_ONLY`, and no fill, upload, final-consent, or submit API. It must validate a concrete
+read-only Lever real-target adapter entirely against fictional local HTML and browser fixtures. It
+must also prepare, without activating, the exact private local packet and draft target-capability
+proposal needed for a later owner approval.
+
+**The first real employer validation uses a dedicated read-only inspection runner. Packet readiness
+blockers may be observed during inspection but do not authorize application filling. The normal
+application runner remains fail-closed on unresolved packet/document/answer/disclosure state.**
+
+Requirements are exact capability ID/version/digest, `REAL_TARGET`, origin, path prefix, operation,
+adapter/form versions, packet ID/digest, job/profile/evaluation versions, all document/answer/
+disclosure digests, unresolved count, and target URL binding; fail-closed destination, stale packet,
+capability, origin/path, adapter, and form checks; zero candidate values as browser inputs; passive
+DOM/form introspection only; enum-level protection stops; safe semantic field inventory; and durable
+value-free audit events. A `REVIEW_REQUIRED` packet is inspectable in this lane and remains unusable
+by the application lane.
+
+## Architecture, data flow, proposed files, and dependencies
+
+- `packages/application-runner/src/target-runner.ts`: evolve the capability contract to schema
+  version 2 with a non-empty, explicit `allowedOperations` set drawn from
+  `OPEN_AND_INSPECT_ONLY`, `MAP_FOR_FILL`, `FILL`, `UPLOAD`, and `SUBMIT`; require real inspection
+  capabilities to contain only `OPEN_AND_INSPECT_ONLY`; bind the selected operation immutably; retain
+  all v1 apply-runner behavior for its existing synthetic fixtures and fail closed if its required
+  application operations are absent.
+- New inspection-domain module(s) in `packages/application-runner`: define the narrow adapter browser
+  port, semantic inventory schemas, classification states, protection/destination/form validation,
+  immutable inspection binding, and `TargetInspectionRunner`. The browser port provides navigation
+  plus read-only snapshot data and deliberately has no typing, selection, clicking, file chooser,
+  upload, authentication, popup-following, or submit primitive.
+- New Lever real inspection adapter: `lever-real-inspection-v1` validates synthetic structural
+  contract `lever-application-inspection-v1`, exact destination scope, popup/hidden-step signals,
+  supported inert controls, and safe field semantics. It never captures field values or unnecessary
+  prose and never auto-learns a changed live form.
+- `packages/database/drizzle/0008_real_target_inspection_scope.sql`, schema, and runner repository:
+  add explicit operation JSON to immutable target capability versions and operation to frozen runner
+  bindings; persist safe `runner.inspection.bound/opened/completed/stopped` events through typed audit
+  metadata. Upgrade tests cover schema 7 to 8 and rollback by restoring the verified pre-migration
+  backup; no existing migration is modified.
+- Fictional test fixtures and an existing loopback synthetic target route/server exercise the real
+  adapter implementation without an external request. If a new route is necessary, it remains
+  guarded by `APPLYPILOT_SYNTHETIC_MODE=1` and must follow the installed Next.js documentation.
+- `apps/web` owner surfaces expose operation scope, proposed/approved state, read-only results, and
+  recovery signals without private URLs, labels, candidate answers, or session data. Server actions
+  cannot create approval or invoke a real target during this train.
+- `ARCHITECTURE.md`, `docs/APPLICATION_RUNNER.md`, `docs/OFFLINE_GO_LIVE_ENABLEMENT.md`, and
+  `docs/GO_LIVE_CHECKLIST.md` document the separate lane, exact future approval, release truth, and
+  continued `NOT_READY` classification for Personal Live V1.
+- Private ignored runtime artifacts hold the real target URL, frozen packet identifiers/digests, and
+  a draft unapproved target capability. None are committed, printed in tracked logs, or copied into
+  fixtures.
+
+Data flow is `private current job/profile/evaluation -> existing packet preparation -> immutable
+frozen inspection binding -> exact operation-capability gate -> read-only browser navigation -> inert
+DOM snapshot -> Lever structural-contract/protection/destination checks -> generic semantic inventory
+-> offline mapping classification -> safe durable audit`. Candidate profile data is excluded from the
+browser port. The normal lane remains `READY packet -> exact application capability -> open -> map ->
+fill -> final review -> one-use consent -> submit`, with every existing stop preserved.
+
+No new production dependency is planned. Existing Zod, SQLite/Drizzle, Playwright, Vitest, Next.js,
+and local runtime confinement are sufficient. The real adapter must depend on a narrow injected
+read-only browser interface so unit/integration tests can prove zero mutation events.
+
+## Risks, security/privacy, testing, rollback, and acceptance
+
+Primary risks are accidentally broadening one capability into fill/submit authority, weakening packet
+readiness, allowing redirect or popup escape, confusing passive DOM reads with candidate-data entry,
+persisting form prose or values, approving a capability during preparation, relying on an invented
+live form hash, or leaking the private target/packet into Git. Controls are explicit operation enums
+in both capability and binding; a separate class and narrower browser port; origin/path checks before
+and after navigation; zero-click/zero-write tests; deterministic `FORM_CHANGED`, `DESTINATION_CHANGED`,
+and protection stops; strict safe inventory schemas; typed redacted audits; private ignored runtime
+files; release diff and privacy audits; and active-target-capability count zero at handoff.
+
+The synthetic matrix covers a normal form; unknown required control; CV and cover-letter uploads;
+work rights, sponsorship, citizenship/export-control, and clearance questions; CAPTCHA, auth, MFA,
+bot/rate/access/restriction signals; unsupported widget; changed form; changed destination/path;
+popup/new-tab; hidden submit; file chooser; and both `REVIEW_REQUIRED` and `READY_TO_APPLY` packets.
+Negative authority tests invoke or attempt map-for-fill, fill, upload, final review, consent, and submit
+under the same capability/packet and require denial before browser mutation. Existing application-
+runner tests must continue proving unresolved packets pause `PACKET_NOT_READY`, unknown required
+answers and disclosures stop, stale packets/documents stop, consent is fresh and one-use, and an
+ambiguous outcome never triggers blind retry.
+
+Validation includes focused runner/database/adapter/authority tests; format; zero-warning lint;
+strict typecheck; full unit, integration, serialized E2E; local and showcase production builds;
+showcase boundary and privacy audits; full and production dependency audits; real database status,
+schema/pending/integrity/FKs; verified backup and restore preview; 0000-0007 immutability plus schema
+7-to-8 upgrade; aggregate preflight and release check; `git diff --check`; and `git fsck --strict`.
+The complete base-to-head diff must contain no real payload, private URL, candidate fact, credential,
+session value, or live network primitive invocation.
+
+Rollback is a normal revert of code/docs/migration `0008`, followed by restoring the verified schema
+7 backup if the private database is upgraded. The target proposal remains unapproved and removable as
+an ignored private file. No external rollback exists because no target request or employer mutation is
+permitted.
+
+Acceptance requires operation scope to be explicit and immutable; the inspection runner to expose
+only read-only inspection; the Lever real adapter and every synthetic matrix case to pass; browser
+writes/value changes/uploads/submissions/candidate outbound to equal zero; application-runner
+protections to remain unchanged; safe audits to contain enums/IDs/counts only; exact private packet
+and unapproved capability proposal to be prepared; active real-target approvals to remain zero;
+schema v8/pending zero/integrity `PASS`/FKs zero after a verified backup/upgrade; privacy/security and
+all release gates to pass; exact-head push and PR CI to be green; and lifetime actions to remain
+`9/0/0/0`. Only then may the owner-preapproved PR merge occur normally. The merged implementation is
+still not evidence that first real target validation occurred.
+
+## Exact implementation sequence
+
+1. Commit this blueprint on `feat/real-target-inspection-runner` before application-code changes.
+2. Add failing tests that demonstrate v1 capability/binding cannot machine-enforce operation scope
+   and that the normal runner rejects unresolved packets.
+3. Add immutable v2 operation scope and migration `0008`, preserving all prior migrations and normal
+   application semantics.
+4. Implement the separate inspection binding, read-only browser port, runner, safe inventory and
+   classifications, typed audits, and fictional Lever inspection adapter/matrix.
+5. Add the minimum owner UI/recovery status needed to expose scoped readiness without enabling live
+   actions; update architecture and runner/go-live documentation.
+6. Use only ignored private local data to resolve/freeze the selected packet and write a draft,
+   deterministic, unapproved target capability proposal with fresh expiry bounds; do not navigate.
+7. Create and verify a real-database backup, migrate schema 7 to 8, run integrity/FK/privacy checks,
+   and prove exact restore from the backup. Stop and restore on any failure.
+8. Run focused and complete validation, update this plan with exact results and limitations, inspect
+   the full authority/privacy/migration diff, and commit coherent work.
+9. Push only this branch, open PR `feat: add read-only real target inspection`, require exact-head push
+   and PR CI green, self-review, then merge normally only if every owner-preapproved condition remains
+   true. Refresh clean `main`; do not perform a live employer inspection after merge.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / PRIVATE OFFLINE PREPARATION COMPLETE / PR GATES PENDING`. Capability schema v2
+now carries canonical operation scope and rejects any real-target operation set other than the single
+`OPEN_AND_INSPECT_ONLY` value. Additive migration `0008_real_target_inspection_scope.sql` stores that
+scope plus a separate inspection binding/lifecycle; a base-to-working-tree diff confirms migrations
+`0000`–`0007` are unchanged. The normal application runner still requires the complete application
+operation set and pauses unresolved packets as `PACKET_NOT_READY`.
+
+The dedicated `TargetInspectionRunner`, `lever-real-inspection-v1`, and
+`lever-application-inspection-v1` expose only passive DOM inspection. The fresh browser context permits
+only GET/HEAD, confines navigation and subresources to the approved origin, refuses out-of-scope
+navigation, popup/download escape, write requests, hidden interactive steps, unsupported widgets,
+authentication/protection signals, and page/form drift, and receives no candidate values. Its result
+schema requires browser writes, value changes, uploads, submissions, and candidate outbound fields to
+be literal zero. The durable current-binding check covers capability version/digest, newest packet and
+job/profile/evaluation tuples, evaluation freshness, target, and packet document/answer/disclosure
+digests. A real capability ID is deterministically packet-bound, and one capability version/packet/
+operation can create only one durable inspection binding. The owner-confirmed production command
+requires the exact capability ID/version/digest and packet ID/digest and an already persisted current
+approval before it can launch; it was not invoked during this train.
+
+The real local database had schema 7, one pending migration, integrity `PASS`, and zero FK issues. A
+verified schema-7 backup and restore preview passed; the confirmed migration created another verified
+schema-7 backup and completed at schema 8 with zero pending migrations, integrity `PASS`, zero FK
+issues, 26 jobs, 29 job versions, 173 field-evidence rows, 268 requirement-evidence rows, and 493
+coverage items. Private offline preparation then bound the exact owner-selected request-9 source run,
+Lever tenant capability, external job ID, role, and local application destination; persisted one
+review-required packet with two unresolved readiness blockers; and wrote one ignored DRAFT capability
+proposal. No target capability or inspection binding was activated. A new schema-8 backup and restore
+preview passed. Active source and target capabilities are both zero.
+
+Completed validation at this point: formatting check; zero-warning lint; strict typecheck; 58 focused
+runner/database/schema tests; 489 full unit tests across 48 files; 21 integration tests across 3 files;
+33 serialized Playwright E2E tests including the fictional target matrix; local production build;
+showcase production build; showcase boundary audit (`19` source files and export checked); privacy
+audit (`306` tracked files, `880` history paths, `878` history blobs, `1393` build/test artifacts, and
+`11` private canaries); full dependency audit; and production dependency audit. Both dependency
+audits report zero vulnerabilities. One initial unit run correctly exposed a stale schema-7 test
+fixture; the fixture was updated to current schema 8 and the complete rerun passed. Remaining gates are
+aggregate preflight/release check, final diff/fsck, exact-head commit/push/PR CI, full-delta self-review,
+conditional normal merge, and clean-main verification. Lifetime real actions remain `9/0/0/0`.
+
+The first clean committed-head release check at `2bc99e3c9eb9047da2705be8ccab8e001f32311c`
+passed 491 unit, 21 integration, 33 E2E, both builds, privacy, dependency, database, and release
+classification gates. During the subsequent full-delta self-review, an actual out-of-scope loopback
+redirect fixture showed that the browser blocked navigation safely but reported `FORM_CHANGED`
+instead of the required precise `DESTINATION_CHANGED`. The first focused redirect rerun therefore
+reported 1 passed/1 failed, and a second attempt still reported 1 passed/1 failed. The adapter now
+returns a value-free `DESTINATION_CHANGED` snapshot whenever navigation is blocked or the page URL no
+longer equals the exact bound URL; the focused E2E rerun passes 2/2. A new exact-head commit, complete
+release rerun, and both refreshed GitHub CI checks are required before merge.

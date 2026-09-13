@@ -20,12 +20,22 @@ export async function getRunnerEnablementView() {
   const local = getLocalDatabase();
   const repository = getRunnerEnablementRepository();
   if (!local || !repository)
-    return { status: "DATABASE_MIGRATION_REQUIRED" as const, capabilities: [], recoveries: [] };
+    return {
+      status: "DATABASE_MIGRATION_REQUIRED" as const,
+      capabilities: [],
+      recoveries: [],
+      inspections: [],
+    };
   let allowlist: Awaited<ReturnType<typeof loadPrivateRunnerTargetAllowlist>>;
   try {
     allowlist = await loadPrivateRunnerTargetAllowlist(repositoryRoot(), allowlistFilename());
   } catch {
-    return { status: "CONFIGURATION_REJECTED" as const, capabilities: [], recoveries: [] };
+    return {
+      status: "CONFIGURATION_REJECTED" as const,
+      capabilities: [],
+      recoveries: [],
+      inspections: [],
+    };
   }
   const capabilities = allowlist.capabilities.map((capability) => ({
     capabilityId: capability.capabilityId,
@@ -36,6 +46,7 @@ export async function getRunnerEnablementView() {
     allowedPathPrefix: capability.allowedPathPrefix,
     formVersion: capability.formVersion,
     adapterVersion: capability.adapterVersion,
+    operations: [...capability.allowedOperations],
     readiness: runnerTargetReadiness(capability).status,
     policyExpiresAt: capability.policyExpiresAt,
     capabilityExpiresAt: capability.capabilityExpiresAt,
@@ -54,7 +65,25 @@ export async function getRunnerEnablementView() {
     state: string;
     stopReason: string | null;
   }>;
-  return { status: allowlist.status, capabilities, recoveries };
+  const inspections = local.sqlite
+    .prepare(
+      `SELECT id,operation,state,safe_stop_reason AS stopReason,field_count AS fieldCount,
+              unresolved_count AS unresolvedCount,form_version AS formVersion,
+              adapter_version AS adapterVersion,updated_at AS updatedAt
+       FROM runner_inspection_bindings ORDER BY updated_at DESC LIMIT 20`,
+    )
+    .all() as Array<{
+    id: string;
+    operation: string;
+    state: string;
+    stopReason: string | null;
+    fieldCount: number;
+    unresolvedCount: number;
+    formVersion: string;
+    adapterVersion: string;
+    updatedAt: string;
+  }>;
+  return { status: allowlist.status, capabilities, recoveries, inspections };
 }
 
 async function exactCapability(capabilityId: string): Promise<RunnerTargetCapability> {

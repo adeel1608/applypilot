@@ -4,7 +4,10 @@ import BetterSqlite3 from "better-sqlite3";
 
 import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
-import { operationalSourceReadiness } from "./lib/source-readiness";
+import {
+  operationalSourceReadiness,
+  sourceEnabledBetaReleaseReadiness,
+} from "./lib/source-readiness";
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--quality-gates-complete")) {
@@ -35,6 +38,7 @@ async function main(): Promise<void> {
     schemaVersion = 0;
   }
   const source = await operationalSourceReadiness(root);
+  const sourceBeta = await sourceEnabledBetaReleaseReadiness(root);
   const schemaStatus = databaseSchemaStatus(schemaVersion);
   const manualBetaBlockers = [
     ...(schemaStatus.pendingMigrations > 0 ? ["PENDING_DATABASE_MIGRATION"] : []),
@@ -57,13 +61,13 @@ async function main(): Promise<void> {
     `RELEASE_MANUAL_INTAKE_BETA state=${manualBetaBlockers.length === 0 ? "READY" : "NOT_READY"} blockers=${manualBetaBlockers.length ? manualBetaBlockers.join(",") : "none"}`,
   );
   console.log(
-    `RELEASE_SOURCE_ENABLED_BETA state=${source.activeCapabilityCount > 0 ? "APPROVED_CAPABILITY_PRESENT_REQUIRES_SCOPED_SMOKE" : "WAITING_FOR_APPROVED_TENANT"}`,
+    `RELEASE_SOURCE_ENABLED_BETA state=${sourceBeta.state} active_capability_count=${source.activeCapabilityCount}`,
   );
   console.log(
-    "RELEASE_PERSONAL_LIVE_V1 state=NOT_READY blockers=APPROVED_SOURCE_REQUIRED,REAL_RUNNER_TARGET_APPROVAL_REQUIRED",
+    "RELEASE_PERSONAL_LIVE_V1 state=NOT_READY blockers=REAL_RUNNER_TARGET_APPROVAL_REQUIRED,FIRST_REAL_TARGET_VALIDATION_REQUIRED",
   );
   console.log(
-    `RELEASE_CLASSIFICATION state=${manualBetaBlockers.length === 0 ? "MANUAL_INTAKE_BETA_READY" : "NOT_READY"} deferred=SOURCE_TENANT_APPROVAL,REAL_TARGET_APPROVAL`,
+    `RELEASE_CLASSIFICATION state=${manualBetaBlockers.length === 0 && sourceBeta.state === "READY" ? "SOURCE_ENABLED_PERSONAL_BETA_READY" : manualBetaBlockers.length === 0 ? "MANUAL_INTAKE_BETA_READY" : "NOT_READY"} deferred=REAL_TARGET_APPROVAL`,
   );
 }
 

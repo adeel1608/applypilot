@@ -5,8 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   ApplicationPacketSchema,
+  LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+  LEVER_REAL_INSPECTION_ADAPTER_VERSION,
   RunnerTargetCapabilitySchema,
+  deterministicRunnerTargetCapabilityId,
+  freezeInspectionBinding,
   freezeRunnerBinding,
+  packetDigest,
 } from "@applypilot/application-runner";
 
 import { RunnerEnablementRepository } from "./runner-enablement-repository";
@@ -24,6 +29,7 @@ function database() {
     "0005_r2_matching_quality_hardening.sql",
     "0006_r2_calibration_qualification.sql",
     "0007_personal_live_v1_enablement.sql",
+    "0008_real_target_inspection_scope.sql",
   ]) {
     sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
   }
@@ -68,7 +74,7 @@ function database() {
 
 function capability() {
   return RunnerTargetCapabilitySchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     capabilityId: "runner-synthetic-fixture",
     version: 1,
     predecessorVersion: null,
@@ -78,6 +84,7 @@ function capability() {
     allowedPathPrefix: "/synthetic-application",
     formVersion: "synthetic-form-v1",
     adapterVersion: "synthetic-adapter-v1",
+    allowedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"],
     approvalState: "APPROVED",
     approvalReference: "fixture-approval",
     approvedAt: now.toISOString(),
@@ -85,6 +92,17 @@ function capability() {
     policyExpiresAt: "2027-09-10T00:00:00.000Z",
     capabilityExpiresAt: "2027-09-10T00:00:00.000Z",
     revokedAt: null,
+  });
+}
+
+function inspectionCapability() {
+  return RunnerTargetCapabilitySchema.parse({
+    ...capability(),
+    capabilityId: "runner-inspection-fixture",
+    alias: "Fictional read-only inspection",
+    formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+    adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
+    allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
   });
 }
 
@@ -227,6 +245,176 @@ describe("runner enablement persistence", () => {
         safeMetadata: { state: "PAUSED", candidateName: "forbidden" } as never,
       }),
     ).toThrow();
+    sqlite.close();
+  });
+
+  it("persists a separately scoped inspection binding and safe lifecycle audits", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `inspection:${++sequence}`,
+    );
+    const target = inspectionCapability();
+    repository.persistTargetCapabilityVersion(target);
+    const inspectionPacket = ApplicationPacketSchema.parse({
+      ...packet(),
+      documents: [],
+      answers: [],
+    });
+    const binding = freezeInspectionBinding(inspectionPacket, target);
+    repository.bindInspection({
+      runId: "inspection-run:1",
+      binding,
+      targetCapability: target,
+    });
+    expect(repository.currentInspectionBinding("inspection-run:1")).toEqual(binding);
+    repository.recordInspectionAudit("inspection-run:1", {
+      type: "runner.inspection.opened",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        adapterVersion: target.adapterVersion,
+        formVersion: target.formVersion,
+      },
+    });
+    repository.recordInspectionAudit("inspection-run:1", {
+      type: "runner.inspection.completed",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        fieldCount: 9,
+        reviewRequiredCount: 3,
+        documentRequiredCount: 2,
+        unsupportedCount: 1,
+      },
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT state,safe_stop_reason AS safeStopReason,field_count AS fieldCount,
+                  classification_summary_json AS summary
+           FROM runner_inspection_bindings WHERE id='inspection-run:1'`,
+        )
+        .get(),
+    ).toEqual({
+      state: "COMPLETED",
+      safeStopReason: null,
+      fieldCount: 9,
+      summary: JSON.stringify({
+        reviewRequiredCount: 3,
+        documentRequiredCount: 2,
+        unsupportedCount: 1,
+      }),
+    });
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM audit_events WHERE entity_type='runner_inspection'")
+        .pluck()
+        .get(),
+    ).toBe(3);
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM audit_events").all())).not.toContain(
+      "forbidden@example.test",
+    );
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("invalidates inspection bindings when persisted packet components change", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `inspection-stale:${++sequence}`,
+    );
+    const target = inspectionCapability();
+    repository.persistTargetCapabilityVersion(target);
+    const binding = freezeInspectionBinding(
+      ApplicationPacketSchema.parse({ ...packet(), documents: [], answers: [] }),
+      target,
+    );
+    repository.bindInspection({
+      runId: "inspection-run:stale",
+      binding,
+      targetCapability: target,
+    });
+    sqlite
+      .prepare(
+        `INSERT INTO application_questions
+         (id,packet_id,question_key,question_text,options_json,required,sensitive,version,created_at)
+         VALUES ('question:changed','packet:1','changed','Changed','[]',1,0,1,?)`,
+      )
+      .run(now.toISOString());
+    sqlite
+      .prepare(
+        `INSERT INTO application_answer_versions
+         (id,question_id,answer_json,certainty,fact_references_json,disclosure_state,version,created_at)
+         VALUES ('answer:changed','question:changed','true','VERIFIED_ANSWER','[]','APPROVED',1,?)`,
+      )
+      .run(now.toISOString());
+    expect(() => repository.currentInspectionBinding("inspection-run:stale")).toThrow(
+      "INSPECTION_BINDING_STALE",
+    );
+    sqlite.close();
+  });
+
+  it("binds real inspection authority only when its deterministic ID commits to the packet", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `real-inspection:${++sequence}`,
+    );
+    const realPacket = ApplicationPacketSchema.parse({
+      ...packet(),
+      targetUrl: "https://jobs.lever.co/fictional/00000000-0000-4000-8000-000000000001/apply",
+      targetHost: "jobs.lever.co",
+      documents: [],
+      answers: [],
+    });
+    sqlite
+      .prepare("UPDATE application_packets SET target_url=?,target_host=? WHERE id='packet:1'")
+      .run(realPacket.targetUrl, realPacket.targetHost);
+    const targetBase = {
+      ...inspectionCapability(),
+      targetKind: "REAL_TARGET" as const,
+      allowedOrigin: "https://jobs.lever.co",
+      allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+    };
+    const wrongTarget = RunnerTargetCapabilitySchema.parse({
+      ...targetBase,
+      capabilityId: "runner_wrong_packet_scope",
+    });
+    repository.persistTargetCapabilityVersion(wrongTarget);
+    expect(() =>
+      repository.bindInspection({
+        runId: "inspection-run:wrong",
+        binding: freezeInspectionBinding(realPacket, wrongTarget),
+        targetCapability: wrongTarget,
+      }),
+    ).toThrow("INSPECTION_CAPABILITY_PACKET_SCOPE_MISMATCH");
+
+    const correctTarget = RunnerTargetCapabilitySchema.parse({
+      ...targetBase,
+      capabilityId: deterministicRunnerTargetCapabilityId({
+        targetKind: "REAL_TARGET",
+        allowedOrigin: targetBase.allowedOrigin,
+        allowedPathPrefix: targetBase.allowedPathPrefix,
+        operation: "OPEN_AND_INSPECT_ONLY",
+        formVersion: targetBase.formVersion,
+        adapterVersion: targetBase.adapterVersion,
+        packetDigest: packetDigest(realPacket),
+      }),
+    });
+    repository.persistTargetCapabilityVersion(correctTarget);
+    const binding = freezeInspectionBinding(realPacket, correctTarget);
+    repository.bindInspection({
+      runId: "inspection-run:correct",
+      binding,
+      targetCapability: correctTarget,
+    });
+    expect(repository.currentInspectionBinding("inspection-run:correct")).toEqual(binding);
     sqlite.close();
   });
 });

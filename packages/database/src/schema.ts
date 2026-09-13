@@ -964,6 +964,7 @@ export const runnerTargetCapabilityVersions = sqliteTable("runner_target_capabil
   allowedPathPrefix: text("allowed_path_prefix").notNull(),
   formVersion: text("form_version").notNull(),
   adapterVersion: text("adapter_version").notNull(),
+  allowedOperationsJson: text("allowed_operations_json").notNull(),
   approvalState: text("approval_state").notNull(),
   approvalReference: text("approval_reference"),
   approvedAt: text("approved_at"),
@@ -1003,6 +1004,37 @@ export const runnerRecoveryEvents = sqliteTable("runner_recovery_events", {
   reasonCode: text("reason_code").notNull(),
   safeMetadataJson: text("safe_metadata_json").notNull(),
   occurredAt: text("occurred_at").notNull(),
+});
+
+export const runnerInspectionBindings = sqliteTable("runner_inspection_bindings", {
+  id: text("id").primaryKey(),
+  targetCapabilityVersionId: text("target_capability_version_id")
+    .notNull()
+    .references(() => runnerTargetCapabilityVersions.id, { onDelete: "restrict" }),
+  operation: text("operation").notNull(),
+  packetId: text("packet_id")
+    .notNull()
+    .references(() => applicationPackets.id, { onDelete: "restrict" }),
+  packetDigest: text("packet_digest").notNull(),
+  jobVersionId: text("job_version_id").notNull(),
+  profileVersionId: text("profile_version_id").notNull(),
+  evaluationVersionId: text("evaluation_version_id").notNull(),
+  documentsDigest: text("documents_digest").notNull(),
+  answersDigest: text("answers_digest").notNull(),
+  disclosuresDigest: text("disclosures_digest").notNull(),
+  targetUrl: text("target_url").notNull(),
+  targetOrigin: text("target_origin").notNull(),
+  targetPath: text("target_path").notNull(),
+  allowedPathPrefix: text("allowed_path_prefix").notNull(),
+  formVersion: text("form_version").notNull(),
+  adapterVersion: text("adapter_version").notNull(),
+  unresolvedCount: integer("unresolved_count").notNull(),
+  state: text("state").notNull(),
+  safeStopReason: text("safe_stop_reason"),
+  fieldCount: integer("field_count").notNull(),
+  classificationSummaryJson: text("classification_summary_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });
 
 export const schema = {
@@ -1063,4 +1095,5 @@ export const schema = {
   runnerTargetCapabilityVersions,
   runnerRunBindings,
   runnerRecoveryEvents,
+  runnerInspectionBindings,
 };

@@ -87,7 +87,9 @@ export function getRunnerEnablementRepository(): RunnerEnablementRepository | nu
   if (
     !local ||
     !local.sqlite
-      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='runner_run_bindings'")
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runner_inspection_bindings'",
+      )
       .get()
   )
     return null;

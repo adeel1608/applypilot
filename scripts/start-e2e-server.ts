@@ -45,6 +45,7 @@ try {
       "0005_r2_matching_quality_hardening.sql",
       "0006_r2_calibration_qualification.sql",
       "0007_personal_live_v1_enablement.sql",
+      "0008_real_target_inspection_scope.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
