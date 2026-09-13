@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "playwright";
 
 import {
   ApplicationPacketSchema,
@@ -119,6 +120,16 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     ["hidden-step", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["hidden-submit", "COMPLETED", null],
     ["file-chooser", "COMPLETED", null],
+    ["labels-absent", "COMPLETED", null],
+    ["unusual-native", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["large-attributes", "COMPLETED", null],
+    ["unicode", "COMPLETED", null],
+    ["no-form", "STOPPED", "FORM_CHANGED"],
+    ["multiple-forms", "COMPLETED", null],
+    ["over-200", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["dynamic-insert", "COMPLETED", null],
+    ["shadow-dom", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["no-submit", "STOPPED", "FORM_CHANGED"],
   ] as const) {
     const { capability, binding } = inspection(caseName);
     const result = await new TargetInspectionRunner(
@@ -140,5 +151,174 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
         candidateDataOutboundFields: 0,
       });
     }
+  }
+});
+
+test("bounds fictional attributes and handles labels absent and Unicode safely", async ({
+  page,
+}) => {
+  for (const caseName of ["labels-absent", "large-attributes", "unicode"] as const) {
+    const { binding } = inspection(caseName);
+    const snapshot = await new PlaywrightReadOnlyInspectionBrowser(page).inspect(binding);
+    expect(snapshot.controls.length, caseName).toBeGreaterThan(0);
+    for (const field of snapshot.controls) {
+      expect(field.name.length, caseName).toBeLessThanOrEqual(200);
+      expect(field.id.length, caseName).toBeLessThanOrEqual(200);
+      expect(field.label.length, caseName).toBeLessThanOrEqual(200);
+      expect(field.autocomplete.length, caseName).toBeLessThanOrEqual(100);
+      expect(field.type.length, caseName).toBeLessThanOrEqual(40);
+      expect(/[\uD800-\uDBFF]$/u.test(`${field.name}${field.id}${field.label}`), caseName).toBe(
+        false,
+      );
+    }
+    if (caseName === "labels-absent") expect(snapshot.controls[0]?.label).toBe("");
+  }
+});
+
+test("defensive extraction isolates fictional per-control failures and DOM mutation", async ({
+  browser,
+}) => {
+  for (const caseName of [
+    "style",
+    "labels-collection",
+    "label-text",
+    "detach",
+    "mutate",
+  ] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    let nonReadRequestCount = 0;
+    page.on("request", (request) => {
+      if (!new Set(["GET", "HEAD"]).has(request.method())) nonReadRequestCount += 1;
+    });
+    await page.addInitScript((fixture) => {
+      if (fixture === "style") {
+        const original = window.getComputedStyle.bind(window);
+        window.getComputedStyle = ((element: Element, pseudo?: string | null) => {
+          if (element instanceof HTMLInputElement && element.name === "firstName") {
+            throw new Error("fictional style accessor failure");
+          }
+          return original(element, pseudo);
+        }) as typeof window.getComputedStyle;
+      }
+      if (fixture === "labels-collection") {
+        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "labels");
+        if (descriptor?.get) {
+          Object.defineProperty(HTMLInputElement.prototype, "labels", {
+            configurable: true,
+            get() {
+              if (this.name === "firstName") {
+                throw new Error("fictional labels collection failure");
+              }
+              return descriptor.get!.call(this);
+            },
+          });
+        }
+      }
+      if (fixture === "label-text") {
+        const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
+        if (descriptor?.get) {
+          Object.defineProperty(HTMLLabelElement.prototype, "textContent", {
+            configurable: true,
+            get() {
+              if (this.querySelector('input[name="firstName"]')) {
+                throw new Error("fictional label accessor failure");
+              }
+              return descriptor.get!.call(this);
+            },
+          });
+        }
+      }
+      if (fixture === "detach" || fixture === "mutate") {
+        const original = Element.prototype.getAttribute;
+        let changed = false;
+        Element.prototype.getAttribute = function (name: string) {
+          const firstName = original.call(this, "name") === "firstName";
+          if (!changed && firstName && name === "type") {
+            changed = true;
+            if (fixture === "detach") this.remove();
+            else {
+              const inserted = document.createElement("input");
+              inserted.name = "dynamicallyInsertedDuringInspection";
+              document.querySelector("form")?.append(inserted);
+            }
+          }
+          return original.call(this, name);
+        };
+      }
+    }, caseName);
+    const { capability, binding } = inspection("normal");
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(page)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, caseName).toMatchObject({
+      state: "STOPPED",
+      stopReason: "UNSUPPORTED_CONTROL",
+    });
+    expect(nonReadRequestCount, caseName).toBe(0);
+    expect(
+      await page
+        .locator("input, textarea, select")
+        .evaluateAll((controls) =>
+          controls.every((control) => !(control as HTMLInputElement).value),
+        ),
+      caseName,
+    ).toBe(true);
+    await context.close();
+  }
+});
+
+test("classifies synthetic navigation, reload, and close races without a retry", async ({
+  browser,
+}) => {
+  for (const caseName of ["client-navigation", "reload", "close"] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const { capability, binding } = inspection("normal");
+    const originalEvaluate = page.evaluate.bind(page);
+    let injected = false;
+    const unstablePage = new Proxy(page, {
+      get(target, property) {
+        if (property === "evaluate") {
+          return async (...args: Parameters<Page["evaluate"]>) => {
+            if (!injected) {
+              injected = true;
+              if (caseName === "client-navigation") {
+                await page.goto(`${binding.targetUrl}&fictional-navigation=1`, {
+                  waitUntil: "commit",
+                });
+              } else if (caseName === "reload") {
+                await page.reload({ waitUntil: "commit" });
+              } else {
+                await page.close();
+              }
+            }
+            return originalEvaluate(...args);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Page;
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(unstablePage)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, caseName).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "NAVIGATION_EXCEPTION",
+    });
+    expect(injected, caseName).toBe(true);
+    await context.close();
   }
 });

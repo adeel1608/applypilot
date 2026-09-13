@@ -5795,3 +5795,198 @@ No source or employer request, browser launch, form action, upload, submission, 
 field occurred in this task. Active source and real-target capabilities remain zero. Lifetime actions
 remain `9/1/0/0`; Source-enabled Personal Beta remains `READY`, first real target validation remains
 unproven, and Personal Live V1 remains `NOT_READY`.
+
+# Lever read-only DOM inspection hardening - 2026-09-13
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting
+`main` and `origin/main` are `c6ccb8dd044212d74f16100e335e12e9d6969e00`; work is isolated on
+`fix/lever-dom-inspection`. Lifetime real source/employer/upload/submission actions are `9/2/0/0`
+and must not change. No employer GET/HEAD, browser navigation to an employer, form interaction,
+upload, submission, or candidate-data transmission is authorized.
+
+## Current state, evidence, objective, and assumptions
+
+The second real inspection run `inspection_6b8108c7-6c18-4258-a867-a3acaec283b8` used the exact
+approved version-4 capability and current packet, reached the exact in-scope Lever destination, and
+then stopped `PAGE_CHANGED` with the value-free internal category `DOM_INSPECTION_EXCEPTION`.
+Browser writes, form mutations, clicks, uploads, submissions, and candidate outbound fields were all
+zero. The run retained no real DOM content, exception detail, response body, header, cookie, field
+value, or employer prose. Version 5 is its immutable revoked successor and active real-target
+capabilities are zero. Historical runs and capability versions 1-5 remain immutable.
+
+The durable category proves that the existing `page.evaluate` call rejected, but not which DOM
+expression or page lifecycle event caused it. Static inspection shows that the current callback
+allows any one failure from label collection iteration, label text, element attributes/identity,
+visibility-style lookup, or another control property to abort the complete snapshot. It also maps
+all evaluation rejection to `DOM_INSPECTION_EXCEPTION`, including execution-context destruction from
+a navigation, reload, page close, or crash. A static `querySelectorAll` result is normally safe, but
+nodes may detach or the page may navigate after `domcontentloaded`; `getComputedStyle` and overridden
+native accessors are observable throw boundaries. No assumption is made that the live page contained
+any particular control or markup.
+
+The objective is a single passive, bounded, robust DOM snapshot in which an individually unreadable
+or detached control becomes a safe unsupported control instead of crashing the whole inventory,
+while whole-page instability still fails closed. Navigation/reload/close/crash during evaluation
+must be classified as `NAVIGATION_EXCEPTION`; stable-context failures that prevent any trustworthy
+snapshot remain `DOM_INSPECTION_EXCEPTION`; schema and final observation failures remain
+`SNAPSHOT_INVALID` and `ADAPTER_OUTPUT_INVALID`. Public failure remains `PAGE_CHANGED`.
+
+## Requirements, architecture, files, and data flow
+
+- `packages/application-runner/src/lever-inspection-adapter.ts`: isolate permitted per-control reads
+  behind browser-local defensive helpers; bound and surrogate-protect every retained string; tolerate
+  missing labels and detached nodes; mark controls unsupported when identity, label, attributes, or
+  computed style cannot be safely read; detect shadow-DOM/custom interaction as unsupported; retain
+  one evaluation, one `goto`, no retry, and exact GET/HEAD/origin/path enforcement. Add passive main-
+  frame navigation, page-close, and crash observation around evaluation so context instability maps
+  to `NAVIGATION_EXCEPTION` without retaining exception text or URLs.
+- `packages/application-runner/src/inspection-runner.test.ts`: cover value-free unit boundaries for
+  stable evaluation failure, navigation/reload/context destruction, page close/crash, invalid safe
+  snapshot, adapter-output validation, exact authority, and zero mutation.
+- `apps/web/app/synthetic-inspection/page.tsx` and `tests/e2e/target-inspection.spec.ts`: extend the
+  fictional loopback fixture/matrix across ordinary forms, labels present/absent, detached/mutating
+  controls, simulated style and label access failures, navigation/reload/context loss, unusual native
+  inputs, long/Unicode attributes, hidden/custom controls, no/multiple forms, more than 200 controls,
+  dynamic insertion, shadow DOM, and submit/no-submit structure. No external host is permitted.
+- `docs/APPLICATION_RUNNER.md`: document the defensive snapshot and lifecycle classification without
+  claiming the real target/form has been validated. `PROJECT_PLAN.md` records exact results.
+
+Data flow remains `one exact in-scope goto -> passive lifecycle guard -> one bounded browser-context
+snapshot -> strict safe snapshot schema -> inert semantic classification -> strict observation ->
+value-free audit`. There is no candidate input channel and no map/fill/upload/submit/final-consent
+method. The target capability, path/origin, operation, packet, policy, and form contract do not
+change. Because extraction and lifecycle classification materially change, adapter version becomes
+`lever-real-inspection-v2`; form contract remains `lever-application-inspection-v1` because accepted
+structural semantics do not change. Policy remains `real-target-inspection-v1`.
+
+## Risks, security/privacy, testing, rollback, and acceptance
+
+Risks are treating an unreliable page as stable, inventing fields after a failed read, retaining
+employer text, masking a navigation as a benign control failure, introducing a second request,
+weakening destination enforcement, or allowing inspection authority into application operations.
+Controls are a fixed field cap, bounded strings, explicit unsupported classification, lifecycle
+epochs/listeners with no payloads, exact URL checks before and after evaluation, strict Zod schemas,
+literal-zero metrics, fictional fixtures, negative authority tests, and privacy/diff review. No error
+message, stack, URL from an exception, raw HTML, value, response body, cookie, storage item, header,
+or candidate fact may be persisted.
+
+Testing begins with red synthetic reproduction of a per-control style/text accessor failure and a
+navigation/context failure that v1 misclassifies. The complete A-W matrix must then prove supported
+forms inventory safely, benign unreadable controls stop as `UNSUPPORTED_CONTROL`, structurally
+unreliable pages fail closed, navigation instability maps to `NAVIGATION_EXCEPTION`, and snapshot/
+observation failures keep their existing categories. Tests must prove one `goto`, no retry, no
+external request, and zero browser write, value change, click, typing, selection, file chooser,
+upload, submission, candidate outbound, or application-operation authority.
+
+Validation includes format, zero-warning lint, strict typecheck, focused runner/adapter/database and
+DOM matrix tests, full unit/integration/serialized E2E, local and showcase production builds,
+showcase boundary and privacy audits, full and production dependency audits, aggregate preflight and
+release check, schema/pending/integrity/FKs, migration immutability, `git diff --check`, and `git fsck
+--strict`. Schema remains 8, pending migrations zero, integrity `PASS`, and FKs zero; migrations
+`0000`-`0008` are immutable and no migration is expected. Rollback is a normal revert of the offline
+code/test/docs commit; private history is untouched.
+
+Acceptance requires a precise deterministic synthetic reproduction; the narrow defensive extraction
+and lifecycle classification to pass the complete matrix; adapter v2/form v1; all zero-mutation and
+negative-authority invariants; no real/private data in Git; full local and exact-head GitHub CI green;
+normal merge of the owner-preapproved PR; clean refreshed main; and an ignored, inactive version-6
+DRAFT with predecessor 5 only after packet/job/profile/evaluation bindings are revalidated. Creating
+v6 is not approval or authority for employer visit 3.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before changing application code or tests.
+2. Add red synthetic unit and Playwright regressions for isolated property/style failure and
+   navigation/context instability, then extend the complete A-W fictional matrix.
+3. Implement bounded defensive per-control extraction plus passive navigation/close/crash lifecycle
+   classification, with one evaluation, no wait, no retry, and no second navigation.
+4. Bump only the adapter to `lever-real-inspection-v2`; retain form and policy versions and all
+   operation/destination authority.
+5. Run focused and complete validation, update this plan/docs with exact results, inspect the full
+   privacy/authority/migration diff, and commit coherent work.
+6. Push `fix/lever-dom-inspection`, open PR `fix: harden Lever read-only DOM inspection`, require exact-
+   head push and PR CI green, self-review, and merge normally only if every preapproved condition
+   remains true.
+7. Refresh clean main, verify private history and current packet/version bindings, create ignored
+   version-6 DRAFT with predecessor 5 and fresh 24-hour/30-minute expiries using production digest
+   logic, keep it inactive, and stop for exact owner approval without any live request.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / CLEAN COMMITTED-HEAD RELEASE PASS / EXACT-HEAD CI PENDING / OFFLINE ONLY`. Historical
+visit #2 remains immutable at `STOPPED / PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`; no content or
+cause detail was backfilled. The live destination, form, or exact throwing expression cannot be
+inferred from the retained enum. The deterministic software class is nevertheless reproduced:
+before the fix, a fictional `getComputedStyle` failure aborted the complete browser evaluation, and
+three new lifecycle tests showed main-frame navigation, close, and crash all misclassified as stable
+`DOM_INSPECTION_EXCEPTION` while 31 prior focused cases remained green.
+
+The static callback audit covered collection query/conversion/mapping; tag, attribute, ID,
+`hasAttribute`, connection, labels collection and label-text access; computed style and style
+properties; control detachment and list mutation; form and structural marker reads; navigation,
+reload, execution-context destruction, main-frame detach, page close/crash; unusual native controls;
+long/Unicode strings; control/form caps; dynamic controls; and open shadow interaction. Whole-page
+query/conversion failure still rejects as `DOM_INSPECTION_EXCEPTION`. Snapshot-schema rejection and
+final observation rejection remain `SNAPSHOT_INVALID` and `ADAPTER_OUTPUT_INVALID`.
+
+`lever-real-inspection-v2` performs the same single exact `goto` and one passive evaluation. Every
+individual control string/boolean/label/style read is isolated; retained strings are length bounded
+and do not end on a lone high surrogate. A failed read or detached control becomes an unsupported
+control. Changed control identity/order, more than 200 controls, more than 20 forms, unreadable page
+markers, opaque interactive shadow DOM, or another incomplete structure fails closed through the
+existing unsupported-control signal. Passive main-frame navigation/reload/detach and page close/
+crash events are counted without payloads around evaluation; an unstable context maps to
+`NAVIGATION_EXCEPTION`. There is no sleep, second `goto`, retry, error-text inspection, page content,
+field value, raw HTML, response body, cookie, storage, header, click, write, upload, submission, or
+candidate-data channel.
+
+The form contract remains `lever-application-inspection-v1`: semantic fields, structural acceptance,
+and protection behavior are unchanged. Only extraction robustness and safe lifecycle classification
+changed, so adapter v2 is the appropriate version boundary. Target origin/path, operation, packet,
+policy, request methods, and application authority remain unchanged. Inspection authority still
+cannot construct map/fill/upload/submit/final-consent operations.
+
+The fictional A-W matrix covers ordinary and multiple forms; labels present, absent, null, and
+throwing; detached and mutating controls; style failure; execution-context navigation, same-origin
+client navigation, reload, main-frame detach, page close/crash; unusual native inputs; 10,000-unit
+attributes; Unicode/surrogate boundaries; hidden and custom controls; no form; over 200 controls;
+dynamic insertion; interactive shadow DOM; and submit/no-submit structure. Five Playwright tests pass
+and assert zero non-GET/HEAD requests, unchanged empty control values, no retry, correct fail-closed
+signals, and bounded raw structural fields. Focused runner/adapter/database tests pass `64/64`.
+
+The complete dirty-tree release check passes format, zero-warning lint, strict typecheck, `507` unit
+tests across `49` files, `21` integration tests across `3` files, both production builds (`31` local
+routes and `6` showcase pages), the `19`-file showcase audit, all `36` serialized E2E tests, privacy
+audit, and full plus production dependency audits with zero vulnerabilities. Privacy checked `315`
+tracked files, `931` reachable-history paths, `929` reachable-history blobs, `1,417` build/test
+artifacts, and `11` private canaries. Schema is 8, pending migrations zero, integrity `PASS`, and FKs
+zero. No migration was added and `0000`-`0008` have no base-to-working-tree diff. The release summary
+remains Source-enabled Personal Beta `READY`, first real target validation unproven, and Personal Live
+V1 `NOT_READY`.
+
+The committed implementation head `360a4f22fcb553d8f0f6aba4f95da7f3886ad7f8` passed the complete clean
+release check: format, zero-warning lint, strict typecheck, 507/507 unit tests in 49 files, 21/21
+integration tests in 3 files, local production build with 31 generated pages, public-showcase build
+with 6 pages, showcase audit across 19 source files, and 36/36 serialized Playwright tests. The
+privacy audit passed across 315 tracked files, 938 historical paths, 936 historical blobs, 1,428
+build/test artifacts, and 11 private canaries. Full and production dependency audits reported zero
+vulnerabilities. Release state was schema 8, zero pending migrations, integrity `PASS`, zero foreign-
+key issues, zero active source capabilities, and runner `TARGET_APPROVAL_REQUIRED`. `git diff
+--check` passed and `git fsck --strict` exited successfully; its informational output listed only
+unreachable local objects and no repository corruption. The focused post-hardening runner/database
+set also passed 64/64 tests, and the expanded target-inspection Playwright file passed 5/5 tests.
+
+The complete A-W synthetic matrix now covers normal forms, labels present/absent, unusual native
+types, long/Unicode attributes, no/multiple forms, more than 200 controls, dynamic insertion, shadow
+interaction, no submit control, custom/hidden/document/eligibility/protection widgets, isolated
+style/label failures, detachment/list mutation, same-origin navigation, reload, and page close.
+Inventory tests assert bounded safe metadata, unchanged input values, and zero non-GET/HEAD browser
+requests. Lifecycle tests additionally cover execution-context destruction, main-frame detachment,
+and crash. Stable whole-snapshot failure remains `DOM_INSPECTION_EXCEPTION`; lifecycle instability
+is now `NAVIGATION_EXCEPTION`; invalid snapshot and invalid observation remain separately classified.
+
+Remaining mechanics are the plan-results commit, complete clean final-branch-head release rerun,
+branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean main refresh, current
+private binding verification, and inactive version-6 draft creation. No employer or source request,
+browser launch to an employer, form interaction, upload, submission, or candidate outbound field
+occurred; lifetime actions remain `9/2/0/0`.
