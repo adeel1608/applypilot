@@ -10,13 +10,17 @@ import {
 } from "./lib/local-process";
 import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
-import { operationalSourceReadiness } from "./lib/source-readiness";
+import {
+  operationalSourceReadiness,
+  sourceEnabledBetaReleaseReadiness,
+} from "./lib/source-readiness";
 import { validatePrivateProfileAtPath } from "./validate-private-profile";
 
 async function main(): Promise<void> {
   const root = repositoryRoot();
   const profile = await validatePrivateProfileAtPath(join(root, "data", "profile.private.json"));
   const source = await operationalSourceReadiness(root);
+  const sourceBeta = await sourceEnabledBetaReleaseReadiness(root);
   const databasePresent = existsSync(localDatabasePath());
   let databaseSchema = 0;
   let databaseIntegrity = "UNKNOWN";
@@ -67,7 +71,7 @@ async function main(): Promise<void> {
     `PREFLIGHT_MANUAL_INTAKE_BETA state=${manualBetaBlockers.length === 0 && failures.length === 0 ? "READY" : "BLOCKED"}`,
   );
   console.log(
-    `PREFLIGHT_SOURCE_ENABLED_BETA state=${source.activeCapabilityCount > 0 ? "APPROVED_CAPABILITY_PRESENT" : "WAITING_FOR_APPROVED_TENANT"}`,
+    `PREFLIGHT_SOURCE_ENABLED_BETA state=${sourceBeta.state} active_capability_count=${source.activeCapabilityCount}`,
   );
   console.log(
     `PREFLIGHT_RESULT status=${failures.length ? "BLOCKED" : manualBetaBlockers.length ? "PASS_WITH_MANUAL_BETA_BLOCKERS" : "PASS"} blockers=${failures.length ? failures.join(",") : manualBetaBlockers.length ? manualBetaBlockers.join(",") : "none"}`,

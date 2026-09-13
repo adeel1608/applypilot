@@ -54,6 +54,7 @@ describe("database foundation", () => {
         "runnerTargetCapabilityVersions",
         "runnerRunBindings",
         "runnerRecoveryEvents",
+        "runnerInspectionBindings",
       ]),
     );
   });
@@ -116,6 +117,7 @@ describe("database foundation", () => {
       "0005_r2_matching_quality_hardening.sql",
       "0006_r2_calibration_qualification.sql",
       "0007_personal_live_v1_enablement.sql",
+      "0008_real_target_inspection_scope.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -151,9 +153,10 @@ describe("database foundation", () => {
         "runner_target_capability_versions",
         "runner_run_bindings",
         "runner_recovery_events",
+        "runner_inspection_bindings",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(7);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(8);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
@@ -215,6 +218,62 @@ describe("database foundation", () => {
       });
     }
     expect(sqlite.pragma("user_version", { simple: true })).toBe(7);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("upgrades schema v7 to v8 with explicit operation scope and preserved capability history", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+      "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
+    ]) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO runner_target_capability_versions
+         (id,capability_id,version,predecessor_id,target_kind,alias,allowed_origin,
+          allowed_path_prefix,form_version,adapter_version,approval_state,approval_reference,
+          approved_at,policy_version,policy_expires_at,capability_expires_at,
+          configuration_digest,revoked_at,created_at)
+         VALUES ('capability-version:1','legacy-synthetic',1,NULL,'SYNTHETIC_LOCAL','Fixture',
+          'http://127.0.0.1:4123','/synthetic','synthetic-form-v1','synthetic-adapter-v1',
+          'DRAFT',NULL,NULL,'fixture-policy','2027-01-01T00:00:00.000Z',
+          '2027-01-01T00:00:00.000Z',?,NULL,'2026-09-10T00:00:00.000Z')`,
+      )
+      .run("a".repeat(64));
+    const before = sqlite.prepare("SELECT * FROM runner_target_capability_versions").get();
+    sqlite.exec(
+      readFileSync(
+        new URL("../drizzle/0008_real_target_inspection_scope.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(8);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT allowed_operations_json AS operations FROM runner_target_capability_versions",
+        )
+        .get(),
+    ).toEqual({ operations: '["MAP_FOR_FILL","FILL","UPLOAD","SUBMIT"]' });
+    expect(sqlite.prepare("SELECT * FROM runner_target_capability_versions").get()).toMatchObject(
+      before as object,
+    );
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM sqlite_master WHERE type='table' AND name='runner_inspection_bindings'",
+        )
+        .get(),
+    ).toEqual({ count: 1 });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

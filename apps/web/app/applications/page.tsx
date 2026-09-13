@@ -174,7 +174,7 @@ export default async function ApplicationsPage() {
           </p>
         )}
         {runnerView.status === "DATABASE_MIGRATION_REQUIRED" && (
-          <p role="alert">Local schema 0007 is required before a runner target can be approved.</p>
+          <p role="alert">Local schema 0008 is required before a runner target can be approved.</p>
         )}
         {runnerView.capabilities.map((capability, index) => (
           <article className="job-row" key={`${capability.capabilityId}:${capability.version}`}>
@@ -187,6 +187,7 @@ export default async function ApplicationsPage() {
                 {capability.allowedPathPrefix} · form {capability.formVersion} · adapter{" "}
                 {capability.adapterVersion}
               </p>
+              <p>Operations: {capability.operations.join(", ").replaceAll("_", " ")}</p>
               <p>
                 {capability.readiness.replaceAll("_", " ")} · capability expires{" "}
                 {new Date(capability.capabilityExpiresAt).toLocaleString("en-AU")}
@@ -257,6 +258,26 @@ export default async function ApplicationsPage() {
           <p>
             No runner recovery event exists. CAPTCHA, MFA, authentication, bot, rate, access, form
             drift and ambiguous outcomes all require owner review.
+          </p>
+        )}
+        <h3>Read-only target inspections</h3>
+        {runnerView.inspections.length ? (
+          <ol>
+            {runnerView.inspections.map((inspection) => (
+              <li key={inspection.id}>
+                <strong>{inspection.state.replaceAll("_", " ")}</strong> /{" "}
+                {inspection.operation.replaceAll("_", " ")} / {inspection.fieldCount} semantic
+                fields / {inspection.unresolvedCount} packet blockers
+                {inspection.stopReason
+                  ? ` / stopped ${inspection.stopReason.replaceAll("_", " ")}`
+                  : ""}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>
+            No real target inspection has occurred. A scoped approval and a separate owner-started
+            control are required before read-only navigation.
           </p>
         )}
       </section>

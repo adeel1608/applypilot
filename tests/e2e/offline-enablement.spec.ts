@@ -24,6 +24,9 @@ test("runner approval and recovery surface requires a private target capability"
   await expect(
     page.getByText(/CAPTCHA, MFA, authentication, bot, rate, access, form drift/),
   ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Read-only target inspections" })).toBeVisible();
+  await expect(page.getByText(/No real target inspection has occurred/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /inspect/i })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Real target interaction approval required" }),
   ).toBeVisible();

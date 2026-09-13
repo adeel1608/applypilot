@@ -28,9 +28,33 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
+export const RunnerTargetOperationSchema = z.enum([
+  "OPEN_AND_INSPECT_ONLY",
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "SUBMIT",
+]);
+export type RunnerTargetOperation = z.infer<typeof RunnerTargetOperationSchema>;
+
+const applicationOperations: RunnerTargetOperation[] = ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"];
+
+function hasExactOperations(
+  actual: readonly RunnerTargetOperation[],
+  expected: readonly RunnerTargetOperation[],
+): boolean {
+  return (
+    actual.length === expected.length && actual.every((value, index) => value === expected[index])
+  );
+}
+
+export function targetCapabilitySupportsApplication(capability: RunnerTargetCapability): boolean {
+  return hasExactOperations(capability.allowedOperations, applicationOperations);
+}
+
 export const RunnerTargetCapabilitySchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     capabilityId: z.string().min(1).max(100),
     version: z.number().int().positive(),
     predecessorVersion: z.number().int().positive().nullable(),
@@ -40,6 +64,7 @@ export const RunnerTargetCapabilitySchema = z
     allowedPathPrefix: z.string().startsWith("/").max(300),
     formVersion: z.string().min(1).max(100),
     adapterVersion: z.string().min(1).max(100),
+    allowedOperations: z.array(RunnerTargetOperationSchema).min(1).max(5),
     approvalState: z.enum(["DRAFT", "APPROVED", "REVOKED", "EXPIRED", "SUPERSEDED"]),
     approvalReference: z.string().min(1).max(200).nullable(),
     approvedAt: z.iso.datetime().nullable(),
@@ -80,13 +105,31 @@ export const RunnerTargetCapabilitySchema = z
     if (value.approvalState === "REVOKED" && !value.revokedAt) {
       context.addIssue({ code: "custom", message: "Revoked capability requires revokedAt" });
     }
+    if (new Set(value.allowedOperations).size !== value.allowedOperations.length) {
+      context.addIssue({ code: "custom", message: "Target operations must be unique" });
+    }
+    const canonicalOrder = RunnerTargetOperationSchema.options.filter((operation) =>
+      value.allowedOperations.includes(operation),
+    );
+    if (!hasExactOperations(value.allowedOperations, canonicalOrder)) {
+      context.addIssue({ code: "custom", message: "Target operations must use canonical order" });
+    }
+    if (
+      value.targetKind === "REAL_TARGET" &&
+      !hasExactOperations(value.allowedOperations, ["OPEN_AND_INSPECT_ONLY"])
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Real target authority is inspection-only in this release",
+      });
+    }
   });
 
 export type RunnerTargetCapability = z.infer<typeof RunnerTargetCapabilitySchema>;
 
 export const RunnerTargetAllowlistSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     capabilities: z.array(RunnerTargetCapabilitySchema).max(10),
   })
   .strict()
@@ -108,6 +151,30 @@ export const RunnerTargetAllowlistSchema = z
 
 export function runnerTargetCapabilityDigest(input: RunnerTargetCapability): string {
   return sha256(canonical(RunnerTargetCapabilitySchema.parse(input)));
+}
+
+export function deterministicRunnerTargetCapabilityId(input: {
+  targetKind: "SYNTHETIC_LOCAL" | "REAL_TARGET";
+  allowedOrigin: string;
+  allowedPathPrefix: string;
+  operation: RunnerTargetOperation;
+  formVersion: string;
+  adapterVersion: string;
+  packetDigest: string;
+}): string {
+  const value = z
+    .object({
+      targetKind: z.enum(["SYNTHETIC_LOCAL", "REAL_TARGET"]),
+      allowedOrigin: z.url(),
+      allowedPathPrefix: z.string().startsWith("/").max(300),
+      operation: RunnerTargetOperationSchema,
+      formVersion: z.string().min(1).max(100),
+      adapterVersion: z.string().min(1).max(100),
+      packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .strict()
+    .parse(input);
+  return `runner_${sha256(canonical(value)).slice(0, 24)}`;
 }
 
 export function runnerTargetReadiness(input: RunnerTargetCapability, now = new Date()) {
@@ -155,6 +222,14 @@ export const RunnerAuditMetadataSchemas = {
       version: z.number().int().positive(),
       state: z.enum(["DRAFT", "APPROVED", "REVOKED", "EXPIRED", "SUPERSEDED"]),
       targetKind: z.enum(["SYNTHETIC_LOCAL", "REAL_TARGET"]),
+      operations: z.array(RunnerTargetOperationSchema).min(1).max(5),
+    })
+    .strict(),
+  "runner.target.revoked": z
+    .object({
+      capabilityId: z.string().min(1),
+      version: z.number().int().positive(),
+      targetKind: z.enum(["SYNTHETIC_LOCAL", "REAL_TARGET"]),
     })
     .strict(),
   "runner.run.bound": z
@@ -190,6 +265,54 @@ export const RunnerAuditMetadataSchemas = {
   "runner.consent.consumed": z
     .object({ runId: z.string().min(1), consentId: z.string().min(1) })
     .strict(),
+  "runner.inspection.bound": z
+    .object({
+      runId: z.string().min(1),
+      packetId: z.string().min(1),
+      capabilityId: z.string().min(1),
+      capabilityVersion: z.number().int().positive(),
+      operation: z.literal("OPEN_AND_INSPECT_ONLY"),
+      unresolvedCount: z.number().int().nonnegative(),
+    })
+    .strict(),
+  "runner.inspection.opened": z
+    .object({
+      runId: z.string().min(1),
+      operation: z.literal("OPEN_AND_INSPECT_ONLY"),
+      adapterVersion: z.string().min(1).max(100),
+      formVersion: z.string().min(1).max(100),
+    })
+    .strict(),
+  "runner.inspection.completed": z
+    .object({
+      runId: z.string().min(1),
+      operation: z.literal("OPEN_AND_INSPECT_ONLY"),
+      fieldCount: z.number().int().min(0).max(200),
+      reviewRequiredCount: z.number().int().min(0).max(200),
+      documentRequiredCount: z.number().int().min(0).max(200),
+      unsupportedCount: z.number().int().min(0).max(200),
+    })
+    .strict(),
+  "runner.inspection.stopped": z
+    .object({
+      runId: z.string().min(1),
+      operation: z.literal("OPEN_AND_INSPECT_ONLY"),
+      reason: z.enum([
+        "CAPTCHA",
+        "MFA",
+        "AUTHENTICATION_REQUIRED",
+        "BOT_DETECTION",
+        "RATE_LIMIT",
+        "ACCESS_CONTROL",
+        "WEBSITE_RESTRICTION",
+        "PAGE_CHANGED",
+        "FORM_CHANGED",
+        "DESTINATION_CHANGED",
+        "UNSUPPORTED_CONTROL",
+        "TARGET_APPROVAL_REQUIRED",
+      ]),
+    })
+    .strict(),
 } as const;
 
 export type RunnerAuditEventType = keyof typeof RunnerAuditMetadataSchemas;
@@ -204,6 +327,9 @@ export function freezeRunnerBinding(
 ): FrozenRunnerBinding {
   const packet = ApplicationPacketSchema.parse(packetInput);
   const capability = RunnerTargetCapabilitySchema.parse(capabilityInput);
+  if (!targetCapabilitySupportsApplication(capability)) {
+    throw new Error("TARGET_OPERATION_SCOPE_INVALID");
+  }
   if (!packet.targetUrl) throw new Error("APPLICATION_DESTINATION_INVALID");
   const target = new URL(packet.targetUrl);
   const origin = new URL(capability.allowedOrigin);
@@ -343,7 +469,10 @@ export class TargetIndependentApplicationRunner {
     RunnerTargetCapabilitySchema.parse(capability);
     FrozenRunnerBindingSchema.parse(binding);
     if (adapter.targetKind !== capability.targetKind) throw new Error("TARGET_ADAPTER_MISMATCH");
-    if (runnerTargetReadiness(capability, now()).status !== "TARGET_ENABLED") {
+    if (
+      runnerTargetReadiness(capability, now()).status !== "TARGET_ENABLED" ||
+      !targetCapabilitySupportsApplication(capability)
+    ) {
       this.pause("TARGET_APPROVAL_REQUIRED");
     } else if (binding.unresolvedCount > 0) {
       this.pause("PACKET_NOT_READY");

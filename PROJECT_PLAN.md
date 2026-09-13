@@ -5596,3 +5596,46 @@ still not evidence that first real target validation occurred.
 9. Push only this branch, open PR `feat: add read-only real target inspection`, require exact-head push
    and PR CI green, self-review, then merge normally only if every owner-preapproved condition remains
    true. Refresh clean `main`; do not perform a live employer inspection after merge.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / PRIVATE OFFLINE PREPARATION COMPLETE / PR GATES PENDING`. Capability schema v2
+now carries canonical operation scope and rejects any real-target operation set other than the single
+`OPEN_AND_INSPECT_ONLY` value. Additive migration `0008_real_target_inspection_scope.sql` stores that
+scope plus a separate inspection binding/lifecycle; a base-to-working-tree diff confirms migrations
+`0000`–`0007` are unchanged. The normal application runner still requires the complete application
+operation set and pauses unresolved packets as `PACKET_NOT_READY`.
+
+The dedicated `TargetInspectionRunner`, `lever-real-inspection-v1`, and
+`lever-application-inspection-v1` expose only passive DOM inspection. The fresh browser context permits
+only GET/HEAD, confines navigation and subresources to the approved origin, refuses out-of-scope
+navigation, popup/download escape, write requests, hidden interactive steps, unsupported widgets,
+authentication/protection signals, and page/form drift, and receives no candidate values. Its result
+schema requires browser writes, value changes, uploads, submissions, and candidate outbound fields to
+be literal zero. The durable current-binding check covers capability version/digest, newest packet and
+job/profile/evaluation tuples, evaluation freshness, target, and packet document/answer/disclosure
+digests. A real capability ID is deterministically packet-bound, and one capability version/packet/
+operation can create only one durable inspection binding. The owner-confirmed production command
+requires the exact capability ID/version/digest and packet ID/digest and an already persisted current
+approval before it can launch; it was not invoked during this train.
+
+The real local database had schema 7, one pending migration, integrity `PASS`, and zero FK issues. A
+verified schema-7 backup and restore preview passed; the confirmed migration created another verified
+schema-7 backup and completed at schema 8 with zero pending migrations, integrity `PASS`, zero FK
+issues, 26 jobs, 29 job versions, 173 field-evidence rows, 268 requirement-evidence rows, and 493
+coverage items. Private offline preparation then bound the exact owner-selected request-9 source run,
+Lever tenant capability, external job ID, role, and local application destination; persisted one
+review-required packet with two unresolved readiness blockers; and wrote one ignored DRAFT capability
+proposal. No target capability or inspection binding was activated. A new schema-8 backup and restore
+preview passed. Active source and target capabilities are both zero.
+
+Completed validation at this point: formatting check; zero-warning lint; strict typecheck; 58 focused
+runner/database/schema tests; 489 full unit tests across 48 files; 21 integration tests across 3 files;
+33 serialized Playwright E2E tests including the fictional target matrix; local production build;
+showcase production build; showcase boundary audit (`19` source files and export checked); privacy
+audit (`306` tracked files, `880` history paths, `878` history blobs, `1393` build/test artifacts, and
+`11` private canaries); full dependency audit; and production dependency audit. Both dependency
+audits report zero vulnerabilities. One initial unit run correctly exposed a stale schema-7 test
+fixture; the fixture was updated to current schema 8 and the complete rerun passed. Remaining gates are
+aggregate preflight/release check, final diff/fsck, exact-head commit/push/PR CI, full-delta self-review,
+conditional normal merge, and clean-main verification. Lifetime real actions remain `9/0/0/0`.

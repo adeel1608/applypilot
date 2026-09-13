@@ -5,6 +5,7 @@ import {
   InMemoryFinalConsentStore,
   RunnerTargetCapabilitySchema,
   TargetIndependentApplicationRunner,
+  deterministicRunnerTargetCapabilityId,
   freezeRunnerBinding,
   loadPrivateRunnerTargetAllowlist,
   runnerTargetReadiness,
@@ -59,7 +60,7 @@ function packet(overrides: Partial<ApplicationPacket> = {}) {
 
 function capability(overrides: Partial<RunnerTargetCapability> = {}) {
   return RunnerTargetCapabilitySchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     capabilityId: "runner:synthetic-fixture",
     version: 1,
     predecessorVersion: null,
@@ -69,6 +70,7 @@ function capability(overrides: Partial<RunnerTargetCapability> = {}) {
     allowedPathPrefix: "/synthetic-application",
     formVersion: "synthetic-form-v1",
     adapterVersion: "synthetic-adapter-v1",
+    allowedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"],
     approvalState: "APPROVED",
     approvalReference: "SYNTHETIC_FIXTURE_APPROVAL",
     approvedAt: "2026-09-10T00:00:00.000Z",
@@ -155,6 +157,15 @@ describe("target-independent application runner", () => {
         candidate: { email: "forbidden@example.test" },
       }),
     ).toThrow();
+    expect(
+      validateRunnerAuditMetadata("runner.target.versioned", {
+        capabilityId: "capability:1",
+        version: 1,
+        state: "APPROVED",
+        targetKind: "SYNTHETIC_LOCAL",
+        operations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"],
+      }),
+    ).toBeDefined();
   });
 
   it("loads target authority only from the confined ignored private file", async () => {
@@ -167,7 +178,7 @@ describe("target-independent application runner", () => {
       });
       await writeFile(
         join(root, "data", "private", "runner-target-allowlist.json"),
-        JSON.stringify({ schemaVersion: 1, capabilities: [capability()] }),
+        JSON.stringify({ schemaVersion: 2, capabilities: [capability()] }),
       );
       await expect(loadPrivateRunnerTargetAllowlist(root)).resolves.toMatchObject({
         status: "RUNNER_TARGET_ALLOWLIST_READY",
@@ -202,6 +213,49 @@ describe("target-independent application runner", () => {
     expect(
       runnerTargetReadiness(capability({ capabilityExpiresAt: "2026-09-09T00:00:00.000Z" }), now),
     ).toMatchObject({ status: "TARGET_DISABLED", reason: "CAPABILITY_EXPIRED" });
+  });
+
+  it("keeps unresolved packets fail-closed in the normal application lane", async () => {
+    const value = packet({ documents: [] });
+    const target = capability();
+    const binding = freezeRunnerBinding(value, target);
+    const adapter = new FixtureAdapter(value, target);
+    const runner = new TargetIndependentApplicationRunner(
+      value,
+      target,
+      binding,
+      adapter,
+      new InMemoryFinalConsentStore(() => now),
+      () => binding,
+      () => now,
+    );
+    expect(binding.unresolvedCount).toBeGreaterThan(0);
+    expect(runner.snapshot()).toMatchObject({
+      state: "PAUSED",
+      checkpoints: [{ state: "PAUSED", stopReason: "PACKET_NOT_READY" }],
+      finalAttempts: 0,
+    });
+    await expect(runner.open()).rejects.toThrow("RUN_STATE_REQUIRED:PREPARED");
+    expect(adapter.submissions).toBe(0);
+  });
+
+  it("derives a deterministic target capability id from exact authority and packet binding", () => {
+    const input = {
+      targetKind: "REAL_TARGET" as const,
+      allowedOrigin: "https://jobs.lever.co",
+      allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+      operation: "OPEN_AND_INSPECT_ONLY" as const,
+      formVersion: "lever-application-inspection-v1",
+      adapterVersion: "lever-real-inspection-v1",
+      packetDigest: "a".repeat(64),
+    };
+    expect(deterministicRunnerTargetCapabilityId(input)).toMatch(/^runner_[a-f0-9]{24}$/);
+    expect(deterministicRunnerTargetCapabilityId(input)).toBe(
+      deterministicRunnerTargetCapabilityId({ ...input }),
+    );
+    expect(
+      deterministicRunnerTargetCapabilityId({ ...input, packetDigest: "b".repeat(64) }),
+    ).not.toBe(deterministicRunnerTargetCapabilityId(input));
   });
 
   it.each([
@@ -254,7 +308,7 @@ describe("target-independent application runner", () => {
     expect(adapter.submissions).toBe(1);
   });
 
-  it("keeps a real-shaped target behind the same frozen gates using a no-network fixture adapter", async () => {
+  it("refuses to reuse an inspection-only real capability in the application lane", () => {
     const value = packet({
       targetUrl: "https://careers.example.test/apply/fictional",
       targetHost: "careers.example.test",
@@ -263,48 +317,9 @@ describe("target-independent application runner", () => {
       targetKind: "REAL_TARGET",
       allowedOrigin: "https://careers.example.test",
       allowedPathPrefix: "/apply/",
+      allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
     });
-    const binding = freezeRunnerBinding(value, target);
-    let submissions = 0;
-    const observation: TargetObservation = {
-      targetUrl: value.targetUrl!,
-      formVersion: target.formVersion,
-      adapterVersion: target.adapterVersion,
-      documentDigests: value.documents.map(({ digest }) => digest),
-      protectionSignals: [],
-    };
-    const adapter: ApplicationTargetAdapter = {
-      targetKind: "REAL_TARGET",
-      open: async () => observation,
-      map: async () => observation,
-      fill: async () => observation,
-      submit: async () => {
-        submissions += 1;
-        return "CONFIRMED";
-      },
-    };
-    const runner = new TargetIndependentApplicationRunner(
-      value,
-      target,
-      binding,
-      adapter,
-      new InMemoryFinalConsentStore(() => now),
-      () => binding,
-      () => now,
-    );
-    await runner.open();
-    await runner.map();
-    await runner.fill();
-    runner.readyForFinalReview();
-    const consent = runner.createConsent();
-    expect(
-      await runner.submit({
-        consentId: consent.id,
-        token: consent.token,
-        ownerConfirmed: true,
-      }),
-    ).toMatchObject({ state: "SUBMITTED" });
-    expect(submissions).toBe(1);
+    expect(() => freezeRunnerBinding(value, target)).toThrow("TARGET_OPERATION_SCOPE_INVALID");
   });
 
   it("treats a lost or ambiguous response as terminal OUTCOME_UNKNOWN and never retries", async () => {
