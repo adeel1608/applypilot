@@ -6139,16 +6139,18 @@ family sequence with zero writes. Five focused serialized target-inspection E2E 
 The independently reviewed adapter-v2 inputs derive
 `runner_2fb0a3653f3e4337c60abce6` in production code.
 
-The complete clean release check at implementation head
-`7675ddb007e96a4d600f6dc9ef97d4b14572cae5` passed doctor, schema/status/preflight, format, lint,
-strict typecheck, 525 unit tests across 49 files, 21 integration tests across 3 files, both production
+The complete clean release check at implementation/test head
+`44a6dda33d01e485e81510b272423801a465b701` passed doctor, schema/status/preflight, format, lint,
+strict typecheck, 526 unit tests across 49 files, 21 integration tests across 3 files, both production
 builds and showcase boundary audit, 36 serialized E2E tests, privacy audit over 315 tracked files,
-953 history paths, 951 history blobs, 1,457 build/test artifacts and 11 private canaries, and full/
+955 history paths, 953 history blobs, 1,463 build/test artifacts and 11 private canaries, and full/
 production dependency audits with zero known vulnerabilities. It reported schema 8, pending 0,
 integrity PASS, zero FK issues, source-enabled Personal Beta READY, zero active source capabilities,
-and target approval required. One additional fictional end-to-end family-transition regression was
-then added and passed; the final exact-head complete release rerun remains required after the results
-commit.
+and target approval required. Fifteen focused database schema/migration/backup/restore/runtime tests
+also pass. Fresh ignored backup `backup-2026-09-13T08-43-22.442Z-708bea72` is schema 8 with integrity
+PASS and its exact restore preview passes. Migrations `0000`-`0008` have no diff from starting main;
+`git diff --check` and `git fsck --strict` pass (fsck reports only unreachable objects). The results-
+only plan commit is followed by one final exact-head release check before push.
 
 No migration was added or edited, no private proposal/report value is included in Git, and no source
 or employer request, real browser navigation, inspection run, candidate value, form interaction,
