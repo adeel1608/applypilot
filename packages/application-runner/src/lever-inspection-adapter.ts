@@ -295,10 +295,43 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
     this.page.on("popup", popupHandler);
     this.page.on("download", downloadHandler);
     try {
-      const response = await this.page.goto(binding.targetUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
+      let response = null;
+      try {
+        response = await this.page.goto(binding.targetUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+      } catch (error) {
+        if (!blockedDestination) throw error;
+        return ReadOnlyBrowserSnapshotSchema.parse({
+          targetUrl: binding.targetUrl,
+          httpStatus: null,
+          declaredFormVersion: null,
+          formCount: 0,
+          controls: [],
+          protectionSignals: ["DESTINATION_CHANGED"],
+          popupAttempted,
+          downloadAttempted,
+          blockedWriteRequest,
+          blockedDestination,
+          hiddenInteractiveStep: false,
+        });
+      }
+      if (blockedDestination || this.page.url() !== binding.targetUrl) {
+        return ReadOnlyBrowserSnapshotSchema.parse({
+          targetUrl: binding.targetUrl,
+          httpStatus: response?.status() ?? null,
+          declaredFormVersion: null,
+          formCount: 0,
+          controls: [],
+          protectionSignals: ["DESTINATION_CHANGED"],
+          popupAttempted,
+          downloadAttempted,
+          blockedWriteRequest,
+          blockedDestination,
+          hiddenInteractiveStep: false,
+        });
+      }
       const dom = await this.page.evaluate(() => {
         const clean = (value: string | null | undefined, max: number) =>
           (value ?? "").replace(/\s+/g, " ").trim().slice(0, max);

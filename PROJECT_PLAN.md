@@ -5639,3 +5639,13 @@ audits report zero vulnerabilities. One initial unit run correctly exposed a sta
 fixture; the fixture was updated to current schema 8 and the complete rerun passed. Remaining gates are
 aggregate preflight/release check, final diff/fsck, exact-head commit/push/PR CI, full-delta self-review,
 conditional normal merge, and clean-main verification. Lifetime real actions remain `9/0/0/0`.
+
+The first clean committed-head release check at `2bc99e3c9eb9047da2705be8ccab8e001f32311c`
+passed 491 unit, 21 integration, 33 E2E, both builds, privacy, dependency, database, and release
+classification gates. During the subsequent full-delta self-review, an actual out-of-scope loopback
+redirect fixture showed that the browser blocked navigation safely but reported `FORM_CHANGED`
+instead of the required precise `DESTINATION_CHANGED`. The first focused redirect rerun therefore
+reported 1 passed/1 failed, and a second attempt still reported 1 passed/1 failed. The adapter now
+returns a value-free `DESTINATION_CHANGED` snapshot whenever navigation is blocked or the page URL no
+longer equals the exact bound URL; the focused E2E rerun passes 2/2. A new exact-head commit, complete
+release rerun, and both refreshed GitHub CI checks are required before merge.

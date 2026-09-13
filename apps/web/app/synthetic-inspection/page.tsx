@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 const fixtureCases = [
   "normal",
@@ -14,6 +14,7 @@ const fixtureCases = [
   "restriction",
   "unsupported",
   "changed-form",
+  "changed-destination",
   "popup",
   "hidden-step",
   "hidden-submit",
@@ -45,6 +46,7 @@ export default async function SyntheticInspectionPage({
 }) {
   if (process.env.APPLYPILOT_SYNTHETIC_MODE !== "1") notFound();
   const fixture = fixtureCase((await searchParams).case);
+  if (fixture === "changed-destination") redirect("/synthetic-application");
   const formVersion =
     fixture === "changed-form"
       ? "lever-application-inspection-v2"

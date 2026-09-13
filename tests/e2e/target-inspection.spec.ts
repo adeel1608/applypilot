@@ -114,6 +114,7 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     ["restriction", "STOPPED", "WEBSITE_RESTRICTION"],
     ["unsupported", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["changed-form", "STOPPED", "FORM_CHANGED"],
+    ["changed-destination", "STOPPED", "DESTINATION_CHANGED"],
     ["popup", "STOPPED", "DESTINATION_CHANGED"],
     ["hidden-step", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["hidden-submit", "COMPLETED", null],
