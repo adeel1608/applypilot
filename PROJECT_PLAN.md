@@ -5649,3 +5649,149 @@ reported 1 passed/1 failed, and a second attempt still reported 1 passed/1 faile
 returns a value-free `DESTINATION_CHANGED` snapshot whenever navigation is blocked or the page URL no
 longer equals the exact bound URL; the focused E2E rerun passes 2/2. A new exact-head commit, complete
 release rerun, and both refreshed GitHub CI checks are required before merge.
+
+# First real-target stop diagnosis and value-free diagnostics - 2026-09-13
+
+Status: `BLUEPRINT COMPLETE / PATH B SELECTED / OFFLINE ONLY`. The clean starting `main` and
+`origin/main` are `322e03f48087ca38dc6d3a927fc16c703f81630d`. Work is isolated on
+`fix/target-inspection-diagnostics`. Historical run
+`inspection_94d7d62f-e962-4d1b-88cb-9353ccdc3323` used target capability version 1 and the exact
+reviewed packet, reached `runner.inspection.opened`, then durably stopped as `PAGE_CHANGED`; it has no
+completed event. Capability version 2 is immutable `REVOKED`, active real-target capabilities are
+zero, and lifetime source/employer/upload/submission actions are `9/1/0/0`.
+
+## Current state and decision
+
+The durable record proves only that `TargetInspectionRunner` did not receive an accepted observation.
+It does not retain whether the cause was a generic HTTP error, Playwright navigation exception,
+read-only snapshot rejection, DOM-evaluation exception, adapter-output rejection, or another adapter
+exception. Binding/version staleness is not implicated: the browser-open event was recorded only after
+the current-binding gate passed, and the persisted stop is not `TARGET_APPROVAL_REQUIRED`. No
+destination-policy or HTTP class is durably present. The deepest safe conclusion is therefore
+`UNKNOWN_SAFE_BOUNDARY`, and `DIAGNOSTIC GAP CONFIRMED`; no real adapter/form defect is proven.
+
+Path B is selected. Preserve the public fail-closed stop reason `PAGE_CHANGED`, but attach exactly one
+fixed, value-free internal diagnostic category when that broad code is produced:
+`HTTP_ERROR`, `NAVIGATION_EXCEPTION`, `SNAPSHOT_INVALID`, `DOM_INSPECTION_EXCEPTION`,
+`ADAPTER_OUTPUT_INVALID`, or `UNKNOWN_INSPECTION_EXCEPTION`. Do not retain URL values, status text,
+response/page/form content, selectors, exception messages/stacks, cookies, storage, headers, or
+candidate data. Numeric HTTP status is not required and will not be persisted. Existing audit JSON and
+inspection `classification_summary_json` can safely store the enum, so no migration is justified and
+`0000`-`0008` remain immutable.
+
+## Objective, scope, assumptions, and requirements
+
+The objective is to make every future `PAGE_CHANGED` terminal record distinguish the approved safe
+failure classes while leaving navigation authority, target/path policy, form interpretation, operation
+scope, candidate isolation, and public stop semantics unchanged. This task is offline: zero employer
+GET/HEAD, browser launches, source calls, form interactions, uploads, submissions, and candidate
+outbound fields. Historical capability/run rows are immutable. A version-3 DRAFT may be created only
+after the narrow fix is reviewed and merged, current packet/job/profile/evaluation bindings still
+match, and all gates are green; creation is not approval or run authority.
+
+Requirements are: typed diagnostic errors at the inspection boundary; explicit classification of
+generic HTTP >=400, navigation exceptions, snapshot-schema rejection, DOM inspection exceptions,
+adapter-output schema rejection, and unknown exceptions; strict audit schemas; durable category
+storage without schema change; unchanged public `PAGE_CHANGED`; no exception content; no authority
+broadening; and regression proof that all protection-specific stops remain specific. Because only
+diagnostic plumbing changes and the adapter's network/form semantics do not, adapter version remains
+`lever-real-inspection-v1` and form contract remains `lever-application-inspection-v1`.
+
+## Architecture, files, data flow, and dependencies
+
+- `packages/application-runner/src/inspection-runner.ts`: define the diagnostic enum/error contract,
+  classify adapter throws and adapter-output parse failures, add the category to stopped results and
+  audit records, and require a category for broad `PAGE_CHANGED` stops.
+- `packages/application-runner/src/lever-inspection-adapter.ts`: convert generic HTTP, snapshot
+  validation, navigation, and DOM-evaluation failures into the fixed categories. Preserve exact
+  GET/HEAD, origin/path, popup/download/write and zero-mutation behavior.
+- `packages/application-runner/src/target-runner.ts`: extend only the strict stopped-audit metadata
+  schema with a nullable diagnostic enum.
+- `packages/database/src/runner-enablement-repository.ts`: store the value-free diagnostic category in
+  existing JSON metadata for stopped inspections; no new column or migration.
+- Focused unit/database/E2E tests: reproduce HTTP 404/500, navigation exception, invalid snapshot,
+  DOM-evaluation exception, adapter-output rejection, and unknown exception; assert the shared public
+  `PAGE_CHANGED`, distinct durable category, redacted audit storage, and zero mutations.
+- `docs/APPLICATION_RUNNER.md` and this plan: document public-versus-internal semantics and the real-run
+  diagnosis without claiming a form change or successful target validation.
+
+Data flow is `read-only browser/adapter failure -> fixed diagnostic error/category ->
+TargetInspectionRunner public PAGE_CHANGED -> strict value-free stopped audit -> existing local JSON
+summary`. Dependencies remain Playwright, Zod, SQLite, and the existing audit repository. No new
+package, external service, schema, or target contract is introduced.
+
+## Risks, security/privacy, testing, rollback, and acceptance
+
+Risks are exception-text leakage, overclaiming the historical cause, changing protection precedence,
+misclassifying adapter-output failures, or silently broadening target behavior. Controls are closed
+enums, no error serialization, strict schemas, synthetic-only fixtures, public stop invariance,
+privacy/diff audits, and exact base-to-head authority review. Historical run classification remains
+`UNKNOWN_SAFE_BOUNDARY`; the new categories are prospective and are not backfilled.
+
+Testing covers the complete PAGE_CHANGED collapse matrix, current semantic inventory/protection tests,
+database storage/redaction, negative authority, format, zero-warning lint, strict typecheck, full unit
+and integration, serialized E2E, local/showcase builds and showcase audit, privacy and dependency
+audits, schema/pending/integrity/FKs, migration immutability, release check, `git diff --check`, and
+`git fsck --strict`. Backup/restore is not required because no schema or real-database mutation is
+needed for the code change; the existing database is read-only until the post-merge private draft is
+written. Rollback is a normal revert of the narrow code/docs commits; existing historical evidence and
+private data are not deleted or rewritten.
+
+Acceptance requires all six synthetic categories to produce `PAGE_CHANGED` with the correct value-free
+diagnostic; specific safety stops to remain unchanged; the database to persist only the enum; no
+private/live payload in Git; adapter/form versions unchanged with justification; no migration; full
+local and exact-head GitHub CI green; normal merge of the narrow PR only after self-review; clean merged
+main; current private bindings reverified; one ignored version-3 DRAFT with predecessor 2 and fresh
+24-hour/30-minute expiries; active approved real targets zero; no new inspection binding/run; and
+lifetime actions still `9/1/0/0`.
+
+## Exact implementation steps
+
+1. Commit this blueprint before application-code changes.
+2. Add failing synthetic tests for every currently collapsed path and strict audit redaction.
+3. Implement typed value-free diagnostics and existing-JSON persistence without changing public stop,
+   adapter/form versions, authority, or migrations.
+4. Run focused gates, full release validation, migration diff, privacy/authority self-review, and commit.
+5. Push one narrow branch, open one PR, obtain exact-head push/PR CI green, and merge normally only if
+   the reviewed delta remains within this blueprint.
+6. Refresh clean `main`, reverify private packet/version/target history, and create ignored capability
+   version 3 DRAFT with predecessor 2 and fresh expiries using production digest logic.
+7. Verify zero active target capability, zero new inspection run/action, update this result record, and
+   stop for exact owner approval of the returned draft.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / PATH B / OFFLINE RELEASE GATES GREEN / PR PENDING`. Historical evidence was
+verified without mutation: the one run used capability version 1 and the reviewed packet, recorded
+bound/opened/stopped events, ended `STOPPED / PAGE_CHANGED`, has no completed event, and version 2 is
+`REVOKED`. Because the old stopped audit contains no diagnostic category or safe snapshot, its deepest
+cause remains `UNKNOWN_SAFE_BOUNDARY`. No software/form defect is proven and the historical record is
+not backfilled.
+
+The prospective implementation keeps public `PAGE_CHANGED` while adding the six fixed categories from
+the blueprint to stopped results, strict audits, and the existing inspection summary JSON. The Lever
+adapter maps generic HTTP >=400, navigation, snapshot, DOM, and adapter-output boundaries without
+serializing error details; the runner supplies `UNKNOWN_INSPECTION_EXCEPTION` for an unclassified
+throw. Audit metadata is validated before any lifecycle mutation, and a regression proves injected
+exception text is rejected while the binding remains `OPENED`. Adapter version remains
+`lever-real-inspection-v1` and form contract remains `lever-application-inspection-v1` because
+authority, navigation, DOM semantics, and form classification are unchanged. No migration was added
+and migrations `0000`-`0008` have no base-to-working-tree diff.
+
+The initial focused matrix failed six new assertions while all 22 prior cases passed, proving the
+collapse. After implementation, 39 focused inspection/database tests pass, including HTTP 404, HTTP
+500, browser navigation exception, invalid read-only snapshot, DOM inspection exception,
+adapter-output rejection, and unknown adapter exception. A complete dirty-tree release check passed
+501 unit tests across 49 files, 21 integration tests across three files, both local and showcase builds,
+the 19-file showcase audit, 33 serialized E2E tests, privacy audit, and both dependency audits with zero
+vulnerabilities. Privacy checked 315 tracked files, 922 history paths, 920 history blobs, 1,424
+build/test artifacts, and 11 private canaries. Schema remains 8, pending migrations zero, integrity
+`PASS`, and foreign-key issues zero. The final post-review code adjustment strengthened snapshot
+classification and pre-mutation audit validation; strict typecheck and all 39 focused tests pass after
+that adjustment. A clean exact-head release rerun, diff/fsck, PR CI, normal merge, and offline private
+version-3 preparation remain.
+
+No source or employer request, browser launch, form action, upload, submission, or candidate outbound
+field occurred in this task. Active source and real-target capabilities remain zero. Lifetime actions
+remain `9/1/0/0`; Source-enabled Personal Beta remains `READY`, first real target validation remains
+unproven, and Personal Live V1 remains `NOT_READY`.

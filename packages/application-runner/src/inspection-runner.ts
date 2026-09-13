@@ -9,10 +9,12 @@ import {
   type ApplicationPacket,
 } from "./beta";
 import {
+  InspectionDiagnosticCategorySchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
   runnerTargetCapabilityDigest,
   runnerTargetReadiness,
+  type InspectionDiagnosticCategory,
   type RunnerTargetCapability,
 } from "./target-runner";
 
@@ -162,6 +164,22 @@ export const FrozenInspectionBindingSchema = z
 
 export type FrozenInspectionBinding = z.infer<typeof FrozenInspectionBindingSchema>;
 
+export class InspectionDiagnosticError extends Error {
+  readonly category: InspectionDiagnosticCategory;
+
+  constructor(category: InspectionDiagnosticCategory) {
+    super("INSPECTION_DIAGNOSTIC");
+    this.name = "InspectionDiagnosticError";
+    this.category = InspectionDiagnosticCategorySchema.parse(category);
+  }
+}
+
+function diagnosticCategory(error: unknown): InspectionDiagnosticCategory {
+  return error instanceof InspectionDiagnosticError
+    ? error.category
+    : "UNKNOWN_INSPECTION_EXCEPTION";
+}
+
 function targetWithinCapability(target: URL, capability: RunnerTargetCapability): boolean {
   const origin = new URL(capability.allowedOrigin);
   const prefix = capability.allowedPathPrefix;
@@ -246,6 +264,7 @@ export type InspectionAuditRecord =
       metadata: {
         operation: "OPEN_AND_INSPECT_ONLY";
         reason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
+        diagnosticCategory: InspectionDiagnosticCategory | null;
       };
     };
 
@@ -256,6 +275,7 @@ export type InspectionRunResult =
   | {
       state: "STOPPED";
       stopReason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
+      diagnosticCategory: InspectionDiagnosticCategory | null;
       observation: null;
     };
 
@@ -304,16 +324,19 @@ export class TargetInspectionRunner {
         formVersion: this.binding.formVersion,
       },
     });
-    let observation: TargetInspectionObservation;
+    let adapterOutput: TargetInspectionObservation;
     try {
-      observation = TargetInspectionObservationSchema.parse(
-        await this.adapter.inspect(this.binding),
-      );
-    } catch {
-      return this.stop("PAGE_CHANGED");
+      adapterOutput = await this.adapter.inspect(this.binding);
+    } catch (error) {
+      return this.stop("PAGE_CHANGED", diagnosticCategory(error));
     }
+    const parsedObservation = TargetInspectionObservationSchema.safeParse(adapterOutput);
+    if (!parsedObservation.success) return this.stop("PAGE_CHANGED", "ADAPTER_OUTPUT_INVALID");
+    const observation = parsedObservation.data;
     const signal = observation.protectionSignals[0];
-    if (signal) return this.stop(signal);
+    if (signal) {
+      return this.stop(signal, signal === "PAGE_CHANGED" ? "UNKNOWN_INSPECTION_EXCEPTION" : null);
+    }
     if (observation.targetUrl !== this.binding.targetUrl) return this.stop("DESTINATION_CHANGED");
     if (
       observation.formVersion !== this.binding.formVersion ||
@@ -354,13 +377,27 @@ export class TargetInspectionRunner {
     }
   }
 
-  private stop(reason: InspectionStopReason): InspectionRunResult {
+  private stop(
+    reason: InspectionStopReason,
+    diagnosticCategory: InspectionDiagnosticCategory | null = null,
+  ): InspectionRunResult {
+    const safeDiagnosticCategory =
+      reason === "PAGE_CHANGED" ? (diagnosticCategory ?? "UNKNOWN_INSPECTION_EXCEPTION") : null;
     this.state = "STOPPED";
     this.stopReason = reason;
     this.audit({
       type: "runner.inspection.stopped",
-      metadata: { operation: "OPEN_AND_INSPECT_ONLY", reason },
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        reason,
+        diagnosticCategory: safeDiagnosticCategory,
+      },
     });
-    return { state: "STOPPED", stopReason: reason, observation: null };
+    return {
+      state: "STOPPED",
+      stopReason: reason,
+      diagnosticCategory: safeDiagnosticCategory,
+      observation: null,
+    };
   }
 }

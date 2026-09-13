@@ -17,11 +17,20 @@ The inspection inventory classifies contact, document, work-authorisation, spons
 
 Authentication, CAPTCHA, MFA, bot detection, rate limiting, access restrictions, changed destination/page/form, popup/download attempts, write requests, hidden interactive steps, and unsupported widgets stop the inspection. They are never bypassed.
 
+`PAGE_CHANGED` remains the public fail-closed result for a broad inspection failure. Future stopped
+inspections additionally retain exactly one value-free diagnostic category when applicable:
+`HTTP_ERROR`, `NAVIGATION_EXCEPTION`, `SNAPSHOT_INVALID`, `DOM_INSPECTION_EXCEPTION`,
+`ADAPTER_OUTPUT_INVALID`, or `UNKNOWN_INSPECTION_EXCEPTION`. Only that fixed enum is written to the
+local audit and inspection summary. Exception messages, stack traces, response/status text, URLs,
+selectors, page content, headers, cookies, storage, and candidate values are not diagnostic metadata.
+The historical first real-target stop predates this instrumentation and therefore remains
+`UNKNOWN_SAFE_BOUNDARY`; it must not be relabelled as a form change.
+
 ## Frozen binding and persistence
 
 An inspection binding commits to the exact current packet, packet digest, job/profile/evaluation versions, capability ID/version/digest, target URL/origin/path, allowed path prefix, adapter/form versions, and document/answer/disclosure digests. A review-required packet may be inspected because inspection does not fill it, but a stale packet or later-changed capability, packet, job, profile, or evaluation fails before the browser opens.
 
-Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. Audits record only safe operation, version, stop reason, and aggregate classification counts.
+Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. Audits record only safe operation, version, stop reason, a fixed value-free diagnostic category, and aggregate classification counts.
 
 ## Answers, disclosure, and final submission
 
