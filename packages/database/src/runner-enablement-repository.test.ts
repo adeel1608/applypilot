@@ -319,6 +319,89 @@ describe("runner enablement persistence", () => {
     sqlite.close();
   });
 
+  it("persists only a fixed value-free diagnostic category for PAGE_CHANGED", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `diagnostic:${++sequence}`,
+    );
+    const target = inspectionCapability();
+    repository.persistTargetCapabilityVersion(target);
+    const binding = freezeInspectionBinding(
+      ApplicationPacketSchema.parse({ ...packet(), documents: [], answers: [] }),
+      target,
+    );
+    repository.bindInspection({
+      runId: "inspection-run:diagnostic",
+      binding,
+      targetCapability: target,
+    });
+    repository.recordInspectionAudit("inspection-run:diagnostic", {
+      type: "runner.inspection.opened",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        adapterVersion: target.adapterVersion,
+        formVersion: target.formVersion,
+      },
+    });
+    expect(() =>
+      repository.recordInspectionAudit("inspection-run:diagnostic", {
+        type: "runner.inspection.stopped",
+        metadata: {
+          operation: "OPEN_AND_INSPECT_ONLY",
+          reason: "PAGE_CHANGED",
+          diagnosticCategory: "NAVIGATION_EXCEPTION",
+          exceptionMessage: "must never persist",
+        },
+      } as never),
+    ).toThrow();
+    expect(
+      sqlite
+        .prepare(
+          "SELECT state FROM runner_inspection_bindings WHERE id='inspection-run:diagnostic'",
+        )
+        .pluck()
+        .get(),
+    ).toBe("OPENED");
+    repository.recordInspectionAudit("inspection-run:diagnostic", {
+      type: "runner.inspection.stopped",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        reason: "PAGE_CHANGED",
+        diagnosticCategory: "NAVIGATION_EXCEPTION",
+      },
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT state,safe_stop_reason AS stopReason,classification_summary_json AS summary
+           FROM runner_inspection_bindings WHERE id='inspection-run:diagnostic'`,
+        )
+        .get(),
+    ).toEqual({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      summary: JSON.stringify({ diagnosticCategory: "NAVIGATION_EXCEPTION" }),
+    });
+    const stoppedAudit = sqlite
+      .prepare(
+        `SELECT redacted_metadata_json AS metadata FROM audit_events
+         WHERE entity_id='inspection-run:diagnostic' AND event_type='runner.inspection.stopped'`,
+      )
+      .get() as { metadata: string };
+    expect(JSON.parse(stoppedAudit.metadata)).toEqual({
+      runId: "inspection-run:diagnostic",
+      operation: "OPEN_AND_INSPECT_ONLY",
+      reason: "PAGE_CHANGED",
+      diagnosticCategory: "NAVIGATION_EXCEPTION",
+    });
+    expect(stoppedAudit.metadata).not.toContain("message");
+    expect(stoppedAudit.metadata).not.toContain("stack");
+    sqlite.close();
+  });
+
   it("invalidates inspection bindings when persisted packet components change", () => {
     const sqlite = database();
     let sequence = 0;

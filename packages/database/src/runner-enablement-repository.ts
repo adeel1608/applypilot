@@ -520,6 +520,10 @@ export class RunnerEnablementRepository {
 
   recordInspectionAudit(runId: string, record: InspectionAuditRecord): void {
     const id = z.string().min(1).max(200).parse(runId);
+    const safeAuditMetadata = validateRunnerAuditMetadata(record.type, {
+      runId: id,
+      ...record.metadata,
+    });
     const row = this.sqlite
       .prepare("SELECT state FROM runner_inspection_bindings WHERE id=?")
       .get(id) as { state: string } | undefined;
@@ -553,16 +557,18 @@ export class RunnerEnablementRepository {
       }
       this.sqlite
         .prepare(
-          "UPDATE runner_inspection_bindings SET state='STOPPED',safe_stop_reason=?,updated_at=? WHERE id=?",
+          `UPDATE runner_inspection_bindings
+           SET state='STOPPED',safe_stop_reason=?,classification_summary_json=?,updated_at=?
+           WHERE id=?`,
         )
-        .run(record.metadata.reason, timestamp, id);
+        .run(
+          record.metadata.reason,
+          JSON.stringify({ diagnosticCategory: record.metadata.diagnosticCategory }),
+          timestamp,
+          id,
+        );
     }
-    this.audit(
-      record.type,
-      "runner_inspection",
-      id,
-      validateRunnerAuditMetadata(record.type, { runId: id, ...record.metadata }),
-    );
+    this.audit(record.type, "runner_inspection", id, safeAuditMetadata);
   }
 
   recordRecoveryEvent(runId: string, input: z.input<typeof RecoveryEventSchema>): string {

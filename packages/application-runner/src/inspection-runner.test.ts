@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
+import type { Page } from "playwright";
 
 import {
   ApplicationPacketSchema,
+  InspectionDiagnosticError,
   LEVER_APPLICATION_INSPECTION_FORM_VERSION,
   LEVER_REAL_INSPECTION_ADAPTER_VERSION,
   LeverRealTargetInspectionAdapter,
+  PlaywrightReadOnlyInspectionBrowser,
   ReadOnlyBrowserSnapshotSchema,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
   freezeInspectionBinding,
   freezeRunnerBinding,
   type ApplicationPacket,
+  type InspectionAuditRecord,
   type ReadOnlyBrowserSnapshot,
   type RunnerTargetCapability,
 } from "./index";
@@ -112,15 +116,19 @@ class FixtureBrowser {
 function runnerFor(value = packet(), target = capability(), browser = new FixtureBrowser()) {
   const binding = freezeInspectionBinding(value, target);
   const audits: string[] = [];
+  const auditRecords: InspectionAuditRecord[] = [];
   const runner = new TargetInspectionRunner(
     target,
     binding,
     new LeverRealTargetInspectionAdapter(browser),
     () => binding,
-    (record) => audits.push(record.type),
+    (record) => {
+      audits.push(record.type);
+      auditRecords.push(record);
+    },
     () => now,
   );
-  return { runner, binding, browser, audits };
+  return { runner, binding, browser, audits, auditRecords };
 }
 
 describe("read-only real target inspection", () => {
@@ -255,6 +263,159 @@ describe("read-only real target inspection", () => {
     expect(await runnerFor(packet(), capability(), noForm).runner.openAndInspect()).toMatchObject({
       state: "STOPPED",
       stopReason: "FORM_CHANGED",
+    });
+  });
+
+  it.each([
+    ["HTTP 404", "HTTP_ERROR", new FixtureBrowser(snapshot({ httpStatus: 404 }))],
+    ["HTTP 500", "HTTP_ERROR", new FixtureBrowser(snapshot({ httpStatus: 500 }))],
+    [
+      "invalid read-only snapshot",
+      "SNAPSHOT_INVALID",
+      new FixtureBrowser({ ...snapshot(), httpStatus: "invalid" } as never),
+    ],
+  ] as const)(
+    "keeps PAGE_CHANGED public while retaining the value-free %s category",
+    async (_caseName, diagnosticCategory, browser) => {
+      const { runner, auditRecords } = runnerFor(packet(), capability(), browser);
+      expect(await runner.openAndInspect()).toMatchObject({
+        state: "STOPPED",
+        stopReason: "PAGE_CHANGED",
+        diagnosticCategory,
+        observation: null,
+      });
+      expect(auditRecords.at(-1)).toEqual({
+        type: "runner.inspection.stopped",
+        metadata: {
+          operation: "OPEN_AND_INSPECT_ONLY",
+          reason: "PAGE_CHANGED",
+          diagnosticCategory,
+        },
+      });
+    },
+  );
+
+  it.each([
+    ["browser navigation exception", "NAVIGATION_EXCEPTION"],
+    ["DOM evaluation exception", "DOM_INSPECTION_EXCEPTION"],
+  ] as const)("retains a fixed category for %s", async (_caseName, diagnosticCategory) => {
+    const target = capability();
+    const binding = freezeInspectionBinding(packet(), target);
+    const audits: InspectionAuditRecord[] = [];
+    const runner = new TargetInspectionRunner(
+      target,
+      binding,
+      new LeverRealTargetInspectionAdapter({
+        async inspect() {
+          throw new InspectionDiagnosticError(diagnosticCategory);
+        },
+      }),
+      () => binding,
+      (record) => audits.push(record),
+      () => now,
+    );
+    expect(await runner.openAndInspect()).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory,
+    });
+    expect(audits.at(-1)).toMatchObject({ metadata: { diagnosticCategory } });
+  });
+
+  it.each([
+    [
+      "navigation",
+      "NAVIGATION_EXCEPTION",
+      {
+        goto: async () => {
+          throw new Error("fictional navigation detail");
+        },
+      },
+    ],
+    [
+      "DOM inspection",
+      "DOM_INSPECTION_EXCEPTION",
+      {
+        goto: async () => ({ status: () => 200 }),
+        evaluate: async () => {
+          throw new Error("fictional DOM detail");
+        },
+      },
+    ],
+    [
+      "browser snapshot",
+      "SNAPSHOT_INVALID",
+      {
+        goto: async () => ({ status: () => 200 }),
+        evaluate: async () => ({
+          declaredFormVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+          formCount: "invalid",
+          controls: [],
+          protectionSignals: [],
+          popupDeclared: false,
+          hiddenInteractiveStep: false,
+        }),
+      },
+    ],
+  ] as const)(
+    "classifies the production %s failure without retaining details",
+    async (_caseName, category, overrides) => {
+      const targetUrl = packet().targetUrl!;
+      const page = {
+        route: async () => undefined,
+        unroute: async () => undefined,
+        on: () => undefined,
+        off: () => undefined,
+        url: () => targetUrl,
+        mainFrame: () => ({}),
+        evaluate: async () => ({
+          declaredFormVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+          formCount: 1,
+          controls: [],
+          protectionSignals: [],
+          popupDeclared: false,
+          hiddenInteractiveStep: false,
+        }),
+        ...overrides,
+      } as unknown as Page;
+      await expect(
+        new PlaywrightReadOnlyInspectionBrowser(page).inspect(
+          freezeInspectionBinding(packet(), capability()),
+        ),
+      ).rejects.toMatchObject({ category, message: "INSPECTION_DIAGNOSTIC" });
+    },
+  );
+
+  it("distinguishes adapter-output rejection from an unknown adapter exception", async () => {
+    const target = capability();
+    const binding = freezeInspectionBinding(packet(), target);
+    const adapter = (inspect: () => Promise<never>) => ({
+      adapterVersion: target.adapterVersion,
+      formVersion: target.formVersion,
+      inspect,
+    });
+    const run = async (inspect: () => Promise<never>) =>
+      new TargetInspectionRunner(
+        target,
+        binding,
+        adapter(inspect),
+        () => binding,
+        () => undefined,
+        () => now,
+      ).openAndInspect();
+    expect(await run(async () => ({ invalid: true }) as never)).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "ADAPTER_OUTPUT_INVALID",
+    });
+    expect(
+      await run(async () => {
+        throw new Error("fictional detail must not be retained");
+      }),
+    ).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "UNKNOWN_INSPECTION_EXCEPTION",
     });
   });
 

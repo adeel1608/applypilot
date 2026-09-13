@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   FrozenInspectionBindingSchema,
+  InspectionDiagnosticError,
   InspectionControlTypeSchema,
   InspectionFieldSchema,
   InspectionFieldSemanticSchema,
@@ -58,6 +59,12 @@ export const ReadOnlyBrowserSnapshotSchema = z
   .strict();
 
 export type ReadOnlyBrowserSnapshot = z.infer<typeof ReadOnlyBrowserSnapshotSchema>;
+
+function parseReadOnlyBrowserSnapshot(input: unknown): ReadOnlyBrowserSnapshot {
+  const parsed = ReadOnlyBrowserSnapshotSchema.safeParse(input);
+  if (!parsed.success) throw new InspectionDiagnosticError("SNAPSHOT_INVALID");
+  return parsed.data;
+}
 
 export interface ReadOnlyInspectionBrowser {
   inspect(binding: FrozenInspectionBinding): Promise<ReadOnlyBrowserSnapshot>;
@@ -207,8 +214,11 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
     ) {
       throw new Error("LEVER_INSPECTION_HOST_UNSUPPORTED");
     }
-    const snapshot = ReadOnlyBrowserSnapshotSchema.parse(await this.browser.inspect(binding));
+    const snapshot = parseReadOnlyBrowserSnapshot(await this.browser.inspect(binding));
     const signal = firstSignal(snapshot);
+    if (signal === "PAGE_CHANGED" && snapshot.httpStatus !== null && snapshot.httpStatus >= 400) {
+      throw new InspectionDiagnosticError("HTTP_ERROR");
+    }
     const fields = snapshot.controls.map(safeField);
     const structurallySupported =
       snapshot.formCount > 0 && fields.some(({ semanticType }) => semanticType === "FINAL_SUBMIT");
@@ -222,7 +232,7 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
           : unsupportedControl
             ? (["UNSUPPORTED_CONTROL"] as const)
             : [];
-    return TargetInspectionObservationSchema.parse({
+    const observation = TargetInspectionObservationSchema.safeParse({
       targetUrl: snapshot.targetUrl,
       formVersion: this.formVersion,
       adapterVersion: this.adapterVersion,
@@ -236,6 +246,8 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
         candidateDataOutboundFields: 0,
       },
     });
+    if (!observation.success) throw new InspectionDiagnosticError("ADAPTER_OUTPUT_INVALID");
+    return observation.data;
   }
 }
 
@@ -301,9 +313,9 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           waitUntil: "domcontentloaded",
           timeout: 30_000,
         });
-      } catch (error) {
-        if (!blockedDestination) throw error;
-        return ReadOnlyBrowserSnapshotSchema.parse({
+      } catch {
+        if (!blockedDestination) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        return parseReadOnlyBrowserSnapshot({
           targetUrl: binding.targetUrl,
           httpStatus: null,
           declaredFormVersion: null,
@@ -332,86 +344,102 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           hiddenInteractiveStep: false,
         });
       }
-      const dom = await this.page.evaluate(() => {
-        const clean = (value: string | null | undefined, max: number) =>
-          (value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-        const controls = [...document.querySelectorAll("input, select, textarea, button")]
-          .slice(0, 200)
-          .map((element, index) => {
-            const input = element as HTMLInputElement;
-            const labels = "labels" in input && input.labels ? [...input.labels] : [];
-            const label = clean(
-              labels.map((item) => item.textContent).join(" ") ||
-                element.getAttribute("aria-label") ||
-                element.getAttribute("data-inspection-label"),
-              200,
-            );
-            const tag = element.tagName.toLowerCase() as "input" | "select" | "textarea" | "button";
-            const type = clean(
-              element.getAttribute("type") || (tag === "button" ? "submit" : "text"),
-              40,
-            ).toLowerCase();
-            const style = window.getComputedStyle(element);
-            return {
-              index,
-              tag,
-              type,
-              name: clean(element.getAttribute("name"), 200),
-              id: clean(element.id, 200),
-              autocomplete: clean(element.getAttribute("autocomplete"), 100),
-              required: element.hasAttribute("required"),
-              hidden:
-                type === "hidden" ||
-                element.hasAttribute("hidden") ||
-                style.display === "none" ||
-                style.visibility === "hidden",
-              label,
-              unsupportedWidget:
-                element.hasAttribute("data-unsupported-control") ||
-                element.getAttribute("role") === "combobox-custom",
-            };
-          });
-        const explicitSignal = document
-          .querySelector("[data-stop-reason]")
-          ?.getAttribute("data-stop-reason");
-        const supportedSignals = [
-          "CAPTCHA",
-          "MFA",
-          "AUTHENTICATION_REQUIRED",
-          "BOT_DETECTION",
-          "RATE_LIMIT",
-          "ACCESS_CONTROL",
-          "WEBSITE_RESTRICTION",
-          "PAGE_CHANGED",
-          "FORM_CHANGED",
-          "DESTINATION_CHANGED",
-          "UNSUPPORTED_CONTROL",
-        ];
-        const protectionSignals =
-          explicitSignal && supportedSignals.includes(explicitSignal) ? [explicitSignal] : [];
-        return {
-          declaredFormVersion:
-            document.querySelector("[data-form-version]")?.getAttribute("data-form-version") ??
-            null,
-          formCount: document.forms.length,
-          controls,
-          protectionSignals,
-          popupDeclared: Boolean(
-            document.querySelector('a[target="_blank"], form[target="_blank"]'),
-          ),
-          hiddenInteractiveStep: Boolean(document.querySelector("[data-hidden-application-step]")),
-        };
-      });
-      const { popupDeclared, ...safeDom } = dom;
-      return ReadOnlyBrowserSnapshotSchema.parse({
-        targetUrl: this.page.url(),
-        httpStatus: response?.status() ?? null,
-        ...safeDom,
-        popupAttempted: popupAttempted || popupDeclared,
-        downloadAttempted,
-        blockedWriteRequest,
-        blockedDestination,
-      });
+      let dom;
+      try {
+        dom = await this.page.evaluate(() => {
+          const clean = (value: string | null | undefined, max: number) =>
+            (value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+          const controls = [...document.querySelectorAll("input, select, textarea, button")]
+            .slice(0, 200)
+            .map((element, index) => {
+              const input = element as HTMLInputElement;
+              const labels = "labels" in input && input.labels ? [...input.labels] : [];
+              const label = clean(
+                labels.map((item) => item.textContent).join(" ") ||
+                  element.getAttribute("aria-label") ||
+                  element.getAttribute("data-inspection-label"),
+                200,
+              );
+              const tag = element.tagName.toLowerCase() as
+                | "input"
+                | "select"
+                | "textarea"
+                | "button";
+              const type = clean(
+                element.getAttribute("type") || (tag === "button" ? "submit" : "text"),
+                40,
+              ).toLowerCase();
+              const style = window.getComputedStyle(element);
+              return {
+                index,
+                tag,
+                type,
+                name: clean(element.getAttribute("name"), 200),
+                id: clean(element.id, 200),
+                autocomplete: clean(element.getAttribute("autocomplete"), 100),
+                required: element.hasAttribute("required"),
+                hidden:
+                  type === "hidden" ||
+                  element.hasAttribute("hidden") ||
+                  style.display === "none" ||
+                  style.visibility === "hidden",
+                label,
+                unsupportedWidget:
+                  element.hasAttribute("data-unsupported-control") ||
+                  element.getAttribute("role") === "combobox-custom",
+              };
+            });
+          const explicitSignal = document
+            .querySelector("[data-stop-reason]")
+            ?.getAttribute("data-stop-reason");
+          const supportedSignals = [
+            "CAPTCHA",
+            "MFA",
+            "AUTHENTICATION_REQUIRED",
+            "BOT_DETECTION",
+            "RATE_LIMIT",
+            "ACCESS_CONTROL",
+            "WEBSITE_RESTRICTION",
+            "PAGE_CHANGED",
+            "FORM_CHANGED",
+            "DESTINATION_CHANGED",
+            "UNSUPPORTED_CONTROL",
+          ];
+          const protectionSignals =
+            explicitSignal && supportedSignals.includes(explicitSignal) ? [explicitSignal] : [];
+          return {
+            declaredFormVersion:
+              document.querySelector("[data-form-version]")?.getAttribute("data-form-version") ??
+              null,
+            formCount: document.forms.length,
+            controls,
+            protectionSignals,
+            popupDeclared: Boolean(
+              document.querySelector('a[target="_blank"], form[target="_blank"]'),
+            ),
+            hiddenInteractiveStep: Boolean(
+              document.querySelector("[data-hidden-application-step]"),
+            ),
+          };
+        });
+      } catch {
+        throw new InspectionDiagnosticError("DOM_INSPECTION_EXCEPTION");
+      }
+      try {
+        const { popupDeclared, ...safeDom } = dom;
+        return parseReadOnlyBrowserSnapshot({
+          targetUrl: this.page.url(),
+          httpStatus: response?.status() ?? null,
+          ...safeDom,
+          popupAttempted: popupAttempted || popupDeclared,
+          downloadAttempted,
+          blockedWriteRequest,
+          blockedDestination,
+        });
+      } catch (error) {
+        if (error instanceof InspectionDiagnosticError) throw error;
+        throw new InspectionDiagnosticError("SNAPSHOT_INVALID");
+      }
     } finally {
       this.page.off("popup", popupHandler);
       this.page.off("download", downloadHandler);

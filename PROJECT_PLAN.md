@@ -5758,3 +5758,40 @@ lifetime actions still `9/1/0/0`.
    version 3 DRAFT with predecessor 2 and fresh expiries using production digest logic.
 7. Verify zero active target capability, zero new inspection run/action, update this result record, and
    stop for exact owner approval of the returned draft.
+
+## Implementation and validation result
+
+Status: `IMPLEMENTED / PATH B / OFFLINE RELEASE GATES GREEN / PR PENDING`. Historical evidence was
+verified without mutation: the one run used capability version 1 and the reviewed packet, recorded
+bound/opened/stopped events, ended `STOPPED / PAGE_CHANGED`, has no completed event, and version 2 is
+`REVOKED`. Because the old stopped audit contains no diagnostic category or safe snapshot, its deepest
+cause remains `UNKNOWN_SAFE_BOUNDARY`. No software/form defect is proven and the historical record is
+not backfilled.
+
+The prospective implementation keeps public `PAGE_CHANGED` while adding the six fixed categories from
+the blueprint to stopped results, strict audits, and the existing inspection summary JSON. The Lever
+adapter maps generic HTTP >=400, navigation, snapshot, DOM, and adapter-output boundaries without
+serializing error details; the runner supplies `UNKNOWN_INSPECTION_EXCEPTION` for an unclassified
+throw. Audit metadata is validated before any lifecycle mutation, and a regression proves injected
+exception text is rejected while the binding remains `OPENED`. Adapter version remains
+`lever-real-inspection-v1` and form contract remains `lever-application-inspection-v1` because
+authority, navigation, DOM semantics, and form classification are unchanged. No migration was added
+and migrations `0000`-`0008` have no base-to-working-tree diff.
+
+The initial focused matrix failed six new assertions while all 22 prior cases passed, proving the
+collapse. After implementation, 39 focused inspection/database tests pass, including HTTP 404, HTTP
+500, browser navigation exception, invalid read-only snapshot, DOM inspection exception,
+adapter-output rejection, and unknown adapter exception. A complete dirty-tree release check passed
+501 unit tests across 49 files, 21 integration tests across three files, both local and showcase builds,
+the 19-file showcase audit, 33 serialized E2E tests, privacy audit, and both dependency audits with zero
+vulnerabilities. Privacy checked 315 tracked files, 922 history paths, 920 history blobs, 1,424
+build/test artifacts, and 11 private canaries. Schema remains 8, pending migrations zero, integrity
+`PASS`, and foreign-key issues zero. The final post-review code adjustment strengthened snapshot
+classification and pre-mutation audit validation; strict typecheck and all 39 focused tests pass after
+that adjustment. A clean exact-head release rerun, diff/fsck, PR CI, normal merge, and offline private
+version-3 preparation remain.
+
+No source or employer request, browser launch, form action, upload, submission, or candidate outbound
+field occurred in this task. Active source and real-target capabilities remain zero. Lifetime actions
+remain `9/1/0/0`; Source-enabled Personal Beta remains `READY`, first real target validation remains
+unproven, and Personal Live V1 remains `NOT_READY`.
