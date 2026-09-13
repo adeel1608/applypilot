@@ -12,6 +12,8 @@ import {
   freezeInspectionBinding,
   freezeRunnerBinding,
   packetDigest,
+  runnerTargetCapabilityIdentity,
+  type ApplicationPacket,
 } from "@applypilot/application-runner";
 
 import { RunnerEnablementRepository } from "./runner-enablement-repository";
@@ -95,14 +97,25 @@ function capability() {
   });
 }
 
-function inspectionCapability() {
-  return RunnerTargetCapabilitySchema.parse({
+function inspectionCapability(value: ApplicationPacket = packet()) {
+  const input = {
     ...capability(),
-    capabilityId: "runner-inspection-fixture",
     alias: "Fictional read-only inspection",
     formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
     adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
     allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
+  } as const;
+  return RunnerTargetCapabilitySchema.parse({
+    ...input,
+    capabilityId: deterministicRunnerTargetCapabilityId({
+      targetKind: input.targetKind,
+      allowedOrigin: input.allowedOrigin,
+      allowedPathPrefix: input.allowedPathPrefix,
+      operation: "OPEN_AND_INSPECT_ONLY",
+      formVersion: input.formVersion,
+      adapterVersion: input.adapterVersion,
+      packetDigest: packetDigest(value),
+    }),
   });
 }
 
@@ -256,13 +269,13 @@ describe("runner enablement persistence", () => {
       () => now,
       () => `inspection:${++sequence}`,
     );
-    const target = inspectionCapability();
-    repository.persistTargetCapabilityVersion(target);
     const inspectionPacket = ApplicationPacketSchema.parse({
       ...packet(),
       documents: [],
       answers: [],
     });
+    const target = inspectionCapability(inspectionPacket);
+    repository.persistTargetCapabilityVersion(target);
     const binding = freezeInspectionBinding(inspectionPacket, target);
     repository.bindInspection({
       runId: "inspection-run:1",
@@ -327,12 +340,14 @@ describe("runner enablement persistence", () => {
       () => now,
       () => `diagnostic:${++sequence}`,
     );
-    const target = inspectionCapability();
+    const inspectionPacket = ApplicationPacketSchema.parse({
+      ...packet(),
+      documents: [],
+      answers: [],
+    });
+    const target = inspectionCapability(inspectionPacket);
     repository.persistTargetCapabilityVersion(target);
-    const binding = freezeInspectionBinding(
-      ApplicationPacketSchema.parse({ ...packet(), documents: [], answers: [] }),
-      target,
-    );
+    const binding = freezeInspectionBinding(inspectionPacket, target);
     repository.bindInspection({
       runId: "inspection-run:diagnostic",
       binding,
@@ -410,12 +425,14 @@ describe("runner enablement persistence", () => {
       () => now,
       () => `inspection-stale:${++sequence}`,
     );
-    const target = inspectionCapability();
+    const inspectionPacket = ApplicationPacketSchema.parse({
+      ...packet(),
+      documents: [],
+      answers: [],
+    });
+    const target = inspectionCapability(inspectionPacket);
     repository.persistTargetCapabilityVersion(target);
-    const binding = freezeInspectionBinding(
-      ApplicationPacketSchema.parse({ ...packet(), documents: [], answers: [] }),
-      target,
-    );
+    const binding = freezeInspectionBinding(inspectionPacket, target);
     repository.bindInspection({
       runId: "inspection-run:stale",
       binding,
@@ -469,14 +486,16 @@ describe("runner enablement persistence", () => {
       ...targetBase,
       capabilityId: "runner_wrong_packet_scope",
     });
-    repository.persistTargetCapabilityVersion(wrongTarget);
-    expect(() =>
-      repository.bindInspection({
-        runId: "inspection-run:wrong",
-        binding: freezeInspectionBinding(realPacket, wrongTarget),
-        targetCapability: wrongTarget,
-      }),
-    ).toThrow("INSPECTION_CAPABILITY_PACKET_SCOPE_MISMATCH");
+    const wrongIdentity = runnerTargetCapabilityIdentity(wrongTarget, packetDigest(realPacket));
+    expect(() => repository.persistTargetCapabilityVersion(wrongTarget, wrongIdentity)).toThrow(
+      "TARGET_CAPABILITY_IDENTITY_MISMATCH",
+    );
+    expect(
+      sqlite
+        .prepare("SELECT COUNT(*) FROM runner_target_capability_versions WHERE capability_id=?")
+        .pluck()
+        .get(wrongTarget.capabilityId),
+    ).toBe(0);
 
     const correctTarget = RunnerTargetCapabilitySchema.parse({
       ...targetBase,
@@ -490,7 +509,13 @@ describe("runner enablement persistence", () => {
         packetDigest: packetDigest(realPacket),
       }),
     });
-    repository.persistTargetCapabilityVersion(correctTarget);
+    expect(() => repository.persistTargetCapabilityVersion(correctTarget)).toThrow(
+      "TARGET_CAPABILITY_IDENTITY_CONTEXT_REQUIRED",
+    );
+    repository.persistTargetCapabilityVersion(
+      correctTarget,
+      runnerTargetCapabilityIdentity(correctTarget, packetDigest(realPacket)),
+    );
     const binding = freezeInspectionBinding(realPacket, correctTarget);
     repository.bindInspection({
       runId: "inspection-run:correct",

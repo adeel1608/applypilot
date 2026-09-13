@@ -9,10 +9,9 @@ import {
   ApplicationPacketSchema,
   LEVER_APPLICATION_INSPECTION_FORM_VERSION,
   LEVER_REAL_INSPECTION_ADAPTER_VERSION,
-  RunnerTargetCapabilitySchema,
   deriveDuplicatePacketState,
   deriveJobExpiryState,
-  deterministicRunnerTargetCapabilityId,
+  deriveNextRunnerTargetCapability,
   freezeInspectionBinding,
   packetDigest,
   runnerTargetCapabilityDigest,
@@ -222,7 +221,7 @@ function main(): void {
     }
     const recordedAt = new Date();
     const packetHash = packetDigest(packet);
-    const capabilityId = deterministicRunnerTargetCapabilityId({
+    const identity = {
       targetKind: "REAL_TARGET",
       allowedOrigin: target.origin,
       allowedPathPrefix: target.pathname,
@@ -230,26 +229,20 @@ function main(): void {
       formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
       adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
       packetDigest: packetHash,
-    });
-    const capability = RunnerTargetCapabilitySchema.parse({
-      schemaVersion: 2,
-      capabilityId,
-      version: 1,
-      predecessorVersion: null,
-      targetKind: "REAL_TARGET",
-      alias: `${report.employer} ${report.title} read-only inspection`,
-      allowedOrigin: target.origin,
-      allowedPathPrefix: target.pathname,
-      formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
-      adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
-      allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
-      approvalState: "DRAFT",
-      approvalReference: null,
-      approvedAt: null,
-      policyVersion: "real-target-inspection-v1",
-      policyExpiresAt: new Date(recordedAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      capabilityExpiresAt: new Date(recordedAt.getTime() + 30 * 60 * 1000).toISOString(),
-      revokedAt: null,
+    } as const;
+    const capability = deriveNextRunnerTargetCapability({
+      previous: null,
+      identity,
+      lifecycle: {
+        alias: `${report.employer} ${report.title} read-only inspection`,
+        approvalState: "DRAFT",
+        approvalReference: null,
+        approvedAt: null,
+        policyVersion: "real-target-inspection-v1",
+        policyExpiresAt: new Date(recordedAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        capabilityExpiresAt: new Date(recordedAt.getTime() + 30 * 60 * 1000).toISOString(),
+        revokedAt: null,
+      },
     });
     const binding = freezeInspectionBinding(packet, capability);
     const outputPath = join(

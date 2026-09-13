@@ -11,8 +11,10 @@ import {
   ReadOnlyBrowserSnapshotSchema,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
+  deterministicRunnerTargetCapabilityId,
   freezeInspectionBinding,
   freezeRunnerBinding,
+  packetDigest,
   type ApplicationPacket,
   type InspectionAuditRecord,
   type ReadOnlyBrowserSnapshot,
@@ -40,10 +42,22 @@ function packet(overrides: Partial<ApplicationPacket> = {}) {
   });
 }
 
-function capability(overrides: Partial<RunnerTargetCapability> = {}) {
+function capability(
+  value: ApplicationPacket = packet(),
+  overrides: Partial<RunnerTargetCapability> = {},
+) {
+  const identity = {
+    targetKind: "REAL_TARGET" as const,
+    allowedOrigin: "https://jobs.lever.co",
+    allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+    operation: "OPEN_AND_INSPECT_ONLY" as const,
+    formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+    adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
+    packetDigest: packetDigest(value),
+  };
   return RunnerTargetCapabilitySchema.parse({
     schemaVersion: 2,
-    capabilityId: "runner_inspection_fixture",
+    capabilityId: deterministicRunnerTargetCapabilityId(identity),
     version: 1,
     predecessorVersion: null,
     targetKind: "REAL_TARGET",
@@ -113,7 +127,7 @@ class FixtureBrowser {
   }
 }
 
-function runnerFor(value = packet(), target = capability(), browser = new FixtureBrowser()) {
+function runnerFor(value = packet(), target = capability(value), browser = new FixtureBrowser()) {
   const binding = freezeInspectionBinding(value, target);
   const audits: string[] = [];
   const auditRecords: InspectionAuditRecord[] = [];
@@ -132,6 +146,14 @@ function runnerFor(value = packet(), target = capability(), browser = new Fixtur
 }
 
 describe("read-only real target inspection", () => {
+  it("rejects a cross-identity adapter change while freezing the packet binding", () => {
+    const value = packet();
+    const malformed = capability(value, { adapterVersion: "lever-real-inspection-v3" });
+    expect(() => freezeInspectionBinding(value, malformed)).toThrow(
+      "TARGET_CAPABILITY_IDENTITY_MISMATCH",
+    );
+  });
+
   it.each([
     packet(),
     packet({

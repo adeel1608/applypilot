@@ -7,11 +7,12 @@ import {
   FrozenInspectionBindingSchema,
   FrozenRunnerBindingSchema,
   RunnerTargetCapabilitySchema,
-  deterministicRunnerTargetCapabilityId,
+  assertRunnerTargetCapabilityIdentity,
   inspectionAnswersDigest,
   inspectionDisclosuresDigest,
   inspectionDocumentsDigest,
   runnerTargetCapabilityDigest,
+  runnerTargetCapabilityIdentity,
   validateRunnerAuditMetadata,
   type FinalActionConsent,
   type FinalConsentStore,
@@ -19,6 +20,7 @@ import {
   type FrozenRunnerBinding,
   type InspectionAuditRecord,
   type RunnerTargetCapability,
+  type RunnerTargetCapabilityIdentity,
 } from "@applypilot/application-runner";
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -54,8 +56,15 @@ export class RunnerEnablementRepository {
     private readonly id: () => string = randomUUID,
   ) {}
 
-  persistTargetCapabilityVersion(input: RunnerTargetCapability): { id: string; created: boolean } {
+  persistTargetCapabilityVersion(
+    input: RunnerTargetCapability,
+    identity?: RunnerTargetCapabilityIdentity,
+  ): { id: string; created: boolean } {
     const capability = RunnerTargetCapabilitySchema.parse(input);
+    if (capability.targetKind === "REAL_TARGET") {
+      if (!identity) throw new Error("TARGET_CAPABILITY_IDENTITY_CONTEXT_REQUIRED");
+      assertRunnerTargetCapabilityIdentity(capability, identity);
+    }
     const digest = runnerTargetCapabilityDigest(capability);
     const existing = this.sqlite
       .prepare(
@@ -286,20 +295,15 @@ export class RunnerEnablementRepository {
     ) {
       throw new Error("INSPECTION_CAPABILITY_BINDING_MISMATCH");
     }
-    if (
-      capability.targetKind === "REAL_TARGET" &&
-      capability.capabilityId !==
-        deterministicRunnerTargetCapabilityId({
-          targetKind: capability.targetKind,
-          allowedOrigin: capability.allowedOrigin,
-          allowedPathPrefix: capability.allowedPathPrefix,
-          operation: binding.operation,
-          formVersion: capability.formVersion,
-          adapterVersion: capability.adapterVersion,
-          packetDigest: binding.packetDigest,
-        })
-    ) {
-      throw new Error("INSPECTION_CAPABILITY_PACKET_SCOPE_MISMATCH");
+    if (capability.targetKind === "REAL_TARGET") {
+      try {
+        assertRunnerTargetCapabilityIdentity(
+          capability,
+          runnerTargetCapabilityIdentity(capability, binding.packetDigest),
+        );
+      } catch {
+        throw new Error("INSPECTION_CAPABILITY_PACKET_SCOPE_MISMATCH");
+      }
     }
     const capabilityRow = this.sqlite
       .prepare(

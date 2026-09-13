@@ -44,6 +44,8 @@ boundaries; it does not retrospectively claim which expression failed on the rea
 
 An inspection binding commits to the exact current packet, packet digest, job/profile/evaluation versions, capability ID/version/digest, target URL/origin/path, allowed path prefix, adapter/form versions, and document/answer/disclosure digests. A review-required packet may be inspected because inspection does not fill it, but a stale packet or later-changed capability, packet, job, profile, or evaluation fails before the browser opens.
 
+A real-target capability ID is derived only from its target kind, exact origin, exact path, one allowed operation, form contract, adapter, and packet digest. Changing any of those inputs creates a new capability family at version 1 with no predecessor. Alias, lifecycle state and references, timestamps and expiries, version, and predecessor do not rotate identity; unchanged identity advances within the same family. Offline proposal preparation, packet freezing, real-target persistence, inspection binding, and execution all use the same central assertion. A cross-family or malformed lineage therefore fails before persistence or employer access. The deterministic ID function itself is unchanged.
+
 Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. Audits record only safe operation, version, stop reason, a fixed value-free diagnostic category, and aggregate classification counts.
 
 ## Answers, disclosure, and final submission

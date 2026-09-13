@@ -32,6 +32,8 @@ Then, in `/sources`, type `RUN <capabilityId>` and select the explicit owner-con
 
 Before opening any real employer page, the exact private packet and one immutable schema-v2 capability for the reviewed adapter must be prepared offline. The approved capability version must be persisted through the owner surface before an owner-started run. The owner must provide this exact approval record outside Git:
 
+The capability family is derived from the exact target kind, origin, path, single operation, form contract, adapter, and packet digest. Reusing that scope advances the existing family; changing any identity input starts a new family at version 1 with no predecessor. Proposal preparation, approval persistence, revocation, packet binding, and execution enforce this rule consistently and fail offline on a mismatched ID or lineage.
+
 ```text
 OWNER APPROVAL — FIRST REAL EMPLOYER TARGET INTERACTION
 Target capability ID: <capabilityId>
@@ -48,6 +50,8 @@ I approve one owner-started read-only inspection with this exact target, capabil
 ```
 
 In `/applications`, first persist the exact approved capability by typing `APPROVE <capabilityId>` and selecting its checkbox. Starting the inspection remains a separate deliberate owner action. The inspection adapter is `lever-real-inspection-v2`, the form contract is `lever-application-inspection-v1`, and the capability operation list must equal `[OPEN_AND_INSPECT_ONLY]`. Upload or fill requires different future code and authority. Final submission always requires immediate owner review of the frozen packet and a fresh, short-lived, one-use consent bound to packet, destination, form, adapter, document, answer, and disclosure digests. A lost or ambiguous response is terminal `OUTCOME_UNKNOWN`; never retry it automatically.
+
+The current 30-minute target-capability expiry is security-compatible but operationally fragile for a deliberate review-and-start workflow; a prior approved version expired during that gap. Keep the existing limit for this remediation. A future, separately reviewed authority-design change should consider either a 90–120 minute approval window or a short execution lease minted from an approved capability without broadening operation or target scope.
 
 ## Offline release boundary
 
