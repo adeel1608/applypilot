@@ -6120,3 +6120,39 @@ independently expected value. Creating that DRAFT does not approve or execute it
    adapter v2, verify the independently derived new ID, version 1/null predecessor, exact packet,
    production digest, 24-hour/30-minute windows, zero active authority/run/network action, and stop
    for fresh owner approval.
+
+## Implementation and pre-PR validation results
+
+Implemented the unchanged deterministic identity contract as a central assertion and added one
+family-aware succession helper. Initial proposal preparation now always derives a version-1 family;
+packet freezing, real-target database persistence, owner approval/revocation, binding, and execution
+preflight share the same packet-bound assertion. The audited defect boundary was the unchecked manual
+private refresh workflow together with pre-existing persistence paths that schema-validated but did
+not deterministically re-derive identity before write. The execution gate remains unchanged in
+authority and was correct to stop the malformed proposal.
+
+The focused fictional matrix passes 83 tests across target capability, inspection runner, and
+runner-enablement persistence suites. It covers all seven identity rotations, lifecycle/timestamp/
+alias/version/predecessor non-rotation, same-family v1-v2-v3, adapter-change new-family v1/null,
+no-row malformed persistence, and a complete fictional prepare/approve/execution-preflight A-to-B
+family sequence with zero writes. Five focused serialized target-inspection E2E cases also pass.
+The independently reviewed adapter-v2 inputs derive
+`runner_2fb0a3653f3e4337c60abce6` in production code.
+
+The complete clean release check at implementation head
+`7675ddb007e96a4d600f6dc9ef97d4b14572cae5` passed doctor, schema/status/preflight, format, lint,
+strict typecheck, 525 unit tests across 49 files, 21 integration tests across 3 files, both production
+builds and showcase boundary audit, 36 serialized E2E tests, privacy audit over 315 tracked files,
+953 history paths, 951 history blobs, 1,457 build/test artifacts and 11 private canaries, and full/
+production dependency audits with zero known vulnerabilities. It reported schema 8, pending 0,
+integrity PASS, zero FK issues, source-enabled Personal Beta READY, zero active source capabilities,
+and target approval required. One additional fictional end-to-end family-transition regression was
+then added and passed; the final exact-head complete release rerun remains required after the results
+commit.
+
+No migration was added or edited, no private proposal/report value is included in Git, and no source
+or employer request, real browser navigation, inspection run, candidate value, form interaction,
+upload, submission, or outbound candidate field occurred. The 30-minute expiry remains unchanged:
+it is security-compatible but operationally fragile for separate review/approval/start. A future
+authority-design review should consider a 90-120 minute window or a short execution lease; this PR
+does not broaden duration or authority.

@@ -11,6 +11,7 @@ import {
   ReadOnlyBrowserSnapshotSchema,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
+  deriveNextRunnerTargetCapability,
   deterministicRunnerTargetCapabilityId,
   freezeInspectionBinding,
   freezeRunnerBinding,
@@ -19,6 +20,7 @@ import {
   type InspectionAuditRecord,
   type ReadOnlyBrowserSnapshot,
   type RunnerTargetCapability,
+  type TargetInspectionAdapter,
 } from "./index";
 
 const now = new Date("2026-09-13T04:00:00.000Z");
@@ -146,6 +148,84 @@ function runnerFor(value = packet(), target = capability(value), browser = new F
 }
 
 describe("read-only real target inspection", () => {
+  it("keeps synthetic prepare and execution preflight aligned across an adapter-family change", async () => {
+    const value = packet();
+    const baseIdentity = {
+      targetKind: "REAL_TARGET" as const,
+      allowedOrigin: "https://jobs.lever.co",
+      allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+      operation: "OPEN_AND_INSPECT_ONLY" as const,
+      formVersion: "fictional-form-v1",
+      adapterVersion: "fictional-adapter-a",
+      packetDigest: packetDigest(value),
+    };
+    const approvedLifecycle = {
+      alias: "Fictional approved inspection",
+      approvalState: "APPROVED" as const,
+      approvalReference: "FICTIONAL_OWNER_APPROVAL",
+      approvedAt: "2026-09-13T03:59:00.000Z",
+      policyVersion: "fictional-policy-v1",
+      policyExpiresAt: "2026-09-14T04:00:00.000Z",
+      capabilityExpiresAt: "2026-09-13T04:30:00.000Z",
+      revokedAt: null,
+    };
+    const adapter = (adapterVersion: string): TargetInspectionAdapter => ({
+      adapterVersion,
+      formVersion: baseIdentity.formVersion,
+      async inspect(binding) {
+        return {
+          targetUrl: binding.targetUrl,
+          formVersion: binding.formVersion,
+          adapterVersion: binding.adapterVersion,
+          fields: [],
+          protectionSignals: [],
+          metrics: {
+            browserWriteEvents: 0,
+            formValueChanges: 0,
+            uploads: 0,
+            submissions: 0,
+            candidateDataOutboundFields: 0,
+          },
+        };
+      },
+    });
+    const execute = async (target: RunnerTargetCapability) => {
+      const binding = freezeInspectionBinding(value, target);
+      return new TargetInspectionRunner(
+        target,
+        binding,
+        adapter(target.adapterVersion),
+        () => binding,
+        () => undefined,
+        () => now,
+      ).openAndInspect();
+    };
+
+    const familyA = deriveNextRunnerTargetCapability({
+      previous: null,
+      identity: baseIdentity,
+      lifecycle: approvedLifecycle,
+    });
+    expect(await execute(familyA)).toMatchObject({ state: "COMPLETED" });
+
+    const identityB = { ...baseIdentity, adapterVersion: "fictional-adapter-b" };
+    const malformedB = RunnerTargetCapabilitySchema.parse({
+      ...familyA,
+      adapterVersion: identityB.adapterVersion,
+    });
+    expect(() => freezeInspectionBinding(value, malformedB)).toThrow(
+      "TARGET_CAPABILITY_IDENTITY_MISMATCH",
+    );
+
+    const familyB = deriveNextRunnerTargetCapability({
+      previous: familyA,
+      identity: identityB,
+      lifecycle: approvedLifecycle,
+    });
+    expect(familyB).toMatchObject({ version: 1, predecessorVersion: null });
+    expect(await execute(familyB)).toMatchObject({ state: "COMPLETED" });
+  });
+
   it("rejects a cross-identity adapter change while freezing the packet binding", () => {
     const value = packet();
     const malformed = capability(value, { adapterVersion: "lever-real-inspection-v3" });
