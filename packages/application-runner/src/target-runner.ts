@@ -187,6 +187,96 @@ export function deterministicRunnerTargetCapabilityId(input: {
   return `runner_${sha256(canonical(value)).slice(0, 24)}`;
 }
 
+export type RunnerTargetCapabilityIdentity = Parameters<
+  typeof deterministicRunnerTargetCapabilityId
+>[0];
+
+export type RunnerTargetCapabilityLifecycle = Pick<
+  RunnerTargetCapability,
+  | "alias"
+  | "approvalState"
+  | "approvalReference"
+  | "approvedAt"
+  | "policyVersion"
+  | "policyExpiresAt"
+  | "capabilityExpiresAt"
+  | "revokedAt"
+>;
+
+export function runnerTargetCapabilityIdentity(
+  input: RunnerTargetCapability,
+  packetDigest: string,
+): RunnerTargetCapabilityIdentity {
+  const capability = RunnerTargetCapabilitySchema.parse(input);
+  if (capability.allowedOperations.length !== 1) {
+    throw new Error("TARGET_CAPABILITY_SINGLE_OPERATION_IDENTITY_REQUIRED");
+  }
+  return {
+    targetKind: capability.targetKind,
+    allowedOrigin: capability.allowedOrigin,
+    allowedPathPrefix: capability.allowedPathPrefix,
+    operation: capability.allowedOperations[0],
+    formVersion: capability.formVersion,
+    adapterVersion: capability.adapterVersion,
+    packetDigest,
+  };
+}
+
+export function assertRunnerTargetCapabilityIdentity(
+  input: RunnerTargetCapability,
+  identity: RunnerTargetCapabilityIdentity,
+): RunnerTargetCapability {
+  const capability = RunnerTargetCapabilitySchema.parse(input);
+  const expectedId = deterministicRunnerTargetCapabilityId(identity);
+  if (
+    capability.capabilityId !== expectedId ||
+    capability.targetKind !== identity.targetKind ||
+    capability.allowedOrigin !== identity.allowedOrigin ||
+    capability.allowedPathPrefix !== identity.allowedPathPrefix ||
+    capability.formVersion !== identity.formVersion ||
+    capability.adapterVersion !== identity.adapterVersion ||
+    capability.allowedOperations.length !== 1 ||
+    capability.allowedOperations[0] !== identity.operation
+  ) {
+    throw new Error("TARGET_CAPABILITY_IDENTITY_MISMATCH");
+  }
+  return capability;
+}
+
+export function deriveNextRunnerTargetCapability(input: {
+  previous: RunnerTargetCapability | null;
+  identity: RunnerTargetCapabilityIdentity;
+  lifecycle: RunnerTargetCapabilityLifecycle;
+}): RunnerTargetCapability {
+  const expectedId = deterministicRunnerTargetCapabilityId(input.identity);
+  const previous = input.previous ? RunnerTargetCapabilitySchema.parse(input.previous) : null;
+  const sameFamily = previous?.capabilityId === expectedId;
+  if (sameFamily && previous) {
+    assertRunnerTargetCapabilityIdentity(previous, input.identity);
+  }
+  const capability = RunnerTargetCapabilitySchema.parse({
+    schemaVersion: 2,
+    capabilityId: expectedId,
+    version: sameFamily ? previous.version + 1 : 1,
+    predecessorVersion: sameFamily ? previous.version : null,
+    targetKind: input.identity.targetKind,
+    alias: input.lifecycle.alias,
+    allowedOrigin: input.identity.allowedOrigin,
+    allowedPathPrefix: input.identity.allowedPathPrefix,
+    formVersion: input.identity.formVersion,
+    adapterVersion: input.identity.adapterVersion,
+    allowedOperations: [input.identity.operation],
+    approvalState: input.lifecycle.approvalState,
+    approvalReference: input.lifecycle.approvalReference,
+    approvedAt: input.lifecycle.approvedAt,
+    policyVersion: input.lifecycle.policyVersion,
+    policyExpiresAt: input.lifecycle.policyExpiresAt,
+    capabilityExpiresAt: input.lifecycle.capabilityExpiresAt,
+    revokedAt: input.lifecycle.revokedAt,
+  });
+  return assertRunnerTargetCapabilityIdentity(capability, input.identity);
+}
+
 export function runnerTargetReadiness(input: RunnerTargetCapability, now = new Date()) {
   const capability = RunnerTargetCapabilitySchema.parse(input);
   if (capability.approvalState !== "APPROVED") {

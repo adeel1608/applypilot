@@ -8,12 +8,13 @@ import { z } from "zod";
 import {
   ApplicationPacketSchema,
   RunnerTargetCapabilitySchema,
-  deterministicRunnerTargetCapabilityId,
+  assertRunnerTargetCapabilityIdentity,
   freezeInspectionBinding,
   loadPrivateRunnerTargetAllowlist,
   packetDigest,
   runLeverInspectionInFreshBrowser,
   runnerTargetCapabilityDigest,
+  runnerTargetCapabilityIdentity,
   runnerTargetReadiness,
 } from "@applypilot/application-runner";
 import { RunnerEnablementRepository } from "@applypilot/database";
@@ -112,18 +113,16 @@ async function main(): Promise<void> {
   ] as const;
   if (
     immutableFields.some((field) => capability[field] !== proposed[field]) ||
-    JSON.stringify(capability.allowedOperations) !== JSON.stringify(proposed.allowedOperations) ||
-    capability.capabilityId !==
-      deterministicRunnerTargetCapabilityId({
-        targetKind: capability.targetKind,
-        allowedOrigin: capability.allowedOrigin,
-        allowedPathPrefix: capability.allowedPathPrefix,
-        operation: "OPEN_AND_INSPECT_ONLY",
-        formVersion: capability.formVersion,
-        adapterVersion: capability.adapterVersion,
-        packetDigest: expectedPacketDigest,
-      })
+    JSON.stringify(capability.allowedOperations) !== JSON.stringify(proposed.allowedOperations)
   ) {
+    throw new Error("INSPECTION_PROPOSAL_SCOPE_CHANGED");
+  }
+  try {
+    assertRunnerTargetCapabilityIdentity(
+      capability,
+      runnerTargetCapabilityIdentity(capability, expectedPacketDigest),
+    );
+  } catch {
     throw new Error("INSPECTION_PROPOSAL_SCOPE_CHANGED");
   }
 

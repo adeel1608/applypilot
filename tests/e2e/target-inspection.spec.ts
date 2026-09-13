@@ -9,7 +9,9 @@ import {
   PlaywrightReadOnlyInspectionBrowser,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
+  deterministicRunnerTargetCapabilityId,
   freezeInspectionBinding,
+  packetDigest,
 } from "@applypilot/application-runner";
 
 const now = new Date("2026-09-13T04:00:00.000Z");
@@ -31,9 +33,18 @@ function inspection(caseName: string) {
     documents: [],
     answers: [],
   });
+  const identity = {
+    targetKind: "SYNTHETIC_LOCAL" as const,
+    allowedOrigin: "http://127.0.0.1:3100",
+    allowedPathPrefix: "/synthetic-inspection",
+    operation: "OPEN_AND_INSPECT_ONLY" as const,
+    formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
+    adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
+    packetDigest: packetDigest(packet),
+  };
   const capability = RunnerTargetCapabilitySchema.parse({
     schemaVersion: 2,
-    capabilityId: `runner_e2e_inspection_${caseName}`,
+    capabilityId: deterministicRunnerTargetCapabilityId(identity),
     version: 1,
     predecessorVersion: null,
     targetKind: "SYNTHETIC_LOCAL",

@@ -12,6 +12,8 @@ import {
   InspectionDiagnosticCategorySchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
+  assertRunnerTargetCapabilityIdentity,
+  runnerTargetCapabilityIdentity,
   runnerTargetCapabilityDigest,
   runnerTargetReadiness,
   type InspectionDiagnosticCategory,
@@ -211,6 +213,10 @@ export function freezeInspectionBinding(
   if (!packet.targetUrl) throw new Error("APPLICATION_DESTINATION_INVALID");
   const target = new URL(packet.targetUrl);
   if (!targetWithinCapability(target, capability)) throw new Error("TARGET_CAPABILITY_MISMATCH");
+  assertRunnerTargetCapabilityIdentity(
+    capability,
+    runnerTargetCapabilityIdentity(capability, packetDigest(packet)),
+  );
   return FrozenInspectionBindingSchema.parse({
     operation: "OPEN_AND_INSPECT_ONLY",
     packetId: packet.id,

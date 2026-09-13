@@ -1,12 +1,22 @@
 import "server-only";
 
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { z } from "zod";
 
 import {
+  ApplicationPacketSchema,
   RunnerTargetCapabilitySchema,
+  assertRunnerTargetCapabilityIdentity,
+  deriveNextRunnerTargetCapability,
+  freezeInspectionBinding,
   loadPrivateRunnerTargetAllowlist,
+  packetDigest,
+  runnerTargetCapabilityIdentity,
   runnerTargetReadiness,
   type RunnerTargetCapability,
+  type RunnerTargetCapabilityIdentity,
 } from "@applypilot/application-runner";
 
 import { getLocalDatabase, getRunnerEnablementRepository } from "./local-database";
@@ -15,6 +25,13 @@ import { resolveLocalDataDirectory } from "./local-data-directory";
 const repositoryRoot = () => dirname(resolveLocalDataDirectory());
 const allowlistFilename = () =>
   process.env.APPLYPILOT_RUNNER_ALLOWLIST_FILENAME ?? "runner-target-allowlist.json";
+const PrivateInspectionProposalSchema = z
+  .object({
+    packet: ApplicationPacketSchema,
+    packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    proposedCapability: RunnerTargetCapabilitySchema,
+  })
+  .passthrough();
 
 export async function getRunnerEnablementView() {
   const local = getLocalDatabase();
@@ -86,39 +103,88 @@ export async function getRunnerEnablementView() {
   return { status: allowlist.status, capabilities, recoveries, inspections };
 }
 
-async function exactCapability(capabilityId: string): Promise<RunnerTargetCapability> {
+async function exactCapability(capabilityId: string): Promise<{
+  capability: RunnerTargetCapability;
+  identity: RunnerTargetCapabilityIdentity;
+}> {
   const id = RunnerTargetCapabilitySchema.shape.capabilityId.parse(capabilityId);
   const allowlist = await loadPrivateRunnerTargetAllowlist(repositoryRoot(), allowlistFilename());
   if (allowlist.status !== "RUNNER_TARGET_ALLOWLIST_READY")
     throw new Error("APPROVED_TARGET_REQUIRED");
   const matches = allowlist.capabilities.filter(({ capabilityId: value }) => value === id);
   if (matches.length !== 1) throw new Error("RUNNER_TARGET_CAPABILITY_NOT_UNIQUE");
-  return RunnerTargetCapabilitySchema.parse(matches[0]);
+  const capability = RunnerTargetCapabilitySchema.parse(matches[0]);
+  const proposal = PrivateInspectionProposalSchema.parse(
+    JSON.parse(
+      readFileSync(
+        /* turbopackIgnore: true */ join(
+          resolveLocalDataDirectory(),
+          "private",
+          "reports",
+          "real-target-inspection-proposal.json",
+        ),
+        "utf8",
+      ),
+    ),
+  );
+  if (packetDigest(proposal.packet) !== proposal.packetDigest) {
+    throw new Error("INSPECTION_PROPOSAL_PACKET_DIGEST_MISMATCH");
+  }
+  const immutableFields = [
+    "capabilityId",
+    "version",
+    "predecessorVersion",
+    "targetKind",
+    "allowedOrigin",
+    "allowedPathPrefix",
+    "formVersion",
+    "adapterVersion",
+    "policyVersion",
+    "policyExpiresAt",
+    "capabilityExpiresAt",
+  ] as const;
+  if (
+    immutableFields.some((field) => capability[field] !== proposal.proposedCapability[field]) ||
+    JSON.stringify(capability.allowedOperations) !==
+      JSON.stringify(proposal.proposedCapability.allowedOperations)
+  ) {
+    throw new Error("INSPECTION_PROPOSAL_SCOPE_CHANGED");
+  }
+  const identity = runnerTargetCapabilityIdentity(capability, proposal.packetDigest);
+  assertRunnerTargetCapabilityIdentity(capability, identity);
+  freezeInspectionBinding(proposal.packet, capability);
+  return { capability, identity };
 }
 
 export async function persistApprovedRunnerTarget(capabilityId: string): Promise<void> {
-  const capability = await exactCapability(capabilityId);
+  const { capability, identity } = await exactCapability(capabilityId);
   if (runnerTargetReadiness(capability).status !== "TARGET_ENABLED")
     throw new Error("RUNNER_TARGET_NOT_ENABLED");
   const repository = getRunnerEnablementRepository();
   if (!repository) throw new Error("DATABASE_MIGRATION_REQUIRED");
-  repository.persistTargetCapabilityVersion(capability);
+  repository.persistTargetCapabilityVersion(capability, identity);
   repository.assertTargetCapabilityCurrent(capability);
 }
 
 export async function revokeRunnerTarget(capabilityId: string): Promise<void> {
-  const capability = await exactCapability(capabilityId);
+  const { capability, identity } = await exactCapability(capabilityId);
   const repository = getRunnerEnablementRepository();
   if (!repository) throw new Error("DATABASE_MIGRATION_REQUIRED");
-  repository.persistTargetCapabilityVersion(capability);
+  repository.persistTargetCapabilityVersion(capability, identity);
   const timestamp = new Date().toISOString();
-  repository.persistTargetCapabilityVersion({
-    ...capability,
-    version: capability.version + 1,
-    predecessorVersion: capability.version,
-    approvalState: "REVOKED",
-    approvalReference: null,
-    approvedAt: null,
-    revokedAt: timestamp,
+  const revoked = deriveNextRunnerTargetCapability({
+    previous: capability,
+    identity,
+    lifecycle: {
+      alias: capability.alias,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      policyVersion: capability.policyVersion,
+      policyExpiresAt: capability.policyExpiresAt,
+      capabilityExpiresAt: capability.capabilityExpiresAt,
+      revokedAt: timestamp,
+    },
   });
+  repository.persistTargetCapabilityVersion(revoked, identity);
 }

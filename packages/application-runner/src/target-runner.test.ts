@@ -5,9 +5,12 @@ import {
   InMemoryFinalConsentStore,
   RunnerTargetCapabilitySchema,
   TargetIndependentApplicationRunner,
+  assertRunnerTargetCapabilityIdentity,
+  deriveNextRunnerTargetCapability,
   deterministicRunnerTargetCapabilityId,
   freezeRunnerBinding,
   loadPrivateRunnerTargetAllowlist,
+  runnerTargetCapabilityIdentity,
   runnerTargetReadiness,
   validateRunnerAuditMetadata,
   type ApplicationPacket,
@@ -256,6 +259,168 @@ describe("target-independent application runner", () => {
     expect(
       deterministicRunnerTargetCapabilityId({ ...input, packetDigest: "b".repeat(64) }),
     ).not.toBe(deterministicRunnerTargetCapabilityId(input));
+  });
+
+  describe("target capability identity families", () => {
+    const baseIdentity = {
+      targetKind: "REAL_TARGET" as const,
+      allowedOrigin: "https://jobs.lever.co",
+      allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+      operation: "OPEN_AND_INSPECT_ONLY" as const,
+      formVersion: "lever-application-inspection-v1",
+      adapterVersion: "lever-real-inspection-v1",
+      packetDigest: "a".repeat(64),
+    };
+    const lifecycle = {
+      alias: "Fictional read-only inspection",
+      approvalState: "DRAFT" as const,
+      approvalReference: null,
+      approvedAt: null,
+      policyVersion: "fictional-policy-v1",
+      policyExpiresAt: "2026-09-11T02:00:00.000Z",
+      capabilityExpiresAt: "2026-09-10T03:00:00.000Z",
+      revokedAt: null,
+    };
+
+    it("derives the independently reviewed adapter-v2 family for the private packet digest", () => {
+      expect(
+        deterministicRunnerTargetCapabilityId({
+          targetKind: "REAL_TARGET",
+          allowedOrigin: "https://jobs.lever.co",
+          allowedPathPrefix: "/shieldai/ec27312c-b829-42fb-9a1f-e5733b38b0c1/apply",
+          operation: "OPEN_AND_INSPECT_ONLY",
+          formVersion: "lever-application-inspection-v1",
+          adapterVersion: "lever-real-inspection-v2",
+          packetDigest: "69cbad61af3830a30ce919cc1d0830696ddc2dbdd043965205c9c166e6196a78",
+        }),
+      ).toBe("runner_2fb0a3653f3e4337c60abce6");
+    });
+
+    it.each([
+      ["adapterVersion", { adapterVersion: "lever-real-inspection-v2" }],
+      ["formVersion", { formVersion: "lever-application-inspection-v2" }],
+      ["packetDigest", { packetDigest: "b".repeat(64) }],
+      ["allowedOrigin", { allowedOrigin: "https://example.test" }],
+      ["allowedPathPrefix", { allowedPathPrefix: "/fictional/changed/apply" }],
+      ["operation", { operation: "MAP_FOR_FILL" as const }],
+      ["targetKind", { targetKind: "SYNTHETIC_LOCAL" as const }],
+    ])("rotates identity when %s changes", (_field, change) => {
+      expect(deterministicRunnerTargetCapabilityId({ ...baseIdentity, ...change })).not.toBe(
+        deterministicRunnerTargetCapabilityId(baseIdentity),
+      );
+    });
+
+    it.each([
+      ["alias", { alias: "Renamed fictional inspection" }],
+      ["approvalState", { approvalState: "REVOKED" as const, revokedAt: now.toISOString() }],
+      [
+        "approvalReference",
+        {
+          approvalState: "APPROVED" as const,
+          approvalReference: "fictional-owner-approval",
+          approvedAt: now.toISOString(),
+        },
+      ],
+      [
+        "approvedAt",
+        {
+          approvalState: "APPROVED" as const,
+          approvalReference: "fictional-owner-approval",
+          approvedAt: "2026-09-10T02:01:00.000Z",
+        },
+      ],
+      ["revokedAt", { approvalState: "REVOKED" as const, revokedAt: now.toISOString() }],
+      ["policyVersion", { policyVersion: "fictional-policy-v2" }],
+      ["policyExpiresAt", { policyExpiresAt: "2026-09-12T02:00:00.000Z" }],
+      ["capabilityExpiresAt", { capabilityExpiresAt: "2026-09-10T04:00:00.000Z" }],
+    ])("keeps the identity family when %s changes", (_field, change) => {
+      const first = deriveNextRunnerTargetCapability({
+        previous: null,
+        identity: baseIdentity,
+        lifecycle,
+      });
+      const nextLifecycle = { ...lifecycle, ...change };
+      const next = deriveNextRunnerTargetCapability({
+        previous: first,
+        identity: baseIdentity,
+        lifecycle: nextLifecycle,
+      });
+      expect(next).toMatchObject({
+        capabilityId: first.capabilityId,
+        version: 2,
+        predecessorVersion: 1,
+      });
+    });
+
+    it("aligns preparation and execution identity while starting changed adapter scope at version one", () => {
+      const first = deriveNextRunnerTargetCapability({
+        previous: null,
+        identity: baseIdentity,
+        lifecycle,
+      });
+      const second = deriveNextRunnerTargetCapability({
+        previous: first,
+        identity: baseIdentity,
+        lifecycle,
+      });
+      const third = deriveNextRunnerTargetCapability({
+        previous: second,
+        identity: baseIdentity,
+        lifecycle,
+      });
+      expect([first.version, second.version, third.version]).toEqual([1, 2, 3]);
+      expect([
+        first.predecessorVersion,
+        second.predecessorVersion,
+        third.predecessorVersion,
+      ]).toEqual([null, 1, 2]);
+      const lifecycleOnlyVersion = RunnerTargetCapabilitySchema.parse({
+        ...third,
+        version: 9,
+        predecessorVersion: 8,
+      });
+      expect(
+        deterministicRunnerTargetCapabilityId(
+          runnerTargetCapabilityIdentity(lifecycleOnlyVersion, baseIdentity.packetDigest),
+        ),
+      ).toBe(first.capabilityId);
+
+      const changedIdentity = { ...baseIdentity, adapterVersion: "lever-real-inspection-v2" };
+      const malformed = RunnerTargetCapabilitySchema.parse({
+        ...third,
+        adapterVersion: changedIdentity.adapterVersion,
+      });
+      expect(() =>
+        assertRunnerTargetCapabilityIdentity(
+          malformed,
+          runnerTargetCapabilityIdentity(malformed, changedIdentity.packetDigest),
+        ),
+      ).toThrow("TARGET_CAPABILITY_IDENTITY_MISMATCH");
+      expect(() =>
+        deriveNextRunnerTargetCapability({
+          previous: malformed,
+          identity: baseIdentity,
+          lifecycle,
+        }),
+      ).toThrow("TARGET_CAPABILITY_IDENTITY_MISMATCH");
+
+      const changed = deriveNextRunnerTargetCapability({
+        previous: third,
+        identity: changedIdentity,
+        lifecycle,
+      });
+      expect(changed).toMatchObject({
+        capabilityId: deterministicRunnerTargetCapabilityId(changedIdentity),
+        version: 1,
+        predecessorVersion: null,
+      });
+      expect(() =>
+        assertRunnerTargetCapabilityIdentity(
+          changed,
+          runnerTargetCapabilityIdentity(changed, changedIdentity.packetDigest),
+        ),
+      ).not.toThrow();
+    });
   });
 
   it.each([

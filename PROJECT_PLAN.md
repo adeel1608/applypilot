@@ -5990,3 +5990,171 @@ branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean
 private binding verification, and inactive version-6 draft creation. No employer or source request,
 browser launch to an employer, form interaction, upload, submission, or candidate outbound field
 occurred; lifetime actions remain `9/2/0/0`.
+
+# Real-target capability identity-family remediation - 2026-09-13
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
+`main`/`origin/main` at `a40ea60e3f7233c01a7960d30c4f0246024b7d1c` on
+`fix/target-capability-identity-versioning`. Lifetime real source/employer/upload/submission actions
+remain `9/2/0/0`; no employer visit, GET/HEAD, browser navigation, inspection run, candidate value,
+form action, upload, submission, or candidate outbound field is authorized.
+
+## Current state, confirmed defect, objective, and assumptions
+
+The third employer inspection was correctly stopped before run creation or network activity. The
+approved configuration used historical family ID `runner_b8af8ddb92a86973d3f2c1fb` with adapter
+`lever-real-inspection-v2`, while the unchanged production identity function independently derived
+`runner_2fb0a3653f3e4337c60abce6`. Production returned the safe pre-execution boundary
+`INSPECTION_PROPOSAL_SCOPE_CHANGED`; navigation and candidate outbound remained zero. The old family
+is now closed by immutable version 8 `REVOKED`, digest
+`10b52954c65715c4b589794c071fed40eb4e23431fe6de478dc8ca145591d2f0`, revoked at
+`2026-09-13T08:12:27.910Z`. Versions 1-8 and both stopped inspection runs must not change.
+
+Static audit confirms the deterministic identity function intentionally binds `targetKind`, exact
+origin, exact path prefix, operation, form version, adapter version, and packet digest. It is correct
+and must remain unchanged. `prepare-target-inspection.ts` already derives a fresh ID and starts at
+version 1, while `run-target-inspection.ts` and database `bindInspection` validate identity only at
+execution/binding. The gap is earlier persistence and offline refresh: strict capability schema and
+digest validation do not prove deterministic identity, `persistTargetCapabilityVersion` currently
+accepts a real-target version without packet identity context, the owner UI persists/revokes such a
+value directly from the allowlist, and no checked refresh/succession helper exists. Manual private
+proposal/allowlist refresh therefore changed adapter v1 to v2 while carrying forward the old ID and
+version chain. The live gate was correct; the creation/versioning workflow was not.
+
+The objective is to make identity validation a reusable pre-persistence invariant, encode safe
+same-family versus new-family succession once, align preparation/approval/revocation/execution, and
+then replace only the ignored malformed current proposal with a production-created adapter-v2 family
+version 1 DRAFT after the code is reviewed and merged. Historical database and report records stay
+immutable. The current packet digest and job/profile/evaluation bindings must be revalidated before
+private proposal preparation.
+
+## Requirements, architecture, files, and data flow
+
+- `packages/application-runner/src/target-runner.ts`: retain
+  `deterministicRunnerTargetCapabilityId` byte-for-byte in behavior; add a strict identity-input
+  schema/helper, a central `TARGET_CAPABILITY_IDENTITY_MISMATCH` assertion that also checks capability
+  scope fields, and a single succession helper. An unchanged derived identity continues the previous
+  family at `version + 1` with `predecessorVersion = previous.version`; a changed identity starts the
+  newly derived family at version 1 with a null predecessor. Lifecycle metadata, alias, approval
+  values, timestamps, version, and predecessor never enter deterministic identity.
+- `packages/application-runner/src/inspection-runner.ts`: validate the packet-bound deterministic
+  identity while freezing an inspection binding so malformed capability/proposal pairs fail offline
+  before persistence or execution.
+- `packages/database/src/runner-enablement-repository.ts`: require packet-bound identity context and
+  the central assertion before persisting every `REAL_TARGET` capability version. Synthetic-local
+  persistence remains compatible. Reuse the assertion in inspection binding and keep per-family
+  immutable/sequential database rules.
+- `scripts/prepare-target-inspection.ts`: construct the initial proposal through the succession
+  helper with no previous family, producing derived family version 1/null predecessor; assert the
+  resulting binding before writing the ignored proposal.
+- `scripts/run-target-inspection.ts`: replace its duplicate inline identity calculation with the same
+  central assertion while retaining every exact confirmation, authority, readiness, destination,
+  packet, one-navigation, and zero-write gate.
+- `apps/web/lib/runner-workspace.ts`: read and strictly validate the current ignored inspection
+  proposal/packet context before approval persistence, pass the identity context to the repository,
+  and use the succession helper for same-scope revocation. No UI action opens an employer page.
+- Focused tests in application-runner and database packages cover identity rotation, lifecycle
+  non-rotation, same-family v1-v2-v3, adapter-change new-family v1, malformed cross-family
+  persistence rejection, and prepare/execution-equivalent preflight. Applicable runner documentation
+  records the contract and the separate 30-minute usability observation.
+
+Data flow becomes `validated packet + exact target/adapter/form/operation -> canonical identity
+inputs -> deterministic ID -> central assertion -> family-aware capability construction -> frozen
+binding -> approval persistence -> execution preflight`. An identity-scope change cannot inherit a
+predecessor from another family. DRAFT-to-APPROVED promotion of an unpersisted reviewed proposal keeps
+its family/version; persisted refresh/revocation successors use the same-family next-version rule.
+The database schema already represents independent IDs/families, so no migration is required.
+
+## Dependencies, risks, security/privacy, testing, rollback, and acceptance
+
+Dependencies remain Zod, the existing SHA-256 canonicalizer, application-runner schemas, SQLite
+repository, and ignored private proposal/allowlist files. No new package or service is needed. Risks
+are weakening identity by dropping adapter/form/packet fields, treating lifecycle metadata as scope,
+linking a new ID to an old predecessor, breaking synthetic-local runner fixtures, reading or
+committing private proposal data, mutating historical versions, or accidentally invoking a live
+runner. Controls are an unchanged deterministic function, strict schemas, explicit single-operation
+identity input, fail-closed pre-persistence assertion, fictional inputs, migration diff, privacy
+audit, and zero invocation of the real inspection runner.
+
+The synthetic matrix changes each identity field independently and requires a new ID; changes each
+non-identity lifecycle field independently and requires the same derived ID; proves v1-v2-v3
+same-family succession; proves adapter change starts version 1/null predecessor; rejects old ID plus
+new adapter before persistence; and proves preparation and execution assertions agree. Focused
+database tests must show malformed real-target persistence creates no row while a correctly derived
+new family persists and binds. Existing negative operation, consent, zero-mutation, target-inspection,
+and loopback tests remain green.
+
+Complete validation is format, zero-warning lint, strict typecheck, focused identity/proposal/
+repository/inspection tests, all unit and integration tests, serialized Playwright E2E, local and
+showcase production builds, showcase boundary audit, privacy audit, full and production dependency
+audits, aggregate preflight/release check, schema 8/pending 0/integrity PASS/FKs 0, immutable
+`0000`-`0008`, `git diff --check`, and `git fsck --strict`. Rollback is a normal revert of the code,
+tests, and docs commit; the post-merge private repair archives the malformed proposal and uses the
+normal production preparation script, without deleting or rewriting history.
+
+Acceptance requires the deterministic function to remain unchanged; all seven identity fields and
+all listed non-identity fields to behave as specified; cross-identity continuation to fail before
+persistence; preparation, approval/revocation, binding, and execution to share one contract; no
+migration or authority broadening; full local and exact-head GitHub CI green; normal owner-preapproved
+merge; clean refreshed main; old family latest state still v8 REVOKED; current packet bindings exact;
+and one ignored, inactive adapter-v2 family version-1 DRAFT whose production-derived ID equals the
+independently expected value. Creating that DRAFT does not approve or execute it.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before tests or application-code changes.
+2. Add red tests for adapter/form/packet/origin/path/operation/target-kind rotation, lifecycle
+   non-rotation, unsafe cross-family succession, and persistence-before-execution rejection.
+3. Implement the central identity assertion and family-aware succession helper without modifying the
+   deterministic identity algorithm.
+4. Apply the helpers to binding, database persistence, preparation, owner approval/revocation, and
+   execution preflight; update runner/offline documentation and the separate expiry usability note.
+5. Run focused and complete release gates, update this record with exact results, inspect privacy,
+   migration, authority, and history diffs, and commit coherent work.
+6. Push `fix/target-capability-identity-versioning`, open PR
+   `fix: enforce target capability identity families`, require exact-head push/PR CI green, self-
+   review, and merge normally only if every preapproved condition remains true.
+7. Refresh clean main; revalidate old-family v8 and both historical runs, packet/job/profile/
+   evaluation currency, active source/target counts, and lifetime `9/2/0/0`.
+8. Archive the ignored malformed proposal, invoke the normal production preparation path offline for
+   adapter v2, verify the independently derived new ID, version 1/null predecessor, exact packet,
+   production digest, 24-hour/30-minute windows, zero active authority/run/network action, and stop
+   for fresh owner approval.
+
+## Implementation and pre-PR validation results
+
+Implemented the unchanged deterministic identity contract as a central assertion and added one
+family-aware succession helper. Initial proposal preparation now always derives a version-1 family;
+packet freezing, real-target database persistence, owner approval/revocation, binding, and execution
+preflight share the same packet-bound assertion. The audited defect boundary was the unchecked manual
+private refresh workflow together with pre-existing persistence paths that schema-validated but did
+not deterministically re-derive identity before write. The execution gate remains unchanged in
+authority and was correct to stop the malformed proposal.
+
+The focused fictional matrix passes 83 tests across target capability, inspection runner, and
+runner-enablement persistence suites. It covers all seven identity rotations, lifecycle/timestamp/
+alias/version/predecessor non-rotation, same-family v1-v2-v3, adapter-change new-family v1/null,
+no-row malformed persistence, and a complete fictional prepare/approve/execution-preflight A-to-B
+family sequence with zero writes. Five focused serialized target-inspection E2E cases also pass.
+The independently reviewed adapter-v2 inputs derive
+`runner_2fb0a3653f3e4337c60abce6` in production code.
+
+The complete clean release check at implementation/test head
+`44a6dda33d01e485e81510b272423801a465b701` passed doctor, schema/status/preflight, format, lint,
+strict typecheck, 526 unit tests across 49 files, 21 integration tests across 3 files, both production
+builds and showcase boundary audit, 36 serialized E2E tests, privacy audit over 315 tracked files,
+955 history paths, 953 history blobs, 1,463 build/test artifacts and 11 private canaries, and full/
+production dependency audits with zero known vulnerabilities. It reported schema 8, pending 0,
+integrity PASS, zero FK issues, source-enabled Personal Beta READY, zero active source capabilities,
+and target approval required. Fifteen focused database schema/migration/backup/restore/runtime tests
+also pass. Fresh ignored backup `backup-2026-09-13T08-43-22.442Z-708bea72` is schema 8 with integrity
+PASS and its exact restore preview passes. Migrations `0000`-`0008` have no diff from starting main;
+`git diff --check` and `git fsck --strict` pass (fsck reports only unreachable objects). The results-
+only plan commit is followed by one final exact-head release check before push.
+
+No migration was added or edited, no private proposal/report value is included in Git, and no source
+or employer request, real browser navigation, inspection run, candidate value, form interaction,
+upload, submission, or outbound candidate field occurred. The 30-minute expiry remains unchanged:
+it is security-compatible but operationally fragile for separate review/approval/start. A future
+authority-design review should consider a 90-120 minute window or a short execution lease; this PR
+does not broaden duration or authority.
