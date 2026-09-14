@@ -14,6 +14,10 @@ import {
   operationalSourceReadiness,
   sourceEnabledBetaReleaseReadiness,
 } from "./lib/source-readiness";
+import {
+  firstRealTargetValidationReadiness,
+  type FirstRealTargetValidationReadiness,
+} from "./lib/target-readiness";
 import { validatePrivateProfileAtPath } from "./validate-private-profile";
 
 async function main(): Promise<void> {
@@ -25,6 +29,10 @@ async function main(): Promise<void> {
   let databaseSchema = 0;
   let databaseIntegrity = "UNKNOWN";
   let foreignKeyIssues = 0;
+  let targetValidation: FirstRealTargetValidationReadiness = {
+    state: "REQUIRED",
+    completedInspectionCount: 0,
+  };
   if (databasePresent) {
     const database = new BetterSqlite3(localDatabasePath(), {
       readonly: true,
@@ -35,6 +43,7 @@ async function main(): Promise<void> {
       databaseIntegrity =
         database.pragma("integrity_check", { simple: true }) === "ok" ? "PASS" : "FAIL";
       foreignKeyIssues = (database.pragma("foreign_key_check") as unknown[]).length;
+      targetValidation = firstRealTargetValidationReadiness(database);
     } finally {
       database.close();
     }
@@ -65,7 +74,9 @@ async function main(): Promise<void> {
   console.log(
     `PREFLIGHT_SOURCE state=${source.state} capability_count=${source.configuredCapabilityCount} active_capability_count=${source.activeCapabilityCount}`,
   );
-  console.log("PREFLIGHT_RUNNER real_target=TARGET_APPROVAL_REQUIRED synthetic=TEST_MODE_ONLY");
+  console.log(
+    `PREFLIGHT_RUNNER real_target=TARGET_APPROVAL_REQUIRED first_real_target_validation=${targetValidation.state} completed_inspection_count=${targetValidation.completedInspectionCount} synthetic=TEST_MODE_ONLY`,
+  );
   console.log(`PREFLIGHT_BACKUP readiness=${databasePresent ? "READY" : "WAITING_FOR_DATABASE"}`);
   console.log(
     `PREFLIGHT_MANUAL_INTAKE_BETA state=${manualBetaBlockers.length === 0 && failures.length === 0 ? "READY" : "BLOCKED"}`,

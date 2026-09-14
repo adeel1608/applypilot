@@ -1,8 +1,8 @@
 # Offline Personal Live V1 enablement
 
-Status: **SOURCE-ENABLED PERSONAL BETA READY; FIRST REAL TARGET VALIDATION REMAINS UNPROVEN.**
+Status: **SOURCE-ENABLED PERSONAL BETA READY; FIRST REAL TARGET VALIDATION PROVEN; PERSONAL LIVE V1 NOT READY.**
 
-The owner-reviewed request #9 proved one bounded Lever source-to-R2 run and established Source-enabled Personal Beta readiness. That capability is revoked and authorises no later request. Target operation authority is machine-separated: `OPEN_AND_INSPECT_ONLY` uses a dedicated passive runner, while map/fill/upload/submit remain in the application runner and cannot use an inspection capability. Seven exact owner-authorized read-only employer visits have occurred; each failed closed before a valid form inventory, and none entered candidate data, clicked, changed a form, uploaded, or submitted. Visit 7 retained the fixed value-free diagnostic `BLOCKED_WRITE_REQUEST`; its capability is terminal and authorises no further visit.
+The owner-reviewed request #9 proved one bounded Lever source-to-R2 run and established Source-enabled Personal Beta readiness. That capability is revoked and authorises no later request. Target operation authority is machine-separated: `OPEN_AND_INSPECT_ONLY` uses a dedicated passive runner, while map/fill/upload/submit remain in the application runner and cannot use an inspection capability. Seven exact owner-authorized read-only employer visits failed closed before a valid form inventory. Visit 8 completed the exact scriptless v7 passive inspection, produced a bounded value-free 79-control inventory, and durably proved first real target validation. Across all visits, candidate data, clicks, form changes, uploads, and submissions remained zero. The consumed v7 authority was immediately succeeded by an immutable revoked version, so it authorises no further visit.
 
 Schema `0008_real_target_inspection_scope.sql` is additive. It adds immutable operation scope to target capabilities and stores separate frozen inspection bindings/lifecycle records. Migrations `0000`–`0007` remain immutable.
 
@@ -57,6 +57,6 @@ The current 30-minute target-capability expiry is security-compatible but operat
 
 - Source-enabled Personal Beta: ready on the reviewed request #9 evidence; no active source capability or new-request authority.
 - Target-independent application runner, binding, consent and recovery framework: ready for controlled synthetic validation only; adapter observations are schema-closed, interruptions stop without retry, and consent binds the complete frozen run.
-- Lever read-only real-target inspection lane: v7 is offline-hardened with a scriptless fresh browser; readable unfamiliar controls remain explicit unsupported inventory fields while any observed write request or structural uncertainty stops with a fixed value-free cause. A fresh v7-family approval and separate owner start would be required for any future controlled validation.
+- Lever read-only real-target inspection lane: v7 is validated for the exact approved target with a scriptless fresh browser; readable unfamiliar controls remain explicit unsupported inventory fields while any observed write request or structural uncertainty stops with a fixed value-free cause. Historical validation is not current authority: a fresh exact target capability approval and separate owner start are required for every future interaction.
 - Real employer visit, fill, upload and submission authority: absent until separate exact approvals; inspection authority cannot grant application authority.
 - Hosted production, scheduling, LinkedIn automation, CAPTCHA/MFA bypass, tenant enumeration, employer-form bypass and background submission: not authorised.

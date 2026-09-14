@@ -8,6 +8,10 @@ import {
   operationalSourceReadiness,
   sourceEnabledBetaReleaseReadiness,
 } from "./lib/source-readiness";
+import {
+  firstRealTargetValidationReadiness,
+  type FirstRealTargetValidationReadiness,
+} from "./lib/target-readiness";
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--quality-gates-complete")) {
@@ -21,6 +25,10 @@ async function main(): Promise<void> {
   let schemaVersion = 0;
   let databaseIntegrity = "UNKNOWN";
   let foreignKeyIssues = 0;
+  let targetValidation: FirstRealTargetValidationReadiness = {
+    state: "REQUIRED",
+    completedInspectionCount: 0,
+  };
   try {
     const database = new BetterSqlite3(localDatabasePath(), {
       readonly: true,
@@ -31,6 +39,7 @@ async function main(): Promise<void> {
       databaseIntegrity =
         database.pragma("integrity_check", { simple: true }) === "ok" ? "PASS" : "FAIL";
       foreignKeyIssues = (database.pragma("foreign_key_check") as unknown[]).length;
+      targetValidation = firstRealTargetValidationReadiness(database);
     } finally {
       database.close();
     }
@@ -56,15 +65,21 @@ async function main(): Promise<void> {
   console.log(
     `RELEASE_SOURCE state=${source.state} capability_count=${source.configuredCapabilityCount} active_capability_count=${source.activeCapabilityCount}`,
   );
-  console.log("RELEASE_RUNNER state=TARGET_APPROVAL_REQUIRED");
+  console.log(
+    `RELEASE_RUNNER state=TARGET_APPROVAL_REQUIRED first_real_target_validation=${targetValidation.state} completed_inspection_count=${targetValidation.completedInspectionCount}`,
+  );
   console.log(
     `RELEASE_MANUAL_INTAKE_BETA state=${manualBetaBlockers.length === 0 ? "READY" : "NOT_READY"} blockers=${manualBetaBlockers.length ? manualBetaBlockers.join(",") : "none"}`,
   );
   console.log(
     `RELEASE_SOURCE_ENABLED_BETA state=${sourceBeta.state} active_capability_count=${source.activeCapabilityCount}`,
   );
+  const personalLiveBlockers = [
+    "REAL_RUNNER_TARGET_APPROVAL_REQUIRED",
+    ...(targetValidation.state === "PROVEN" ? [] : ["FIRST_REAL_TARGET_VALIDATION_REQUIRED"]),
+  ];
   console.log(
-    "RELEASE_PERSONAL_LIVE_V1 state=NOT_READY blockers=REAL_RUNNER_TARGET_APPROVAL_REQUIRED,FIRST_REAL_TARGET_VALIDATION_REQUIRED",
+    `RELEASE_PERSONAL_LIVE_V1 state=NOT_READY blockers=${personalLiveBlockers.join(",")}`,
   );
   console.log(
     `RELEASE_CLASSIFICATION state=${manualBetaBlockers.length === 0 && sourceBeta.state === "READY" ? "SOURCE_ENABLED_PERSONAL_BETA_READY" : manualBetaBlockers.length === 0 ? "MANUAL_INTAKE_BETA_READY" : "NOT_READY"} deferred=REAL_TARGET_APPROVAL`,

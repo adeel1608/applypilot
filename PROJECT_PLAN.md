@@ -7011,3 +7011,111 @@ Source-enabled Personal Beta remains `READY`, first real target validation remai
 Personal Live V1 remains `NOT_READY`. The next action is exact owner approval of this DRAFT before
 its expiry. Approval alone must not start inspection; a separate exact one-shot `INSPECT`
 confirmation remains mandatory.
+
+## Durable first-real-target validation readiness blueprint - 2026-09-15
+
+Current state: clean branch `fix/real-target-validation-readiness` starts from merged `main`
+`eaa78a6e1ca76d5d329b090fc727e6ea6c229286`. Under the owner's exact one-shot v7 authority, run
+`inspection_f0af2018-8022-42ad-8406-fe478f134a6d` completed a passive inspection of the exact bound
+Shield AI target through `lever-real-inspection-v7`. It produced a bounded 79-control value-free
+inventory with zero browser writes, form changes, candidate fields outbound, uploads, or submissions.
+The consumed approved capability version was immediately succeeded by immutable version 2
+`REVOKED`; active approved real-target capabilities returned to zero. Schema 8, pending migrations
+zero, integrity, foreign keys, privacy, and preflight checks pass. Lifetime real
+source/employer/upload/submission counts are now `9/8/0/0`.
+
+Objective: correct the offline preflight and release projections so the completed, scope-consistent,
+terminally revoked real-target inspection is recognized as durable proof of first real target
+validation. This is classification logic only. It must not grant target authority, enable a runner
+operation, remove the continuing per-target owner-approval requirement, or classify Personal Live V1
+as ready.
+
+Assumptions and requirements:
+
+- proof must be derived only from local private database evidence already written by the normal
+  inspection runner and immutable capability ledger; no separate mutable readiness flag is needed;
+- a row qualifies only when its binding is `COMPLETED`, has no safe stop reason, has a bounded nonzero
+  field inventory, and joins to the originally `APPROVED` `REAL_TARGET` capability for exactly
+  `[OPEN_AND_INSPECT_ONLY]`;
+- target URL/origin/path, form contract, and adapter recorded on the binding must exactly match the
+  bound capability and remain within its approved destination scope;
+- the classification summary must be valid, bounded, value-free aggregate JSON, and a direct
+  successor of the consumed capability must prove terminal `REVOKED` state;
+- missing tables, missing evidence, stopped/opened/bound runs, malformed JSON, inconsistent bindings,
+  unbounded counts, or nonterminal authority must fail closed to `REQUIRED`;
+- current target authority remains `TARGET_APPROVAL_REQUIRED`, Source-enabled Personal Beta remains
+  `READY`, and Personal Live V1 remains `NOT_READY` because every future employer target interaction
+  still requires a fresh exact owner-approved capability and separate start;
+- migrations `0000`-`0008` are immutable and no migration is required.
+
+Architecture and proposed files:
+
+- `scripts/lib/target-readiness.ts`: add a small read-only, Zod-validated projection over the existing
+  runner inspection and target capability tables. Return only `PROVEN`/`REQUIRED` and a count of
+  qualifying completed inspections; never expose field labels, employer prose, candidate data, or
+  target content;
+- `scripts/lib/target-readiness.test.ts`: cover absent schema/evidence, stopped or inconsistent rows,
+  malformed aggregates, missing terminal revocation, and a valid completed/revoked lineage;
+- `scripts/preflight-summary.ts` and `scripts/release-summary.ts`: consume the projection while the
+  private database is open, report first-real-target validation independently from current target
+  authority, and omit only the stale `FIRST_REAL_TARGET_VALIDATION_REQUIRED` blocker when proof is
+  valid;
+- readiness documentation and this plan: record the real validation outcome, unchanged authority
+  boundary, exact validation results, and remaining owner gates without private field values.
+
+Data flow: read-only SQLite connection -> table existence check -> bounded joined inspection rows ->
+strict row/aggregate validation -> exact destination/contract/operation/terminal-lineage checks ->
+aggregate readiness result -> safe one-line preflight/release status. Dependencies remain the existing
+`better-sqlite3`, Zod, schema 8, and immutable capability records. No network, browser, application,
+candidate-document, or private-data write occurs in this implementation.
+
+Risks include treating a stopped or structurally inconsistent run as proof, conflating historical
+validation with present authority, leaking target contents through summaries, or breaking release
+checks against databases predating schema 8. Mitigations are fail-closed table detection, strict
+bounded parsing, exact cross-record comparisons, proof of a revoked successor, aggregate-only output,
+and explicit independent reporting of `TARGET_APPROVAL_REQUIRED`. Rollback is a normal revert of this
+offline code/docs commit; the private completed run and immutable capability history remain untouched.
+
+Testing strategy: run focused target-readiness tests, then format, lint, strict typecheck, complete
+unit/integration/E2E suites, both production builds, privacy and dependency audits, database
+schema/integrity/foreign-key checks, migration immutability, backup/restore preview, preflight,
+release check, `git diff --check`, and `git fsck --strict`. Implementation-time real
+source/employer/upload/submission actions must remain `0/0/0/0`.
+
+Acceptance criteria: the valid completed v7 run plus revoked successor yields
+`first_real_target_validation=PROVEN`; every unsafe or incomplete synthetic case yields `REQUIRED`;
+release output no longer claims `FIRST_REAL_TARGET_VALIDATION_REQUIRED`; current runner authority
+still reports `TARGET_APPROVAL_REQUIRED`; Personal Live V1 remains `NOT_READY`; all local and exact-head
+CI gates pass; no migration or authority broadening occurs. Implementation steps: (1) encode this
+blueprint; (2) implement the fail-closed projection and tests; (3) integrate both summaries; (4) update
+readiness docs; (5) run focused and full validation; (6) record actual results; (7) commit, push, open
+one offline PR, require exact-head green CI, self-review, and merge only under the owner's existing
+conditional offline authorization; (8) refresh clean main and stop at the next genuine owner gate.
+
+Implementation result: `OFFLINE COMPLETE / LOCAL GATES PASS`. The new read-only readiness projection
+checks only schema-8 aggregate inspection/capability evidence and fails closed unless a completed real
+target binding is internally scope-consistent and has an immediate revoked successor. Seven focused
+regressions cover missing schema/evidence, stopped evidence, malformed aggregates, adapter mismatch,
+broadened operations, unbounded counts, nonterminal authority, and the valid completed/revoked case.
+Against the ignored private database it reports exactly one qualifying completed inspection:
+`first_real_target_validation=PROVEN completed_inspection_count=1`. Current runner state remains
+`TARGET_APPROVAL_REQUIRED`, the stale `FIRST_REAL_TARGET_VALIDATION_REQUIRED` blocker is removed,
+and Personal Live V1 remains `NOT_READY` with `REAL_RUNNER_TARGET_APPROVAL_REQUIRED`.
+
+Validation results: the complete release check passed after a no-diff local line-ending normalization
+of two already-merged v7 files. Formatting, ESLint, strict TypeScript, 564 unit tests, 21 integration
+tests, both production builds, public-showcase audit, 44 Playwright E2E tests, privacy audit over 318
+tracked files/1,015 history paths/1,013 history blobs/1,608 build-test artifacts/11 canaries, and both
+dependency audits with zero vulnerabilities passed. The private database remains schema 8, pending
+migrations 0, integrity `PASS`, foreign-key issues 0. Ignored backup
+`backup-2026-09-14T23-38-40.497Z-33369254` and its non-destructive restore preview passed at schema 8
+with integrity `PASS`. Migrations `0000`-`0008` have no diff from merged main. `git diff --check`
+passed; `git fsck --strict` reported only the previously known dangling objects and no corruption.
+No migration or dependency change was made. This implementation made zero real source, employer,
+upload, or submission actions; lifetime counts remain `9/8/0/0`.
+
+Remaining work: commit the coherent offline delta, push this branch, open one PR, require both
+exact-head CI events, self-review the diff and merge only if the standing conditional offline gates
+remain satisfied, then refresh clean `main`. The next product action remains owner-gated: historical
+target validation grants no present source or employer authority, and no fill/upload/submit path is
+enabled.
