@@ -6343,3 +6343,138 @@ occurred. Lifetime real actions therefore remain `9/3/0/0`.
 Because this validation result is now recorded in the plan, rerun the complete release command on the
 final documentation-inclusive commit before push. Then require exact-head push and PR Actions green,
 self-review the complete diff, and merge only under the owner's stated pre-approval conditions.
+
+# Lever destination-change diagnostics after visit 4 - 2026-09-14
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
+merged `main`/`origin/main` at `2b14c6b54b640a09381095978912e877399a06a6` on
+`fix/lever-destination-diagnostics`. The owner approved and separately started v3 capability
+`runner_75d47133dbf66be997939992` version 1, digest
+`442e6b12da1980131d365554cdb4f07046690d2addc9e70e8fcdbbc14f70e260`, for exactly one
+`OPEN_AND_INSPECT_ONLY` attempt. Visit 4 run
+`inspection_959441f0-4e9d-42f0-bcbc-f7139b3ed2cb` executed at the exact target once, made no retry,
+and stopped safely with `DESTINATION_CHANGED` before DOM inventory. Candidate values, clicks,
+typing, form changes, file chooser actions, uploads, submissions, and candidate outbound were all
+zero/NONE. The family is terminal at immutable version 2 `REVOKED`, digest
+`02e24991bf3938cd44103ed81af811adb925e59393d1dd107e9bdb595e2d4ef9`; active approved target
+authority is zero. Lifetime real actions are now `9/4/0/0`. Visit 5 is not authorized.
+
+## Evidence limit, objective, and assumptions
+
+The durable visit records intentionally contain only the public stop and zero-value counters. They do
+not retain the attempted/final URL or distinguish a blocked out-of-scope main navigation, a safe-
+scope but non-exact query/path variation, a popup, or a URL-read failure. Therefore the historical
+destination is unknowable and this plan does not claim which condition occurred. No employer page,
+network trace, response body, history, cache, HTML, or browser state may be recovered or re-requested.
+
+The narrow offline objective is to make a future terminal `DESTINATION_CHANGED` actionable without
+weakening exact destination authority or retaining employer data. Add only a fixed, value-free cause
+enum; preserve the public stop, one exact `goto`, zero retry, cross-origin/path blocking, exact final-
+URL gate, zero mutation, and all existing candidate-data boundaries. This change must not make visit
+4 successful retroactively and must not authorize or execute visit 5.
+
+## Architecture, data flow, and proposed files
+
+Introduce a strict `DestinationChangeDiagnostic` enum with fixed values for blocked out-of-scope main
+navigation, final-origin change, final-path change, final query/fragment variation, popup attempt, and
+unknown destination state. The browser snapshot sets at most one fixed value at the point the safety
+condition is detected. The adapter carries it only when the protection signal is
+`DESTINATION_CHANGED`; `TargetInspectionRunner` retains it in the stopped result and existing JSON
+audit/inspection-summary metadata. Any other stop clears it. No URL, query key/value, path value,
+selector, page text, exception message, response data, header, cookie, storage, or candidate value is
+retained.
+
+Data flow becomes `route/final-url/popup safety condition -> fixed enum -> schema-validated snapshot
+-> DESTINATION_CHANGED protection result -> fixed enum in existing JSON metadata`. Expected tracked
+changes are this plan; application-runner schemas, adapter, runner and tests; database JSON audit tests;
+fictional local Playwright fixtures/specs; and runner docs. No database migration or private/live
+artifact is expected. Migrations `0000`-`0008` remain immutable.
+
+Because the production inspection output and diagnostic semantics change, bump
+`lever-real-inspection-v3` to `lever-real-inspection-v4`. Keep form
+`lever-application-inspection-v1`, policy `real-target-inspection-v1`, and the deterministic identity
+function unchanged. Adapter v4 must produce a new deterministic capability family at version 1/null
+predecessor after merge; neither the closed v2 nor v3 family may be reused.
+
+## Security, risks, tests, rollback, and acceptance
+
+Primary risks are accidentally retaining a real URL component, treating an in-scope variation as
+authorized, converting the diagnostic into retry behavior, mis-associating a cause with a non-
+destination stop, weakening popup/route blocking, or expanding real operation scope. Controls are a
+closed enum, strict Zod schemas, invariant clearing outside `DESTINATION_CHANGED`, synthetic-only
+fixtures, exact navigation-count assertions, zero-value metrics, and privacy/history audits.
+
+Fictional tests cover blocked cross-origin/path main navigation, exact-path query/fragment variation,
+in-prefix path variation, popup attempts, URL-read failure, malformed/extra diagnostic data,
+non-destination clearing, persistence of only the enum, one `goto`, no retry, no writes, and existing
+DOM/classification/lifecycle matrices. Full validation is format, lint, strict typecheck, focused
+runner/adapter/database tests, all unit/integration/E2E, local and showcase builds, showcase and
+privacy audits, both dependency audits, release check, schema/pending/integrity/FKs, ignored backup
+and restore preview, migration immutability, `git diff --check`, and `git fsck --strict`.
+
+Acceptance requires a value-free fixed cause for every synthetic destination stop, no exact URL data
+outside the already approved binding, no authority/network broadening, no migration, exact-head local
+and GitHub CI green, normal offline PR merge under the owner's standing authorization, clean refreshed
+main, packet/job/profile/evaluation currency, zero active authority, and only an offline adapter-v4
+version-1/null-predecessor DRAFT. Rollback is a normal revert of tracked code/docs; immutable visit 4,
+capability, database, and private evidence are never rewritten.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before application-code changes.
+2. Add failing schema/runner/database and fictional Playwright tests for each fixed destination cause.
+3. Implement the minimal enum propagation and v4 bump without changing route/final-URL decisions.
+4. Update docs and this plan with exact behavior and validation results.
+5. Run the focused and complete release matrix plus backup/migration/Git integrity checks.
+6. Push one offline PR titled `fix: classify Lever destination changes`, require exact-head CI green,
+   self-review, and merge normally only if all standing safety conditions remain satisfied.
+7. Refresh clean main, revalidate the current technical packet, archive the used v3 proposal, and use
+   production preparation offline to create only a new adapter-v4 family DRAFT. Do not approve or
+   execute it. Stop at the mandatory fresh capability-approval gate.
+
+## Implementation and local validation completed
+
+The offline implementation is complete. `DestinationChangeDiagnostic` is a closed, value-free enum
+covering blocked out-of-scope main navigation, final-origin change, final-path change, final
+query/fragment variation, popup attempt, and unknown destination state. Strict snapshot, observation,
+audit, and repository boundaries propagate it only with `DESTINATION_CHANGED`; mismatched,
+value-bearing, extra, and unsupported data fails schema validation. The production Playwright reader
+sets the cause at route, exact-final-URL, load, popup, and bounded-pass lifecycle boundaries while
+retaining the existing one-`goto`, no-retry, zero-write behavior. It never records the observed URL.
+Adapter identity is now `lever-real-inspection-v4`; form and policy remain unchanged. This is an
+identity change only: no authority, operation, origin, path, retry, redirect, persistence-table, or
+network behavior was broadened, and no migration was added.
+
+Tracked implementation changes are limited to the application-runner contracts/adapter/runner and
+tests, the existing database JSON summary and tests, fictional Playwright assertions, and accurate
+README/runner/enablement documentation. Unit tests cover every fixed cause, unknown fallback,
+blocked main navigation, one navigation, non-destination clearing/rejection, strict audit pairing,
+value-bearing input rejection, and persistence of only the fixed enum. The existing fictional E2E
+matrix now verifies the final-path and popup causes, and navigation instability distinguishes an
+exact-destination change from same-destination reload/close failures. Historical visit 4 remains only
+`DESTINATION_CHANGED`; it was not relabelled with an unobserved cause.
+
+The focused strict typecheck and runner/database selection passed 57/57 tests. The focused browser
+regressions passed, including the 2/2 destination/lifecycle subset. The complete
+`npm.cmd run release:check` passed doctor; schema/preflight; formatting; lint; strict typecheck;
+536/536 unit tests in 49 files; 21/21 integration tests in 3 files; local and showcase production
+builds; public showcase audit; 42/42 E2E tests; privacy audit; full and production dependency audits;
+and release summary. Privacy checked 316 tracked files, 972 history paths, 970 history blobs, 1,544
+build/test artifacts, and 11 private canaries; both dependency audits found zero vulnerabilities.
+The first release attempt stopped at formatting after E2E-generated fixture files required Prettier;
+running Prettier produced no tracked semantic diff, and the complete rerun passed.
+
+The private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
+foreign-key issues. Ignored backup `backup-2026-09-14T09-27-24.419Z-5efc3049` is schema 8 with
+integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
+starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
+`git fsck --strict` passed; fsck reported only harmless dangling objects. No request or browser action
+occurred during remediation or validation. Lifetime real actions remain source/employer visit/upload/
+submission `9/4/0/0`; active source and target capabilities are both zero. Source-enabled Personal
+Beta remains ready; Personal Live V1 remains not ready pending a successfully approved real-target
+validation.
+
+Before push, rerun the complete release command on the clean documentation-inclusive commit. Then
+push this same branch, require exact-head push and PR checks green, self-review the complete diff,
+and merge only under the owner's standing fully offline authorization. After merge, prepare only the
+fresh adapter-v4 DRAFT and stop before approval or execution.

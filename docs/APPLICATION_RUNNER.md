@@ -11,9 +11,9 @@ The separation is machine-enforced in the Zod capability contract, immutable cap
 
 ## Read-only Lever inspection contract
 
-`lever-real-inspection-v3` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
+`lever-real-inspection-v4` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
 
-The v3 adapter uses Playwright-owned selector and element-handle reads after one navigation; it does
+The v4 adapter uses Playwright-owned selector and element-handle reads after one navigation; it does
 not execute a snapshot callback in the employer main world. Employer overrides of document query
 functions, DOM prototypes, collection iterators, `Array`, `String`, style helpers, labels, or custom
 element getters therefore do not become trusted inspection primitives. It performs two bounded
@@ -44,12 +44,22 @@ content, headers, cookies, storage, and candidate values are not diagnostic meta
 The historical first real-target stop predates this instrumentation and therefore remains
 `UNKNOWN_SAFE_BOUNDARY`; it must not be relabelled as a form change.
 
+`DESTINATION_CHANGED` remains the public fail-closed result for every exact-route mismatch. Adapter
+v4 additionally retains at most one fixed value-free cause: `MAIN_NAVIGATION_OUT_OF_SCOPE`,
+`FINAL_ORIGIN_CHANGED`, `FINAL_PATH_CHANGED`, `FINAL_QUERY_OR_FRAGMENT_CHANGED`, `POPUP_ATTEMPT`, or
+`DESTINATION_STATE_UNKNOWN`. These causes never contain or preserve the observed URL. They do not
+expand path authority, permit a retry, or convert any changed destination into an approved target.
+
 The second and third real-target attempts reached their exact approved destination but stopped before
 a valid inventory with `DOM_INSPECTION_EXCEPTION`. They retained no DOM content and do not prove the
 form contract. A fictional stable-URL page that poisons `document.querySelectorAll` reproduces a
 compatible v2 failure mechanism; it is not evidence of the historical Shield AI cause. Runtime
-extraction changed for v3, so its adapter-bound deterministic identity starts a new capability family
-at version 1 with no predecessor. The closed v2 family is never reused.
+extraction changed for v3, so its adapter-bound deterministic identity started a new capability family
+at version 1 with no predecessor. The closed v2 family is never reused. The fourth attempt used that
+v3 family and stopped with `DESTINATION_CHANGED` before DOM inventory; its historical record cannot
+safely distinguish the exact cause. Adapter v4 adds only value-free destination diagnostics and must
+therefore start another new capability family at version 1 with no predecessor. No fifth visit is
+authorized by this software change.
 
 ## Frozen binding and persistence
 
@@ -57,7 +67,7 @@ An inspection binding commits to the exact current packet, packet digest, job/pr
 
 A real-target capability ID is derived only from its target kind, exact origin, exact path, one allowed operation, form contract, adapter, and packet digest. Changing any of those inputs creates a new capability family at version 1 with no predecessor. Alias, lifecycle state and references, timestamps and expiries, version, and predecessor do not rotate identity; unchanged identity advances within the same family. Offline proposal preparation, packet freezing, real-target persistence, inspection binding, and execution all use the same central assertion. A cross-family or malformed lineage therefore fails before persistence or employer access. The deterministic ID function itself is unchanged.
 
-Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. No migration is needed for v3: the optional fixed diagnostic stage uses existing JSON audit/summary fields. Audits record only safe operation, version, stop reason, fixed value-free diagnostic enums, and aggregate classification counts.
+Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. No migration is needed for v4: the fixed diagnostics use existing JSON audit/summary fields. Audits record only safe operation, version, stop reason, fixed value-free diagnostic enums, and aggregate classification counts.
 
 ## Answers, disclosure, and final submission
 

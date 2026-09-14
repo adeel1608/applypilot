@@ -7,6 +7,7 @@ import {
   LEVER_APPLICATION_INSPECTION_FORM_VERSION,
   LEVER_REAL_INSPECTION_ADAPTER_VERSION,
   LeverRealTargetInspectionAdapter,
+  PlaywrightReadOnlyInspectionBrowser,
   ReadOnlyBrowserSnapshotSchema,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
@@ -111,6 +112,7 @@ function snapshot(overrides: Partial<ReadOnlyBrowserSnapshot> = {}): ReadOnlyBro
       control(1, "Submit application", { tag: "button", type: "submit" }),
     ],
     protectionSignals: [],
+    destinationDiagnostic: null,
     popupAttempted: false,
     downloadAttempted: false,
     blockedWriteRequest: false,
@@ -188,6 +190,7 @@ describe("read-only real target inspection", () => {
           adapterVersion: binding.adapterVersion,
           fields: [],
           protectionSignals: [],
+          destinationDiagnostic: null,
           metrics: {
             browserWriteEvents: 0,
             formValueChanges: 0,
@@ -385,6 +388,14 @@ describe("read-only real target inspection", () => {
       "SNAPSHOT_INVALID",
       new FixtureBrowser({ ...snapshot(), httpStatus: "invalid" } as never),
     ],
+    [
+      "invalid destination diagnostic",
+      "SNAPSHOT_INVALID",
+      new FixtureBrowser({
+        ...snapshot(),
+        destinationDiagnostic: "https://private.example",
+      } as never),
+    ],
   ] as const)(
     "keeps PAGE_CHANGED public while retaining the value-free %s category",
     async (_caseName, diagnosticCategory, browser) => {
@@ -402,10 +413,135 @@ describe("read-only real target inspection", () => {
           reason: "PAGE_CHANGED",
           diagnosticCategory,
           diagnosticStage: null,
+          destinationDiagnostic: null,
         },
       });
     },
   );
+
+  it.each([
+    ["blocked main navigation", { blockedDestination: true }, "MAIN_NAVIGATION_OUT_OF_SCOPE"],
+    ["popup attempt", { popupAttempted: true }, "POPUP_ATTEMPT"],
+  ] as const)("retains only the fixed %s destination cause", async (_name, overrides, cause) => {
+    const browser = new FixtureBrowser(snapshot(overrides));
+    const { runner, auditRecords } = runnerFor(packet(), capability(), browser);
+    expect(await runner.openAndInspect()).toMatchObject({
+      state: "STOPPED",
+      stopReason: "DESTINATION_CHANGED",
+      diagnosticCategory: null,
+      diagnosticStage: null,
+      destinationDiagnostic: cause,
+      observation: null,
+    });
+    expect(auditRecords.at(-1)).toMatchObject({
+      metadata: {
+        reason: "DESTINATION_CHANGED",
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: cause,
+      },
+    });
+  });
+
+  it("rejects a stray destination cause for a non-destination stop", async () => {
+    const browser = new FixtureBrowser({
+      ...snapshot(),
+      protectionSignals: ["CAPTCHA"],
+      destinationDiagnostic: "POPUP_ATTEMPT",
+    } as never);
+    expect(await runnerFor(packet(), capability(), browser).runner.openAndInspect()).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "SNAPSHOT_INVALID",
+      destinationDiagnostic: null,
+    });
+  });
+
+  it.each([
+    ["origin", "origin", "FINAL_ORIGIN_CHANGED"],
+    ["path", "path", "FINAL_PATH_CHANGED"],
+    ["query", "query", "FINAL_QUERY_OR_FRAGMENT_CHANGED"],
+    ["unreadable state", "unreadable", "DESTINATION_STATE_UNKNOWN"],
+  ] as const)(
+    "classifies a final %s change without retaining its value",
+    async (_name, kind, cause) => {
+      const binding = localRegressionBinding();
+      let gotoCount = 0;
+      const url =
+        kind === "origin"
+          ? `https://example.test${new URL(binding.targetUrl).pathname}`
+          : kind === "path"
+            ? `${binding.targetUrl}/step`
+            : kind === "query"
+              ? `${binding.targetUrl}?step=1`
+              : null;
+      const page = {
+        route: async () => undefined,
+        unroute: async () => undefined,
+        on: () => undefined,
+        off: () => undefined,
+        mainFrame: () => ({}),
+        goto: async () => {
+          gotoCount += 1;
+          return { status: () => 200 };
+        },
+        url: () => {
+          if (url === null) throw new Error("fictional inaccessible destination");
+          return url;
+        },
+      } as unknown as Page;
+      const result = await new LeverRealTargetInspectionAdapter(
+        new PlaywrightReadOnlyInspectionBrowser(page),
+      ).inspect(binding);
+      expect(result).toMatchObject({
+        targetUrl: binding.targetUrl,
+        protectionSignals: ["DESTINATION_CHANGED"],
+        destinationDiagnostic: cause,
+      });
+      expect(JSON.stringify(result)).not.toContain(url ?? "fictional inaccessible destination");
+      expect(gotoCount).toBe(1);
+    },
+  );
+
+  it("classifies a blocked out-of-scope main navigation without retrying", async () => {
+    const binding = localRegressionBinding();
+    const mainFrame = {};
+    let routeHandler: ((route: never) => Promise<void>) | undefined;
+    let gotoCount = 0;
+    const page = {
+      route: async (_pattern: string, handler: (route: never) => Promise<void>) => {
+        routeHandler = handler;
+      },
+      unroute: async () => undefined,
+      on: () => undefined,
+      off: () => undefined,
+      mainFrame: () => mainFrame,
+      goto: async () => {
+        gotoCount += 1;
+        await routeHandler?.({
+          request: () => ({
+            method: () => "GET",
+            isNavigationRequest: () => true,
+            frame: () => mainFrame,
+            url: () => "https://example.test/out-of-scope",
+          }),
+          abort: async () => undefined,
+          continue: async () => undefined,
+        } as never);
+        throw new Error("fictional blocked navigation");
+      },
+    } as unknown as Page;
+    const result = await new LeverRealTargetInspectionAdapter(
+      new PlaywrightReadOnlyInspectionBrowser(page),
+    ).inspect(binding);
+    expect(result).toMatchObject({
+      targetUrl: binding.targetUrl,
+      protectionSignals: ["DESTINATION_CHANGED"],
+      destinationDiagnostic: "MAIN_NAVIGATION_OUT_OF_SCOPE",
+    });
+    expect(JSON.stringify(result)).not.toContain("example.test");
+    expect(gotoCount).toBe(1);
+  });
 
   it.each([
     ["execution-context destruction during main-frame navigation", "framenavigated"],
@@ -672,6 +808,7 @@ describe("read-only real target inspection", () => {
     expect(await runnerFor(packet(), capability(), changed).runner.openAndInspect()).toMatchObject({
       state: "STOPPED",
       stopReason: "DESTINATION_CHANGED",
+      destinationDiagnostic: "DESTINATION_STATE_UNKNOWN",
     });
     expect(() =>
       freezeInspectionBinding(

@@ -19,13 +19,15 @@ import {
   type TargetInspectionObservation,
 } from "./inspection-runner";
 import {
+  DestinationChangeDiagnosticSchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
+  type DestinationChangeDiagnostic,
   type DomInspectionDiagnosticStage,
   type RunnerTargetCapability,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v3";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v4";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -51,13 +53,28 @@ export const ReadOnlyBrowserSnapshotSchema = z
     formCount: z.number().int().nonnegative().max(20),
     controls: z.array(RawControlSchema).max(200),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
+    destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable().default(null),
     popupAttempted: z.boolean(),
     downloadAttempted: z.boolean(),
     blockedWriteRequest: z.boolean(),
     blockedDestination: z.boolean(),
     hiddenInteractiveStep: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.destinationDiagnostic !== null &&
+      value.protectionSignals[0] !== "DESTINATION_CHANGED" &&
+      !value.popupAttempted &&
+      !value.blockedDestination
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["destinationDiagnostic"],
+        message: "DESTINATION_DIAGNOSTIC_WITHOUT_DESTINATION_SIGNAL",
+      });
+    }
+  });
 
 export type ReadOnlyBrowserSnapshot = z.infer<typeof ReadOnlyBrowserSnapshotSchema>;
 
@@ -217,6 +234,15 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
     }
     const snapshot = parseReadOnlyBrowserSnapshot(await this.browser.inspect(binding));
     const signal = firstSignal(snapshot);
+    const destinationDiagnostic =
+      signal === "DESTINATION_CHANGED"
+        ? (snapshot.destinationDiagnostic ??
+          (snapshot.popupAttempted
+            ? "POPUP_ATTEMPT"
+            : snapshot.blockedDestination
+              ? "MAIN_NAVIGATION_OUT_OF_SCOPE"
+              : "DESTINATION_STATE_UNKNOWN"))
+        : null;
     if (signal === "PAGE_CHANGED" && snapshot.httpStatus !== null && snapshot.httpStatus >= 400) {
       throw new InspectionDiagnosticError("HTTP_ERROR");
     }
@@ -239,6 +265,7 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
       adapterVersion: this.adapterVersion,
       fields,
       protectionSignals,
+      destinationDiagnostic,
       metrics: {
         browserWriteEvents: 0,
         formValueChanges: 0,
@@ -263,6 +290,33 @@ function urlInScope(url: string, binding: FrozenInspectionBinding): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+function pageUrlOrNull(page: Page): string | null {
+  try {
+    return page.url();
+  } catch {
+    return null;
+  }
+}
+
+function classifyDestinationChange(
+  currentUrl: string | null,
+  binding: FrozenInspectionBinding,
+): DestinationChangeDiagnostic {
+  if (currentUrl === null) return "DESTINATION_STATE_UNKNOWN";
+  try {
+    const expected = new URL(binding.targetUrl);
+    const current = new URL(currentUrl);
+    if (current.origin !== expected.origin) return "FINAL_ORIGIN_CHANGED";
+    if (current.pathname !== expected.pathname) return "FINAL_PATH_CHANGED";
+    if (current.search !== expected.search || current.hash !== expected.hash) {
+      return "FINAL_QUERY_OR_FRAGMENT_CHANGED";
+    }
+    return "DESTINATION_STATE_UNKNOWN";
+  } catch {
+    return "DESTINATION_STATE_UNKNOWN";
   }
 }
 
@@ -749,7 +803,7 @@ function domInspectionFailure(stage: DomInspectionDiagnosticStage): InspectionDi
 }
 
 /**
- * Adapter-v3 browser boundary. All DOM primitives are invoked through Playwright's utility-world
+ * Adapter-v4 browser boundary. All DOM primitives are invoked through Playwright's utility-world
  * selector/element APIs; no employer-main-world callback or control value read is used.
  */
 export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
@@ -765,6 +819,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
     let downloadAttempted = false;
     let blockedWriteRequest = false;
     let blockedDestination = false;
+    let destinationDiagnostic: DestinationChangeDiagnostic | null = null;
     let mainFrameNavigationCount = 0;
     let pageClosed = false;
     let pageCrashed = false;
@@ -781,6 +836,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         request.isNavigationRequest() && request.frame() === inspectedMainFrame;
       if (mainNavigation && !urlInScope(request.url(), binding)) {
         blockedDestination = true;
+        destinationDiagnostic = "MAIN_NAVIGATION_OUT_OF_SCOPE";
         await route.abort("blockedbyclient");
         return;
       }
@@ -792,6 +848,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
     };
     const popupHandler = (popup: Page) => {
       popupAttempted = true;
+      destinationDiagnostic ??= "POPUP_ATTEMPT";
       void popup.close();
     };
     const downloadHandler = (download: Download) => {
@@ -834,6 +891,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           formCount: 0,
           controls: [],
           protectionSignals: ["DESTINATION_CHANGED"],
+          destinationDiagnostic: destinationDiagnostic ?? "MAIN_NAVIGATION_OUT_OF_SCOPE",
           popupAttempted,
           downloadAttempted,
           blockedWriteRequest,
@@ -841,7 +899,8 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           hiddenInteractiveStep: false,
         });
       }
-      if (blockedDestination || this.page.url() !== binding.targetUrl) {
+      const initialDestination = pageUrlOrNull(this.page);
+      if (blockedDestination || initialDestination !== binding.targetUrl) {
         return parseReadOnlyBrowserSnapshot({
           targetUrl: binding.targetUrl,
           httpStatus: response?.status() ?? null,
@@ -849,6 +908,8 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
           formCount: 0,
           controls: [],
           protectionSignals: ["DESTINATION_CHANGED"],
+          destinationDiagnostic:
+            destinationDiagnostic ?? classifyDestinationChange(initialDestination, binding),
           popupAttempted,
           downloadAttempted,
           blockedWriteRequest,
@@ -860,8 +921,23 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       try {
         await this.page.waitForLoadState("load", { timeout: 5_000 });
       } catch {
-        if (blockedDestination || this.page.url() !== binding.targetUrl) {
-          throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        const loadDestination = pageUrlOrNull(this.page);
+        if (blockedDestination || loadDestination !== binding.targetUrl) {
+          return parseReadOnlyBrowserSnapshot({
+            targetUrl: binding.targetUrl,
+            httpStatus: response?.status() ?? null,
+            declaredFormVersion: null,
+            formCount: 0,
+            controls: [],
+            protectionSignals: ["DESTINATION_CHANGED"],
+            destinationDiagnostic:
+              destinationDiagnostic ?? classifyDestinationChange(loadDestination, binding),
+            popupAttempted,
+            downloadAttempted,
+            blockedWriteRequest,
+            blockedDestination,
+            hiddenInteractiveStep: false,
+          });
         }
         throw domInspectionFailure("DOM_PAGE_METADATA");
       }
@@ -895,7 +971,30 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         secondPass = await this.capturePassivePass();
         if (navigationBecameUnstable()) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
       } catch (error) {
-        if (navigationBecameUnstable()) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        if (navigationBecameUnstable()) {
+          const changedDestination = pageUrlOrNull(this.page);
+          if (
+            (!pageClosed && !pageCrashed && changedDestination === null) ||
+            (changedDestination !== null && changedDestination !== binding.targetUrl)
+          ) {
+            return parseReadOnlyBrowserSnapshot({
+              targetUrl: binding.targetUrl,
+              httpStatus: response?.status() ?? null,
+              declaredFormVersion: null,
+              formCount: 0,
+              controls: [],
+              protectionSignals: ["DESTINATION_CHANGED"],
+              destinationDiagnostic:
+                destinationDiagnostic ?? classifyDestinationChange(changedDestination, binding),
+              popupAttempted,
+              downloadAttempted,
+              blockedWriteRequest,
+              blockedDestination,
+              hiddenInteractiveStep: false,
+            });
+          }
+          throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        }
         if (error instanceof InspectionDiagnosticError) throw error;
         throw domInspectionFailure("DOM_UNKNOWN");
       }
@@ -918,6 +1017,8 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         targetUrl: this.page.url(),
         httpStatus: response?.status() ?? null,
         ...snapshotPass,
+        destinationDiagnostic:
+          popupAttempted || popupDeclared ? "POPUP_ATTEMPT" : destinationDiagnostic,
         popupAttempted: popupAttempted || popupDeclared,
         downloadAttempted,
         blockedWriteRequest,

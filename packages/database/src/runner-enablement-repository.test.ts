@@ -369,6 +369,7 @@ describe("runner enablement persistence", () => {
           reason: "PAGE_CHANGED",
           diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
           diagnosticStage: "DOM_QUERY",
+          destinationDiagnostic: null,
           exceptionMessage: "must never persist",
         },
       } as never),
@@ -388,6 +389,7 @@ describe("runner enablement persistence", () => {
         reason: "PAGE_CHANGED",
         diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
         diagnosticStage: "DOM_QUERY",
+        destinationDiagnostic: null,
       },
     });
     expect(
@@ -403,6 +405,7 @@ describe("runner enablement persistence", () => {
       summary: JSON.stringify({
         diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
         diagnosticStage: "DOM_QUERY",
+        destinationDiagnostic: null,
       }),
     });
     const stoppedAudit = sqlite
@@ -417,9 +420,80 @@ describe("runner enablement persistence", () => {
       reason: "PAGE_CHANGED",
       diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
       diagnosticStage: "DOM_QUERY",
+      destinationDiagnostic: null,
     });
     expect(stoppedAudit.metadata).not.toContain("message");
     expect(stoppedAudit.metadata).not.toContain("stack");
+
+    const destinationPacket = ApplicationPacketSchema.parse({
+      ...inspectionPacket,
+      jobExpiryState: "UNKNOWN",
+    });
+    const destinationTarget = inspectionCapability(destinationPacket);
+    repository.persistTargetCapabilityVersion(destinationTarget);
+    const destinationBinding = freezeInspectionBinding(destinationPacket, destinationTarget);
+    repository.bindInspection({
+      runId: "inspection-run:destination",
+      binding: destinationBinding,
+      targetCapability: destinationTarget,
+    });
+    repository.recordInspectionAudit("inspection-run:destination", {
+      type: "runner.inspection.opened",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        adapterVersion: destinationTarget.adapterVersion,
+        formVersion: destinationTarget.formVersion,
+      },
+    });
+    expect(() =>
+      repository.recordInspectionAudit("inspection-run:destination", {
+        type: "runner.inspection.stopped",
+        metadata: {
+          operation: "OPEN_AND_INSPECT_ONLY",
+          reason: "DESTINATION_CHANGED",
+          diagnosticCategory: null,
+          diagnosticStage: null,
+          destinationDiagnostic: "https://private.example",
+        },
+      } as never),
+    ).toThrow();
+    expect(() =>
+      repository.recordInspectionAudit("inspection-run:destination", {
+        type: "runner.inspection.stopped",
+        metadata: {
+          operation: "OPEN_AND_INSPECT_ONLY",
+          reason: "CAPTCHA",
+          diagnosticCategory: null,
+          diagnosticStage: null,
+          destinationDiagnostic: "POPUP_ATTEMPT",
+        },
+      }),
+    ).toThrow();
+    repository.recordInspectionAudit("inspection-run:destination", {
+      type: "runner.inspection.stopped",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        reason: "DESTINATION_CHANGED",
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: "FINAL_PATH_CHANGED",
+      },
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT safe_stop_reason AS stopReason,classification_summary_json AS summary
+           FROM runner_inspection_bindings WHERE id='inspection-run:destination'`,
+        )
+        .get(),
+    ).toEqual({
+      stopReason: "DESTINATION_CHANGED",
+      summary: JSON.stringify({
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: "FINAL_PATH_CHANGED",
+      }),
+    });
     sqlite.close();
   });
 

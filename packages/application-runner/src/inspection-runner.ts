@@ -10,6 +10,7 @@ import {
 } from "./beta";
 import {
   DomInspectionDiagnosticStageSchema,
+  DestinationChangeDiagnosticSchema,
   InspectionDiagnosticCategorySchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
@@ -18,6 +19,7 @@ import {
   runnerTargetCapabilityDigest,
   runnerTargetReadiness,
   type DomInspectionDiagnosticStage,
+  type DestinationChangeDiagnostic,
   type InspectionDiagnosticCategory,
   type RunnerTargetCapability,
 } from "./target-runner";
@@ -136,9 +138,22 @@ export const TargetInspectionObservationSchema = z
     adapterVersion: z.string().min(1).max(100),
     fields: z.array(InspectionFieldSchema).max(200),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
+    destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable().default(null),
     metrics: ZeroMutationMetricsSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.destinationDiagnostic !== null &&
+      value.protectionSignals[0] !== "DESTINATION_CHANGED"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["destinationDiagnostic"],
+        message: "DESTINATION_DIAGNOSTIC_WITHOUT_DESTINATION_STOP",
+      });
+    }
+  });
 
 export type TargetInspectionObservation = z.infer<typeof TargetInspectionObservationSchema>;
 
@@ -285,6 +300,7 @@ export type InspectionAuditRecord =
         reason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
         diagnosticCategory: InspectionDiagnosticCategory | null;
         diagnosticStage: DomInspectionDiagnosticStage | null;
+        destinationDiagnostic: DestinationChangeDiagnostic | null;
       };
     };
 
@@ -297,6 +313,7 @@ export type InspectionRunResult =
       stopReason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
       diagnosticCategory: InspectionDiagnosticCategory | null;
       diagnosticStage: DomInspectionDiagnosticStage | null;
+      destinationDiagnostic: DestinationChangeDiagnostic | null;
       observation: null;
     };
 
@@ -357,9 +374,18 @@ export class TargetInspectionRunner {
     const observation = parsedObservation.data;
     const signal = observation.protectionSignals[0];
     if (signal) {
-      return this.stop(signal, signal === "PAGE_CHANGED" ? "UNKNOWN_INSPECTION_EXCEPTION" : null);
+      return this.stop(
+        signal,
+        signal === "PAGE_CHANGED" ? "UNKNOWN_INSPECTION_EXCEPTION" : null,
+        null,
+        signal === "DESTINATION_CHANGED"
+          ? (observation.destinationDiagnostic ?? "DESTINATION_STATE_UNKNOWN")
+          : null,
+      );
     }
-    if (observation.targetUrl !== this.binding.targetUrl) return this.stop("DESTINATION_CHANGED");
+    if (observation.targetUrl !== this.binding.targetUrl) {
+      return this.stop("DESTINATION_CHANGED", null, null, "DESTINATION_STATE_UNKNOWN");
+    }
     if (
       observation.formVersion !== this.binding.formVersion ||
       observation.adapterVersion !== this.binding.adapterVersion
@@ -403,11 +429,14 @@ export class TargetInspectionRunner {
     reason: InspectionStopReason,
     diagnosticCategory: InspectionDiagnosticCategory | null = null,
     diagnosticStage: DomInspectionDiagnosticStage | null = null,
+    destinationDiagnostic: DestinationChangeDiagnostic | null = null,
   ): InspectionRunResult {
     const safeDiagnosticCategory =
       reason === "PAGE_CHANGED" ? (diagnosticCategory ?? "UNKNOWN_INSPECTION_EXCEPTION") : null;
     const safeDiagnosticStage =
       safeDiagnosticCategory === "DOM_INSPECTION_EXCEPTION" ? diagnosticStage : null;
+    const safeDestinationDiagnostic =
+      reason === "DESTINATION_CHANGED" ? destinationDiagnostic : null;
     this.state = "STOPPED";
     this.stopReason = reason;
     this.audit({
@@ -417,6 +446,7 @@ export class TargetInspectionRunner {
         reason,
         diagnosticCategory: safeDiagnosticCategory,
         diagnosticStage: safeDiagnosticStage,
+        destinationDiagnostic: safeDestinationDiagnostic,
       },
     });
     return {
@@ -424,6 +454,7 @@ export class TargetInspectionRunner {
       stopReason: reason,
       diagnosticCategory: safeDiagnosticCategory,
       diagnosticStage: safeDiagnosticStage,
+      destinationDiagnostic: safeDestinationDiagnostic,
       observation: null,
     };
   }
