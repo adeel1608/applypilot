@@ -6984,3 +6984,30 @@ only the previously known unreachable objects. This offline implementation made 
 employer, upload, or submission actions; lifetime counts remain `9/7/0/0`. Remaining work is exact
 commit/push CI, self-review, conditional merge, clean-main refresh, and an offline v7 DRAFT only if
 the current private packet bindings still pass production preparation.
+
+## Final v7 owner-gate checkpoint - 2026-09-15
+
+PR 39 passed both exact-head GitHub quality runs at
+`6241d0c6de9a4d81f03bbb174dfb337be24c03e3` and merged normally as
+`f7452058a4a42e77c8fd40358ecdd1b10bc56cff`. Local `main` and `origin/main` were clean and equal at
+that merge before proposal preparation. The consumed v6 proposal was archived as ignored private
+history. The production preparer revalidated the unchanged packet, job, profile, evaluation, source,
+and destination bindings and created only this new v7-family DRAFT:
+
+- capability `runner_0b90dfd4fffe091d3a9a3f6c`, version 1, predecessor null;
+- DRAFT digest `bd209a79932245e86edf90eec7f3b573bedc534381acb4ede6973a58d8dcb9fd`;
+- packet `inspection_packet_275845864840bc559fec8224`, digest
+  `69cbad61af3830a30ce919cc1d0830696ddc2dbdd043965205c9c166e6196a78`;
+- adapter/form `lever-real-inspection-v7` / `lever-application-inspection-v1`;
+- operation `[OPEN_AND_INSPECT_ONLY]`, policy `real-target-inspection-v1`;
+- policy/capability expiry `2026-09-15T20:45:14.392Z` / `2026-09-14T21:15:14.392Z`;
+- active capability false; authorized network actions zero.
+
+The new family has zero persisted ledger rows and current active approved real-target capabilities
+remain zero. Post-preparation preflight and privacy audit pass; the database remains schema 8,
+pending migrations 0, integrity pass, and foreign-key issues 0. Lifetime real
+source/employer/upload/submission counts remain `9/7/0/0`. No v7 employer request has occurred.
+Source-enabled Personal Beta remains `READY`, first real target validation remains unproven, and
+Personal Live V1 remains `NOT_READY`. The next action is exact owner approval of this DRAFT before
+its expiry. Approval alone must not start inspection; a separate exact one-shot `INSPECT`
+confirmation remains mandatory.
