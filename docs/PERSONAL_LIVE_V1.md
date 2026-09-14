@@ -1,6 +1,6 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **SOURCE-ENABLED PERSONAL BETA READY; PERSONAL LIVE V1 NOT READY.** Manual-intake Personal Beta, R2, and the owner-reviewed request #9 source-ingestion proof are complete. The approved source capability is revoked and no new source request is authorised. Two historical read-only target visits stopped safely without validating the employer form, and no target capability is active. Any new adapter-v2 target authority must use its correctly derived capability family and receive fresh owner approval. Real fill, upload, authentication, submission, scheduling, and hosting remain disabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
+Status: **SOURCE-ENABLED PERSONAL BETA READY; PERSONAL LIVE V1 NOT READY.** Manual-intake Personal Beta, R2, and the owner-reviewed request #9 source-ingestion proof are complete. The approved source capability is revoked and no new source request is authorised. Seven historical read-only target visits stopped safely without validating the employer form, and no target capability is active. The latest v6 visit stopped on an aborted page-generated write request; the v7 scriptless-browser remediation is offline-only and any future v7 target authority must use its correctly derived new capability family and receive fresh owner approval. Real fill, upload, authentication, submission, scheduling, and hosting remain disabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
 
 ## Beta Core implementation snapshot — 2026-09-08
 

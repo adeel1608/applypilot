@@ -13,6 +13,7 @@ import {
   freezeInspectionBinding,
   legacyMainWorldBrowserV2ForLocalRegression,
   packetDigest,
+  runLeverInspectionInFreshBrowser,
 } from "@applypilot/application-runner";
 
 const now = new Date("2026-09-13T04:00:00.000Z");
@@ -114,7 +115,7 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
   ).toBe(true);
 });
 
-test("v6 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
+test("v7 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
   const { capability, binding } = inspection("full-contract");
   const result = await new TargetInspectionRunner(
     capability,
@@ -308,7 +309,7 @@ test("bounds fictional attributes and handles labels absent and Unicode safely",
   }
 });
 
-test("v6 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
+test("v7 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
   test.slow();
   const hostileCases = [
     "document-query-all",
@@ -493,7 +494,7 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
   await context.close();
 });
 
-test("v6 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
+test("v7 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
   browser,
 }) => {
   for (const [caseName, javaScriptEnabled] of [
@@ -524,6 +525,31 @@ test("v6 remains bounded for a large inert DOM and a server-rendered form with J
     }
     await context.close();
   }
+});
+
+test("v7 fresh production browser prevents page-script writes without weakening the route stop", async () => {
+  const { capability, binding } = inspection("blocked-write");
+  const audits: string[] = [];
+  const result = await runLeverInspectionInFreshBrowser({
+    capability,
+    binding,
+    currentBinding: () => binding,
+    audit: ({ type }) => audits.push(type),
+    now: () => now,
+  });
+
+  expect(result.state, JSON.stringify(result)).toBe("COMPLETED");
+  if (result.state !== "COMPLETED") return;
+  expect(result.observation.fields.length).toBeGreaterThan(0);
+  expect(result.observation.unsupportedControlDiagnostic).toBeNull();
+  expect(result.observation.metrics).toEqual({
+    browserWriteEvents: 0,
+    formValueChanges: 0,
+    uploads: 0,
+    submissions: 0,
+    candidateDataOutboundFields: 0,
+  });
+  expect(audits).toEqual(["runner.inspection.opened", "runner.inspection.completed"]);
 });
 
 test("classifies synthetic navigation, reload, close, and context loss without a retry", async ({
@@ -685,7 +711,7 @@ test("fails closed when the passive control or form structure mutates between bo
   }
 });
 
-test("persists only fixed value-free v6 DOM diagnostic stages", async ({ browser }) => {
+test("persists only fixed value-free v7 DOM diagnostic stages", async ({ browser }) => {
   for (const stage of ["DOM_QUERY", "DOM_CONTROL_READ", "DOM_PAGE_METADATA"] as const) {
     const context = await browser.newContext();
     const page = await context.newPage();

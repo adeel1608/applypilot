@@ -29,7 +29,7 @@ import {
   type UnsupportedControlDiagnostic,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v6";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v7";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -839,7 +839,7 @@ function domInspectionFailure(stage: DomInspectionDiagnosticStage): InspectionDi
 }
 
 /**
- * Adapter-v6 browser boundary. All DOM primitives are invoked through Playwright's utility-world
+ * Adapter-v7 browser boundary. All DOM primitives are invoked through Playwright's utility-world
  * selector/element APIs; no employer-main-world callback or control value read is used.
  */
 export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
@@ -1281,6 +1281,7 @@ export async function runLeverInspectionInFreshBrowser(input: {
   try {
     const context = await browser.newContext({
       acceptDownloads: false,
+      javaScriptEnabled: false,
       serviceWorkers: "block",
       permissions: [],
     });

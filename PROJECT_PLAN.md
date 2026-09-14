@@ -6882,3 +6882,105 @@ production builds, public-showcase audit, privacy audit, all-dependency and prod
 audits with zero vulnerabilities, schema 8/pending 0/integrity pass/foreign-key issues 0, and release
 classification. `git diff --check` passed. `git fsck --strict` reported only the previously known
 unreachable objects and no repository corruption. No migration or application-code change was made.
+
+## Offline scriptless passive-inspection remediation blueprint - 2026-09-15
+
+Current state: clean `main` at merge commit `533b8ab7bcff29761804b7b322156ce01a5d3a25` records the
+single v6 visit as a policy-correct `BLOCKED_WRITE_REQUEST` stop. The v6 capability is terminal,
+active approved source and target capability counts are zero, and lifetime real
+source/employer/upload/submission counts are fixed at `9/7/0/0`. No live authority exists for this
+branch.
+
+Objective: preserve the existing fail-closed rule that any observed non-`GET`/`HEAD` request stops an
+inspection, while preventing employer page scripts from originating such requests in the first
+place. The production fresh-browser inspection context will disable JavaScript before navigation.
+This is a narrower passive execution environment, not permission to ignore, inspect, replay, or send
+a blocked request. It must remain compatible with server-rendered form inspection and retain every
+existing origin, destination, popup, download, protection, structural-stability, no-write, and
+zero-retry gate.
+
+Assumptions and requirements:
+
+- the live diagnostic proves only that a non-read request was attempted; its body, endpoint, purpose,
+  and initiating script remain deliberately unknown and must not be inspected or inferred;
+- the public target is inspectable only if its useful structural form is server rendered; if a
+  scriptless future visit exposes no trustworthy form, the existing `FORM_CHANGED`/structural stop
+  remains authoritative;
+- direct adapter tests with JavaScript enabled must continue to prove that a generated write request
+  is aborted and terminates as `BLOCKED_WRITE_REQUEST`;
+- only the production fresh-browser wrapper changes runtime policy by setting
+  `javaScriptEnabled: false`; service workers remain blocked, permissions empty, downloads disabled,
+  exactly one navigation and zero retries/writes remain mandatory;
+- runtime semantics change, so the adapter identity advances from
+  `lever-real-inspection-v6` to `lever-real-inspection-v7`. Because adapter version is part of the
+  deterministic target identity, any later proposal must be a new family at version 1 with null
+  predecessor;
+- there is no schema change or migration. Migrations `0000`-`0008` remain immutable.
+
+Proposed files and data flow:
+
+- `packages/application-runner/src/lever-inspection-adapter.ts`: bump the reviewed adapter constant
+  to v7 and create the fresh browser context with JavaScript disabled; do not change route or DOM
+  classification behavior;
+- `tests/e2e/target-inspection.spec.ts`: add a production-wrapper regression using the fictional
+  server-rendered `blocked-write` fixture. The same fixture must stop in a normal script-enabled
+  direct-adapter context, while the scriptless fresh-browser path must complete with a safe field
+  inventory, zero non-read transmission, and zero mutation;
+- `docs/OFFLINE_GO_LIVE_ENABLEMENT.md` and `docs/PERSONAL_LIVE_V1.md`: describe v7 accurately as an
+  offline-remediated, unvalidated real-target path and retain the requirement for separate exact
+  approval and owner start;
+- `PROJECT_PLAN.md`: record implementation, tests, security/privacy evidence, and remaining gates.
+
+Dependencies are unchanged: the existing Playwright runtime, local fictional fixtures, immutable
+capability model, packet binding, and database ledger are reused. Security/privacy risks are an
+incomplete scriptless form, accidental relaxation of blocked-write handling, script-dependent
+protection signals becoming invisible, or a false claim of real validation. Mitigations are the
+existing two-pass stable DOM checks, exact form/version/submit requirements, explicit protection
+markup inspection, unchanged route-level method/origin enforcement, versioned capability identity,
+synthetic differential coverage, and continued `NOT_READY` classification until a separately
+authorized real validation completes. No page content, request body, response body, cookies,
+storage, headers, candidate values, or live URLs beyond the already approved target identity may be
+added to Git or diagnostics.
+
+Testing strategy: run focused application-runner and target-inspection suites first, then format,
+lint, strict typecheck, all unit and integration tests, both production builds, all E2E, privacy and
+dependency audits, database status, migration immutability, backup/restore preview, release check,
+`git diff --check`, and `git fsck --strict`. Real source, employer, upload, and submission actions for
+this implementation must remain `0/0/0/0`. Rollback is a normal revert of the v7 code/docs commit;
+the historical v6 run and capability versions remain immutable private evidence.
+
+Acceptance criteria: the script-enabled fictional write fixture still stops with
+`BLOCKED_WRITE_REQUEST`; the production fresh-browser wrapper disables JavaScript and completes the
+same server-rendered fixture without any non-read transmission or mutation; all existing safety
+matrices and full gates pass; exact-head CI is green; no migration or authority broadening exists;
+and one offline PR may merge under the owner's standing conditional authorization. Only after a
+clean merged main may the preparer derive a v7 DRAFT. That DRAFT must remain unapproved and
+unexecuted until fresh exact owner approval and a separate one-shot `INSPECT` confirmation.
+
+Implementation steps: (1) encode this blueprint; (2) bump adapter identity and disable JavaScript in
+the fresh production browser context; (3) add the differential fictional regression; (4) update
+readiness docs; (5) run focused and full validation; (6) record actual results; (7) commit, push, open
+one offline PR, require exact-head CI, self-review and merge only if every conditional gate passes;
+(8) refresh clean main and prepare only the next ignored v7 DRAFT if all private bindings remain
+current.
+
+Implementation result: `OFFLINE COMPLETE / REVIEW GATES IN PROGRESS`. Adapter identity is now
+`lever-real-inspection-v7`. The production fresh-browser wrapper sets `javaScriptEnabled: false`
+before creating its sole page; request routing, method/origin blocking, DOM classification, binding,
+audit, zero-mutation, and zero-retry behavior are otherwise unchanged. A new differential E2E proves
+that the production wrapper completes the server-rendered fictional `blocked-write` form without a
+non-read transmission, while the existing script-enabled matrix still stops the same fixture as
+`UNSUPPORTED_CONTROL` / `BLOCKED_WRITE_REQUEST`.
+
+Validation results: focused runner tests passed (63); the new production-wrapper E2E passed; the
+complete script-enabled inspection matrix passed; and the full release check passed with format,
+ESLint, strict TypeScript, 557 unit tests, 21 integration tests, 44 E2E tests, both production builds,
+public-showcase audit, privacy audit, all-dependency and production-dependency audits with zero
+vulnerabilities, schema 8/pending 0/integrity pass/foreign-key issues 0, and correct release
+classification. Ignored private backup `backup-2026-09-14T20-39-54.644Z-bf2459df` and its
+non-destructive restore preview both passed at schema 8/integrity pass. No migration changed;
+migrations `0000`-`0008` remain immutable. `git diff --check` passed, and `git fsck --strict` reported
+only the previously known unreachable objects. This offline implementation made zero real source,
+employer, upload, or submission actions; lifetime counts remain `9/7/0/0`. Remaining work is exact
+commit/push CI, self-review, conditional merge, clean-main refresh, and an offline v7 DRAFT only if
+the current private packet bindings still pass production preparation.
