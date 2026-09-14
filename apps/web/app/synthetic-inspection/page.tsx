@@ -17,6 +17,7 @@ const fixtureCases = [
   "changed-form",
   "changed-destination",
   "popup",
+  "popup-attempt",
   "hidden-step",
   "hidden-submit",
   "file-chooser",
@@ -80,6 +81,14 @@ export default async function SyntheticInspectionPage({
         <a href="https://outside.example.test/fictional" target="_blank" rel="noreferrer">
           Fictional popup step
         </a>
+      ) : null}
+      {fixture === "popup-attempt" ? (
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'document.addEventListener("DOMContentLoaded",()=>{window.open("/synthetic-inspection?case=normal","fictional-popup");},{once:true});',
+          }}
+        />
       ) : null}
       {fixture === "hidden-step" ? (
         <div data-hidden-application-step>Fictional hidden interactive step</div>

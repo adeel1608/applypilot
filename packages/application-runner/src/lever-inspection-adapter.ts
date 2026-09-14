@@ -27,7 +27,7 @@ import {
   type RunnerTargetCapability,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v4";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v5";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -736,7 +736,6 @@ type PassiveDomPass = {
   formCount: number;
   controls: PassiveControl[];
   protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
-  popupDeclared: boolean;
   hiddenInteractiveStep: boolean;
 };
 
@@ -803,7 +802,7 @@ function domInspectionFailure(stage: DomInspectionDiagnosticStage): InspectionDi
 }
 
 /**
- * Adapter-v4 browser boundary. All DOM primitives are invoked through Playwright's utility-world
+ * Adapter-v5 browser boundary. All DOM primitives are invoked through Playwright's utility-world
  * selector/element APIs; no employer-main-world callback or control value read is used.
  */
 export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
@@ -1012,14 +1011,12 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       }
       if (firstSerialized !== secondSerialized) throw domInspectionFailure("DOM_ENUMERATION");
 
-      const { popupDeclared, ...snapshotPass } = secondPass;
       return parseReadOnlyBrowserSnapshot({
         targetUrl: this.page.url(),
         httpStatus: response?.status() ?? null,
-        ...snapshotPass,
-        destinationDiagnostic:
-          popupAttempted || popupDeclared ? "POPUP_ATTEMPT" : destinationDiagnostic,
-        popupAttempted: popupAttempted || popupDeclared,
+        ...secondPass,
+        destinationDiagnostic: popupAttempted ? "POPUP_ATTEMPT" : destinationDiagnostic,
+        popupAttempted,
         downloadAttempted,
         blockedWriteRequest,
         blockedDestination,
@@ -1134,7 +1131,6 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       let lightFormControlCount: number;
       let declaredFormVersion: string | null;
       let protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
-      let popupDeclared: boolean;
       let hiddenStep: boolean;
       let unsupportedMarkerPresent: boolean;
       try {
@@ -1165,10 +1161,6 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         declaredFormVersion = declared.value || null;
         const parsedSignal = RunnerProtectionSignalSchema.safeParse(signal.value);
         protectionSignals = signal.value && parsedSignal.success ? [parsedSignal.data] : [];
-        popupDeclared =
-          (await this.page
-            .locator('xpath=//a[@target="_blank"] | //form[@target="_blank"]')
-            .count()) > 0;
         hiddenStep =
           (await this.page.locator("xpath=//*[@data-hidden-application-step]").count()) > 0;
         unsupportedMarkerPresent =
@@ -1183,7 +1175,6 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         formCount,
         controls,
         protectionSignals,
-        popupDeclared,
         hiddenInteractiveStep:
           controlOverflow ||
           labelOverflow ||
