@@ -6808,3 +6808,36 @@ merge under the owner's conditional offline authorization. After clean merged ma
 v5 private proposal and derive only a new v6 family version-1/null-predecessor DRAFT from the still-
 current private packet. Do not approve or execute it. The first parked live gate will be the exact
 owner approval string for that DRAFT; a separate future one-shot owner start remains mandatory.
+
+## Final overnight checkpoint - 2026-09-14
+
+Status: `OFFLINE WORK COMPLETE / OWNER GATES PARKED`. Exact implementation head
+`68eb73faeb3f05ff1f4923395c455234b190f8ab` passed the clean-worktree release check and both exact-head
+GitHub quality runs. PR 36 merged normally as `afeae5326f4915c6ca74a7ad8a0b978a4f98895a`.
+Local `main` and `origin/main` were refreshed and matched that merge commit before this checkpoint
+branch was created. The final exact-head counts were 557 unit, 21 integration, and 43 E2E tests;
+format, lint, typecheck, local/showcase builds, showcase audit, privacy audit, dependency audits,
+schema 8/pending 0/integrity/FKs, backup/restore preview, migration immutability, diff check, and strict
+Git object verification all passed. Migrations `0000`-`0008` remain unchanged.
+
+The used v5 private proposal is archived as ignored local history. The production offline preparer
+revalidated the existing packet/job/profile/evaluation/source/destination bindings on merged main and
+created a new immutable v6-family DRAFT only:
+
+- capability `runner_54c11308154f25428d22350a`, version 1, predecessor null;
+- DRAFT digest `085da71304dece7cb2b0719e1ce8ba2f88df61e4b618d146f11cac85f5fc164d`;
+- packet `inspection_packet_275845864840bc559fec8224`, digest
+  `69cbad61af3830a30ce919cc1d0830696ddc2dbdd043965205c9c166e6196a78`;
+- adapter/form `lever-real-inspection-v6` / `lever-application-inspection-v1`;
+- policy/capability expiry `2026-09-15T11:22:54.576Z` / `2026-09-14T11:52:54.576Z`;
+- active capability false; authorized network actions zero.
+
+Post-preparation preflight and privacy audits pass. Active source capability count is zero; active
+approved real-target capability count is zero. Lifetime real source/employer/upload/submission counts
+remain `9/6/0/0`. First real target validation remains unproven. Source-enabled Personal Beta remains
+ready; Personal Live V1 remains not ready. All useful independent offline work in this run is complete:
+the application lane is synthetic-only, the candidate fact gaps require owner evidence, the four local
+CV artifacts require a new relevant current document and explicit owner approval, and a useful local
+Australian technical shortlist requires fresh source-network authority. The next operation must be
+owner approval of the exact v6 DRAFT before its expiry; even after that, a separate exact one-shot
+`INSPECT` start is mandatory. No Shield AI validation application may be submitted.
