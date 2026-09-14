@@ -6319,3 +6319,27 @@ revert of tracked code/docs; historical database/capability/run evidence is neve
    deterministic preparation offline to create only a new v3 version-1/null-predecessor DRAFT with
    fresh 24-hour/30-minute windows; never approve or execute. If stale, return
    `PACKET_REFRESH_REQUIRED` without authority creation.
+
+## Completed local release validation
+
+Implementation head `cdd212cea88f95f2c8270eb252949fdc4f2b0f20` passed the complete local
+`npm run release:check`: doctor, schema/preflight, format check, lint, strict typecheck, 527/527 unit
+tests (49 files), 21/21 integration tests (3 files), local and showcase production builds, public
+showcase audit, 42/42 E2E tests, privacy audit, full dependency audit, production dependency audit,
+and release summary. The focused inspection/browser file passed 11/11 independently and the focused
+runner/identity/database selection passed 84/84. Privacy checked 316 tracked files, 970 history paths,
+968 history blobs, 1,531 build/test artifacts, and 11 private canaries. Both dependency audits found
+zero vulnerabilities.
+
+The real private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
+foreign-key issues. Ignored backup `backup-2026-09-14T08-27-01.561Z-e82e45b8` is schema 8 with
+integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
+starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
+`git fsck --strict` passed; fsck reported only harmless unreachable objects. The committed worktree
+was clean throughout validation. No source request, employer request/navigation, inspection run,
+candidate value, click, typing, form mutation, file chooser, upload, submission, or candidate outbound
+occurred. Lifetime real actions therefore remain `9/3/0/0`.
+
+Because this validation result is now recorded in the plan, rerun the complete release command on the
+final documentation-inclusive commit before push. Then require exact-head push and PR Actions green,
+self-review the complete diff, and merge only under the owner's stated pre-approval conditions.
