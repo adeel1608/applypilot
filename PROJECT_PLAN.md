@@ -6180,7 +6180,7 @@ capabilities are zero.
 
 The exact historical exception and page value are intentionally unknowable because only the fixed
 value-free category was retained. Live page data must not be recovered, reconstructed, replayed, or
-inferred. This task may establish only a *compatible reproduced failure mechanism* from fictional
+inferred. This task may establish only a _compatible reproduced failure mechanism_ from fictional
 local pages. Its objective is to audit every current snapshot expression, reproduce the stable-URL
 failure class offline, replace unnecessary dependence on employer-controlled main-world JavaScript
 with the narrowest browser-owned passive-read boundary, preserve fail-closed/data-minimized/one-
@@ -6189,24 +6189,58 @@ Employer visit #4 is not authorized.
 
 ## Expression-level audit and planned treatment
 
-| Expression or boundary | Current guard | Failure class / contamination risk | Synthetic reproduction | Selected treatment |
-| --- | --- | --- | --- | --- |
-| `document.querySelectorAll` and `document.querySelector` | Some calls locally caught; initial control query is top-level | B/C/D; page override or mutation can reject the entire evaluation | A, B, L, N-Q | Replace with Playwright-owned locator/handle enumeration; stage `DOM_QUERY` |
-| Page-world `Array.from`, NodeList iteration | Initial conversion top-level; later conversions inconsistently caught | B/C/D; poisoned iterator/constructor or mutation can abort | G, H, M-P | Avoid page-world collection/Array primitives; use bounded automation-side arrays; `DOM_ENUMERATION` |
-| Page-world array `.slice`, `.map`, `.every` | Top-level during primary mapping | B/C/D; poisoned prototype or concurrent replacement can abort/fabricate | I, M-P | Automation-side native arrays plus two-pass bounded semantic-stability check |
-| String `.slice`, `.replace`, `.trim`, `.toLowerCase` and RegExp | Read helper catches readers, not all normalizer/prototype calls | B/C; poisoned String/RegExp can abort the callback | J, W | Normalize and bound only in trusted Node context after primitive reads |
-| `tagName`, `id`, `isConnected`, custom-element properties | Individual reads mostly caught | C/D; hostile getters, detach, replacement | E, K, S, P | Avoid page properties; use tag-specific browser-owned selectors and stable handles |
-| `getAttribute`, `hasAttribute`, label collections/text | Individual calls caught, collection conversion partly exposed | C/D; prototype overrides, throwing getters, odd values | C, D, G, K, L | Playwright handle/locator metadata reads in its utility boundary, bounded in Node |
-| `getComputedStyle` and style properties | Per-control callback catches the call | C/D; patched function/getters; dynamic style | F, M | Use Playwright passive visibility API; failures become fixed control-read stage |
-| Shadow-root scanning | Outer local catch, but page-world query/iteration remains exposed | C/D; closed/open shadow and large DOM | R, T | Browser-owned bounded structural query; interactive shadow uncertainty fails closed |
-| `document.forms`, structural markers, popup/hidden-step queries | Local catches, but page-world primitives remain trusted | C/D | B, Q, R | Browser-owned locator counts/attributes; retain caps and protection policy |
-| Return-object construction | No dedicated stage | B/C/F; poisoned access during construction | J, M, AA | Construct only from validated primitives in Node |
-| Playwright result serialization | Outer catch only | E/F; unserializable return or destroyed context | X-AA | Remove the large returned object; classify fixed stage/category per passive boundary |
-| Frame/page lifecycle | Event counters around evaluation | E; close/crash/reload/context destruction | X-Z | Retain lifecycle listeners; instability remains `NAVIGATION_EXCEPTION` |
+| Expression or boundary                                          | Current guard                                                         | Failure class / contamination risk                                      | Synthetic reproduction | Selected treatment                                                                                  |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `document.querySelectorAll` and `document.querySelector`        | Some calls locally caught; initial control query is top-level         | B/C/D; page override or mutation can reject the entire evaluation       | A, B, L, N-Q           | Replace with Playwright-owned locator/handle enumeration; stage `DOM_QUERY`                         |
+| Page-world `Array.from`, NodeList iteration                     | Initial conversion top-level; later conversions inconsistently caught | B/C/D; poisoned iterator/constructor or mutation can abort              | G, H, M-P              | Avoid page-world collection/Array primitives; use bounded automation-side arrays; `DOM_ENUMERATION` |
+| Page-world array `.slice`, `.map`, `.every`                     | Top-level during primary mapping                                      | B/C/D; poisoned prototype or concurrent replacement can abort/fabricate | I, M-P                 | Automation-side native arrays plus two-pass bounded semantic-stability check                        |
+| String `.slice`, `.replace`, `.trim`, `.toLowerCase` and RegExp | Read helper catches readers, not all normalizer/prototype calls       | B/C; poisoned String/RegExp can abort the callback                      | J, W                   | Normalize and bound only in trusted Node context after primitive reads                              |
+| `tagName`, `id`, `isConnected`, custom-element properties       | Individual reads mostly caught                                        | C/D; hostile getters, detach, replacement                               | E, K, S, P             | Avoid page properties; use tag-specific browser-owned selectors and stable handles                  |
+| `getAttribute`, `hasAttribute`, label collections/text          | Individual calls caught, collection conversion partly exposed         | C/D; prototype overrides, throwing getters, odd values                  | C, D, G, K, L          | Playwright handle/locator metadata reads in its utility boundary, bounded in Node                   |
+| `getComputedStyle` and style properties                         | Per-control callback catches the call                                 | C/D; patched function/getters; dynamic style                            | F, M                   | Use Playwright passive visibility API; failures become fixed control-read stage                     |
+| Shadow-root scanning                                            | Outer local catch, but page-world query/iteration remains exposed     | C/D; closed/open shadow and large DOM                                   | R, T                   | Browser-owned bounded structural query; interactive shadow uncertainty fails closed                 |
+| `document.forms`, structural markers, popup/hidden-step queries | Local catches, but page-world primitives remain trusted               | C/D                                                                     | B, Q, R                | Browser-owned locator counts/attributes; retain caps and protection policy                          |
+| Return-object construction                                      | No dedicated stage                                                    | B/C/F; poisoned access during construction                              | J, M, AA               | Construct only from validated primitives in Node                                                    |
+| Playwright result serialization                                 | Outer catch only                                                      | E/F; unserializable return or destroyed context                         | X-AA                   | Remove the large returned object; classify fixed stage/category per passive boundary                |
+| Frame/page lifecycle                                            | Event counters around evaluation                                      | E; close/crash/reload/context destruction                               | X-Z                    | Retain lifecycle listeners; instability remains `NAVIGATION_EXCEPTION`                              |
 
 The audit classes are A locally guarded, B top-level unguarded, C page-world prototype/function
 contamination, D DOM mutation, E execution-context lifecycle, and F serialization/result transfer.
-Tests will preserve these labels and must not claim a synthetic case proves the historical cause.
+Tests preserve these labels and do not claim a synthetic case proves the historical cause.
+
+## Implementation outcome (offline, pre-PR)
+
+The selected Strategy B remediation is implemented as adapter `lever-real-inspection-v3`. Production
+now obtains minimal structural metadata through Playwright locator/element-handle operations, builds
+the snapshot in Node, and requires two canonically identical bounded passes after the document load
+state. The exact target, main frame, route restrictions, single-`goto` limit, zero-write counters,
+200-control/400-label/20-form caps, and fail-closed shadow/custom/overflow behavior remain enforced.
+The v2 main-world implementation is retained only behind a loopback-enforcing regression factory so
+the compatible failure class can remain proven without exposing it as the production execution path.
+
+Fixed optional DOM stages now use the existing JSON audit and inspection-summary columns, so schema 8
+and migrations `0000`-`0008` are unchanged. Unit/database tests prove that only the fixed enum is
+retained. The expanded fictional browser suite covers all requested main-world primitive poisoning,
+unusual returns, prototype mutation, DOM/control/form replacement and detachment, interactive shadow
+DOM, control/label bounds, Unicode truncation, lifecycle loss, result serialization, service-worker
+blocking, CSP/resource aborts, JavaScript-disabled/server-rendered markup, semantic classification,
+and exact zero-mutation metrics.
+
+Verified so far:
+
+- `npm run format`: PASS.
+- `npm run lint`: PASS.
+- `npm run typecheck`: PASS.
+- focused runner/database Vitest selection: PASS, 84/84.
+- `npx playwright test tests/e2e/target-inspection.spec.ts`: PASS, 11/11.
+- v2 compatible stable-URL `DOM_INSPECTION_EXCEPTION` reproduction: PASS on fictional loopback only.
+- employer/source requests, employer browser visits, and inspection runs during this task: 0.
+- candidate values, clicks, typing, form writes, file-chooser actions, uploads, submissions, and
+  candidate outbound during this task: 0 / 0 / 0 / 0 / 0 / 0 / 0 / NONE.
+
+The repository-wide release matrix, database/backup checks, immutable-migration verification, PR CI,
+merge, clean-main refresh, private binding validation, and offline v3-family DRAFT preparation remain
+the next ordered steps. No live authority exists or is introduced by this implementation.
 
 ## Strategy comparison and selected architecture
 

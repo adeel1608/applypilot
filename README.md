@@ -62,7 +62,7 @@ Every screenshot and value above is fictional. The showcase deliberately demonst
 
 - **Manual-intake Personal Beta:** ready for supervised local owner use.
 - **Source-enabled Personal Beta:** ready for supervised owner use. Owner-reviewed request #9 used one bounded Lever GET and persisted, normalized, evaluated, and queued all 25 accepted records with zero retries, redirects, unusable records, or candidate data outbound. The capability was revoked after the run. This release decision does not authorise another capability or request.
-- **Real employer interaction:** target approval required. The dedicated Lever inspection lane is offline-ready for exact `OPEN_AND_INSPECT_ONLY` authority; it has no fill, upload, authentication, or submit API. No real employer page has been visited.
+- **Real employer interaction:** target approval required. Three owner-authorized read-only visits stopped safely before a valid inventory; no candidate data, click, form change, upload, or submission occurred. The v3 Lever inspection lane is hardened offline for exact `OPEN_AND_INSPECT_ONLY` authority and has no fill, upload, authentication, or submit API. No active capability authorizes another visit.
 - **Final submission:** always requires fresh exact human consent.
 - **Hosted production application:** not ready. The static fictional showcase is not the private application.
 

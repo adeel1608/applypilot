@@ -9,6 +9,7 @@ import {
   type ApplicationPacket,
 } from "./beta";
 import {
+  DomInspectionDiagnosticStageSchema,
   InspectionDiagnosticCategorySchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
@@ -16,6 +17,7 @@ import {
   runnerTargetCapabilityIdentity,
   runnerTargetCapabilityDigest,
   runnerTargetReadiness,
+  type DomInspectionDiagnosticStage,
   type InspectionDiagnosticCategory,
   type RunnerTargetCapability,
 } from "./target-runner";
@@ -168,18 +170,29 @@ export type FrozenInspectionBinding = z.infer<typeof FrozenInspectionBindingSche
 
 export class InspectionDiagnosticError extends Error {
   readonly category: InspectionDiagnosticCategory;
+  readonly stage: DomInspectionDiagnosticStage | null;
 
-  constructor(category: InspectionDiagnosticCategory) {
+  constructor(
+    category: InspectionDiagnosticCategory,
+    stage: DomInspectionDiagnosticStage | null = null,
+  ) {
     super("INSPECTION_DIAGNOSTIC");
     this.name = "InspectionDiagnosticError";
     this.category = InspectionDiagnosticCategorySchema.parse(category);
+    this.stage = stage === null ? null : DomInspectionDiagnosticStageSchema.parse(stage);
+    if (this.category !== "DOM_INSPECTION_EXCEPTION" && this.stage !== null) {
+      throw new Error("DOM_DIAGNOSTIC_STAGE_CATEGORY_MISMATCH");
+    }
   }
 }
 
-function diagnosticCategory(error: unknown): InspectionDiagnosticCategory {
+function diagnosticDetails(error: unknown): {
+  category: InspectionDiagnosticCategory;
+  stage: DomInspectionDiagnosticStage | null;
+} {
   return error instanceof InspectionDiagnosticError
-    ? error.category
-    : "UNKNOWN_INSPECTION_EXCEPTION";
+    ? { category: error.category, stage: error.stage }
+    : { category: "UNKNOWN_INSPECTION_EXCEPTION", stage: null };
 }
 
 function targetWithinCapability(target: URL, capability: RunnerTargetCapability): boolean {
@@ -271,6 +284,7 @@ export type InspectionAuditRecord =
         operation: "OPEN_AND_INSPECT_ONLY";
         reason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
         diagnosticCategory: InspectionDiagnosticCategory | null;
+        diagnosticStage: DomInspectionDiagnosticStage | null;
       };
     };
 
@@ -282,6 +296,7 @@ export type InspectionRunResult =
       state: "STOPPED";
       stopReason: z.infer<typeof RunnerProtectionSignalSchema> | "TARGET_APPROVAL_REQUIRED";
       diagnosticCategory: InspectionDiagnosticCategory | null;
+      diagnosticStage: DomInspectionDiagnosticStage | null;
       observation: null;
     };
 
@@ -334,7 +349,8 @@ export class TargetInspectionRunner {
     try {
       adapterOutput = await this.adapter.inspect(this.binding);
     } catch (error) {
-      return this.stop("PAGE_CHANGED", diagnosticCategory(error));
+      const diagnostic = diagnosticDetails(error);
+      return this.stop("PAGE_CHANGED", diagnostic.category, diagnostic.stage);
     }
     const parsedObservation = TargetInspectionObservationSchema.safeParse(adapterOutput);
     if (!parsedObservation.success) return this.stop("PAGE_CHANGED", "ADAPTER_OUTPUT_INVALID");
@@ -386,9 +402,12 @@ export class TargetInspectionRunner {
   private stop(
     reason: InspectionStopReason,
     diagnosticCategory: InspectionDiagnosticCategory | null = null,
+    diagnosticStage: DomInspectionDiagnosticStage | null = null,
   ): InspectionRunResult {
     const safeDiagnosticCategory =
       reason === "PAGE_CHANGED" ? (diagnosticCategory ?? "UNKNOWN_INSPECTION_EXCEPTION") : null;
+    const safeDiagnosticStage =
+      safeDiagnosticCategory === "DOM_INSPECTION_EXCEPTION" ? diagnosticStage : null;
     this.state = "STOPPED";
     this.stopReason = reason;
     this.audit({
@@ -397,12 +416,14 @@ export class TargetInspectionRunner {
         operation: "OPEN_AND_INSPECT_ONLY",
         reason,
         diagnosticCategory: safeDiagnosticCategory,
+        diagnosticStage: safeDiagnosticStage,
       },
     });
     return {
       state: "STOPPED",
       stopReason: reason,
       diagnosticCategory: safeDiagnosticCategory,
+      diagnosticStage: safeDiagnosticStage,
       observation: null,
     };
   }

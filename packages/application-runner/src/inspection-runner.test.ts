@@ -7,7 +7,6 @@ import {
   LEVER_APPLICATION_INSPECTION_FORM_VERSION,
   LEVER_REAL_INSPECTION_ADAPTER_VERSION,
   LeverRealTargetInspectionAdapter,
-  PlaywrightReadOnlyInspectionBrowser,
   ReadOnlyBrowserSnapshotSchema,
   RunnerTargetCapabilitySchema,
   TargetInspectionRunner,
@@ -15,6 +14,7 @@ import {
   deterministicRunnerTargetCapabilityId,
   freezeInspectionBinding,
   freezeRunnerBinding,
+  legacyMainWorldBrowserV2ForLocalRegression,
   packetDigest,
   type ApplicationPacket,
   type InspectionAuditRecord,
@@ -147,6 +147,15 @@ function runnerFor(value = packet(), target = capability(value), browser = new F
   return { runner, binding, browser, audits, auditRecords };
 }
 
+function localRegressionBinding() {
+  return {
+    ...freezeInspectionBinding(packet(), capability()),
+    targetUrl: "http://127.0.0.1:3100/fictional/00000000-0000-4000-8000-000000000001/apply",
+    targetOrigin: "http://127.0.0.1:3100",
+    allowedPathPrefix: "/fictional/00000000-0000-4000-8000-000000000001/apply",
+  };
+}
+
 describe("read-only real target inspection", () => {
   it("keeps synthetic prepare and execution preflight aligned across an adapter-family change", async () => {
     const value = packet();
@@ -228,7 +237,7 @@ describe("read-only real target inspection", () => {
 
   it("rejects a cross-identity adapter change while freezing the packet binding", () => {
     const value = packet();
-    const malformed = capability(value, { adapterVersion: "lever-real-inspection-v3" });
+    const malformed = capability(value, { adapterVersion: "lever-real-inspection-v2" });
     expect(() => freezeInspectionBinding(value, malformed)).toThrow(
       "TARGET_CAPABILITY_IDENTITY_MISMATCH",
     );
@@ -392,6 +401,7 @@ describe("read-only real target inspection", () => {
           operation: "OPEN_AND_INSPECT_ONLY",
           reason: "PAGE_CHANGED",
           diagnosticCategory,
+          diagnosticStage: null,
         },
       });
     },
@@ -407,7 +417,8 @@ describe("read-only real target inspection", () => {
   ] as const)(
     "classifies %s during rejected DOM evaluation as navigation instability",
     async (_caseName, eventName) => {
-      const targetUrl = packet().targetUrl!;
+      const binding = localRegressionBinding();
+      const targetUrl = binding.targetUrl;
       const mainFrame = {};
       const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
       const page = {
@@ -437,9 +448,7 @@ describe("read-only real target inspection", () => {
         },
       } as unknown as Page;
       await expect(
-        new PlaywrightReadOnlyInspectionBrowser(page).inspect(
-          freezeInspectionBinding(packet(), capability()),
-        ),
+        legacyMainWorldBrowserV2ForLocalRegression(page).inspect(binding),
       ).rejects.toMatchObject({
         category: "NAVIGATION_EXCEPTION",
         message: "INSPECTION_DIAGNOSTIC",
@@ -472,6 +481,36 @@ describe("read-only real target inspection", () => {
       diagnosticCategory,
     });
     expect(audits.at(-1)).toMatchObject({ metadata: { diagnosticCategory } });
+  });
+
+  it("retains only a fixed value-free DOM diagnostic stage", async () => {
+    const target = capability();
+    const binding = freezeInspectionBinding(packet(), target);
+    const audits: InspectionAuditRecord[] = [];
+    const runner = new TargetInspectionRunner(
+      target,
+      binding,
+      new LeverRealTargetInspectionAdapter({
+        async inspect() {
+          throw new InspectionDiagnosticError("DOM_INSPECTION_EXCEPTION", "DOM_QUERY");
+        },
+      }),
+      () => binding,
+      (record) => audits.push(record),
+      () => now,
+    );
+    expect(await runner.openAndInspect()).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+      diagnosticStage: "DOM_QUERY",
+    });
+    expect(audits.at(-1)).toMatchObject({
+      metadata: {
+        diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+        diagnosticStage: "DOM_QUERY",
+      },
+    });
   });
 
   it.each([
@@ -512,7 +551,8 @@ describe("read-only real target inspection", () => {
   ] as const)(
     "classifies the production %s failure without retaining details",
     async (_caseName, category, overrides) => {
-      const targetUrl = packet().targetUrl!;
+      const binding = localRegressionBinding();
+      const targetUrl = binding.targetUrl;
       const page = {
         route: async () => undefined,
         unroute: async () => undefined,
@@ -531,9 +571,7 @@ describe("read-only real target inspection", () => {
         ...overrides,
       } as unknown as Page;
       await expect(
-        new PlaywrightReadOnlyInspectionBrowser(page).inspect(
-          freezeInspectionBinding(packet(), capability()),
-        ),
+        legacyMainWorldBrowserV2ForLocalRegression(page).inspect(binding),
       ).rejects.toMatchObject({ category, message: "INSPECTION_DIAGNOSTIC" });
     },
   );

@@ -11,13 +11,15 @@ import {
   TargetInspectionRunner,
   deterministicRunnerTargetCapabilityId,
   freezeInspectionBinding,
+  legacyMainWorldBrowserV2ForLocalRegression,
   packetDigest,
 } from "@applypilot/application-runner";
 
 const now = new Date("2026-09-13T04:00:00.000Z");
 
-function inspection(caseName: string) {
-  const targetUrl = `http://127.0.0.1:3100/synthetic-inspection?case=${caseName}`;
+function inspection(caseName: string, route = "synthetic-inspection") {
+  const targetPath = `/${route}`;
+  const targetUrl = `http://127.0.0.1:3100${targetPath}?case=${caseName}`;
   const packet = ApplicationPacketSchema.parse({
     id: `packet:e2e-inspection:${caseName}`,
     jobId: "job:e2e-inspection",
@@ -36,7 +38,7 @@ function inspection(caseName: string) {
   const identity = {
     targetKind: "SYNTHETIC_LOCAL" as const,
     allowedOrigin: "http://127.0.0.1:3100",
-    allowedPathPrefix: "/synthetic-inspection",
+    allowedPathPrefix: targetPath,
     operation: "OPEN_AND_INSPECT_ONLY" as const,
     formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
     adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
@@ -50,7 +52,7 @@ function inspection(caseName: string) {
     targetKind: "SYNTHETIC_LOCAL",
     alias: "Fictional Lever inspection target",
     allowedOrigin: "http://127.0.0.1:3100",
-    allowedPathPrefix: "/synthetic-inspection",
+    allowedPathPrefix: targetPath,
     formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
     adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
     allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
@@ -83,7 +85,7 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
     () => now,
   );
   const result = await runner.openAndInspect();
-  expect(result.state).toBe("COMPLETED");
+  expect(result.state, JSON.stringify(result)).toBe("COMPLETED");
   if (result.state !== "COMPLETED") return;
   expect(result.observation.fields.map(({ semanticType }) => semanticType)).toEqual(
     expect.arrayContaining([
@@ -112,9 +114,53 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
   ).toBe(true);
 });
 
+test("v3 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
+  const { capability, binding } = inspection("full-contract");
+  const result = await new TargetInspectionRunner(
+    capability,
+    binding,
+    new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(page)),
+    () => binding,
+    () => undefined,
+    () => now,
+  ).openAndInspect();
+  expect(result.state, JSON.stringify(result)).toBe("COMPLETED");
+  if (result.state !== "COMPLETED") return;
+  expect(result.observation.fields.map(({ semanticType }) => semanticType)).toEqual(
+    expect.arrayContaining([
+      "FIRST_NAME",
+      "LAST_NAME",
+      "EMAIL",
+      "PHONE",
+      "RESUME_UPLOAD",
+      "COVER_LETTER_UPLOAD",
+      "WORK_AUTHORIZATION",
+      "SPONSORSHIP_REQUIRED",
+      "CITIZENSHIP",
+      "SECURITY_CLEARANCE",
+      "EXPORT_CONTROL",
+      "RELOCATION",
+      "LOCATION",
+      "EDUCATION",
+      "YEARS_EXPERIENCE",
+      "FREE_TEXT",
+      "CONSENT",
+      "FINAL_SUBMIT",
+    ]),
+  );
+  expect(result.observation.fields.filter(({ required }) => required).length).toBeGreaterThan(0);
+  expect(
+    result.observation.fields.filter(
+      ({ inspectionStatus }) => inspectionStatus === "REVIEW_REQUIRED",
+    ).length,
+  ).toBeGreaterThanOrEqual(7);
+});
+
 test("fictional inspection matrix stops safely or inventories without clicks", async ({ page }) => {
+  test.setTimeout(180_000);
   for (const [caseName, expectedState, expectedReason] of [
     ["normal", "COMPLETED", null],
+    ["full-contract", "COMPLETED", null],
     ["unknown-required", "COMPLETED", null],
     ["documents", "COMPLETED", null],
     ["captcha", "STOPPED", "CAPTCHA"],
@@ -186,79 +232,201 @@ test("bounds fictional attributes and handles labels absent and Unicode safely",
   }
 });
 
-test("defensive extraction isolates fictional per-control failures and DOM mutation", async ({
-  browser,
-}) => {
-  for (const caseName of [
-    "style",
-    "labels-collection",
+test("v3 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
+  test.slow();
+  const hostileCases = [
+    "document-query-all",
+    "document-query-one",
+    "element-get-attribute",
+    "element-has-attribute",
+    "html-id-getter",
+    "computed-style",
+    "node-list-iterator",
+    "array-from",
+    "array-methods",
+    "string-methods",
+    "labels-getter",
     "label-text",
-    "detach",
-    "mutate",
-  ] as const) {
+    "forms-getter",
+    "shadow-getter",
+    "unusual-dom-return",
+    "prototype-mutation",
+    "hostile-custom-element",
+  ] as const;
+  for (const caseName of hostileCases) {
     const context = await browser.newContext();
     const page = await context.newPage();
     let nonReadRequestCount = 0;
     page.on("request", (request) => {
       if (!new Set(["GET", "HEAD"]).has(request.method())) nonReadRequestCount += 1;
     });
-    await page.addInitScript((fixture) => {
-      if (fixture === "style") {
-        const original = window.getComputedStyle.bind(window);
-        window.getComputedStyle = ((element: Element, pseudo?: string | null) => {
-          if (element instanceof HTMLInputElement && element.name === "firstName") {
-            throw new Error("fictional style accessor failure");
-          }
-          return original(element, pseudo);
-        }) as typeof window.getComputedStyle;
-      }
-      if (fixture === "labels-collection") {
-        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "labels");
-        if (descriptor?.get) {
-          Object.defineProperty(HTMLInputElement.prototype, "labels", {
-            configurable: true,
-            get() {
-              if (this.name === "firstName") {
-                throw new Error("fictional labels collection failure");
+    const hostilePage = new Proxy(page, {
+      get(target, property) {
+        if (property === "goto") {
+          return async (...args: Parameters<Page["goto"]>) => {
+            const response = await page.goto(...args);
+            await page.evaluate((fixture) => {
+              const fail = () => {
+                throw new Error("fictional hostile page-world primitive");
+              };
+              if (fixture === "document-query-all") document.querySelectorAll = fail as never;
+              if (fixture === "document-query-one") document.querySelector = fail as never;
+              if (fixture === "element-get-attribute") Element.prototype.getAttribute = fail;
+              if (fixture === "element-has-attribute") Element.prototype.hasAttribute = fail;
+              if (fixture === "html-id-getter") {
+                Object.defineProperty(HTMLElement.prototype, "id", {
+                  configurable: true,
+                  get: fail,
+                });
               }
-              return descriptor.get!.call(this);
-            },
-          });
-        }
-      }
-      if (fixture === "label-text") {
-        const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
-        if (descriptor?.get) {
-          Object.defineProperty(HTMLLabelElement.prototype, "textContent", {
-            configurable: true,
-            get() {
-              if (this.querySelector('input[name="firstName"]')) {
-                throw new Error("fictional label accessor failure");
+              if (fixture === "computed-style") window.getComputedStyle = fail as never;
+              if (fixture === "node-list-iterator") {
+                Object.defineProperty(NodeList.prototype, Symbol.iterator, {
+                  configurable: true,
+                  value: fail,
+                });
               }
-              return descriptor.get!.call(this);
-            },
-          });
+              if (fixture === "array-from") Array.from = fail as never;
+              if (fixture === "array-methods") {
+                Array.prototype.slice = fail as never;
+                Array.prototype.map = fail as never;
+                Array.prototype.every = fail as never;
+              }
+              if (fixture === "string-methods") {
+                String.prototype.slice = fail as never;
+                String.prototype.replace = fail as never;
+                String.prototype.trim = fail as never;
+                String.prototype.toLowerCase = fail as never;
+              }
+              if (fixture === "labels-getter") {
+                Object.defineProperty(HTMLInputElement.prototype, "labels", {
+                  configurable: true,
+                  get: fail,
+                });
+              }
+              if (fixture === "label-text") {
+                Object.defineProperty(HTMLLabelElement.prototype, "textContent", {
+                  configurable: true,
+                  get: fail,
+                });
+              }
+              if (fixture === "forms-getter") {
+                Object.defineProperty(Document.prototype, "forms", {
+                  configurable: true,
+                  get: fail,
+                });
+              }
+              if (fixture === "shadow-getter") {
+                Object.defineProperty(Element.prototype, "shadowRoot", {
+                  configurable: true,
+                  get: fail,
+                });
+              }
+              if (fixture === "unusual-dom-return") {
+                document.querySelectorAll = (() => ({ fictional: true })) as never;
+                document.querySelector = (() => ({ fictional: true })) as never;
+              }
+              if (fixture === "prototype-mutation") {
+                queueMicrotask(() => {
+                  Element.prototype.getAttribute = fail;
+                  Array.from = fail as never;
+                });
+              }
+              if (fixture === "hostile-custom-element") {
+                class HostileControl extends HTMLElement {
+                  get id() {
+                    return fail();
+                  }
+                }
+                customElements.define("fictional-hostile-control", HostileControl);
+                const host = document.createElement("fictional-hostile-control");
+                const input = document.createElement("input");
+                input.name = "phone";
+                input.type = "tel";
+                input.setAttribute("aria-label", "Fictional phone");
+                host.append(input);
+                document.querySelector("form")?.append(host);
+              }
+            }, caseName);
+            return response;
+          };
         }
-      }
-      if (fixture === "detach" || fixture === "mutate") {
-        const original = Element.prototype.getAttribute;
-        let changed = false;
-        Element.prototype.getAttribute = function (name: string) {
-          const firstName = original.call(this, "name") === "firstName";
-          if (!changed && firstName && name === "type") {
-            changed = true;
-            if (fixture === "detach") this.remove();
-            else {
-              const inserted = document.createElement("input");
-              inserted.name = "dynamicallyInsertedDuringInspection";
-              document.querySelector("form")?.append(inserted);
-            }
-          }
-          return original.call(this, name);
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Page;
+    const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(hostilePage)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, caseName).toMatchObject({ state: "COMPLETED" });
+    expect(nonReadRequestCount, caseName).toBe(0);
+    const valueLocators = await page.locator("input, textarea, select").all();
+    expect(
+      (await Promise.all(valueLocators.map(async (locator) => locator.inputValue()))).filter(
+        Boolean,
+      ),
+    ).toEqual([]);
+    await context.close();
+  }
+});
+
+test("cross-origin passive resources stay blocked without destabilizing the fictional form", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  let crossOriginRequests = 0;
+  let nonReadRequestCount = 0;
+  page.on("request", (request) => {
+    if (request.url().startsWith("http://127.0.0.1:3200/")) crossOriginRequests += 1;
+    if (!new Set(["GET", "HEAD"]).has(request.method())) nonReadRequestCount += 1;
+  });
+  const resourcePage = new Proxy(page, {
+    get(target, property) {
+      if (property === "goto") {
+        return async (...args: Parameters<Page["goto"]>) => {
+          const response = await page.goto(...args);
+          await page.evaluate(async () => {
+            await fetch("http://127.0.0.1:3200/fictional-passive-resource").catch(() => undefined);
+          });
+          return response;
         };
       }
-    }, caseName);
-    const { capability, binding } = inspection("normal");
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as Page;
+  const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
+  const result = await new TargetInspectionRunner(
+    capability,
+    binding,
+    new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(resourcePage)),
+    () => binding,
+    () => undefined,
+    () => now,
+  ).openAndInspect();
+  expect(result).toMatchObject({ state: "COMPLETED" });
+  expect(crossOriginRequests).toBe(1);
+  expect(nonReadRequestCount).toBe(0);
+  await context.close();
+});
+
+test("v3 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
+  browser,
+}) => {
+  for (const [caseName, javaScriptEnabled] of [
+    ["large-dom", true],
+    ["javascript-disabled", false],
+  ] as const) {
+    const context = await browser.newContext({ javaScriptEnabled, serviceWorkers: "block" });
+    const page = await context.newPage();
+    const { capability, binding } = inspection(caseName, "synthetic-inspection-raw");
     const result = await new TargetInspectionRunner(
       capability,
       binding,
@@ -267,49 +435,76 @@ test("defensive extraction isolates fictional per-control failures and DOM mutat
       () => undefined,
       () => now,
     ).openAndInspect();
-    expect(result, caseName).toMatchObject({
-      state: "STOPPED",
-      stopReason: "UNSUPPORTED_CONTROL",
-    });
-    expect(nonReadRequestCount, caseName).toBe(0);
-    expect(
-      await page
-        .locator("input, textarea, select")
-        .evaluateAll((controls) =>
-          controls.every((control) => !(control as HTMLInputElement).value),
-        ),
-      caseName,
-    ).toBe(true);
+    expect(result, caseName).toMatchObject({ state: "COMPLETED" });
+    if (result.state === "COMPLETED") {
+      expect(result.observation.fields.length, caseName).toBe(4);
+      expect(result.observation.metrics, caseName).toEqual({
+        browserWriteEvents: 0,
+        formValueChanges: 0,
+        uploads: 0,
+        submissions: 0,
+        candidateDataOutboundFields: 0,
+      });
+    }
     await context.close();
   }
 });
 
-test("classifies synthetic navigation, reload, and close races without a retry", async ({
+test("classifies synthetic navigation, reload, close, and context loss without a retry", async ({
   browser,
 }) => {
-  for (const caseName of ["client-navigation", "reload", "close"] as const) {
+  for (const caseName of [
+    "client-navigation",
+    "reload",
+    "close",
+    "execution-context-destroyed",
+  ] as const) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const { capability, binding } = inspection("normal");
-    const originalEvaluate = page.evaluate.bind(page);
+    const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
     let injected = false;
+    let productionGotoCount = 0;
+    let controlCollectionCount = 0;
     const unstablePage = new Proxy(page, {
       get(target, property) {
-        if (property === "evaluate") {
-          return async (...args: Parameters<Page["evaluate"]>) => {
-            if (!injected) {
-              injected = true;
-              if (caseName === "client-navigation") {
-                await page.goto(`${binding.targetUrl}&fictional-navigation=1`, {
-                  waitUntil: "commit",
-                });
-              } else if (caseName === "reload") {
-                await page.reload({ waitUntil: "commit" });
-              } else {
-                await page.close();
-              }
-            }
-            return originalEvaluate(...args);
+        if (property === "goto") {
+          return async (...args: Parameters<Page["goto"]>) => {
+            productionGotoCount += 1;
+            return page.goto(...args);
+          };
+        }
+        if (property === "locator") {
+          return (...args: Parameters<Page["locator"]>) => {
+            const locator = page.locator(...args);
+            if (!args[0].startsWith("xpath=//input")) return locator;
+            return new Proxy(locator, {
+              get(locatorTarget, locatorProperty) {
+                if (locatorProperty === "elementHandles") {
+                  return async () => {
+                    const handles = await locator.elementHandles();
+                    controlCollectionCount += 1;
+                    if (!injected && controlCollectionCount === 2) {
+                      injected = true;
+                      if (
+                        caseName === "client-navigation" ||
+                        caseName === "execution-context-destroyed"
+                      ) {
+                        await page.goto(`${binding.targetUrl}&fictional-navigation=1`, {
+                          waitUntil: "commit",
+                        });
+                      } else if (caseName === "reload") {
+                        await page.reload({ waitUntil: "commit" });
+                      } else {
+                        await page.close();
+                      }
+                    }
+                    return handles;
+                  };
+                }
+                const value = Reflect.get(locatorTarget, locatorProperty, locatorTarget) as unknown;
+                return typeof value === "function" ? value.bind(locatorTarget) : value;
+              },
+            });
           };
         }
         const value = Reflect.get(target, property, target) as unknown;
@@ -330,6 +525,232 @@ test("classifies synthetic navigation, reload, and close races without a retry",
       diagnosticCategory: "NAVIGATION_EXCEPTION",
     });
     expect(injected, caseName).toBe(true);
+    expect(productionGotoCount, caseName).toBe(1);
     await context.close();
   }
+});
+
+test("fails closed when the passive control or form structure mutates between bounded passes", async ({
+  browser,
+}) => {
+  for (const caseName of ["append", "detach", "replace-control", "replace-form"] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    let productionGotoCount = 0;
+    let controlCollectionCount = 0;
+    const mutatingPage = new Proxy(page, {
+      get(target, property) {
+        if (property === "goto") {
+          return async (...args: Parameters<Page["goto"]>) => {
+            productionGotoCount += 1;
+            return page.goto(...args);
+          };
+        }
+        if (property === "locator") {
+          return (...args: Parameters<Page["locator"]>) => {
+            const locator = page.locator(...args);
+            if (!args[0].startsWith("xpath=//input")) return locator;
+            return new Proxy(locator, {
+              get(locatorTarget, locatorProperty) {
+                if (locatorProperty === "elementHandles") {
+                  return async () => {
+                    const handles = await locator.elementHandles();
+                    controlCollectionCount += 1;
+                    if (controlCollectionCount === 2) {
+                      await page.evaluate((fixture) => {
+                        const form = document.querySelector("form");
+                        const first = form?.querySelector("input");
+                        if (fixture === "append") {
+                          const inserted = document.createElement("input");
+                          inserted.name = "location";
+                          form?.append(inserted);
+                        } else if (fixture === "detach") {
+                          first?.remove();
+                        } else if (fixture === "replace-control" && first) {
+                          first.replaceWith(first.cloneNode(true));
+                        } else if (fixture === "replace-form" && form) {
+                          form.replaceWith(form.cloneNode(true));
+                        }
+                      }, caseName);
+                    }
+                    return handles;
+                  };
+                }
+                const value = Reflect.get(locatorTarget, locatorProperty, locatorTarget) as unknown;
+                return typeof value === "function" ? value.bind(locatorTarget) : value;
+              },
+            });
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Page;
+    const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(mutatingPage)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, caseName).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+      diagnosticStage: "DOM_ENUMERATION",
+    });
+    expect(productionGotoCount, caseName).toBe(1);
+    await context.close();
+  }
+});
+
+test("persists only fixed value-free v3 DOM diagnostic stages", async ({ browser }) => {
+  for (const stage of ["DOM_QUERY", "DOM_CONTROL_READ", "DOM_PAGE_METADATA"] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const stagedPage = new Proxy(page, {
+      get(target, property) {
+        if (property === "locator") {
+          return (...args: Parameters<Page["locator"]>) => {
+            if (stage === "DOM_QUERY" && args[0].startsWith("xpath=//input")) {
+              throw new Error("fictional query boundary failure");
+            }
+            const locator = page.locator(...args);
+            if (stage === "DOM_PAGE_METADATA" && args[0] === "xpath=//form") {
+              return new Proxy(locator, {
+                get(locatorTarget, locatorProperty) {
+                  if (locatorProperty === "count") {
+                    return async () => {
+                      throw new Error("fictional metadata boundary failure");
+                    };
+                  }
+                  const value = Reflect.get(
+                    locatorTarget,
+                    locatorProperty,
+                    locatorTarget,
+                  ) as unknown;
+                  return typeof value === "function" ? value.bind(locatorTarget) : value;
+                },
+              });
+            }
+            if (stage === "DOM_CONTROL_READ" && args[0].startsWith("xpath=//input")) {
+              return new Proxy(locator, {
+                get(locatorTarget, locatorProperty) {
+                  if (locatorProperty === "elementHandles") {
+                    return async () => {
+                      const handles = await locator.elementHandles();
+                      const first = handles[0];
+                      if (!first) return handles;
+                      handles[0] = new Proxy(first, {
+                        get(handleTarget, handleProperty) {
+                          if (handleProperty === "$") {
+                            return async () => {
+                              throw new Error("fictional control boundary failure");
+                            };
+                          }
+                          const value = Reflect.get(
+                            handleTarget,
+                            handleProperty,
+                            handleTarget,
+                          ) as unknown;
+                          return typeof value === "function" ? value.bind(handleTarget) : value;
+                        },
+                      });
+                      return handles;
+                    };
+                  }
+                  const value = Reflect.get(
+                    locatorTarget,
+                    locatorProperty,
+                    locatorTarget,
+                  ) as unknown;
+                  return typeof value === "function" ? value.bind(locatorTarget) : value;
+                },
+              });
+            }
+            return locator;
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Page;
+    const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(stagedPage)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, stage).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+      diagnosticStage: stage,
+    });
+    expect(JSON.stringify(result), stage).not.toMatch(/fictional|selector|stack|message/i);
+    await context.close();
+  }
+
+  for (const [stage, serializer] of [
+    [
+      "DOM_RESULT_SERIALIZATION",
+      () => {
+        throw new Error("fictional serialization detail");
+      },
+    ],
+    [
+      "DOM_ENUMERATION",
+      (() => {
+        let call = 0;
+        return () => (++call === 1 ? "first" : "second");
+      })(),
+    ],
+  ] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const { capability, binding } = inspection("normal", "synthetic-inspection-raw");
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(
+        new PlaywrightReadOnlyInspectionBrowser(page, serializer),
+      ),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result, stage).toMatchObject({
+      state: "STOPPED",
+      stopReason: "PAGE_CHANGED",
+      diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+      diagnosticStage: stage,
+    });
+    await context.close();
+  }
+});
+
+test("baseline v2 reproduces a stable-URL DOM inspection exception under hostile page-world query primitives", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    document.querySelectorAll = (() => {
+      throw new Error("fictional hostile query primitive");
+    }) as typeof document.querySelectorAll;
+  });
+  const { binding } = inspection("normal", "synthetic-inspection-raw");
+  await expect(
+    legacyMainWorldBrowserV2ForLocalRegression(page).inspect(binding),
+  ).rejects.toMatchObject({
+    category: "DOM_INSPECTION_EXCEPTION",
+    message: "INSPECTION_DIAGNOSTIC",
+  });
+  expect(page.url()).toBe(binding.targetUrl);
+  await context.close();
 });

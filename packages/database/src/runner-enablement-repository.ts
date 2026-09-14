@@ -567,7 +567,10 @@ export class RunnerEnablementRepository {
         )
         .run(
           record.metadata.reason,
-          JSON.stringify({ diagnosticCategory: record.metadata.diagnosticCategory }),
+          JSON.stringify({
+            diagnosticCategory: record.metadata.diagnosticCategory,
+            diagnosticStage: record.metadata.diagnosticStage,
+          }),
           timestamp,
           id,
         );

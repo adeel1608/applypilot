@@ -367,7 +367,8 @@ describe("runner enablement persistence", () => {
         metadata: {
           operation: "OPEN_AND_INSPECT_ONLY",
           reason: "PAGE_CHANGED",
-          diagnosticCategory: "NAVIGATION_EXCEPTION",
+          diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+          diagnosticStage: "DOM_QUERY",
           exceptionMessage: "must never persist",
         },
       } as never),
@@ -385,7 +386,8 @@ describe("runner enablement persistence", () => {
       metadata: {
         operation: "OPEN_AND_INSPECT_ONLY",
         reason: "PAGE_CHANGED",
-        diagnosticCategory: "NAVIGATION_EXCEPTION",
+        diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+        diagnosticStage: "DOM_QUERY",
       },
     });
     expect(
@@ -398,7 +400,10 @@ describe("runner enablement persistence", () => {
     ).toEqual({
       state: "STOPPED",
       stopReason: "PAGE_CHANGED",
-      summary: JSON.stringify({ diagnosticCategory: "NAVIGATION_EXCEPTION" }),
+      summary: JSON.stringify({
+        diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+        diagnosticStage: "DOM_QUERY",
+      }),
     });
     const stoppedAudit = sqlite
       .prepare(
@@ -410,7 +415,8 @@ describe("runner enablement persistence", () => {
       runId: "inspection-run:diagnostic",
       operation: "OPEN_AND_INSPECT_ONLY",
       reason: "PAGE_CHANGED",
-      diagnosticCategory: "NAVIGATION_EXCEPTION",
+      diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
+      diagnosticStage: "DOM_QUERY",
     });
     expect(stoppedAudit.metadata).not.toContain("message");
     expect(stoppedAudit.metadata).not.toContain("stack");

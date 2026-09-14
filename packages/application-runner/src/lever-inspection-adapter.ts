@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { Download, Frame, Page, Route } from "playwright";
+import type { Download, ElementHandle, Frame, Page, Route } from "playwright";
 import { z } from "zod";
 
 import {
@@ -21,10 +21,11 @@ import {
 import {
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
+  type DomInspectionDiagnosticStage,
   type RunnerTargetCapability,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v2";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v3";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -265,7 +266,7 @@ function urlInScope(url: string, binding: FrozenInspectionBinding): boolean {
   }
 }
 
-export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
+class LegacyMainWorldReadOnlyInspectionBrowserV2 implements ReadOnlyInspectionBrowser {
   constructor(private readonly page: Page) {}
 
   async inspect(bindingInput: FrozenInspectionBinding): Promise<ReadOnlyBrowserSnapshot> {
@@ -655,6 +656,444 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       } catch {
         // A closed/crashed page cannot retain a live route handler.
       }
+    }
+  }
+}
+
+export function legacyMainWorldBrowserV2ForLocalRegression(page: Page): ReadOnlyInspectionBrowser {
+  const legacy = new LegacyMainWorldReadOnlyInspectionBrowserV2(page);
+  return {
+    async inspect(binding) {
+      const hostname = new URL(binding.targetUrl).hostname;
+      if (!new Set(["127.0.0.1", "localhost"]).has(hostname)) {
+        throw new Error("LEGACY_MAIN_WORLD_REGRESSION_REQUIRES_LOOPBACK");
+      }
+      return legacy.inspect(binding);
+    },
+  };
+}
+
+type PassiveControlTag = z.infer<typeof RawControlSchema>["tag"];
+type PassiveControl = z.infer<typeof RawControlSchema>;
+type PassiveHandle = ElementHandle<HTMLElement | SVGElement>;
+
+type PassiveDomPass = {
+  declaredFormVersion: string | null;
+  formCount: number;
+  controls: PassiveControl[];
+  protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
+  popupDeclared: boolean;
+  hiddenInteractiveStep: boolean;
+};
+
+type PrimitiveRead = { value: string; failed: boolean; present: boolean };
+
+const passiveControlSelector = "xpath=//input | //select | //textarea | //button";
+const passiveControlTags = ["input", "select", "textarea", "button"] as const;
+
+function boundedPrimitive(value: unknown, maximum: number): PrimitiveRead {
+  if (value === null || value === undefined) return { value: "", failed: false, present: false };
+  if (typeof value !== "string") return { value: "", failed: true, present: true };
+  const normalized = value
+    .slice(0, maximum * 4)
+    .replace(/\s+/gu, " ")
+    .trim();
+  let result = normalized.slice(0, maximum);
+  const finalCodeUnit = result.charCodeAt(result.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) result = result.slice(0, -1);
+  return { value: result, failed: false, present: true };
+}
+
+async function passiveAttribute(
+  handle: PassiveHandle,
+  name: string,
+  maximum: number,
+): Promise<PrimitiveRead> {
+  try {
+    return boundedPrimitive(await handle.getAttribute(name), maximum);
+  } catch {
+    return { value: "", failed: true, present: false };
+  }
+}
+
+async function passiveText(handle: PassiveHandle, maximum: number): Promise<PrimitiveRead> {
+  try {
+    return boundedPrimitive(await handle.textContent(), maximum);
+  } catch {
+    return { value: "", failed: true, present: false };
+  }
+}
+
+async function passiveTag(handle: PassiveHandle): Promise<PassiveControlTag | null> {
+  for (const tag of passiveControlTags) {
+    let match: PassiveHandle | null = null;
+    try {
+      match = (await handle.$(`xpath=self::${tag}`)) as PassiveHandle | null;
+    } catch {
+      return null;
+    }
+    if (match) {
+      await match.dispose();
+      return tag;
+    }
+  }
+  return null;
+}
+
+async function disposeHandles(handles: readonly PassiveHandle[]): Promise<void> {
+  await Promise.allSettled(handles.map(async (handle) => handle.dispose()));
+}
+
+function domInspectionFailure(stage: DomInspectionDiagnosticStage): InspectionDiagnosticError {
+  return new InspectionDiagnosticError("DOM_INSPECTION_EXCEPTION", stage);
+}
+
+/**
+ * Adapter-v3 browser boundary. All DOM primitives are invoked through Playwright's utility-world
+ * selector/element APIs; no employer-main-world callback or control value read is used.
+ */
+export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
+  constructor(
+    private readonly page: Page,
+    private readonly serializePass: (value: PassiveDomPass) => string = (value) =>
+      JSON.stringify(value),
+  ) {}
+
+  async inspect(bindingInput: FrozenInspectionBinding): Promise<ReadOnlyBrowserSnapshot> {
+    const binding = FrozenInspectionBindingSchema.parse(bindingInput);
+    let popupAttempted = false;
+    let downloadAttempted = false;
+    let blockedWriteRequest = false;
+    let blockedDestination = false;
+    let mainFrameNavigationCount = 0;
+    let pageClosed = false;
+    let pageCrashed = false;
+    const inspectedMainFrame = this.page.mainFrame();
+    const routeHandler = async (route: Route) => {
+      const request = route.request();
+      const method = request.method();
+      if (method !== "GET" && method !== "HEAD") {
+        blockedWriteRequest = true;
+        await route.abort("blockedbyclient");
+        return;
+      }
+      const mainNavigation =
+        request.isNavigationRequest() && request.frame() === inspectedMainFrame;
+      if (mainNavigation && !urlInScope(request.url(), binding)) {
+        blockedDestination = true;
+        await route.abort("blockedbyclient");
+        return;
+      }
+      if (new URL(request.url()).origin !== binding.targetOrigin) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      await route.continue();
+    };
+    const popupHandler = (popup: Page) => {
+      popupAttempted = true;
+      void popup.close();
+    };
+    const downloadHandler = (download: Download) => {
+      downloadAttempted = true;
+      void download.cancel();
+    };
+    const frameNavigationHandler = (frame: Frame) => {
+      if (frame === inspectedMainFrame) mainFrameNavigationCount += 1;
+    };
+    const frameDetachedHandler = (frame: Frame) => {
+      if (frame === inspectedMainFrame) pageClosed = true;
+    };
+    const closeHandler = () => {
+      pageClosed = true;
+    };
+    const crashHandler = () => {
+      pageCrashed = true;
+    };
+
+    await this.page.route("**/*", routeHandler);
+    this.page.on("popup", popupHandler);
+    this.page.on("download", downloadHandler);
+    this.page.on("framenavigated", frameNavigationHandler);
+    this.page.on("framedetached", frameDetachedHandler);
+    this.page.on("close", closeHandler);
+    this.page.on("crash", crashHandler);
+    try {
+      let response = null;
+      try {
+        response = await this.page.goto(binding.targetUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+      } catch {
+        if (!blockedDestination) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        return parseReadOnlyBrowserSnapshot({
+          targetUrl: binding.targetUrl,
+          httpStatus: null,
+          declaredFormVersion: null,
+          formCount: 0,
+          controls: [],
+          protectionSignals: ["DESTINATION_CHANGED"],
+          popupAttempted,
+          downloadAttempted,
+          blockedWriteRequest,
+          blockedDestination,
+          hiddenInteractiveStep: false,
+        });
+      }
+      if (blockedDestination || this.page.url() !== binding.targetUrl) {
+        return parseReadOnlyBrowserSnapshot({
+          targetUrl: binding.targetUrl,
+          httpStatus: response?.status() ?? null,
+          declaredFormVersion: null,
+          formCount: 0,
+          controls: [],
+          protectionSignals: ["DESTINATION_CHANGED"],
+          popupAttempted,
+          downloadAttempted,
+          blockedWriteRequest,
+          blockedDestination,
+          hiddenInteractiveStep: false,
+        });
+      }
+
+      try {
+        await this.page.waitForLoadState("load", { timeout: 5_000 });
+      } catch {
+        if (blockedDestination || this.page.url() !== binding.targetUrl) {
+          throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        }
+        throw domInspectionFailure("DOM_PAGE_METADATA");
+      }
+
+      let navigationCountBeforeSnapshot = mainFrameNavigationCount;
+      const navigationBecameUnstable = () => {
+        let urlChanged = true;
+        let closed = pageClosed;
+        try {
+          urlChanged = this.page.url() !== binding.targetUrl;
+          if (typeof this.page.isClosed === "function") closed ||= this.page.isClosed();
+        } catch {
+          closed = true;
+        }
+        return (
+          closed ||
+          pageCrashed ||
+          urlChanged ||
+          mainFrameNavigationCount !== navigationCountBeforeSnapshot
+        );
+      };
+
+      let firstPass: PassiveDomPass;
+      let secondPass: PassiveDomPass;
+      try {
+        firstPass = await this.capturePassivePass();
+        if (pageClosed || pageCrashed || this.page.url() !== binding.targetUrl) {
+          throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        }
+        navigationCountBeforeSnapshot = mainFrameNavigationCount;
+        secondPass = await this.capturePassivePass();
+        if (navigationBecameUnstable()) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+      } catch (error) {
+        if (navigationBecameUnstable()) throw new InspectionDiagnosticError("NAVIGATION_EXCEPTION");
+        if (error instanceof InspectionDiagnosticError) throw error;
+        throw domInspectionFailure("DOM_UNKNOWN");
+      }
+
+      let firstSerialized: string;
+      let secondSerialized: string;
+      try {
+        firstSerialized = this.serializePass(firstPass);
+        secondSerialized = this.serializePass(secondPass);
+        if (typeof firstSerialized !== "string" || typeof secondSerialized !== "string") {
+          throw new Error("UNSERIALIZABLE_PASS");
+        }
+      } catch {
+        throw domInspectionFailure("DOM_RESULT_SERIALIZATION");
+      }
+      if (firstSerialized !== secondSerialized) throw domInspectionFailure("DOM_ENUMERATION");
+
+      const { popupDeclared, ...snapshotPass } = secondPass;
+      return parseReadOnlyBrowserSnapshot({
+        targetUrl: this.page.url(),
+        httpStatus: response?.status() ?? null,
+        ...snapshotPass,
+        popupAttempted: popupAttempted || popupDeclared,
+        downloadAttempted,
+        blockedWriteRequest,
+        blockedDestination,
+      });
+    } finally {
+      try {
+        this.page.off("popup", popupHandler);
+        this.page.off("download", downloadHandler);
+        this.page.off("framenavigated", frameNavigationHandler);
+        this.page.off("framedetached", frameDetachedHandler);
+        this.page.off("close", closeHandler);
+        this.page.off("crash", crashHandler);
+      } catch {
+        // Lifecycle failure is already represented by the fixed terminal classification.
+      }
+      try {
+        await this.page.unroute("**/*", routeHandler);
+      } catch {
+        // A closed/crashed page cannot retain a live route handler.
+      }
+    }
+  }
+
+  private async capturePassivePass(): Promise<PassiveDomPass> {
+    let controlHandles: PassiveHandle[] = [];
+    let labelHandles: PassiveHandle[] = [];
+    try {
+      controlHandles = (await this.page
+        .locator(passiveControlSelector)
+        .elementHandles()) as PassiveHandle[];
+      labelHandles = (await this.page.locator("xpath=//label").elementHandles()) as PassiveHandle[];
+    } catch {
+      await disposeHandles([...controlHandles, ...labelHandles]);
+      throw domInspectionFailure("DOM_QUERY");
+    }
+
+    try {
+      const controlOverflow = controlHandles.length > 200;
+      const labelOverflow = labelHandles.length > 400;
+      const labelByFor = new Map<string, string>();
+      let labelReadFailed = false;
+      for (const label of labelHandles.slice(0, 400)) {
+        const [target, text] = await Promise.all([
+          passiveAttribute(label, "for", 200),
+          passiveText(label, 200),
+        ]);
+        labelReadFailed ||= target.failed || text.failed;
+        if (target.value && text.value && !labelByFor.has(target.value)) {
+          labelByFor.set(target.value, text.value);
+        }
+      }
+
+      const controls: PassiveControl[] = [];
+      for (const [index, handle] of controlHandles.slice(0, 200).entries()) {
+        const tag = await passiveTag(handle);
+        if (!tag) throw domInspectionFailure("DOM_CONTROL_READ");
+        const [type, name, id, autocomplete, ariaLabel, unsupportedMarker, requiredAttribute] =
+          await Promise.all([
+            passiveAttribute(handle, "type", 40),
+            passiveAttribute(handle, "name", 200),
+            passiveAttribute(handle, "id", 200),
+            passiveAttribute(handle, "autocomplete", 100),
+            passiveAttribute(handle, "aria-label", 200),
+            passiveAttribute(handle, "data-unsupported-control", 20),
+            passiveAttribute(handle, "required", 20),
+          ]);
+        let visible = false;
+        let visibilityFailed = false;
+        try {
+          visible = await handle.isVisible();
+        } catch {
+          visibilityFailed = true;
+        }
+        let wrappingLabel: PassiveHandle | null = null;
+        let wrappingText: PrimitiveRead = { value: "", failed: false, present: false };
+        try {
+          wrappingLabel = (await handle.$("xpath=ancestor::label[1]")) as PassiveHandle | null;
+          if (wrappingLabel) wrappingText = await passiveText(wrappingLabel, 200);
+        } catch {
+          wrappingText = { value: "", failed: true, present: false };
+        } finally {
+          if (wrappingLabel) await wrappingLabel.dispose();
+        }
+        const reads = [
+          type,
+          name,
+          id,
+          autocomplete,
+          ariaLabel,
+          unsupportedMarker,
+          requiredAttribute,
+          wrappingText,
+        ];
+        const failed = reads.some((read) => read.failed) || visibilityFailed;
+        controls.push({
+          index,
+          tag,
+          type: type.value.toLowerCase(),
+          name: name.value,
+          id: id.value,
+          autocomplete: autocomplete.value,
+          required: requiredAttribute.present,
+          hidden: !visible,
+          label: wrappingText.value || labelByFor.get(id.value) || ariaLabel.value,
+          unsupportedWidget: failed || unsupportedMarker.present,
+        });
+      }
+
+      let formCount: number;
+      let lightDocumentControlCount: number;
+      let piercedControlCount: number;
+      let lightFormControlCount: number;
+      let declaredFormVersion: string | null;
+      let protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
+      let popupDeclared: boolean;
+      let hiddenStep: boolean;
+      let unsupportedMarkerPresent: boolean;
+      try {
+        const rawFormCount = await this.page.locator("xpath=//form").count();
+        formCount = Math.min(rawFormCount, 20);
+        lightDocumentControlCount = await this.page.locator(passiveControlSelector).count();
+        piercedControlCount = await this.page
+          .locator("form input, form select, form textarea, form button")
+          .count();
+        lightFormControlCount = await this.page
+          .locator("xpath=//form//input | //form//select | //form//textarea | //form//button")
+          .count();
+        const declaredLocator = this.page.locator("xpath=//*[@data-form-version][1]");
+        const signalLocator = this.page.locator("xpath=//*[@data-stop-reason][1]");
+        const declared = boundedPrimitive(
+          (await declaredLocator.count()) > 0
+            ? await declaredLocator.getAttribute("data-form-version")
+            : null,
+          100,
+        );
+        const signal = boundedPrimitive(
+          (await signalLocator.count()) > 0
+            ? await signalLocator.getAttribute("data-stop-reason")
+            : null,
+          100,
+        );
+        if (declared.failed || signal.failed) throw new Error("PAGE_METADATA_INVALID");
+        declaredFormVersion = declared.value || null;
+        const parsedSignal = RunnerProtectionSignalSchema.safeParse(signal.value);
+        protectionSignals = signal.value && parsedSignal.success ? [parsedSignal.data] : [];
+        popupDeclared =
+          (await this.page
+            .locator('xpath=//a[@target="_blank"] | //form[@target="_blank"]')
+            .count()) > 0;
+        hiddenStep =
+          (await this.page.locator("xpath=//*[@data-hidden-application-step]").count()) > 0;
+        unsupportedMarkerPresent =
+          (await this.page.locator("xpath=//*[@data-unsupported-control]").count()) > 0;
+        if (rawFormCount > 20) hiddenStep = true;
+      } catch {
+        throw domInspectionFailure("DOM_PAGE_METADATA");
+      }
+
+      return {
+        declaredFormVersion,
+        formCount,
+        controls,
+        protectionSignals,
+        popupDeclared,
+        hiddenInteractiveStep:
+          controlOverflow ||
+          labelOverflow ||
+          labelReadFailed ||
+          lightDocumentControlCount !== controlHandles.length ||
+          piercedControlCount !== lightFormControlCount ||
+          hiddenStep ||
+          unsupportedMarkerPresent,
+      };
+    } finally {
+      await disposeHandles([...controlHandles, ...labelHandles]);
     }
   }
 }

@@ -1,8 +1,8 @@
 # Offline Personal Live V1 enablement
 
-Status: **SOURCE-ENABLED PERSONAL BETA READY; READ-ONLY TARGET INSPECTION AWAITS EXACT OWNER APPROVAL.**
+Status: **SOURCE-ENABLED PERSONAL BETA READY; FIRST REAL TARGET VALIDATION REMAINS UNPROVEN.**
 
-The owner-reviewed request #9 proved one bounded Lever source-to-R2 run and established Source-enabled Personal Beta readiness. That capability is revoked and authorises no later request. Target operation authority is now machine-separated: `OPEN_AND_INSPECT_ONLY` uses a dedicated passive runner, while map/fill/upload/submit remain in the application runner and cannot use an inspection capability. Automated target validation uses a loopback fictional form only. No employer page has been visited and no candidate data, document, or form value has been sent externally.
+The owner-reviewed request #9 proved one bounded Lever source-to-R2 run and established Source-enabled Personal Beta readiness. That capability is revoked and authorises no later request. Target operation authority is machine-separated: `OPEN_AND_INSPECT_ONLY` uses a dedicated passive runner, while map/fill/upload/submit remain in the application runner and cannot use an inspection capability. Three exact owner-authorized read-only employer visits have occurred; each failed closed before a valid form inventory, and none entered candidate data, clicked, changed a form, uploaded, or submitted. All related capabilities are terminal and authorise no further visit.
 
 Schema `0008_real_target_inspection_scope.sql` is additive. It adds immutable operation scope to target capabilities and stores separate frozen inspection bindings/lifecycle records. Migrations `0000`–`0007` remain immutable.
 
@@ -49,7 +49,7 @@ Policy/capability expiry: <exact timestamps>
 I approve one owner-started read-only inspection with this exact target, capability version/digest, and frozen packet. I understand it may make GET/HEAD requests needed to load that page, but sends zero candidate fields and performs no clicks, writes, uploads, authentication, or submission. Any authentication, CAPTCHA, MFA, bot, access, rate, destination, page, form, popup, download, write request, hidden step, unsupported control, or version change must stop.
 ```
 
-In `/applications`, first persist the exact approved capability by typing `APPROVE <capabilityId>` and selecting its checkbox. Starting the inspection remains a separate deliberate owner action. The inspection adapter is `lever-real-inspection-v2`, the form contract is `lever-application-inspection-v1`, and the capability operation list must equal `[OPEN_AND_INSPECT_ONLY]`. Upload or fill requires different future code and authority. Final submission always requires immediate owner review of the frozen packet and a fresh, short-lived, one-use consent bound to packet, destination, form, adapter, document, answer, and disclosure digests. A lost or ambiguous response is terminal `OUTCOME_UNKNOWN`; never retry it automatically.
+In `/applications`, first persist the exact approved capability by typing `APPROVE <capabilityId>` and selecting its checkbox. Starting the inspection remains a separate deliberate owner action. Any future proposal uses `lever-real-inspection-v3`, form contract `lever-application-inspection-v1`, and exactly `[OPEN_AND_INSPECT_ONLY]`. Because adapter version is identity-bound, v3 starts a new deterministic capability family at version 1/null predecessor. Upload or fill requires different future code and authority. Final submission always requires immediate owner review of the frozen packet and a fresh, short-lived, one-use consent bound to packet, destination, form, adapter, document, answer, and disclosure digests. A lost or ambiguous response is terminal `OUTCOME_UNKNOWN`; never retry it automatically.
 
 The current 30-minute target-capability expiry is security-compatible but operationally fragile for a deliberate review-and-start workflow; a prior approved version expired during that gap. Keep the existing limit for this remediation. A future, separately reviewed authority-design change should consider either a 90–120 minute approval window or a short execution lease minted from an approved capability without broadening operation or target scope.
 
@@ -57,6 +57,6 @@ The current 30-minute target-capability expiry is security-compatible but operat
 
 - Source-enabled Personal Beta: ready on the reviewed request #9 evidence; no active source capability or new-request authority.
 - Target-independent application runner, binding, consent and recovery framework: ready for controlled synthetic validation only.
-- Lever read-only real-target inspection lane: offline-ready; exact target approval and an owner-started validation run remain required.
+- Lever read-only real-target inspection lane: v3 is offline-hardened; a fresh v3-family approval and separate owner start would be required for any future controlled validation.
 - Real employer visit, fill, upload and submission authority: absent until separate exact approvals; inspection authority cannot grant application authority.
 - Hosted production, scheduling, LinkedIn automation, CAPTCHA/MFA bypass, tenant enumeration, employer-form bypass and background submission: not authorised.

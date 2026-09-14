@@ -11,16 +11,23 @@ The separation is machine-enforced in the Zod capability contract, immutable cap
 
 ## Read-only Lever inspection contract
 
-`lever-real-inspection-v2` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
+`lever-real-inspection-v3` supports only the form contract `lever-application-inspection-v1`. It launches a fresh isolated local Chromium context with no stored session, permissions, downloads, credentials, or candidate values. The browser permits only `GET` and `HEAD`, blocks every cross-origin request, permits no redirect outside the exact origin/path authority, performs no clicks, and reads only bounded structural attributes and minimum labels needed to classify eligibility questions. It never reads control values, page text, response bodies, cookies, storage, or hidden candidate data.
 
-The v2 adapter uses one passive DOM evaluation after one navigation. Each permitted control property,
-label, and computed-style read is isolated and bounded; a detached or individually unreadable control
-becomes unsupported rather than aborting the whole snapshot. Control-list mutation, more than 200
-controls, opaque interactive shadow DOM, or another incomplete page structure fails closed as an
-unsupported step. Main-frame navigation/reload/detach and page close/crash are observed as value-free
-lifecycle events. If the evaluation context is lost during one of those events, the internal category
-is `NAVIGATION_EXCEPTION`, not a stable-DOM defect. There is no sleep, second `goto`, automatic retry,
-or retained exception text.
+The v3 adapter uses Playwright-owned selector and element-handle reads after one navigation; it does
+not execute a snapshot callback in the employer main world. Employer overrides of document query
+functions, DOM prototypes, collection iterators, `Array`, `String`, style helpers, labels, or custom
+element getters therefore do not become trusted inspection primitives. It performs two bounded
+metadata passes, accepts only canonically identical results while the exact destination and main
+frame stay stable, and builds the schema-validated snapshot in the trusted Node process. A detached
+or individually unreadable control becomes unsupported; mutation between passes, more than 200
+controls, more than 20 forms, interactive open shadow DOM, or another incomplete structure fails
+closed. Waiting for document `load` is the only bounded structural readiness gate; there is no timer
+sleep, second `goto`, reload, automatic retry, fallback fetch, or retained exception text.
+
+CDP DOM snapshots were rejected for this revision: they are Chromium-specific, return substantially
+more DOM/text material before filtering, add protocol maintenance surface, and are unnecessary while
+Playwright-owned passive reads pass the hostile-page-world matrix. The former v2 main-world reader is
+reachable only through a loopback-enforcing regression helper and is never selected by production.
 
 The inspection inventory classifies contact, document, work-authorisation, sponsorship, citizenship, export-control, clearance, location, relocation, education, experience, free-text, consent, unknown, and final-submit controls. The result records safe counts and classifications only. Browser writes, field changes, uploads, submissions, and candidate-data outbound counts must all remain exactly zero.
 
@@ -29,16 +36,20 @@ Authentication, CAPTCHA, MFA, bot detection, rate limiting, access restrictions,
 `PAGE_CHANGED` remains the public fail-closed result for a broad inspection failure. Future stopped
 inspections additionally retain exactly one value-free diagnostic category when applicable:
 `HTTP_ERROR`, `NAVIGATION_EXCEPTION`, `SNAPSHOT_INVALID`, `DOM_INSPECTION_EXCEPTION`,
-`ADAPTER_OUTPUT_INVALID`, or `UNKNOWN_INSPECTION_EXCEPTION`. Only that fixed enum is written to the
-local audit and inspection summary. Exception messages, stack traces, response/status text, URLs,
-selectors, page content, headers, cookies, storage, and candidate values are not diagnostic metadata.
+`ADAPTER_OUTPUT_INVALID`, or `UNKNOWN_INSPECTION_EXCEPTION`. A DOM exception may additionally retain
+one fixed stage: `DOM_QUERY`, `DOM_ENUMERATION`, `DOM_CONTROL_READ`, `DOM_PAGE_METADATA`,
+`DOM_RESULT_SERIALIZATION`, or `DOM_UNKNOWN`. Only those enums are written to the local audit and
+inspection summary. Exception messages, stack traces, response/status text, URLs, selectors, page
+content, headers, cookies, storage, and candidate values are not diagnostic metadata.
 The historical first real-target stop predates this instrumentation and therefore remains
 `UNKNOWN_SAFE_BOUNDARY`; it must not be relabelled as a form change.
 
-The second real-target attempt reached its exact approved destination but stopped before a valid
-inventory with `DOM_INSPECTION_EXCEPTION`. It retained no DOM content and does not prove the form
-contract. The v2 hardening is based only on fictional reproduction of the deterministic software
-boundaries; it does not retrospectively claim which expression failed on the real page.
+The second and third real-target attempts reached their exact approved destination but stopped before
+a valid inventory with `DOM_INSPECTION_EXCEPTION`. They retained no DOM content and do not prove the
+form contract. A fictional stable-URL page that poisons `document.querySelectorAll` reproduces a
+compatible v2 failure mechanism; it is not evidence of the historical Shield AI cause. Runtime
+extraction changed for v3, so its adapter-bound deterministic identity starts a new capability family
+at version 1 with no predecessor. The closed v2 family is never reused.
 
 ## Frozen binding and persistence
 
@@ -46,7 +57,7 @@ An inspection binding commits to the exact current packet, packet digest, job/pr
 
 A real-target capability ID is derived only from its target kind, exact origin, exact path, one allowed operation, form contract, adapter, and packet digest. Changing any of those inputs creates a new capability family at version 1 with no predecessor. Alias, lifecycle state and references, timestamps and expiries, version, and predecessor do not rotate identity; unchanged identity advances within the same family. Offline proposal preparation, packet freezing, real-target persistence, inspection binding, and execution all use the same central assertion. A cross-family or malformed lineage therefore fails before persistence or employer access. The deterministic ID function itself is unchanged.
 
-Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. Audits record only safe operation, version, stop reason, a fixed value-free diagnostic category, and aggregate classification counts.
+Migration `0008_real_target_inspection_scope.sql` adds operation scope to target capabilities and a separate inspection lifecycle table. It does not change migrations `0000`–`0007`. No migration is needed for v3: the optional fixed diagnostic stage uses existing JSON audit/summary fields. Audits record only safe operation, version, stop reason, fixed value-free diagnostic enums, and aggregate classification counts.
 
 ## Answers, disclosure, and final submission
 
