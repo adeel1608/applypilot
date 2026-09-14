@@ -6563,3 +6563,48 @@ new adapter-v5 DRAFT offline, and stop at its fresh approval gate. Never make vi
    and merge only if the offline safety conditions remain satisfied.
 7. Refresh main, archive the v4 proposal, and prepare only the fresh v5-family DRAFT. Stop before
    approval or execution with the exact mandatory capability-approval line.
+
+## Implementation and validation completed
+
+The strictly offline implementation is complete. Production adapter identity is now
+`lever-real-inspection-v5`. Its passive DOM pass no longer reads or reports inert `target="_blank"`
+declarations. `POPUP_ATTEMPT` is set only by the already installed Playwright `popup` event handler;
+an observed child page is still closed immediately and the inspection still fails closed as
+`DESTINATION_CHANGED`. Exact final-origin/path/query checks, one main `goto`, zero retries, read-only
+request enforcement, protection stops, and zero candidate/form mutations are unchanged. The
+loopback-only historical v2 regression reader remains unchanged. No authority field, target, network
+budget, operation, form contract, policy, persistence schema, or migration changed.
+
+The fictional browser fixture now distinguishes an inert new-tab declaration from an actual scripted
+popup event. The inert declaration completes normal passive inspection. The observed popup is closed,
+leaves only the main page, stops with `DESTINATION_CHANGED` / `POPUP_ATTEMPT`, uses one main
+navigation, makes no non-read request, and performs no browser write. The complete existing
+destination, lifecycle, hostile-DOM, bounds, protection, and semantic-field matrices remain covered.
+Documentation records that visit 5's historical fixed diagnostic cannot prove whether an actual popup
+opened because adapter v4 conflated declarations with events; immutable visit evidence was not
+rewritten.
+
+Focused validation passed strict typecheck, 49/49 application-runner unit tests, and both focused
+browser regressions (the complete fictional inspection matrix plus inert-declaration/observed-popup
+semantics). The complete `npm.cmd run release:check` passed doctor; schema/preflight; formatting;
+lint; strict typecheck; 536/536 unit tests in 49 files; 21/21 integration tests in 3 files; local and
+showcase production builds; public-showcase audit; 43/43 E2E tests; privacy audit; full and production
+dependency audits; and release classification. Privacy checked 316 tracked files, 984 history paths,
+982 history blobs, 1,572 build/test artifacts, and 11 private canaries. Both dependency audits found
+zero vulnerabilities.
+
+The private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
+foreign-key issues. Ignored backup `backup-2026-09-14T10-21-37.786Z-69ac25b5` is schema 8 with
+integrity `PASS`; its exact restore preview passed without applying a restore. A direct diff from
+starting main confirms migrations `0000`-`0008` are unchanged. `git diff --check` and
+`git fsck --strict` passed; fsck reported only harmless dangling objects. No real source or browser
+action occurred during remediation or validation. Lifetime real actions remain source/employer
+visit/upload/submission `9/5/0/0`; active source and target capabilities are both zero.
+Source-enabled Personal Beta remains ready. Personal Live V1 remains not ready pending a successful
+owner-approved real-target validation.
+
+Before push, commit these implementation/docs/results on the same branch and rerun the complete
+release command at that exact clean commit. Then require exact-head push and PR checks green,
+self-review the complete diff, and merge only under the owner's standing fully offline authorization.
+After merge, create only the fresh adapter-v5 DRAFT through production offline preparation and stop
+before approval or execution.

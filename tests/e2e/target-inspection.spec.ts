@@ -114,7 +114,7 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
   ).toBe(true);
 });
 
-test("v4 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
+test("v5 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
   const { capability, binding } = inspection("full-contract");
   const result = await new TargetInspectionRunner(
     capability,
@@ -173,7 +173,8 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     ["unsupported", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["changed-form", "STOPPED", "FORM_CHANGED"],
     ["changed-destination", "STOPPED", "DESTINATION_CHANGED"],
-    ["popup", "STOPPED", "DESTINATION_CHANGED"],
+    ["popup", "COMPLETED", null],
+    ["popup-attempt", "STOPPED", "DESTINATION_CHANGED"],
     ["hidden-step", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["hidden-submit", "COMPLETED", null],
     ["file-chooser", "COMPLETED", null],
@@ -202,7 +203,7 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     if (result.state === "STOPPED" && caseName === "changed-destination") {
       expect(result.destinationDiagnostic).toBe("FINAL_PATH_CHANGED");
     }
-    if (result.state === "STOPPED" && caseName === "popup") {
+    if (result.state === "STOPPED" && caseName === "popup-attempt") {
       expect(result.destinationDiagnostic).toBe("POPUP_ATTEMPT");
     }
     if (result.state === "COMPLETED") {
@@ -214,6 +215,55 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
         candidateDataOutboundFields: 0,
       });
     }
+  }
+});
+
+test("distinguishes inert popup declarations from observed popup events without retry or writes", async ({
+  browser,
+}) => {
+  for (const [caseName, expectedState] of [
+    ["popup", "COMPLETED"],
+    ["popup-attempt", "STOPPED"],
+  ] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    let mainGotoCount = 0;
+    let nonReadRequestCount = 0;
+    context.on("request", (request) => {
+      if (!new Set(["GET", "HEAD"]).has(request.method())) nonReadRequestCount += 1;
+    });
+    const countedPage = new Proxy(page, {
+      get(target, property) {
+        if (property === "goto") {
+          return (...args: Parameters<Page["goto"]>) => {
+            mainGotoCount += 1;
+            return page.goto(...args);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Page;
+    const { capability, binding } = inspection(caseName);
+    const result = await new TargetInspectionRunner(
+      capability,
+      binding,
+      new LeverRealTargetInspectionAdapter(new PlaywrightReadOnlyInspectionBrowser(countedPage)),
+      () => binding,
+      () => undefined,
+      () => now,
+    ).openAndInspect();
+    expect(result.state, caseName).toBe(expectedState);
+    if (result.state === "STOPPED") {
+      expect(result, caseName).toMatchObject({
+        stopReason: "DESTINATION_CHANGED",
+        destinationDiagnostic: "POPUP_ATTEMPT",
+      });
+    }
+    expect(mainGotoCount, caseName).toBe(1);
+    expect(nonReadRequestCount, caseName).toBe(0);
+    await expect.poll(() => context.pages().length).toBe(1);
+    await context.close();
   }
 });
 
@@ -238,7 +288,7 @@ test("bounds fictional attributes and handles labels absent and Unicode safely",
   }
 });
 
-test("v4 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
+test("v5 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
   test.slow();
   const hostileCases = [
     "document-query-all",
@@ -423,7 +473,7 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
   await context.close();
 });
 
-test("v4 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
+test("v5 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
   browser,
 }) => {
   for (const [caseName, javaScriptEnabled] of [
@@ -615,7 +665,7 @@ test("fails closed when the passive control or form structure mutates between bo
   }
 });
 
-test("persists only fixed value-free v4 DOM diagnostic stages", async ({ browser }) => {
+test("persists only fixed value-free v5 DOM diagnostic stages", async ({ browser }) => {
   for (const stage of ["DOM_QUERY", "DOM_CONTROL_READ", "DOM_PAGE_METADATA"] as const) {
     const context = await browser.newContext();
     const page = await context.newPage();
