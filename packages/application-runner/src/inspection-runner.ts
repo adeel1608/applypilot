@@ -14,6 +14,7 @@ import {
   InspectionDiagnosticCategorySchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
+  UnsupportedControlDiagnosticSchema,
   assertRunnerTargetCapabilityIdentity,
   runnerTargetCapabilityIdentity,
   runnerTargetCapabilityDigest,
@@ -22,6 +23,7 @@ import {
   type DestinationChangeDiagnostic,
   type InspectionDiagnosticCategory,
   type RunnerTargetCapability,
+  type UnsupportedControlDiagnostic,
 } from "./target-runner";
 
 function canonical(value: unknown): string {
@@ -136,9 +138,11 @@ export const TargetInspectionObservationSchema = z
     targetUrl: z.url(),
     formVersion: z.string().min(1).max(100),
     adapterVersion: z.string().min(1).max(100),
+    visibleSectionCount: z.number().int().nonnegative().max(100),
     fields: z.array(InspectionFieldSchema).max(200),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
     destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable().default(null),
+    unsupportedControlDiagnostic: UnsupportedControlDiagnosticSchema.nullable().default(null),
     metrics: ZeroMutationMetricsSchema,
   })
   .strict()
@@ -151,6 +155,18 @@ export const TargetInspectionObservationSchema = z
         code: "custom",
         path: ["destinationDiagnostic"],
         message: "DESTINATION_DIAGNOSTIC_WITHOUT_DESTINATION_STOP",
+      });
+    }
+    if (
+      (value.protectionSignals[0] === "UNSUPPORTED_CONTROL" &&
+        value.unsupportedControlDiagnostic === null) ||
+      (value.protectionSignals[0] !== "UNSUPPORTED_CONTROL" &&
+        value.unsupportedControlDiagnostic !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["unsupportedControlDiagnostic"],
+        message: "UNSUPPORTED_DIAGNOSTIC_WITHOUT_UNSUPPORTED_STOP",
       });
     }
   });
@@ -287,6 +303,7 @@ export type InspectionAuditRecord =
       type: "runner.inspection.completed";
       metadata: {
         operation: "OPEN_AND_INSPECT_ONLY";
+        visibleSectionCount: number;
         fieldCount: number;
         reviewRequiredCount: number;
         documentRequiredCount: number;
@@ -301,6 +318,7 @@ export type InspectionAuditRecord =
         diagnosticCategory: InspectionDiagnosticCategory | null;
         diagnosticStage: DomInspectionDiagnosticStage | null;
         destinationDiagnostic: DestinationChangeDiagnostic | null;
+        unsupportedControlDiagnostic: UnsupportedControlDiagnostic | null;
       };
     };
 
@@ -314,6 +332,7 @@ export type InspectionRunResult =
       diagnosticCategory: InspectionDiagnosticCategory | null;
       diagnosticStage: DomInspectionDiagnosticStage | null;
       destinationDiagnostic: DestinationChangeDiagnostic | null;
+      unsupportedControlDiagnostic: UnsupportedControlDiagnostic | null;
       observation: null;
     };
 
@@ -381,6 +400,9 @@ export class TargetInspectionRunner {
         signal === "DESTINATION_CHANGED"
           ? (observation.destinationDiagnostic ?? "DESTINATION_STATE_UNKNOWN")
           : null,
+        signal === "UNSUPPORTED_CONTROL"
+          ? (observation.unsupportedControlDiagnostic ?? "UNSUPPORTED_UNKNOWN")
+          : null,
       );
     }
     if (observation.targetUrl !== this.binding.targetUrl) {
@@ -397,6 +419,7 @@ export class TargetInspectionRunner {
       type: "runner.inspection.completed",
       metadata: {
         operation: "OPEN_AND_INSPECT_ONLY",
+        visibleSectionCount: observation.visibleSectionCount,
         fieldCount: observation.fields.length,
         reviewRequiredCount: observation.fields.filter(
           ({ inspectionStatus }) => inspectionStatus === "REVIEW_REQUIRED",
@@ -430,6 +453,7 @@ export class TargetInspectionRunner {
     diagnosticCategory: InspectionDiagnosticCategory | null = null,
     diagnosticStage: DomInspectionDiagnosticStage | null = null,
     destinationDiagnostic: DestinationChangeDiagnostic | null = null,
+    unsupportedControlDiagnostic: UnsupportedControlDiagnostic | null = null,
   ): InspectionRunResult {
     const safeDiagnosticCategory =
       reason === "PAGE_CHANGED" ? (diagnosticCategory ?? "UNKNOWN_INSPECTION_EXCEPTION") : null;
@@ -437,6 +461,10 @@ export class TargetInspectionRunner {
       safeDiagnosticCategory === "DOM_INSPECTION_EXCEPTION" ? diagnosticStage : null;
     const safeDestinationDiagnostic =
       reason === "DESTINATION_CHANGED" ? destinationDiagnostic : null;
+    const safeUnsupportedControlDiagnostic =
+      reason === "UNSUPPORTED_CONTROL"
+        ? (unsupportedControlDiagnostic ?? "UNSUPPORTED_UNKNOWN")
+        : null;
     this.state = "STOPPED";
     this.stopReason = reason;
     this.audit({
@@ -447,6 +475,7 @@ export class TargetInspectionRunner {
         diagnosticCategory: safeDiagnosticCategory,
         diagnosticStage: safeDiagnosticStage,
         destinationDiagnostic: safeDestinationDiagnostic,
+        unsupportedControlDiagnostic: safeUnsupportedControlDiagnostic,
       },
     });
     return {
@@ -455,6 +484,7 @@ export class TargetInspectionRunner {
       diagnosticCategory: safeDiagnosticCategory,
       diagnosticStage: safeDiagnosticStage,
       destinationDiagnostic: safeDestinationDiagnostic,
+      unsupportedControlDiagnostic: safeUnsupportedControlDiagnostic,
       observation: null,
     };
   }

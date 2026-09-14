@@ -456,6 +456,55 @@ describe("target-independent application runner", () => {
     expect(await runner.open()).toMatchObject({ state: "PAUSED", stopReason: "PAGE_CHANGED" });
   });
 
+  it.each(["open", "map", "fill"] as const)(
+    "pauses without retry when the synthetic %s stage is interrupted",
+    async (stage) => {
+      const { runner, adapter } = readyRunner();
+      if (stage !== "open") await runner.open();
+      if (stage === "fill") await runner.map();
+      let calls = 0;
+      adapter[stage] = async () => {
+        calls += 1;
+        throw new Error("fictional interruption detail");
+      };
+      expect(await runner[stage]()).toMatchObject({ state: "PAUSED", stopReason: "PAGE_CHANGED" });
+      expect(calls).toBe(1);
+      await expect(runner[stage]()).rejects.toThrow(/^RUN_STATE_REQUIRED:/);
+      expect(calls).toBe(1);
+      expect(runner.snapshot().finalAttempts).toBe(0);
+    },
+  );
+
+  it("rejects malformed adapter observations before advancing", async () => {
+    const { runner, adapter } = readyRunner();
+    adapter.open = async () =>
+      ({
+        targetUrl: "not-a-url",
+        formVersion: "synthetic-form-v1",
+        adapterVersion: "synthetic-adapter-v1",
+        documentDigests: [],
+        protectionSignals: [],
+        privateValue: "must not be accepted",
+      }) as never;
+    expect(await runner.open()).toMatchObject({ state: "PAUSED", stopReason: "PAGE_CHANGED" });
+    expect(runner.snapshot().finalAttempts).toBe(0);
+  });
+
+  it("binds in-memory final consent to the complete frozen runner binding", () => {
+    const { binding } = readyRunner();
+    const store = new InMemoryFinalConsentStore(() => now);
+    const consent = store.issue(binding, 60_000);
+    expect(consent.bindingDigest).toHaveLength(64);
+    expect(
+      store.consume({
+        id: consent.id,
+        token: consent.token,
+        binding: { ...binding, adapterVersion: "synthetic-adapter-v2" },
+        now,
+      }),
+    ).toBe(false);
+  });
+
   it("requires one-use exact final consent and performs one synthetic final attempt", async () => {
     const { runner, adapter } = readyRunner();
     await runner.open();

@@ -188,6 +188,7 @@ export interface FinalActionConsent {
   packetDigest: string;
   targetHost: string;
   formVersion: string;
+  bindingDigest: string;
   expiresAt: string;
   usedAt: string | null;
 }
@@ -272,6 +273,15 @@ export class SyntheticApplicationRunner {
       packetDigest: packetDigest(this.packet),
       targetHost: this.packet.targetHost ?? "",
       formVersion: this.formVersion,
+      bindingDigest: createHash("sha256")
+        .update(
+          canonical({
+            packetDigest: packetDigest(this.packet),
+            targetHost: this.packet.targetHost ?? "",
+            formVersion: this.formVersion,
+          }),
+        )
+        .digest("hex"),
       expiresAt: new Date(this.now().getTime() + ttlMs).toISOString(),
       usedAt: null,
     };
@@ -307,6 +317,16 @@ export class SyntheticApplicationRunner {
     ) {
       return this.pause("PAGE_CHANGED");
     }
+    const submittedBindingDigest = createHash("sha256")
+      .update(
+        canonical({
+          packetDigest: input.packetDigest,
+          targetHost: input.targetHost,
+          formVersion: input.formVersion,
+        }),
+      )
+      .digest("hex");
+    if (submittedBindingDigest !== this.consent.bindingDigest) return this.pause("PAGE_CHANGED");
     this.consent.usedAt = this.now().toISOString();
     this.irreversibleClicks += 1;
     return this.advance(input.responseLost ? "OUTCOME_UNKNOWN" : "SYNTHETIC_SUBMITTED");

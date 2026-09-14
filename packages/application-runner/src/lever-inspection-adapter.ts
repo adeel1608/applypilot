@@ -22,12 +22,14 @@ import {
   DestinationChangeDiagnosticSchema,
   RunnerProtectionSignalSchema,
   RunnerTargetCapabilitySchema,
+  UnsupportedControlDiagnosticSchema,
   type DestinationChangeDiagnostic,
   type DomInspectionDiagnosticStage,
   type RunnerTargetCapability,
+  type UnsupportedControlDiagnostic,
 } from "./target-runner";
 
-export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v5";
+export const LEVER_REAL_INSPECTION_ADAPTER_VERSION = "lever-real-inspection-v6";
 export const LEVER_APPLICATION_INSPECTION_FORM_VERSION = "lever-application-inspection-v1";
 
 const RawControlSchema = z
@@ -41,7 +43,9 @@ const RawControlSchema = z
     required: z.boolean(),
     hidden: z.boolean(),
     label: z.string().max(200),
-    unsupportedWidget: z.boolean(),
+    metadataReadFailed: z.boolean().default(false),
+    customWidgetDeclared: z.boolean().default(false),
+    unsupportedWidget: z.boolean().optional(),
   })
   .strict();
 
@@ -51,6 +55,7 @@ export const ReadOnlyBrowserSnapshotSchema = z
     httpStatus: z.number().int().min(100).max(599).nullable(),
     declaredFormVersion: z.string().min(1).max(100).nullable(),
     formCount: z.number().int().nonnegative().max(20),
+    visibleSectionCount: z.number().int().nonnegative().max(100).default(0),
     controls: z.array(RawControlSchema).max(200),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
     destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable().default(null),
@@ -58,7 +63,8 @@ export const ReadOnlyBrowserSnapshotSchema = z
     downloadAttempted: z.boolean(),
     blockedWriteRequest: z.boolean(),
     blockedDestination: z.boolean(),
-    hiddenInteractiveStep: z.boolean(),
+    unsupportedControlDiagnostic: UnsupportedControlDiagnosticSchema.nullable().default(null),
+    hiddenInteractiveStep: z.boolean().default(false),
   })
   .strict()
   .superRefine((value, context) => {
@@ -72,6 +78,17 @@ export const ReadOnlyBrowserSnapshotSchema = z
         code: "custom",
         path: ["destinationDiagnostic"],
         message: "DESTINATION_DIAGNOSTIC_WITHOUT_DESTINATION_SIGNAL",
+      });
+    }
+    if (
+      value.unsupportedControlDiagnostic !== null &&
+      value.protectionSignals[0] !== undefined &&
+      value.protectionSignals[0] !== "UNSUPPORTED_CONTROL"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["unsupportedControlDiagnostic"],
+        message: "UNSUPPORTED_DIAGNOSTIC_WITH_CONFLICTING_SIGNAL",
       });
     }
   });
@@ -129,7 +146,9 @@ function semanticFor(control: z.infer<typeof RawControlSchema>) {
 }
 
 function controlTypeFor(control: z.infer<typeof RawControlSchema>) {
-  if (control.unsupportedWidget) return "CUSTOM" as const;
+  if (control.metadataReadFailed || control.customWidgetDeclared || control.unsupportedWidget) {
+    return "CUSTOM" as const;
+  }
   if (control.tag === "textarea") return "TEXTAREA" as const;
   if (control.tag === "select") return "SELECT" as const;
   if (control.tag === "button")
@@ -206,12 +225,28 @@ function firstSignal(snapshot: ReadOnlyBrowserSnapshot) {
   if (
     snapshot.blockedWriteRequest ||
     snapshot.downloadAttempted ||
-    snapshot.hiddenInteractiveStep
+    snapshot.hiddenInteractiveStep ||
+    snapshot.unsupportedControlDiagnostic !== null
   ) {
     return "UNSUPPORTED_CONTROL" as const;
   }
   if (snapshot.httpStatus !== null && snapshot.httpStatus >= 400) return "PAGE_CHANGED" as const;
   return null;
+}
+
+function unsupportedDiagnosticFor(
+  snapshot: ReadOnlyBrowserSnapshot,
+  signal: ReturnType<typeof firstSignal>,
+): UnsupportedControlDiagnostic | null {
+  if (signal !== "UNSUPPORTED_CONTROL") return null;
+  if (snapshot.blockedWriteRequest) return "BLOCKED_WRITE_REQUEST";
+  if (snapshot.downloadAttempted) return "DOWNLOAD_ATTEMPT";
+  if (snapshot.unsupportedControlDiagnostic) return snapshot.unsupportedControlDiagnostic;
+  if (snapshot.hiddenInteractiveStep) return "HIDDEN_INTERACTIVE_STEP";
+  if (snapshot.protectionSignals[0] === "UNSUPPORTED_CONTROL") {
+    return "EXPLICIT_UNSUPPORTED_SIGNAL";
+  }
+  return "UNSUPPORTED_UNKNOWN";
 }
 
 export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter {
@@ -249,23 +284,22 @@ export class LeverRealTargetInspectionAdapter implements TargetInspectionAdapter
     const fields = snapshot.controls.map(safeField);
     const structurallySupported =
       snapshot.formCount > 0 && fields.some(({ semanticType }) => semanticType === "FINAL_SUBMIT");
-    const unsupportedControl = fields.some(({ controlType }) => controlType === "CUSTOM");
     const protectionSignals = signal
       ? [signal]
       : snapshot.declaredFormVersion && snapshot.declaredFormVersion !== this.formVersion
         ? (["FORM_CHANGED"] as const)
         : !structurallySupported
           ? (["FORM_CHANGED"] as const)
-          : unsupportedControl
-            ? (["UNSUPPORTED_CONTROL"] as const)
-            : [];
+          : [];
     const observation = TargetInspectionObservationSchema.safeParse({
       targetUrl: snapshot.targetUrl,
       formVersion: this.formVersion,
       adapterVersion: this.adapterVersion,
+      visibleSectionCount: snapshot.visibleSectionCount,
       fields,
       protectionSignals,
       destinationDiagnostic,
+      unsupportedControlDiagnostic: unsupportedDiagnosticFor(snapshot, signal),
       metrics: {
         browserWriteEvents: 0,
         formValueChanges: 0,
@@ -734,14 +768,17 @@ type PassiveHandle = ElementHandle<HTMLElement | SVGElement>;
 type PassiveDomPass = {
   declaredFormVersion: string | null;
   formCount: number;
+  visibleSectionCount: number;
   controls: PassiveControl[];
   protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
-  hiddenInteractiveStep: boolean;
+  unsupportedControlDiagnostic: UnsupportedControlDiagnostic | null;
 };
 
 type PrimitiveRead = { value: string; failed: boolean; present: boolean };
 
 const passiveControlSelector = "xpath=//input | //select | //textarea | //button";
+const passiveSectionSelector =
+  "xpath=//form//fieldset | //form//section | //form//*[@role='group']";
 const passiveControlTags = ["input", "select", "textarea", "button"] as const;
 
 function boundedPrimitive(value: unknown, maximum: number): PrimitiveRead {
@@ -802,7 +839,7 @@ function domInspectionFailure(stage: DomInspectionDiagnosticStage): InspectionDi
 }
 
 /**
- * Adapter-v5 browser boundary. All DOM primitives are invoked through Playwright's utility-world
+ * Adapter-v6 browser boundary. All DOM primitives are invoked through Playwright's utility-world
  * selector/element APIs; no employer-main-world callback or control value read is used.
  */
 export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBrowser {
@@ -1043,19 +1080,24 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
   private async capturePassivePass(): Promise<PassiveDomPass> {
     let controlHandles: PassiveHandle[] = [];
     let labelHandles: PassiveHandle[] = [];
+    let sectionHandles: PassiveHandle[] = [];
     try {
       controlHandles = (await this.page
         .locator(passiveControlSelector)
         .elementHandles()) as PassiveHandle[];
       labelHandles = (await this.page.locator("xpath=//label").elementHandles()) as PassiveHandle[];
+      sectionHandles = (await this.page
+        .locator(passiveSectionSelector)
+        .elementHandles()) as PassiveHandle[];
     } catch {
-      await disposeHandles([...controlHandles, ...labelHandles]);
+      await disposeHandles([...controlHandles, ...labelHandles, ...sectionHandles]);
       throw domInspectionFailure("DOM_QUERY");
     }
 
     try {
       const controlOverflow = controlHandles.length > 200;
       const labelOverflow = labelHandles.length > 400;
+      const sectionOverflow = sectionHandles.length > 100;
       const labelByFor = new Map<string, string>();
       let labelReadFailed = false;
       for (const label of labelHandles.slice(0, 400)) {
@@ -1066,6 +1108,16 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         labelReadFailed ||= target.failed || text.failed;
         if (target.value && text.value && !labelByFor.has(target.value)) {
           labelByFor.set(target.value, text.value);
+        }
+      }
+
+      let visibleSectionCount = 0;
+      let sectionReadFailed = false;
+      for (const section of sectionHandles.slice(0, 100)) {
+        try {
+          if (await section.isVisible()) visibleSectionCount += 1;
+        } catch {
+          sectionReadFailed = true;
         }
       }
 
@@ -1114,18 +1166,20 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         controls.push({
           index,
           tag,
-          type: type.value.toLowerCase(),
+          type: type.value ? type.value.toLowerCase() : tag === "button" ? "submit" : "text",
           name: name.value,
           id: id.value,
           autocomplete: autocomplete.value,
           required: requiredAttribute.present,
           hidden: !visible,
           label: wrappingText.value || labelByFor.get(id.value) || ariaLabel.value,
-          unsupportedWidget: failed || unsupportedMarker.present,
+          metadataReadFailed: failed,
+          customWidgetDeclared: unsupportedMarker.present,
         });
       }
 
       let formCount: number;
+      let rawFormCount: number;
       let lightDocumentControlCount: number;
       let piercedControlCount: number;
       let lightFormControlCount: number;
@@ -1134,7 +1188,7 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
       let hiddenStep: boolean;
       let unsupportedMarkerPresent: boolean;
       try {
-        const rawFormCount = await this.page.locator("xpath=//form").count();
+        rawFormCount = await this.page.locator("xpath=//form").count();
         formCount = Math.min(rawFormCount, 20);
         lightDocumentControlCount = await this.page.locator(passiveControlSelector).count();
         piercedControlCount = await this.page
@@ -1170,22 +1224,45 @@ export class PlaywrightReadOnlyInspectionBrowser implements ReadOnlyInspectionBr
         throw domInspectionFailure("DOM_PAGE_METADATA");
       }
 
+      const controlMetadataReadFailed = controls.some(({ metadataReadFailed }) =>
+        Boolean(metadataReadFailed),
+      );
+      const unsupportedControlDiagnostic: UnsupportedControlDiagnostic | null = controlOverflow
+        ? "CONTROL_LIMIT_EXCEEDED"
+        : labelOverflow
+          ? "LABEL_LIMIT_EXCEEDED"
+          : rawFormCount > 20
+            ? "FORM_LIMIT_EXCEEDED"
+            : sectionOverflow
+              ? "SECTION_LIMIT_EXCEEDED"
+              : controlMetadataReadFailed
+                ? "CONTROL_METADATA_UNREADABLE"
+                : labelReadFailed
+                  ? "LABEL_METADATA_UNREADABLE"
+                  : sectionReadFailed
+                    ? "SECTION_METADATA_UNREADABLE"
+                    : lightDocumentControlCount !== controlHandles.length
+                      ? "CONTROL_SET_MISMATCH"
+                      : piercedControlCount > lightFormControlCount
+                        ? "SHADOW_CONTROL_PRESENT"
+                        : piercedControlCount !== lightFormControlCount
+                          ? "CONTROL_SET_MISMATCH"
+                          : hiddenStep
+                            ? "HIDDEN_INTERACTIVE_STEP"
+                            : unsupportedMarkerPresent
+                              ? "CUSTOM_WIDGET_DECLARED"
+                              : null;
+
       return {
         declaredFormVersion,
         formCount,
+        visibleSectionCount,
         controls,
         protectionSignals,
-        hiddenInteractiveStep:
-          controlOverflow ||
-          labelOverflow ||
-          labelReadFailed ||
-          lightDocumentControlCount !== controlHandles.length ||
-          piercedControlCount !== lightFormControlCount ||
-          hiddenStep ||
-          unsupportedMarkerPresent,
+        unsupportedControlDiagnostic,
       };
     } finally {
-      await disposeHandles([...controlHandles, ...labelHandles]);
+      await disposeHandles([...controlHandles, ...labelHandles, ...sectionHandles]);
     }
   }
 }

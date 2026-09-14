@@ -67,6 +67,25 @@ export const DestinationChangeDiagnosticSchema = z.enum([
 ]);
 export type DestinationChangeDiagnostic = z.infer<typeof DestinationChangeDiagnosticSchema>;
 
+export const UnsupportedControlDiagnosticSchema = z.enum([
+  "BLOCKED_WRITE_REQUEST",
+  "DOWNLOAD_ATTEMPT",
+  "CONTROL_LIMIT_EXCEEDED",
+  "LABEL_LIMIT_EXCEEDED",
+  "FORM_LIMIT_EXCEEDED",
+  "SECTION_LIMIT_EXCEEDED",
+  "CONTROL_METADATA_UNREADABLE",
+  "LABEL_METADATA_UNREADABLE",
+  "SECTION_METADATA_UNREADABLE",
+  "CONTROL_SET_MISMATCH",
+  "SHADOW_CONTROL_PRESENT",
+  "HIDDEN_INTERACTIVE_STEP",
+  "CUSTOM_WIDGET_DECLARED",
+  "EXPLICIT_UNSUPPORTED_SIGNAL",
+  "UNSUPPORTED_UNKNOWN",
+]);
+export type UnsupportedControlDiagnostic = z.infer<typeof UnsupportedControlDiagnosticSchema>;
+
 const applicationOperations: RunnerTargetOperation[] = ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"];
 
 function hasExactOperations(
@@ -335,6 +354,10 @@ export const FrozenRunnerBindingSchema = z
 
 export type FrozenRunnerBinding = z.infer<typeof FrozenRunnerBindingSchema>;
 
+export function runnerBindingDigest(input: FrozenRunnerBinding): string {
+  return sha256(canonical(FrozenRunnerBindingSchema.parse(input)));
+}
+
 export const RunnerAuditMetadataSchemas = {
   "runner.target.versioned": z
     .object({
@@ -407,6 +430,7 @@ export const RunnerAuditMetadataSchemas = {
     .object({
       runId: z.string().min(1),
       operation: z.literal("OPEN_AND_INSPECT_ONLY"),
+      visibleSectionCount: z.number().int().min(0).max(100),
       fieldCount: z.number().int().min(0).max(200),
       reviewRequiredCount: z.number().int().min(0).max(200),
       documentRequiredCount: z.number().int().min(0).max(200),
@@ -434,6 +458,7 @@ export const RunnerAuditMetadataSchemas = {
       diagnosticCategory: InspectionDiagnosticCategorySchema.nullable(),
       diagnosticStage: DomInspectionDiagnosticStageSchema.nullable(),
       destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable(),
+      unsupportedControlDiagnostic: UnsupportedControlDiagnosticSchema.nullable(),
     })
     .strict()
     .superRefine((value, context) => {
@@ -445,6 +470,16 @@ export const RunnerAuditMetadataSchemas = {
           code: "custom",
           path: ["destinationDiagnostic"],
           message: "DESTINATION_DIAGNOSTIC_STOP_MISMATCH",
+        });
+      }
+      if (
+        (value.reason === "UNSUPPORTED_CONTROL" && value.unsupportedControlDiagnostic === null) ||
+        (value.reason !== "UNSUPPORTED_CONTROL" && value.unsupportedControlDiagnostic !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["unsupportedControlDiagnostic"],
+          message: "UNSUPPORTED_DIAGNOSTIC_STOP_MISMATCH",
         });
       }
     }),
@@ -524,13 +559,17 @@ export const RunnerProtectionSignalSchema = z.enum([
   "UNSUPPORTED_CONTROL",
 ]);
 
-export interface TargetObservation {
-  targetUrl: string;
-  formVersion: string;
-  adapterVersion: string;
-  documentDigests: string[];
-  protectionSignals: z.infer<typeof RunnerProtectionSignalSchema>[];
-}
+export const TargetObservationSchema = z
+  .object({
+    targetUrl: z.url(),
+    formVersion: z.string().min(1).max(100),
+    adapterVersion: z.string().min(1).max(100),
+    documentDigests: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(20),
+    protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
+  })
+  .strict();
+
+export type TargetObservation = z.infer<typeof TargetObservationSchema>;
 
 export interface ApplicationTargetAdapter {
   readonly targetKind: "SYNTHETIC_LOCAL" | "REAL_TARGET";
@@ -559,6 +598,7 @@ export class InMemoryFinalConsentStore implements FinalConsentStore {
       packetDigest: binding.packetDigest,
       targetHost: new URL(binding.targetOrigin).hostname,
       formVersion: binding.formVersion,
+      bindingDigest: runnerBindingDigest(binding),
       expiresAt: new Date(this.now().getTime() + ttlMs).toISOString(),
       usedAt: null,
     };
@@ -577,7 +617,8 @@ export class InMemoryFinalConsentStore implements FinalConsentStore {
       !timingSafeEqual(supplied, expected) ||
       stored.packetDigest !== input.binding.packetDigest ||
       stored.targetHost !== new URL(input.binding.targetOrigin).hostname ||
-      stored.formVersion !== input.binding.formVersion
+      stored.formVersion !== input.binding.formVersion ||
+      stored.bindingDigest !== runnerBindingDigest(input.binding)
     )
       return false;
     stored.usedAt = input.now.toISOString();
@@ -619,8 +660,14 @@ export class TargetIndependentApplicationRunner {
   async open(): Promise<RunnerCheckpoint> {
     this.assertState("PREPARED");
     if (!this.bindingsCurrent()) return this.pause("PAGE_CHANGED");
-    const observation = await this.adapter.open(this.binding);
-    return this.acceptObservation(observation, "OPENED");
+    try {
+      return this.acceptObservation(
+        TargetObservationSchema.parse(await this.adapter.open(this.binding)),
+        "OPENED",
+      );
+    } catch {
+      return this.pause("PAGE_CHANGED");
+    }
   }
 
   async map(): Promise<RunnerCheckpoint> {
@@ -634,13 +681,27 @@ export class TargetIndependentApplicationRunner {
       ({ required, disclosureState }) => required && disclosureState !== "APPROVED",
     );
     if (disclosure) return this.pause("SENSITIVE_DISCLOSURE_REQUIRED");
-    return this.acceptObservation(await this.adapter.map(this.packet, this.binding), "MAPPED");
+    try {
+      return this.acceptObservation(
+        TargetObservationSchema.parse(await this.adapter.map(this.packet, this.binding)),
+        "MAPPED",
+      );
+    } catch {
+      return this.pause("PAGE_CHANGED");
+    }
   }
 
   async fill(): Promise<RunnerCheckpoint> {
     this.assertState("MAPPED");
     if (!this.bindingsCurrent()) return this.pause("PAGE_CHANGED");
-    return this.acceptObservation(await this.adapter.fill(this.packet, this.binding), "FILLED");
+    try {
+      return this.acceptObservation(
+        TargetObservationSchema.parse(await this.adapter.fill(this.packet, this.binding)),
+        "FILLED",
+      );
+    } catch {
+      return this.pause("PAGE_CHANGED");
+    }
   }
 
   readyForFinalReview(): RunnerCheckpoint {

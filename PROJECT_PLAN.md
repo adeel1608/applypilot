@@ -6738,3 +6738,73 @@ when all remaining work needs fresh owner authority or facts.
 9. Refresh main, create only a production-derived adapter-v6 version-1/null-predecessor DRAFT, keep
    source and target authority inactive, complete remaining offline audits, and return one compact
    morning checkpoint with the first exact owner action.
+
+## Implementation and offline audit checkpoint - 2026-09-14
+
+Status: `IMPLEMENTED / LOCAL RELEASE GATES PASS / PR PENDING`. Blueprint commit
+`260032fa9f998acbd791ed9aa2c1d4d3e11524c0` precedes all runtime edits. The adapter identity is now
+`lever-real-inspection-v6`; form and policy contracts remain unchanged. No source request, employer
+visit, upload, submission, authentication action, capability approval, authority broadening, or
+migration occurred. Lifetime real source/employer/upload/submission counts remain `9/6/0/0`; active
+source and approved target capabilities remain zero.
+
+Implemented inspection behavior:
+
+- readable native controls with unfamiliar types or semantics are retained as per-field
+  `UNSUPPORTED` entries rather than terminating an otherwise trustworthy inventory;
+- structural uncertainty still terminates with `UNSUPPORTED_CONTROL`, now paired strictly with one
+  fixed value-free cause for blocked writes, downloads, control/label/form/section limits, unreadable
+  metadata, control-set mismatch, shadow controls, hidden steps, declared custom widgets, explicit
+  signals, or unknown state;
+- successful observations and audits include bounded visible-section counts; stopped audits and the
+  existing JSON summary retain only the closed diagnostic enum;
+- the passive browser still performs one `goto`, two bounded reads, GET/HEAD-only routing, zero
+  navigation retries and zero browser writes, and does not retain values, HTML, arbitrary page text,
+  response bodies, URLs beyond the approved binding, exception text, cookies, storage, or headers;
+- v5 visit 6 remains historical `UNSUPPORTED_CONTROL` with no subtype. The expanded fictional matrix
+  reproduces compatible mechanisms only and does not claim the exact live cause.
+
+The target-independent application-engine audit found and closed two synthetic safety gaps without
+enabling `REAL_TARGET` application operations. Adapter observations are now strict bounded Zod
+objects, and interrupted or malformed open/map/fill stages pause after exactly one call. Final consent
+now carries a digest of the complete frozen run binding; the database store validates every persisted
+binding field without a schema change. `MAP_FOR_FILL`, `FILL`, document-digest-verified `UPLOAD`, and
+fresh one-use-consent `SUBMIT` are ready for synthetic controlled validation only. Ambiguous or lost
+submit outcomes remain terminal `OUTCOME_UNKNOWN` with no retry. Real map/fill/upload/submit remains
+deliberately disabled until a successful inspection, a suitable non-validation target, and separate
+owner-reviewed operation authority exist.
+
+Private readiness was audited locally without copying values into Git. The private profile validates
+and contains verified identity, contact, location, three education records, three employment records,
+and 48 skill records. It contains no project records and no explicit profile facts for citizenship,
+sponsorship, relocation, clearance, or a declared years-of-experience answer; its work-right hours
+basis is not temporally bounded. Those are one consolidated missing-facts set and must remain unknown
+until owner evidence exists. Four current-profile CV artifacts exist, but all are stale, unapproved,
+and tailored to a retail role; there is no explicitly owner-approved current robotics/mechatronics CV.
+No upload is authorized. Already-local normalized jobs contain no worthwhile Melbourne/Victoria/
+Australia technical role, so the technical shortlist result is `FRESH_SOURCE_FETCH_REQUIRED`; no
+fetch or application is authorized, and the Shield AI London validation role remains forbidden for
+submission.
+
+Validation completed before the final documentation checkpoint:
+
+- format check, ESLint and strict TypeScript: pass;
+- focused application-runner/database suite: pass (136 tests before the final additional persistence
+  regression; that regression is rerun below before commit);
+- full unit: 49 files / 556 tests pass;
+- integration: 3 files / 21 tests pass;
+- Playwright E2E: 43 tests pass, including the expanded unsupported-control, hostile-page, lifecycle,
+  target-identity, synthetic application, accessibility and no-JavaScript matrices;
+- local production build, showcase build and public-showcase boundary audit: pass;
+- privacy audit: pass; all-dependency and production-dependency audits: zero vulnerabilities;
+- database: schema 8, pending migrations 0, integrity pass, foreign-key issues 0;
+- a fresh ignored private backup and its non-destructive restore preview: pass;
+- migrations `0000`-`0008`: unchanged; `git diff --check` and `git fsck --strict`: pass (only
+  pre-existing unreachable objects reported by fsck).
+
+Remaining sequence is to rerun the exact final local gates after the added persistence regression,
+commit and push this one offline change set, open one PR, require exact-head CI green, self-review and
+merge under the owner's conditional offline authorization. After clean merged main, archive the used
+v5 private proposal and derive only a new v6 family version-1/null-predecessor DRAFT from the still-
+current private packet. Do not approve or execute it. The first parked live gate will be the exact
+owner approval string for that DRAFT; a separate future one-shot owner start remains mandatory.
