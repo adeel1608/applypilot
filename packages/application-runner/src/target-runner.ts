@@ -47,6 +47,16 @@ export const InspectionDiagnosticCategorySchema = z.enum([
 ]);
 export type InspectionDiagnosticCategory = z.infer<typeof InspectionDiagnosticCategorySchema>;
 
+export const DomInspectionDiagnosticStageSchema = z.enum([
+  "DOM_QUERY",
+  "DOM_ENUMERATION",
+  "DOM_CONTROL_READ",
+  "DOM_PAGE_METADATA",
+  "DOM_RESULT_SERIALIZATION",
+  "DOM_UNKNOWN",
+]);
+export type DomInspectionDiagnosticStage = z.infer<typeof DomInspectionDiagnosticStageSchema>;
+
 const applicationOperations: RunnerTargetOperation[] = ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"];
 
 function hasExactOperations(
@@ -412,6 +422,7 @@ export const RunnerAuditMetadataSchemas = {
         "TARGET_APPROVAL_REQUIRED",
       ]),
       diagnosticCategory: InspectionDiagnosticCategorySchema.nullable(),
+      diagnosticStage: DomInspectionDiagnosticStageSchema.nullable(),
     })
     .strict(),
 } as const;

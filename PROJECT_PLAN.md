@@ -1,9 +1,9 @@
 # ApplyPilot Project Plan
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
 Owner: `adeel1608`  
 Repository: `adeel1608/applypilot`  
-Working branch: `feat/real-target-inspection-runner`
+Working branch: `fix/lever-dom-snapshot-boundary`
 
 Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
 
@@ -6158,3 +6158,188 @@ upload, submission, or outbound candidate field occurred. The 30-minute expiry r
 it is security-compatible but operationally fragile for separate review/approval/start. A future
 authority-design review should consider a 90-120 minute window or a short execution lease; this PR
 does not broaden duration or authority.
+
+# Lever DOM snapshot boundary remediation - 2026-09-14
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
+`main`/`origin/main` at `d4fe7f2c554849e40afd99e55ddb5e8bf6596d9c` on
+`fix/lever-dom-snapshot-boundary`. Lifetime real source/employer/upload/submission actions are
+`9/3/0/0` and must not change. No source request, employer GET/HEAD, employer browser navigation,
+inspection run, form interaction, candidate value, upload, submission, or candidate outbound field
+is authorized.
+
+## Current state, objective, and evidence limits
+
+Historical visit #3 (`inspection_dad326c3-5309-4352-bba0-39272ca7fc3e`) passed deterministic
+capability identity, approved digest, frozen packet/version binding, exact destination, and the
+one-navigation gate. The target opened, navigation remained stable, and every zero-mutation counter
+remained zero. The run then failed closed at `PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`, persisted
+`BOUND -> OPENED -> STOPPED`, and terminated through same-family v2 `REVOKED`. Both historical
+adapter-v2 versions and all three inspection runs remain immutable; active approved target
+capabilities are zero.
+
+The exact historical exception and page value are intentionally unknowable because only the fixed
+value-free category was retained. Live page data must not be recovered, reconstructed, replayed, or
+inferred. This task may establish only a _compatible reproduced failure mechanism_ from fictional
+local pages. Its objective is to audit every current snapshot expression, reproduce the stable-URL
+failure class offline, replace unnecessary dependence on employer-controlled main-world JavaScript
+with the narrowest browser-owned passive-read boundary, preserve fail-closed/data-minimized/one-
+navigation/zero-write behavior, and add a fixed value-free diagnostic stage without a migration.
+Employer visit #4 is not authorized.
+
+## Expression-level audit and planned treatment
+
+| Expression or boundary                                          | Current guard                                                         | Failure class / contamination risk                                      | Synthetic reproduction | Selected treatment                                                                                  |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `document.querySelectorAll` and `document.querySelector`        | Some calls locally caught; initial control query is top-level         | B/C/D; page override or mutation can reject the entire evaluation       | A, B, L, N-Q           | Replace with Playwright-owned locator/handle enumeration; stage `DOM_QUERY`                         |
+| Page-world `Array.from`, NodeList iteration                     | Initial conversion top-level; later conversions inconsistently caught | B/C/D; poisoned iterator/constructor or mutation can abort              | G, H, M-P              | Avoid page-world collection/Array primitives; use bounded automation-side arrays; `DOM_ENUMERATION` |
+| Page-world array `.slice`, `.map`, `.every`                     | Top-level during primary mapping                                      | B/C/D; poisoned prototype or concurrent replacement can abort/fabricate | I, M-P                 | Automation-side native arrays plus two-pass bounded semantic-stability check                        |
+| String `.slice`, `.replace`, `.trim`, `.toLowerCase` and RegExp | Read helper catches readers, not all normalizer/prototype calls       | B/C; poisoned String/RegExp can abort the callback                      | J, W                   | Normalize and bound only in trusted Node context after primitive reads                              |
+| `tagName`, `id`, `isConnected`, custom-element properties       | Individual reads mostly caught                                        | C/D; hostile getters, detach, replacement                               | E, K, S, P             | Avoid page properties; use tag-specific browser-owned selectors and stable handles                  |
+| `getAttribute`, `hasAttribute`, label collections/text          | Individual calls caught, collection conversion partly exposed         | C/D; prototype overrides, throwing getters, odd values                  | C, D, G, K, L          | Playwright handle/locator metadata reads in its utility boundary, bounded in Node                   |
+| `getComputedStyle` and style properties                         | Per-control callback catches the call                                 | C/D; patched function/getters; dynamic style                            | F, M                   | Use Playwright passive visibility API; failures become fixed control-read stage                     |
+| Shadow-root scanning                                            | Outer local catch, but page-world query/iteration remains exposed     | C/D; closed/open shadow and large DOM                                   | R, T                   | Browser-owned bounded structural query; interactive shadow uncertainty fails closed                 |
+| `document.forms`, structural markers, popup/hidden-step queries | Local catches, but page-world primitives remain trusted               | C/D                                                                     | B, Q, R                | Browser-owned locator counts/attributes; retain caps and protection policy                          |
+| Return-object construction                                      | No dedicated stage                                                    | B/C/F; poisoned access during construction                              | J, M, AA               | Construct only from validated primitives in Node                                                    |
+| Playwright result serialization                                 | Outer catch only                                                      | E/F; unserializable return or destroyed context                         | X-AA                   | Remove the large returned object; classify fixed stage/category per passive boundary                |
+| Frame/page lifecycle                                            | Event counters around evaluation                                      | E; close/crash/reload/context destruction                               | X-Z                    | Retain lifecycle listeners; instability remains `NAVIGATION_EXCEPTION`                              |
+
+The audit classes are A locally guarded, B top-level unguarded, C page-world prototype/function
+contamination, D DOM mutation, E execution-context lifecycle, and F serialization/result transfer.
+Tests preserve these labels and do not claim a synthetic case proves the historical cause.
+
+## Implementation outcome (offline, pre-PR)
+
+The selected Strategy B remediation is implemented as adapter `lever-real-inspection-v3`. Production
+now obtains minimal structural metadata through Playwright locator/element-handle operations, builds
+the snapshot in Node, and requires two canonically identical bounded passes after the document load
+state. The exact target, main frame, route restrictions, single-`goto` limit, zero-write counters,
+200-control/400-label/20-form caps, and fail-closed shadow/custom/overflow behavior remain enforced.
+The v2 main-world implementation is retained only behind a loopback-enforcing regression factory so
+the compatible failure class can remain proven without exposing it as the production execution path.
+
+Fixed optional DOM stages now use the existing JSON audit and inspection-summary columns, so schema 8
+and migrations `0000`-`0008` are unchanged. Unit/database tests prove that only the fixed enum is
+retained. The expanded fictional browser suite covers all requested main-world primitive poisoning,
+unusual returns, prototype mutation, DOM/control/form replacement and detachment, interactive shadow
+DOM, control/label bounds, Unicode truncation, lifecycle loss, result serialization, service-worker
+blocking, CSP/resource aborts, JavaScript-disabled/server-rendered markup, semantic classification,
+and exact zero-mutation metrics.
+
+Verified so far:
+
+- `npm run format`: PASS.
+- `npm run lint`: PASS.
+- `npm run typecheck`: PASS.
+- focused runner/database Vitest selection: PASS, 84/84.
+- `npx playwright test tests/e2e/target-inspection.spec.ts`: PASS, 11/11.
+- v2 compatible stable-URL `DOM_INSPECTION_EXCEPTION` reproduction: PASS on fictional loopback only.
+- employer/source requests, employer browser visits, and inspection runs during this task: 0.
+- candidate values, clicks, typing, form writes, file-chooser actions, uploads, submissions, and
+  candidate outbound during this task: 0 / 0 / 0 / 0 / 0 / 0 / 0 / NONE.
+
+The repository-wide release matrix, database/backup checks, immutable-migration verification, PR CI,
+merge, clean-main refresh, private binding validation, and offline v3-family DRAFT preparation remain
+the next ordered steps. No live authority exists or is introduced by this implementation.
+
+## Strategy comparison and selected architecture
+
+- Strategy A, current single main-world `page.evaluate`, is compact but trusts employer-controlled
+  JavaScript primitives and collapses an unguarded primitive/transfer failure into one category.
+- Strategy B, Playwright-owned passive reads, uses selector/element-handle metadata reads from its
+  automation utility boundary. It avoids a user callback in the employer main world, never reads
+  control values, and permits fixed-stage isolation. Collections and strings stay strictly capped;
+  two bounded semantic passes must agree before accepting a snapshot.
+- Strategy C, CDP/isolated browser snapshots, is Chromium-specific, returns substantially broader
+  DOM/text data before minimization, couples the runner to protocol internals, and adds maintenance
+  and privacy surface. It will be assessed but is not selected unless Strategy B proves inadequate.
+
+Select Strategy B provisionally. Implement an adapter-v3 passive collector behind the existing
+browser contract. One exact `goto` is followed by bounded browser-owned reads; there is no reload,
+retry, fallback fetch, second browser, click, focus, fill, scroll, dispatch, upload, or submit.
+Collect at most 200 controls and 20 forms, retain only tag/type/name/id/autocomplete/required/
+visibility/minimum-label metadata, never read `value`, and construct hashes/classification in Node.
+Two metadata passes must be canonically identical while URL/main-frame/page state stay stable. Any
+semantic mutation, unreadable primitive, opaque interactive shadow structure, or lifecycle change
+fails closed without arbitrary sleeps.
+
+## Diagnostics, versioning, files, and data flow
+
+Add a strict fixed `DomInspectionDiagnosticStage` enum: `DOM_QUERY`, `DOM_ENUMERATION`,
+`DOM_CONTROL_READ`, `DOM_PAGE_METADATA`, `DOM_RESULT_SERIALIZATION`, and `DOM_UNKNOWN`.
+`DOM_INSPECTION_EXCEPTION` remains the internal category and `PAGE_CHANGED` the public stop. The
+optional stage travels only through existing result/audit JSON and never contains error messages,
+stacks, selectors, page text, HTML, values, response data, headers, cookies, storage, or new URLs.
+No migration is expected.
+
+Runtime extraction semantics materially change, so adapter version becomes
+`lever-real-inspection-v3`; form stays `lever-application-inspection-v1` and policy stays
+`real-target-inspection-v1`. Adapter version is identity-bound, so future v3 authority must use a new
+derived family at version 1/null predecessor. The closed v2 family must not be reused or edited.
+
+Expected tracked changes are this plan, `docs/APPLICATION_RUNNER.md`, application-runner adapter/
+diagnostic code and tests, database audit tests if required, and fictional Playwright fixtures/specs.
+No migration, private report, live payload, candidate document, or authority file is planned. Data
+flow becomes `single exact goto -> bounded metadata pass A -> lifecycle/destination gate -> pass B ->
+canonical equality gate -> Zod snapshot -> existing classifier -> existing terminal policy`.
+
+## Testing, security, rollback, and acceptance
+
+Fictional tests cover A-AB: poisoned document/Element/HTMLElement/NodeList/Array/String/style/label
+primitives; unusual objects; prototype/DOM/control/form mutations; shadow/custom controls; large
+DOM/control/label/attribute inputs; Unicode/surrogate edges; close/reload/context destruction;
+serialization failure; and stable evaluation rejection. They also cover realistic text/email/tel/
+select/radio/checkbox/textarea/file/submit/optional/required/dynamic/hidden/consent/eligibility
+structures and every existing semantic classification. Route tests prove cross-origin resource aborts
+do not broaden authority; service-worker blocking, CSP, script errors, JS assumptions, no extensions,
+and headless mode remain tested/documented without weakening controls.
+
+Acceptance requires a deterministic pre-remediation compatible `DOM_INSPECTION_EXCEPTION`, hostile
+main-world primitives unable to crash or fabricate v3, bounded schema-valid output or fixed-stage
+fail-closed result, classifier parity, one navigation/no retries/zero mutations, no authority
+broadening, schema 8/pending 0/integrity PASS/FKs 0, immutable `0000`-`0008`, full local and exact-head
+CI green, privacy/dependency audits green, and normal owner-preapproved merge. Rollback is a normal
+revert of tracked code/docs; historical database/capability/run evidence is never rewritten.
+
+## Exact implementation and release sequence
+
+1. Commit this blueprint before changing application code.
+2. Add baseline hostile-main-world tests proving compatible stable-URL v2 failures and documenting
+   cases that instead produce lifecycle or schema diagnostics.
+3. Implement fixed stages and the Playwright-owned bounded two-pass collector; bump only adapter to
+   v3 and preserve form/policy/authority contracts.
+4. Add the A-AB hostile/mutation/lifecycle/serialization/network/fixture/classification matrix and
+   focused runner/database/identity/frozen-binding negative-authority tests.
+5. Update docs and this section with audit, strategy results, exact tests, limitations, and rollback.
+6. Run format, lint, typecheck, focused/unit/integration/E2E, both builds/showcase audit, privacy,
+   dependency audits, preflight/release, DB/backup-restore/migration checks, diff-check, and fsck.
+7. Push, open PR `fix: harden Lever DOM snapshot boundary`, require exact-head push/PR CI green,
+   self-review, and merge normally only if every owner-preapproved condition remains true.
+8. Refresh clean main and revalidate packet/job/profile/evaluation. If current, use production
+   deterministic preparation offline to create only a new v3 version-1/null-predecessor DRAFT with
+   fresh 24-hour/30-minute windows; never approve or execute. If stale, return
+   `PACKET_REFRESH_REQUIRED` without authority creation.
+
+## Completed local release validation
+
+Implementation head `cdd212cea88f95f2c8270eb252949fdc4f2b0f20` passed the complete local
+`npm run release:check`: doctor, schema/preflight, format check, lint, strict typecheck, 527/527 unit
+tests (49 files), 21/21 integration tests (3 files), local and showcase production builds, public
+showcase audit, 42/42 E2E tests, privacy audit, full dependency audit, production dependency audit,
+and release summary. The focused inspection/browser file passed 11/11 independently and the focused
+runner/identity/database selection passed 84/84. Privacy checked 316 tracked files, 970 history paths,
+968 history blobs, 1,531 build/test artifacts, and 11 private canaries. Both dependency audits found
+zero vulnerabilities.
+
+The real private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
+foreign-key issues. Ignored backup `backup-2026-09-14T08-27-01.561Z-e82e45b8` is schema 8 with
+integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
+starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
+`git fsck --strict` passed; fsck reported only harmless unreachable objects. The committed worktree
+was clean throughout validation. No source request, employer request/navigation, inspection run,
+candidate value, click, typing, form mutation, file chooser, upload, submission, or candidate outbound
+occurred. Lifetime real actions therefore remain `9/3/0/0`.
+
+Because this validation result is now recorded in the plan, rerun the complete release command on the
+final documentation-inclusive commit before push. Then require exact-head push and PR Actions green,
+self-review the complete diff, and merge only under the owner's stated pre-approval conditions.

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 const fixtureCases = [
   "normal",
+  "full-contract",
   "unknown-required",
   "documents",
   "eligibility",
@@ -107,6 +108,22 @@ export default async function SyntheticInspectionPage({
             Email
             <input name="email" type="email" autoComplete="email" required />
           </label>
+          {fixture === "full-contract" ? (
+            <>
+              <label>
+                Phone
+                <input name="phone" type="tel" autoComplete="tel" />
+              </label>
+              <label>
+                Resume
+                <input name="resume" type="file" required />
+              </label>
+              <label>
+                Cover letter
+                <input name="coverLetter" type="file" />
+              </label>
+            </>
+          ) : null}
           {fixture === "unknown-required" ? (
             <label>
               Fictional unknown required field
@@ -125,7 +142,7 @@ export default async function SyntheticInspectionPage({
               <input name="coverLetter" type="file" />
             </label>
           ) : null}
-          {fixture === "eligibility" ? (
+          {["eligibility", "full-contract"].includes(fixture) ? (
             <fieldset>
               <legend>Fictional eligibility questions</legend>
               <label>
@@ -160,6 +177,45 @@ export default async function SyntheticInspectionPage({
                 Security clearance
                 <input name="securityClearance" required />
               </label>
+              {fixture === "full-contract" ? (
+                <>
+                  <label>
+                    Current location
+                    <input name="location" />
+                  </label>
+                  <fieldset>
+                    <legend>Relocation</legend>
+                    <label>
+                      <input name="relocation" type="radio" /> Fictional yes
+                    </label>
+                    <label>
+                      <input name="relocation" type="radio" /> Fictional no
+                    </label>
+                  </fieldset>
+                  <label>
+                    Education
+                    <select name="education" defaultValue="">
+                      <option value="">Select</option>
+                      <option value="fictional-degree">Fictional degree</option>
+                    </select>
+                  </label>
+                  <label>
+                    Years of experience
+                    <input name="yearsExperience" type="number" />
+                  </label>
+                  <label>
+                    Additional information
+                    <textarea name="additionalInformation" />
+                  </label>
+                  <label>
+                    <input name="consent" type="checkbox" required /> Consent to fictional terms
+                  </label>
+                  <input name="internalMarker" type="hidden" />
+                  <div role="group" data-fictional-custom-component>
+                    Fictional inert custom component
+                  </div>
+                </>
+              ) : null}
             </fieldset>
           ) : null}
           {fixture === "unsupported" ? (
@@ -183,6 +239,7 @@ export default async function SyntheticInspectionPage({
                 <input key={index} name={`boundedControl${index}`} />
               ))
             : null}
+          {fixture === "shadow-dom" ? <div id="fictional-shadow-host" /> : null}
           {fixture === "no-submit" ? null : (
             <button type="submit" hidden={fixture === "hidden-submit"}>
               Submit fictional application
@@ -195,24 +252,21 @@ export default async function SyntheticInspectionPage({
           <input name="secondaryOptionalField" />
         </form>
       ) : null}
-      {fixture === "dynamic-insert" ? (
+      {["dynamic-insert", "full-contract"].includes(fixture) ? (
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'document.addEventListener("DOMContentLoaded",()=>{const input=document.createElement("input");input.name="dynamicallyInsertedBeforeInspection";document.querySelector("form")?.append(input);},{once:true});',
+              'document.addEventListener("DOMContentLoaded",()=>{const input=document.createElement("input");input.name="location";input.setAttribute("aria-label","Fictional dynamically mounted location");document.querySelector("form")?.append(input);},{once:true});',
           }}
         />
       ) : null}
       {fixture === "shadow-dom" ? (
-        <>
-          <div id="fictional-shadow-host" />
-          <script
-            dangerouslySetInnerHTML={{
-              __html:
-                'document.addEventListener("DOMContentLoaded",()=>{const host=document.getElementById("fictional-shadow-host");const root=host?.attachShadow({mode:"open"});const input=document.createElement("input");input.name="shadowInteractiveControl";root?.append(input);},{once:true});',
-            }}
-          />
-        </>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'document.addEventListener("DOMContentLoaded",()=>{const host=document.getElementById("fictional-shadow-host");const root=host?.attachShadow({mode:"open"});const input=document.createElement("input");input.name="shadowInteractiveControl";root?.append(input);},{once:true});',
+          }}
+        />
       ) : null}
     </main>
   );
