@@ -6478,3 +6478,88 @@ Before push, rerun the complete release command on the clean documentation-inclu
 push this same branch, require exact-head push and PR checks green, self-review the complete diff,
 and merge only under the owner's standing fully offline authorization. After merge, prepare only the
 fresh adapter-v4 DRAFT and stop before approval or execution.
+
+# Lever popup-attempt semantics after visit 5 - 2026-09-14
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
+merged `main`/`origin/main` at `4f71ac271e218bbe9fca2bf1f096232c02c99c2d` on
+`fix/lever-popup-declaration-semantics`. The owner approved and separately started adapter-v4
+capability `runner_b164d5f4219112b1833c8a6a` version 1, approved digest
+`b0e2086943750a6b3c1b891577351dd1279be175557e8dda8cb2030b28561327`, for exactly one
+`OPEN_AND_INSPECT_ONLY` attempt. Visit 5 run
+`inspection_46c7e0db-7e85-4c65-bf08-eec17315320e` made one main navigation with no retry and stopped
+before inventory on `DESTINATION_CHANGED` / `POPUP_ATTEMPT`. Candidate values, clicks, typing, form
+changes, file chooser actions, uploads, submissions, and candidate outbound were all zero/NONE. The
+family is terminal at immutable version 2 `REVOKED`, digest
+`31b626545f43b1fd7a07606fd1b2fcd65f701f86f6964c8ffabad7584c660658`; active approved target
+authority is zero. Lifetime real actions are now source/employer visit/upload/submission `9/5/0/0`.
+Visit 6 is not authorized.
+
+## Root cause, evidence limit, and objective
+
+Offline code inspection found a deterministic semantic conflation in adapter v4. The Playwright
+`popup` event handler correctly marks and closes a popup that actually opens, but the passive DOM pass
+also searches for any inert anchor or form with `target="_blank"`, names that fact `popupDeclared`, and
+ORs it into `popupAttempted`. Merely declaring a possible new-tab destination is not an attempted
+popup when the runner performs no click or submission. Common employer pages may contain such inert
+links, so the current code can stop without any popup event. The durable fixed diagnostic deliberately
+does not distinguish these two inputs; visit 5 therefore cannot be relabelled as a proven browser
+popup, and no employer content or additional request may be used to infer which input was present.
+
+The narrow objective is to make `POPUP_ATTEMPT` mean an observed Playwright popup event only. An inert
+`target="_blank"` declaration remains unread and unactivated and must not stop otherwise valid passive
+inspection. Any actual popup remains closed immediately and produces the existing fail-closed
+`DESTINATION_CHANGED` / `POPUP_ATTEMPT` result. Preserve exact main destination checks, one main
+`goto`, zero retries, request blocking, no clicks, no writes, and all candidate-data boundaries.
+
+## Architecture, files, data flow, and dependencies
+
+Remove `popupDeclared` from the production `PassiveDomPass`, its DOM metadata query, canonical
+two-pass snapshot, and final popup calculation. Keep the runtime page `popup` listener and its fixed
+diagnostic unchanged. Data flow becomes `observed Playwright popup event -> close child page ->
+POPUP_ATTEMPT`; an inert declaration has no security effect because no runner operation activates it.
+Do not change the loopback-only legacy v2 regression reader except where tests require explicit
+historical compatibility.
+
+Expected tracked changes are this plan; the Lever inspection adapter and unit tests; fictional local
+inspection fixtures/E2E; and readiness/runner documentation. No external dependency or database
+migration is required. Migrations `0000`-`0008` remain immutable. Because the accepted runtime
+semantics change, bump adapter identity from `lever-real-inspection-v4` to
+`lever-real-inspection-v5`; keep form `lever-application-inspection-v1`, policy
+`real-target-inspection-v1`, identity derivation, operation, target, and all authority fields
+unchanged. Any future v5 proposal must be a new deterministic version-1/null-predecessor family.
+
+## Security, tests, rollback, and acceptance
+
+Primary risks are missing a real popup, creating an implicit popup allowance, weakening navigation
+blocking, allowing a second main navigation, or accidentally reusing v4 authority. Controls are the
+existing pre-navigation popup listener and immediate close, a synthetic actual-popup event fixture,
+an inert-declaration fixture, navigation/request counters, zero-mutation assertions, strict adapter
+identity, and complete privacy/security gates. No popup is followed or inspected.
+
+Synthetic acceptance requires: inert `target="_blank"` anchor and form declarations complete passive
+inventory; a scripted same-origin fictional popup produces the actual Playwright event, is closed,
+and stops with `POPUP_ATTEMPT`; no candidate value, click, type, form mutation, upload, submission, or
+non-read request occurs; the main page executes exactly one `goto`; existing destination, lifecycle,
+hostile-DOM, control, and protection matrices remain fail-closed. Run format, lint, strict typecheck,
+all unit/integration/E2E, local/showcase builds and audit, privacy and dependency audits, preflight,
+release check, schema/pending/integrity/FKs, ignored backup/restore preview, migration immutability,
+`git diff --check`, and `git fsck --strict`.
+
+Acceptance also requires a normal offline PR with exact-head push/PR CI green and self-review before
+the owner's standing pre-authorized merge. Rollback is a normal revert of tracked code/docs; immutable
+visits 1-5, capability versions, database evidence, and private reports are never rewritten. After
+merge, refresh clean main, archive the used v4 proposal, revalidate the current packet, prepare only a
+new adapter-v5 DRAFT offline, and stop at its fresh approval gate. Never make visit 6 automatically.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before changing application code.
+2. Add synthetic inert-declaration and actual-popup-event regressions with no-retry/zero-write checks.
+3. Remove declaration-to-attempt conflation from the production reader and bump only adapter to v5.
+4. Update README, runner/enablement docs, and this plan with exact results and limitations.
+5. Run focused and complete local gates plus backup/migration/Git-integrity checks.
+6. Push one PR `fix: distinguish popup attempts from declarations`, require exact-head CI, self-review,
+   and merge only if the offline safety conditions remain satisfied.
+7. Refresh main, archive the v4 proposal, and prepare only the fresh v5-family DRAFT. Stop before
+   approval or execution with the exact mandatory capability-approval line.
