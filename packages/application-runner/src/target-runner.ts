@@ -57,6 +57,16 @@ export const DomInspectionDiagnosticStageSchema = z.enum([
 ]);
 export type DomInspectionDiagnosticStage = z.infer<typeof DomInspectionDiagnosticStageSchema>;
 
+export const DestinationChangeDiagnosticSchema = z.enum([
+  "MAIN_NAVIGATION_OUT_OF_SCOPE",
+  "FINAL_ORIGIN_CHANGED",
+  "FINAL_PATH_CHANGED",
+  "FINAL_QUERY_OR_FRAGMENT_CHANGED",
+  "POPUP_ATTEMPT",
+  "DESTINATION_STATE_UNKNOWN",
+]);
+export type DestinationChangeDiagnostic = z.infer<typeof DestinationChangeDiagnosticSchema>;
+
 const applicationOperations: RunnerTargetOperation[] = ["MAP_FOR_FILL", "FILL", "UPLOAD", "SUBMIT"];
 
 function hasExactOperations(
@@ -423,8 +433,21 @@ export const RunnerAuditMetadataSchemas = {
       ]),
       diagnosticCategory: InspectionDiagnosticCategorySchema.nullable(),
       diagnosticStage: DomInspectionDiagnosticStageSchema.nullable(),
+      destinationDiagnostic: DestinationChangeDiagnosticSchema.nullable(),
     })
-    .strict(),
+    .strict()
+    .superRefine((value, context) => {
+      if (
+        (value.reason === "DESTINATION_CHANGED" && value.destinationDiagnostic === null) ||
+        (value.reason !== "DESTINATION_CHANGED" && value.destinationDiagnostic !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["destinationDiagnostic"],
+          message: "DESTINATION_DIAGNOSTIC_STOP_MISMATCH",
+        });
+      }
+    }),
 } as const;
 
 export type RunnerAuditEventType = keyof typeof RunnerAuditMetadataSchemas;

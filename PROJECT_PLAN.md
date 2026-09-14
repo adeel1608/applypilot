@@ -6431,3 +6431,50 @@ capability, database, and private evidence are never rewritten.
 7. Refresh clean main, revalidate the current technical packet, archive the used v3 proposal, and use
    production preparation offline to create only a new adapter-v4 family DRAFT. Do not approve or
    execute it. Stop at the mandatory fresh capability-approval gate.
+
+## Implementation and local validation completed
+
+The offline implementation is complete. `DestinationChangeDiagnostic` is a closed, value-free enum
+covering blocked out-of-scope main navigation, final-origin change, final-path change, final
+query/fragment variation, popup attempt, and unknown destination state. Strict snapshot, observation,
+audit, and repository boundaries propagate it only with `DESTINATION_CHANGED`; mismatched,
+value-bearing, extra, and unsupported data fails schema validation. The production Playwright reader
+sets the cause at route, exact-final-URL, load, popup, and bounded-pass lifecycle boundaries while
+retaining the existing one-`goto`, no-retry, zero-write behavior. It never records the observed URL.
+Adapter identity is now `lever-real-inspection-v4`; form and policy remain unchanged. This is an
+identity change only: no authority, operation, origin, path, retry, redirect, persistence-table, or
+network behavior was broadened, and no migration was added.
+
+Tracked implementation changes are limited to the application-runner contracts/adapter/runner and
+tests, the existing database JSON summary and tests, fictional Playwright assertions, and accurate
+README/runner/enablement documentation. Unit tests cover every fixed cause, unknown fallback,
+blocked main navigation, one navigation, non-destination clearing/rejection, strict audit pairing,
+value-bearing input rejection, and persistence of only the fixed enum. The existing fictional E2E
+matrix now verifies the final-path and popup causes, and navigation instability distinguishes an
+exact-destination change from same-destination reload/close failures. Historical visit 4 remains only
+`DESTINATION_CHANGED`; it was not relabelled with an unobserved cause.
+
+The focused strict typecheck and runner/database selection passed 57/57 tests. The focused browser
+regressions passed, including the 2/2 destination/lifecycle subset. The complete
+`npm.cmd run release:check` passed doctor; schema/preflight; formatting; lint; strict typecheck;
+536/536 unit tests in 49 files; 21/21 integration tests in 3 files; local and showcase production
+builds; public showcase audit; 42/42 E2E tests; privacy audit; full and production dependency audits;
+and release summary. Privacy checked 316 tracked files, 972 history paths, 970 history blobs, 1,544
+build/test artifacts, and 11 private canaries; both dependency audits found zero vulnerabilities.
+The first release attempt stopped at formatting after E2E-generated fixture files required Prettier;
+running Prettier produced no tracked semantic diff, and the complete rerun passed.
+
+The private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
+foreign-key issues. Ignored backup `backup-2026-09-14T09-27-24.419Z-5efc3049` is schema 8 with
+integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
+starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
+`git fsck --strict` passed; fsck reported only harmless dangling objects. No request or browser action
+occurred during remediation or validation. Lifetime real actions remain source/employer visit/upload/
+submission `9/4/0/0`; active source and target capabilities are both zero. Source-enabled Personal
+Beta remains ready; Personal Live V1 remains not ready pending a successfully approved real-target
+validation.
+
+Before push, rerun the complete release command on the clean documentation-inclusive commit. Then
+push this same branch, require exact-head push and PR checks green, self-review the complete diff,
+and merge only under the owner's standing fully offline authorization. After merge, prepare only the
+fresh adapter-v4 DRAFT and stop before approval or execution.

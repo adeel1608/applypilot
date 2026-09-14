@@ -114,7 +114,7 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
   ).toBe(true);
 });
 
-test("v3 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
+test("v4 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
   const { capability, binding } = inspection("full-contract");
   const result = await new TargetInspectionRunner(
     capability,
@@ -199,6 +199,12 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     ).openAndInspect();
     expect(result.state, caseName).toBe(expectedState);
     if (result.state === "STOPPED") expect(result.stopReason, caseName).toBe(expectedReason);
+    if (result.state === "STOPPED" && caseName === "changed-destination") {
+      expect(result.destinationDiagnostic).toBe("FINAL_PATH_CHANGED");
+    }
+    if (result.state === "STOPPED" && caseName === "popup") {
+      expect(result.destinationDiagnostic).toBe("POPUP_ATTEMPT");
+    }
     if (result.state === "COMPLETED") {
       expect(result.observation.metrics, caseName).toMatchObject({
         browserWriteEvents: 0,
@@ -232,7 +238,7 @@ test("bounds fictional attributes and handles labels absent and Unicode safely",
   }
 });
 
-test("v3 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
+test("v4 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
   test.slow();
   const hostileCases = [
     "document-query-all",
@@ -417,7 +423,7 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
   await context.close();
 });
 
-test("v3 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
+test("v4 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
   browser,
 }) => {
   for (const [caseName, javaScriptEnabled] of [
@@ -519,10 +525,13 @@ test("classifies synthetic navigation, reload, close, and context loss without a
       () => undefined,
       () => now,
     ).openAndInspect();
+    const changedDestination =
+      caseName === "client-navigation" || caseName === "execution-context-destroyed";
     expect(result, caseName).toMatchObject({
       state: "STOPPED",
-      stopReason: "PAGE_CHANGED",
-      diagnosticCategory: "NAVIGATION_EXCEPTION",
+      stopReason: changedDestination ? "DESTINATION_CHANGED" : "PAGE_CHANGED",
+      diagnosticCategory: changedDestination ? null : "NAVIGATION_EXCEPTION",
+      destinationDiagnostic: changedDestination ? "FINAL_QUERY_OR_FRAGMENT_CHANGED" : null,
     });
     expect(injected, caseName).toBe(true);
     expect(productionGotoCount, caseName).toBe(1);
@@ -606,7 +615,7 @@ test("fails closed when the passive control or form structure mutates between bo
   }
 });
 
-test("persists only fixed value-free v3 DOM diagnostic stages", async ({ browser }) => {
+test("persists only fixed value-free v4 DOM diagnostic stages", async ({ browser }) => {
   for (const stage of ["DOM_QUERY", "DOM_CONTROL_READ", "DOM_PAGE_METADATA"] as const) {
     const context = await browser.newContext();
     const page = await context.newPage();
