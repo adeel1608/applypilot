@@ -6608,3 +6608,133 @@ release command at that exact clean commit. Then require exact-head push and PR 
 self-review the complete diff, and merge only under the owner's standing fully offline authorization.
 After merge, create only the fresh adapter-v5 DRAFT through production offline preparation and stop
 before approval or execution.
+
+# Lever unsupported-control inventory and overnight readiness - 2026-09-14
+
+Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
+merged `main`/`origin/main` at `1da9ddf368651bd1b9f768846ad457d61e266489` on
+`fix/lever-unsupported-control-inventory`. Owner-approved adapter-v5 visit 6 run
+`inspection_52a3c739-dcb0-46a8-9886-13e476485bf8` made exactly one employer navigation with zero
+retries and stopped as `UNSUPPORTED_CONTROL` before retaining an inventory. Durable evidence contains
+no unsupported-control subtype; the exact live trigger therefore remains unknown. Candidate values,
+clicks, writes, form changes, uploads, submissions, and candidate outbound were zero/NONE. The v5
+family is terminal at immutable version 2 `REVOKED`, digest
+`34b11ee5365a08fdbe439f6945218a0a2f528b20cfcf788f334816c2bff905d3`; active source and target
+authority are both zero. Lifetime real actions are source/employer visit/upload/submission `9/6/0/0`.
+No seventh visit or other network action is authorized in this work.
+
+## Diagnosis, objective, and evidence boundary
+
+Adapter v5 has two independent routes to `UNSUPPORTED_CONTROL`. The browser-level route combines a
+blocked write request, observed download, control/label/form overflow, failed label/control metadata
+read, control-set mismatch, shadow control, explicit hidden-step marker, explicit unsupported marker,
+or explicit page signal into one boolean/signal. The adapter-level route then stops the entire
+inspection whenever any field maps to control type `CUSTOM`. That includes safely observed ordinary
+native controls such as a non-submit button or an unfamiliar input type, as well as unknown semantics.
+The runner discards the complete observation whenever either route emits the signal. This makes the
+historical live result compatible with multiple mechanisms but does not prove which occurred.
+
+The primary objective is to preserve a complete, bounded, read-only structural inventory when an
+individual field is safely observable but unsupported. Such a field remains explicitly
+`inspectionStatus=UNSUPPORTED`; required or otherwise material unresolved fields remain blockers for
+mapping/filling and are never answered. Whole-inspection `UNSUPPORTED_CONTROL` remains mandatory for
+page-level interaction, protection/safety events, and structural uncertainty that prevents a
+trustworthy inventory. Add a fixed, value-free unsupported-control diagnostic so any future terminal
+stop distinguishes those classes without retaining live labels, HTML, values, URLs beyond the bound
+target, exceptions, cookies, storage, headers, or response bodies.
+
+## Architecture, data flow, files, and versioning
+
+Add a closed `UnsupportedControlDiagnostic` contract with deterministic causes for blocked write,
+download, control/label/form/section bounds, unreadable control or label metadata, unstable control
+scope, shadow controls, hidden interactive steps, declared custom widgets, explicit unsupported
+signals, and unknown unsupported state. Propagate it only when the public stop is
+`UNSUPPORTED_CONTROL`, through strict snapshot and observation schemas, runner result/audit metadata,
+and the existing JSON classification summary. Incorrect pairings and extra/value-bearing fields fail
+validation. No database column or migration is required.
+
+Separate raw-control read integrity from final control support. A failed primitive read or declared
+custom widget remains a structural terminal condition with a fixed cause. A completely readable
+native control whose type or semantic is not supported becomes an inventory field with
+`inspectionStatus=UNSUPPORTED` and does not by itself stop inspection. Hidden native controls remain
+`NOT_APPLICABLE`; document, eligibility/review, consent, radio, checkbox, select, textarea, and final
+submit classifications remain explicit. Add bounded visible-section count to the passive two-pass
+snapshot and final observation so successful inspection records form structure as well as fields.
+Any inconsistent two-pass result still fails closed as DOM enumeration change.
+
+The changed runtime semantics require adapter identity `lever-real-inspection-v6`. Keep form
+`lever-application-inspection-v1`, policy `real-target-inspection-v1`, deterministic identity logic,
+exact origin/path, one `goto`, GET/HEAD-only routing, zero retries, and zero mutations unchanged.
+After merge, production offline preparation must create a new v6 deterministic family at version 1
+with null predecessor. Never extend or reactivate v5.
+
+Expected tracked files are `target-runner.ts`, `inspection-runner.ts` and their tests; the Lever
+inspection adapter and its tests; runner database persistence/tests using existing JSON; fictional
+inspection fixtures/E2E; README and runner/enablement documentation; and this plan. Candidate and
+local-role audit outputs remain ignored/private or are summarized only as non-sensitive readiness
+metadata. Migrations `0000`-`0008` remain immutable.
+
+## Synthetic matrix, application-engine audit, and independent offline tracks
+
+Fictional tests cover every terminal cause plus readable non-submit buttons, unknown native input
+types, unknown optional and required fields, radio groups, checkboxes, files, consent, hidden controls,
+combobox/custom markers, dynamically mounted controls, shadow controls, hidden steps, blocked writes,
+downloads, blocked cross-origin passive assets, count/section bounds, duplicate controls, malformed
+metadata, and stable zero-write navigation. Compatible synthetic mechanisms must be described as such;
+none may be claimed as visit 6's exact cause.
+
+Independently audit the target-independent application engine for `MAP_FOR_FILL`, `FILL`, `UPLOAD`,
+and `SUBMIT`. The current schema deliberately confines REAL_TARGET capability to inspection-only,
+while the synthetic target-independent runner already binds current packet/job/profile/evaluation,
+document/answer/disclosure digests, target/form/adapter, staged map/fill, one-use final consent,
+exactly one submit attempt, and terminal `OUTCOME_UNKNOWN`. Do not weaken the real-target restriction
+or build a target-specific fill adapter before a real form inventory exists. Close any target-
+independent synthetic safety gaps found, but park real execution authority behind later separate
+reviewed operation capabilities and a suitable non-validation target.
+
+Audit current private candidate evidence and documents without copying values into Git. Produce one
+consolidated missing-facts/current-document decision for the owner, never inventing work rights,
+sponsorship, citizenship, clearance, experience, or answers. Rank at most three relevant roles from
+already-local normalized job data, prioritizing Melbourne/Victoria/Australia and evidence-backed fit;
+if no worthwhile role exists, record `FRESH_SOURCE_FETCH_REQUIRED` without fetching. Never select or
+submit the Shield AI London validation role.
+
+## Security, testing, rollback, and acceptance
+
+Primary risks are treating material uncertainty as harmless, losing a real page-level safety stop,
+retaining live content in a diagnostic, weakening cross-origin/write blocking, introducing a hidden
+retry, or accidentally enabling real fill/upload/submit. Controls are fixed enums, strict pairing,
+per-field unsupported status, terminal structural causes, bounded two-pass equality, synthetic-only
+browser fixtures, exact navigation/request counters, zero-value assertions, identity rotation, and
+privacy/history audits.
+
+Run format, lint, strict typecheck, focused inspection/unit/database tests, the complete unsupported
+matrix, hostile-page/lifecycle/identity/negative-authority tests, all unit/integration/E2E, local and
+showcase production builds/audit, privacy and dependency audits, release check,
+schema/pending/integrity/FKs, ignored backup/restore preview, migration immutability,
+`git diff --check`, and `git fsck --strict`. Acceptance requires a complete safe inventory with
+field-level unsupported entries, a fixed cause for every terminal unsupported synthetic pathway,
+zero real actions during remediation, no authority broadening, no migration, exact-head local and
+GitHub CI green, self-review, and normal merge only under the owner's standing offline authorization.
+
+Rollback is a normal revert of tracked code/docs. Immutable visits 1-6, capability history, private
+database/report evidence, and real-action counts are never rewritten. After merge, refresh clean main,
+archive the v5 proposal, prepare only the fresh v6 DRAFT offline, and park its approval gate while
+completing the application-engine, candidate-readiness, document, and local-role audits. Stop only
+when all remaining work needs fresh owner authority or facts.
+
+## Exact implementation sequence
+
+1. Commit this blueprint before application-code changes.
+2. Add strict unsupported-diagnostic contracts and failing runner/database pairing tests.
+3. Add fictional adapter/unit/E2E cases for every terminal cause and harmless field-level case.
+4. Implement v6 per-field inventory semantics, bounded section count, terminal diagnostics, and JSON
+   audit propagation without changing network or mutation behavior.
+5. Audit and, only where target-independent gaps exist, harden the synthetic application pipeline.
+6. Complete private candidate/document and local-role audits without network access or tracked values.
+7. Update docs and this plan with exact implementation and validation results.
+8. Run focused and complete release gates plus backup/migration/Git checks, commit, push one offline
+   PR, require exact-head CI, self-review, and merge normally if every condition passes.
+9. Refresh main, create only a production-derived adapter-v6 version-1/null-predecessor DRAFT, keep
+   source and target authority inactive, complete remaining offline audits, and return one compact
+   morning checkpoint with the first exact owner action.
