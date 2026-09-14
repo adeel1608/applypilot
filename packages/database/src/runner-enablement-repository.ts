@@ -13,6 +13,7 @@ import {
   inspectionDocumentsDigest,
   runnerTargetCapabilityDigest,
   runnerTargetCapabilityIdentity,
+  runnerBindingDigest,
   validateRunnerAuditMetadata,
   type FinalActionConsent,
   type FinalConsentStore,
@@ -548,6 +549,7 @@ export class RunnerEnablementRepository {
         .run(
           record.metadata.fieldCount,
           JSON.stringify({
+            visibleSectionCount: record.metadata.visibleSectionCount,
             reviewRequiredCount: record.metadata.reviewRequiredCount,
             documentRequiredCount: record.metadata.documentRequiredCount,
             unsupportedCount: record.metadata.unsupportedCount,
@@ -571,6 +573,7 @@ export class RunnerEnablementRepository {
             diagnosticCategory: record.metadata.diagnosticCategory,
             diagnosticStage: record.metadata.diagnosticStage,
             destinationDiagnostic: record.metadata.destinationDiagnostic,
+            unsupportedControlDiagnostic: record.metadata.unsupportedControlDiagnostic,
           }),
           timestamp,
           id,
@@ -661,6 +664,7 @@ class DatabaseFinalConsentStore implements FinalConsentStore {
       packetDigest: binding.packetDigest,
       targetHost: new URL(binding.targetOrigin).hostname,
       formVersion: binding.formVersion,
+      bindingDigest: runnerBindingDigest(binding),
       expiresAt: new Date(this.now().getTime() + ttlMs).toISOString(),
       usedAt: null,
     };
@@ -743,18 +747,26 @@ class DatabaseFinalConsentStore implements FinalConsentStore {
     const frozen = FrozenRunnerBindingSchema.parse(binding);
     const stored = this.sqlite
       .prepare(
-        `SELECT packet_digest AS packetDigest,target_origin AS targetOrigin,form_version AS formVersion
-       FROM runner_run_bindings WHERE run_id=?`,
+        `SELECT b.packet_id AS packetId,b.packet_digest AS packetDigest,
+                b.job_version_id AS jobVersionId,b.profile_version_id AS profileVersionId,
+                b.evaluation_version_id AS evaluationVersionId,b.documents_digest AS documentsDigest,
+                b.answers_digest AS answersDigest,b.disclosures_digest AS disclosuresDigest,
+                b.target_origin AS targetOrigin,b.target_path AS targetPath,
+                b.form_version AS formVersion,b.adapter_version AS adapterVersion,
+                b.unresolved_count AS unresolvedCount,c.capability_id AS targetCapabilityId,
+                c.version AS targetCapabilityVersion,c.configuration_digest AS targetCapabilityDigest
+         FROM runner_run_bindings b
+         JOIN runner_target_capability_versions c ON c.id=b.target_capability_version_id
+         WHERE b.run_id=?`,
       )
-      .get(this.runId) as
-      | { packetDigest: string; targetOrigin: string; formVersion: string }
-      | undefined;
-    if (
-      !stored ||
-      stored.packetDigest !== frozen.packetDigest ||
-      stored.targetOrigin !== frozen.targetOrigin ||
-      stored.formVersion !== frozen.formVersion
-    )
+      .get(this.runId) as Record<string, unknown> | undefined;
+    if (!stored) throw new Error("CONSENT_RUN_BINDING_MISMATCH");
+    const persisted = FrozenRunnerBindingSchema.safeParse({
+      ...stored,
+      targetUrl: `${stored.targetOrigin}${stored.targetPath}`,
+    });
+    if (!persisted.success || runnerBindingDigest(persisted.data) !== runnerBindingDigest(frozen)) {
       throw new Error("CONSENT_RUN_BINDING_MISMATCH");
+    }
   }
 }

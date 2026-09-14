@@ -96,6 +96,8 @@ function control(
     required: true,
     hidden: false,
     label,
+    metadataReadFailed: false,
+    customWidgetDeclared: false,
     unsupportedWidget: false,
     ...overrides,
   };
@@ -107,6 +109,7 @@ function snapshot(overrides: Partial<ReadOnlyBrowserSnapshot> = {}): ReadOnlyBro
     httpStatus: 200,
     declaredFormVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
     formCount: 1,
+    visibleSectionCount: 1,
     controls: [
       control(0, "First name", { name: "firstName", autocomplete: "given-name" }),
       control(1, "Submit application", { tag: "button", type: "submit" }),
@@ -117,6 +120,7 @@ function snapshot(overrides: Partial<ReadOnlyBrowserSnapshot> = {}): ReadOnlyBro
     downloadAttempted: false,
     blockedWriteRequest: false,
     blockedDestination: false,
+    unsupportedControlDiagnostic: null,
     hiddenInteractiveStep: false,
     ...overrides,
   });
@@ -188,9 +192,11 @@ describe("read-only real target inspection", () => {
           targetUrl: binding.targetUrl,
           formVersion: binding.formVersion,
           adapterVersion: binding.adapterVersion,
+          visibleSectionCount: 0,
           fields: [],
           protectionSignals: [],
           destinationDiagnostic: null,
+          unsupportedControlDiagnostic: null,
           metrics: {
             browserWriteEvents: 0,
             formValueChanges: 0,
@@ -340,38 +346,115 @@ describe("read-only real target inspection", () => {
   });
 
   it.each([
-    ["CAPTCHA", { protectionSignals: ["CAPTCHA"] }],
-    ["MFA", { protectionSignals: ["MFA"] }],
-    ["AUTHENTICATION_REQUIRED", { httpStatus: 401 }],
-    ["BOT_DETECTION", { protectionSignals: ["BOT_DETECTION"] }],
-    ["RATE_LIMIT", { httpStatus: 429 }],
-    ["ACCESS_CONTROL", { httpStatus: 403 }],
-    ["WEBSITE_RESTRICTION", { protectionSignals: ["WEBSITE_RESTRICTION"] }],
-    ["PAGE_CHANGED", { httpStatus: 500 }],
-    ["FORM_CHANGED", { declaredFormVersion: "lever-application-inspection-v2" }],
-    ["DESTINATION_CHANGED", { blockedDestination: true }],
-    ["DESTINATION_CHANGED", { popupAttempted: true }],
-    ["UNSUPPORTED_CONTROL", { hiddenInteractiveStep: true }],
-    ["UNSUPPORTED_CONTROL", { downloadAttempted: true }],
-    ["UNSUPPORTED_CONTROL", { blockedWriteRequest: true }],
-  ] as const)("stops on %s without any mutation", async (reason, overrides) => {
+    ["CAPTCHA", { protectionSignals: ["CAPTCHA"] }, null],
+    ["MFA", { protectionSignals: ["MFA"] }, null],
+    ["AUTHENTICATION_REQUIRED", { httpStatus: 401 }, null],
+    ["BOT_DETECTION", { protectionSignals: ["BOT_DETECTION"] }, null],
+    ["RATE_LIMIT", { httpStatus: 429 }, null],
+    ["ACCESS_CONTROL", { httpStatus: 403 }, null],
+    ["WEBSITE_RESTRICTION", { protectionSignals: ["WEBSITE_RESTRICTION"] }, null],
+    ["PAGE_CHANGED", { httpStatus: 500 }, null],
+    ["FORM_CHANGED", { declaredFormVersion: "lever-application-inspection-v2" }, null],
+    ["DESTINATION_CHANGED", { blockedDestination: true }, null],
+    ["DESTINATION_CHANGED", { popupAttempted: true }, null],
+    ["UNSUPPORTED_CONTROL", { hiddenInteractiveStep: true }, "HIDDEN_INTERACTIVE_STEP"],
+    ["UNSUPPORTED_CONTROL", { downloadAttempted: true }, "DOWNLOAD_ATTEMPT"],
+    ["UNSUPPORTED_CONTROL", { blockedWriteRequest: true }, "BLOCKED_WRITE_REQUEST"],
+  ] as const)("stops on %s without any mutation", async (reason, overrides, unsupportedCause) => {
     const browser = new FixtureBrowser(snapshot(overrides as Partial<ReadOnlyBrowserSnapshot>));
     const result = await runnerFor(packet(), capability(), browser).runner.openAndInspect();
     expect(result).toMatchObject({ state: "STOPPED", stopReason: reason, observation: null });
+    if (reason === "UNSUPPORTED_CONTROL") {
+      expect(result).toMatchObject({ unsupportedControlDiagnostic: unsupportedCause });
+    }
   });
 
-  it("stops on unsupported custom widgets and malformed form structure", async () => {
-    const custom = new FixtureBrowser(
+  it.each([
+    "CONTROL_LIMIT_EXCEEDED",
+    "LABEL_LIMIT_EXCEEDED",
+    "FORM_LIMIT_EXCEEDED",
+    "SECTION_LIMIT_EXCEEDED",
+    "CONTROL_METADATA_UNREADABLE",
+    "LABEL_METADATA_UNREADABLE",
+    "SECTION_METADATA_UNREADABLE",
+    "CONTROL_SET_MISMATCH",
+    "SHADOW_CONTROL_PRESENT",
+    "HIDDEN_INTERACTIVE_STEP",
+    "CUSTOM_WIDGET_DECLARED",
+    "EXPLICIT_UNSUPPORTED_SIGNAL",
+    "UNSUPPORTED_UNKNOWN",
+  ] as const)("retains only fixed value-free unsupported cause %s", async (cause) => {
+    const browser = new FixtureBrowser(snapshot({ unsupportedControlDiagnostic: cause }));
+    const { runner, auditRecords } = runnerFor(packet(), capability(), browser);
+    expect(await runner.openAndInspect()).toMatchObject({
+      state: "STOPPED",
+      stopReason: "UNSUPPORTED_CONTROL",
+      unsupportedControlDiagnostic: cause,
+      observation: null,
+    });
+    expect(auditRecords.at(-1)).toEqual({
+      type: "runner.inspection.stopped",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        reason: "UNSUPPORTED_CONTROL",
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: null,
+        unsupportedControlDiagnostic: cause,
+      },
+    });
+  });
+
+  it("rejects unsupported-control diagnostics that conflict with another protection stop", () => {
+    expect(() =>
+      ReadOnlyBrowserSnapshotSchema.parse({
+        ...snapshot(),
+        protectionSignals: ["CAPTCHA"],
+        unsupportedControlDiagnostic: "CUSTOM_WIDGET_DECLARED",
+      }),
+    ).toThrow();
+  });
+
+  it("preserves readable unsupported fields but stops on structural custom widgets", async () => {
+    const readableCustom = new FixtureBrowser(
       snapshot({
         controls: [
-          control(0, "Custom", { unsupportedWidget: true }),
-          control(1, "Submit", { tag: "button", type: "submit" }),
+          control(0, "Fictional native color", { type: "color" }),
+          control(1, "Fictional unknown required"),
+          control(2, "Fictional secondary action", { tag: "button", type: "button" }),
+          control(3, "Submit", { tag: "button", type: "submit" }),
         ],
       }),
     );
-    expect(await runnerFor(packet(), capability(), custom).runner.openAndInspect()).toMatchObject({
+    const readableResult = await runnerFor(
+      packet(),
+      capability(),
+      readableCustom,
+    ).runner.openAndInspect();
+    expect(readableResult).toMatchObject({ state: "COMPLETED" });
+    if (readableResult.state === "COMPLETED") {
+      expect(
+        readableResult.observation.fields.filter(
+          ({ inspectionStatus }) => inspectionStatus === "UNSUPPORTED",
+        ),
+      ).toHaveLength(3);
+    }
+
+    const structuralCustom = new FixtureBrowser(
+      snapshot({
+        controls: [
+          control(0, "Custom", { customWidgetDeclared: true }),
+          control(1, "Submit", { tag: "button", type: "submit" }),
+        ],
+        unsupportedControlDiagnostic: "CUSTOM_WIDGET_DECLARED",
+      }),
+    );
+    expect(
+      await runnerFor(packet(), capability(), structuralCustom).runner.openAndInspect(),
+    ).toMatchObject({
       state: "STOPPED",
       stopReason: "UNSUPPORTED_CONTROL",
+      unsupportedControlDiagnostic: "CUSTOM_WIDGET_DECLARED",
     });
     const noForm = new FixtureBrowser(snapshot({ formCount: 0 }));
     expect(await runnerFor(packet(), capability(), noForm).runner.openAndInspect()).toMatchObject({
@@ -414,6 +497,7 @@ describe("read-only real target inspection", () => {
           diagnosticCategory,
           diagnosticStage: null,
           destinationDiagnostic: null,
+          unsupportedControlDiagnostic: null,
         },
       });
     },

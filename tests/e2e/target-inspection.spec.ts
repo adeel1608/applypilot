@@ -114,7 +114,7 @@ test("read-only Lever adapter inventories the fictional local form with zero bro
   ).toBe(true);
 });
 
-test("v5 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
+test("v6 classifies the complete fictional Lever-like semantic contract", async ({ page }) => {
   const { capability, binding } = inspection("full-contract");
   const result = await new TargetInspectionRunner(
     capability,
@@ -179,12 +179,17 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     ["hidden-submit", "COMPLETED", null],
     ["file-chooser", "COMPLETED", null],
     ["labels-absent", "COMPLETED", null],
-    ["unusual-native", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["unusual-native", "COMPLETED", null],
     ["large-attributes", "COMPLETED", null],
     ["unicode", "COMPLETED", null],
     ["no-form", "STOPPED", "FORM_CHANGED"],
     ["multiple-forms", "COMPLETED", null],
+    ["over-20-forms", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["over-200", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["over-400-labels", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["over-100-sections", "STOPPED", "UNSUPPORTED_CONTROL"],
+    ["duplicate-controls", "COMPLETED", null],
+    ["blocked-write", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["dynamic-insert", "COMPLETED", null],
     ["shadow-dom", "STOPPED", "UNSUPPORTED_CONTROL"],
     ["no-submit", "STOPPED", "FORM_CHANGED"],
@@ -205,6 +210,21 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
     }
     if (result.state === "STOPPED" && caseName === "popup-attempt") {
       expect(result.destinationDiagnostic).toBe("POPUP_ATTEMPT");
+    }
+    if (result.state === "STOPPED") {
+      const unsupportedCauses: Readonly<Record<string, string>> = {
+        unsupported: "CUSTOM_WIDGET_DECLARED",
+        "hidden-step": "HIDDEN_INTERACTIVE_STEP",
+        "over-20-forms": "FORM_LIMIT_EXCEEDED",
+        "over-200": "CONTROL_LIMIT_EXCEEDED",
+        "over-400-labels": "LABEL_LIMIT_EXCEEDED",
+        "over-100-sections": "SECTION_LIMIT_EXCEEDED",
+        "blocked-write": "BLOCKED_WRITE_REQUEST",
+        "shadow-dom": "SHADOW_CONTROL_PRESENT",
+      };
+      const unsupportedCause = unsupportedCauses[caseName];
+      if (unsupportedCause)
+        expect(result.unsupportedControlDiagnostic, caseName).toBe(unsupportedCause);
     }
     if (result.state === "COMPLETED") {
       expect(result.observation.metrics, caseName).toMatchObject({
@@ -288,7 +308,7 @@ test("bounds fictional attributes and handles labels absent and Unicode safely",
   }
 });
 
-test("v5 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
+test("v6 passive reads resist hostile employer main-world primitives", async ({ browser }) => {
   test.slow();
   const hostileCases = [
     "document-query-all",
@@ -473,7 +493,7 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
   await context.close();
 });
 
-test("v5 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
+test("v6 remains bounded for a large inert DOM and a server-rendered form with JavaScript disabled", async ({
   browser,
 }) => {
   for (const [caseName, javaScriptEnabled] of [
@@ -665,7 +685,7 @@ test("fails closed when the passive control or form structure mutates between bo
   }
 });
 
-test("persists only fixed value-free v5 DOM diagnostic stages", async ({ browser }) => {
+test("persists only fixed value-free v6 DOM diagnostic stages", async ({ browser }) => {
   for (const stage of ["DOM_QUERY", "DOM_CONTROL_READ", "DOM_PAGE_METADATA"] as const) {
     const context = await browser.newContext();
     const page = await context.newPage();

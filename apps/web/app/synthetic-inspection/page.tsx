@@ -27,7 +27,12 @@ const fixtureCases = [
   "unicode",
   "no-form",
   "multiple-forms",
+  "over-20-forms",
   "over-200",
+  "over-400-labels",
+  "over-100-sections",
+  "duplicate-controls",
+  "blocked-write",
   "dynamic-insert",
   "shadow-dom",
   "no-submit",
@@ -248,6 +253,22 @@ export default async function SyntheticInspectionPage({
                 <input key={index} name={`boundedControl${index}`} />
               ))
             : null}
+          {fixture === "over-400-labels"
+            ? Array.from({ length: 401 }, (_, index) => (
+                <label key={index}>Fictional bounded label {index}</label>
+              ))
+            : null}
+          {fixture === "over-100-sections"
+            ? Array.from({ length: 101 }, (_, index) => (
+                <section key={index}>Fictional bounded section {index}</section>
+              ))
+            : null}
+          {fixture === "duplicate-controls" ? (
+            <>
+              <input name="fictionalDuplicate" aria-label="Fictional duplicate" />
+              <input name="fictionalDuplicate" aria-label="Fictional duplicate" />
+            </>
+          ) : null}
           {fixture === "shadow-dom" ? <div id="fictional-shadow-host" /> : null}
           {fixture === "no-submit" ? null : (
             <button type="submit" hidden={fixture === "hidden-submit"}>
@@ -260,6 +281,21 @@ export default async function SyntheticInspectionPage({
         <form method="get">
           <input name="secondaryOptionalField" />
         </form>
+      ) : null}
+      {fixture === "over-20-forms"
+        ? Array.from({ length: 20 }, (_, index) => (
+            <form method="get" key={index}>
+              <span>Fictional bounded form {index}</span>
+            </form>
+          ))
+        : null}
+      {fixture === "blocked-write" ? (
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'document.addEventListener("DOMContentLoaded",()=>{void fetch(location.href,{method:"POST",body:"fictional"}).catch(()=>undefined);},{once:true});',
+          }}
+        />
       ) : null}
       {["dynamic-insert", "full-contract"].includes(fixture) ? (
         <script

@@ -198,6 +198,7 @@ describe("runner enablement persistence", () => {
     repository.bindRun({ runId: "run:1", binding, targetCapability: capability() });
     const store = repository.consentStore("run:1");
     const consent = store.issue(binding, 60_000);
+    expect(consent.bindingDigest).toHaveLength(64);
     const stored = sqlite
       .prepare("SELECT token_hash AS tokenHash FROM final_action_consents WHERE id=?")
       .get(consent.id) as { tokenHash: string };
@@ -205,6 +206,31 @@ describe("runner enablement persistence", () => {
     expect(JSON.stringify(stored)).not.toContain(consent.token);
     expect(store.consume({ id: consent.id, token: consent.token, binding, now })).toBe(true);
     expect(store.consume({ id: consent.id, token: consent.token, binding, now })).toBe(false);
+    sqlite.close();
+  });
+
+  it("rejects consent against any changed frozen run binding field", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `binding:${++sequence}`,
+    );
+    repository.persistTargetCapabilityVersion(capability());
+    const binding = freezeRunnerBinding(packet(), capability());
+    repository.bindRun({ runId: "run:1", binding, targetCapability: capability() });
+    const store = repository.consentStore("run:1");
+    const consent = store.issue(binding, 60_000);
+    expect(() =>
+      store.consume({
+        id: consent.id,
+        token: consent.token,
+        binding: { ...binding, answersDigest: "b".repeat(64) },
+        now,
+      }),
+    ).toThrow("CONSENT_RUN_BINDING_MISMATCH");
+    expect(store.consume({ id: consent.id, token: consent.token, binding, now })).toBe(true);
     sqlite.close();
   });
 
@@ -295,6 +321,7 @@ describe("runner enablement persistence", () => {
       type: "runner.inspection.completed",
       metadata: {
         operation: "OPEN_AND_INSPECT_ONLY",
+        visibleSectionCount: 2,
         fieldCount: 9,
         reviewRequiredCount: 3,
         documentRequiredCount: 2,
@@ -314,6 +341,7 @@ describe("runner enablement persistence", () => {
       safeStopReason: null,
       fieldCount: 9,
       summary: JSON.stringify({
+        visibleSectionCount: 2,
         reviewRequiredCount: 3,
         documentRequiredCount: 2,
         unsupportedCount: 1,
@@ -370,6 +398,7 @@ describe("runner enablement persistence", () => {
           diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
           diagnosticStage: "DOM_QUERY",
           destinationDiagnostic: null,
+          unsupportedControlDiagnostic: null,
           exceptionMessage: "must never persist",
         },
       } as never),
@@ -390,6 +419,7 @@ describe("runner enablement persistence", () => {
         diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
         diagnosticStage: "DOM_QUERY",
         destinationDiagnostic: null,
+        unsupportedControlDiagnostic: null,
       },
     });
     expect(
@@ -406,6 +436,7 @@ describe("runner enablement persistence", () => {
         diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
         diagnosticStage: "DOM_QUERY",
         destinationDiagnostic: null,
+        unsupportedControlDiagnostic: null,
       }),
     });
     const stoppedAudit = sqlite
@@ -421,6 +452,7 @@ describe("runner enablement persistence", () => {
       diagnosticCategory: "DOM_INSPECTION_EXCEPTION",
       diagnosticStage: "DOM_QUERY",
       destinationDiagnostic: null,
+      unsupportedControlDiagnostic: null,
     });
     expect(stoppedAudit.metadata).not.toContain("message");
     expect(stoppedAudit.metadata).not.toContain("stack");
@@ -454,6 +486,7 @@ describe("runner enablement persistence", () => {
           diagnosticCategory: null,
           diagnosticStage: null,
           destinationDiagnostic: "https://private.example",
+          unsupportedControlDiagnostic: null,
         },
       } as never),
     ).toThrow();
@@ -466,6 +499,7 @@ describe("runner enablement persistence", () => {
           diagnosticCategory: null,
           diagnosticStage: null,
           destinationDiagnostic: "POPUP_ATTEMPT",
+          unsupportedControlDiagnostic: null,
         },
       }),
     ).toThrow();
@@ -477,6 +511,7 @@ describe("runner enablement persistence", () => {
         diagnosticCategory: null,
         diagnosticStage: null,
         destinationDiagnostic: "FINAL_PATH_CHANGED",
+        unsupportedControlDiagnostic: null,
       },
     });
     expect(
@@ -492,6 +527,80 @@ describe("runner enablement persistence", () => {
         diagnosticCategory: null,
         diagnosticStage: null,
         destinationDiagnostic: "FINAL_PATH_CHANGED",
+        unsupportedControlDiagnostic: null,
+      }),
+    });
+
+    sqlite.close();
+  });
+
+  it("persists only a fixed value-free unsupported-control diagnostic", () => {
+    const sqlite = database();
+    let sequence = 0;
+    const repository = new RunnerEnablementRepository(
+      sqlite,
+      () => now,
+      () => `unsupported:${++sequence}`,
+    );
+    const inspectionPacket = ApplicationPacketSchema.parse({
+      ...packet(),
+      documents: [],
+      answers: [],
+    });
+    const target = inspectionCapability(inspectionPacket);
+    repository.persistTargetCapabilityVersion(target);
+    const binding = freezeInspectionBinding(inspectionPacket, target);
+    repository.bindInspection({
+      runId: "inspection-run:unsupported",
+      binding,
+      targetCapability: target,
+    });
+    repository.recordInspectionAudit("inspection-run:unsupported", {
+      type: "runner.inspection.opened",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        adapterVersion: target.adapterVersion,
+        formVersion: target.formVersion,
+      },
+    });
+    expect(() =>
+      repository.recordInspectionAudit("inspection-run:unsupported", {
+        type: "runner.inspection.stopped",
+        metadata: {
+          operation: "OPEN_AND_INSPECT_ONLY",
+          reason: "UNSUPPORTED_CONTROL",
+          diagnosticCategory: null,
+          diagnosticStage: null,
+          destinationDiagnostic: null,
+          unsupportedControlDiagnostic: "employer control detail",
+        },
+      } as never),
+    ).toThrow();
+    repository.recordInspectionAudit("inspection-run:unsupported", {
+      type: "runner.inspection.stopped",
+      metadata: {
+        operation: "OPEN_AND_INSPECT_ONLY",
+        reason: "UNSUPPORTED_CONTROL",
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: null,
+        unsupportedControlDiagnostic: "CUSTOM_WIDGET_DECLARED",
+      },
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT safe_stop_reason AS stopReason,classification_summary_json AS summary
+           FROM runner_inspection_bindings WHERE id='inspection-run:unsupported'`,
+        )
+        .get(),
+    ).toEqual({
+      stopReason: "UNSUPPORTED_CONTROL",
+      summary: JSON.stringify({
+        diagnosticCategory: null,
+        diagnosticStage: null,
+        destinationDiagnostic: null,
+        unsupportedControlDiagnostic: "CUSTOM_WIDGET_DECLARED",
       }),
     });
     sqlite.close();
