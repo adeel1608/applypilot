@@ -6841,3 +6841,44 @@ CV artifacts require a new relevant current document and explicit owner approval
 Australian technical shortlist requires fresh source-network authority. The next operation must be
 owner approval of the exact v6 DRAFT before its expiry; even after that, a separate exact one-shot
 `INSPECT` start is mandatory. No Shield AI validation application may be submitted.
+
+## Adapter-v6 controlled inspection result - 2026-09-15
+
+Status: `SAFE TERMINAL STOP / NO RETRY AUTHORITY`. The initial v6 proposal above expired without
+approval or execution and remains ignored private history. From unchanged clean main
+`d64ccda0db72e4c8b01bd43a26140bd48a2735c0`, the production offline preparer revalidated the same
+current packet and created a fresh v6-family version-1/null-predecessor DRAFT. The owner approved
+that exact DRAFT, the normal immutable capability ledger persisted the resulting APPROVED digest
+`7a852c008b5d5fc49aca710cdfac374aa85a4501a448c47f28731513a593e391`, and a separate exact owner
+start authorized one `OPEN_AND_INSPECT_ONLY` attempt.
+
+Run `inspection_db6c1681-6bd0-47d9-b444-b3b6f1aa63df` performed exactly one employer navigation
+through `lever-real-inspection-v6` and stopped safely as `UNSUPPORTED_CONTROL`. Its fixed value-free
+diagnostic is `BLOCKED_WRITE_REQUEST`. The route was aborted before transmission. Candidate fields
+outbound, browser writes, form changes, uploads, and submissions were all zero; there was no retry.
+No raw HTML, request body, response body, cookie, storage, secret header, arbitrary page text, or
+candidate value was retained. The consumed authority was immediately succeeded by immutable version
+2 `REVOKED`, digest `23ea21e9043202a99103a7c4b9851099036d5f8a7b212e3fa843fefe30ac2fee`.
+The current active approved real-target capability count is zero.
+
+Offline diagnosis found no defect within the approved v6 contract. The adapter aborts every
+non-`GET`/`HEAD` request and treats the attempt as structural uncertainty. The exact owner-reviewed
+inspection authority also required any write request to stop. Silently continuing after the blocked
+request would therefore change and weaken the reviewed safety contract; it is not an authorized
+remediation. No v7 adapter, replacement DRAFT, or employer visit #8 is created automatically.
+
+Lifetime real source/employer/upload/submission counts are now `9/7/0/0`. First real employer target
+validation remains unproven, Source-enabled Personal Beta remains `READY`, and Personal Live V1
+remains `NOT_READY`. All previously recorded candidate-fact, current-CV, local-shortlist, and
+synthetic-only application-operation blockers remain unchanged. Any next Shield AI inspection would
+require an explicit owner-reviewed architecture decision about whether an aborted page-generated
+write attempt may coexist with a trustworthy passive inventory, a separately reviewed adapter
+version and offline test proof, then a new exact capability approval and fresh one-shot start. The
+Shield AI London role remains technical validation only and must never be filled or submitted.
+
+The documentation-only terminal checkpoint passed the full local release check: format, ESLint,
+strict TypeScript, 557 unit tests, 21 integration tests, 43 Playwright E2E tests, local and showcase
+production builds, public-showcase audit, privacy audit, all-dependency and production-dependency
+audits with zero vulnerabilities, schema 8/pending 0/integrity pass/foreign-key issues 0, and release
+classification. `git diff --check` passed. `git fsck --strict` reported only the previously known
+unreachable objects and no repository corruption. No migration or application-code change was made.
