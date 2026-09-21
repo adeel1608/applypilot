@@ -46,6 +46,11 @@
     "r2:evaluate-private": "tsx scripts/r2-evaluate-private.ts",
     "target:prepare-inspection": "tsx scripts/prepare-target-inspection.ts",
     "target:run-inspection": "tsx scripts/run-target-inspection.ts",
+    "grant:initialize": "tsx scripts/initialize-green-banner-grant.ts",
+    "grant:source-run": "tsx scripts/green-banner-source-run.ts",
+    "grant:source-recover": "tsx scripts/green-banner-source-recover.ts",
+    "grant:document": "tsx scripts/green-banner-document-run.ts",
+    "grant:target-inspection": "tsx scripts/green-banner-target-inspection.ts",
     "audit:production": "npm audit --omit=dev"
   },
   "dependencies": {

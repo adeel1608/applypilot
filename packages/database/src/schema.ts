@@ -1037,6 +1037,53 @@ export const runnerInspectionBindings = sqliteTable("runner_inspection_bindings"
   updatedAt: text("updated_at").notNull(),
 });
 
+export const greenBannerParentGrants = sqliteTable("green_banner_parent_grants", {
+  id: text("id").primaryKey(),
+  grantType: text("grant_type").notNull(),
+  grantDigest: text("grant_digest").notNull(),
+  allowedOperationsJson: text("allowed_operations_json").notNull(),
+  scopeJson: text("scope_json").notNull(),
+  mainSha: text("main_sha").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const greenBannerParentGrantEvents = sqliteTable("green_banner_parent_grant_events", {
+  id: text("id").primaryKey(),
+  parentGrantId: text("parent_grant_id")
+    .notNull()
+    .references(() => greenBannerParentGrants.id, { onDelete: "restrict" }),
+  sequence: integer("sequence").notNull(),
+  state: text("state").notNull(),
+  safeMetadataJson: text("safe_metadata_json").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+});
+
+export const greenBannerChildCapabilities = sqliteTable("green_banner_child_capabilities", {
+  id: text("id").primaryKey(),
+  parentGrantId: text("parent_grant_id")
+    .notNull()
+    .references(() => greenBannerParentGrants.id, { onDelete: "restrict" }),
+  parentGrantDigest: text("parent_grant_digest").notNull(),
+  childDigest: text("child_digest").notNull(),
+  childType: text("child_type").notNull(),
+  operation: text("operation").notNull(),
+  scopeJson: text("scope_json").notNull(),
+  mainSha: text("main_sha").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+export const greenBannerChildEvents = sqliteTable("green_banner_child_events", {
+  id: text("id").primaryKey(),
+  childCapabilityId: text("child_capability_id")
+    .notNull()
+    .references(() => greenBannerChildCapabilities.id, { onDelete: "restrict" }),
+  sequence: integer("sequence").notNull(),
+  state: text("state").notNull(),
+  safeMetadataJson: text("safe_metadata_json").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+});
+
 export const schema = {
   candidateProfiles,
   candidateProfileVersions,
@@ -1096,4 +1143,8 @@ export const schema = {
   runnerRunBindings,
   runnerRecoveryEvents,
   runnerInspectionBindings,
+  greenBannerParentGrants,
+  greenBannerParentGrantEvents,
+  greenBannerChildCapabilities,
+  greenBannerChildEvents,
 };
