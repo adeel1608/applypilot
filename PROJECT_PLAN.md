@@ -7119,3 +7119,150 @@ exact-head CI events, self-review the diff and merge only if the standing condit
 remain satisfied, then refresh clean `main`. The next product action remains owner-gated: historical
 target validation grants no present source or employer authority, and no fill/upload/submit path is
 enabled.
+
+## Persistent green-banner grant and supervised-readiness train - 2026-09-22
+
+Current state: clean `main` at `227df70175f6beed75e4812fa0aee6668216de2f`, with first real target
+validation proven from one completed, revoked passive inspection. Source and target capabilities are
+inactive; lifetime real source/employer/upload/submission counts are `9/8/0/0`. Personal Live V1 is
+not ready because no genuinely suitable Australian technical role has been selected and the real
+application-operation lane is not yet enabled.
+
+Objective: implement the standing owner-authorized `GREEN_BANNER_SESSION_GRANT_V1` as a narrow parent
+authority, then use only deterministic short-lived child capabilities to advance safe readiness toward
+one supervised real application. The parent never authorizes `SUBMIT`; it may cover bounded public
+source discovery, role evaluation, passive target inspection, evidence-backed CV generation, packet
+freezing, MAP_FOR_FILL/FILL/UPLOAD validation, and fill-preview. A fresh one-use final-submit consent
+remains required after the green banner and no submission may occur in this train.
+
+Requirements and safety boundaries:
+
+- the parent grant is immutable, digest-bound, auditable, and stored privately; its allowed-operation
+  ceiling is a closed set that explicitly excludes `SUBMIT`;
+- every child binds operation, source/provider or target origin/path/tenant, packet and current main,
+  plus document/answer/disclosure digests where applicable; child expiry remains short and terminal;
+- child scope is a strict subset of the parent ceiling and cannot widen provider, host, path, tenant,
+  target, packet, adapter, form, document, answer, disclosure, or operation scope;
+- expired children may be re-derived only from the still-valid parent and the same immutable scope;
+- all live source requests remain bounded, public, unauthenticated, HTTPS-only, candidate-blind,
+  redirect-free where required, and protected by existing DNS/host/path/query/byte/time/retry caps;
+- employer interaction remains passive until a suitable role and packet exist; CAPTCHA, MFA, auth,
+  bot, access, rate, destination, form, unsupported-control, or site-drift signals stop and exclude a
+  target without bypass or blind retry;
+- real fill-preview may enter only evidence-backed values and upload the exact frozen current CV;
+  final submit is excluded and ambiguous outcomes remain `OUTCOME_UNKNOWN`;
+- no candidate fact is inferred. Unknown citizenship, visa/work-right, sponsorship, clearance,
+  dates, years of experience, or application answers remain `REVIEW_REQUIRED` and may disqualify a
+  role; local profile evidence is the only claim source;
+- private profile, database, generated CV, packet, browser state, cookies, and live payloads remain
+  ignored/local and never enter Git, CI, reports, or diagnostics.
+
+Architecture and proposed files:
+
+- additive migration `0009_green_banner_session_grant.sql` adds immutable parent grant and child binding
+  ledgers with explicit operation ceilings, deterministic digests, scope JSON, terminal state, and
+  parent foreign keys; migrations `0000`-`0008` remain byte-for-byte unchanged;
+- `packages/application-runner/src/green-banner-grant.ts` defines strict parent/child schemas,
+  canonical digests, deterministic child derivation, subset checks, expiry, and terminal transitions;
+- `packages/database/src/green-banner-repository.ts` persists and validates parent/child lineage
+  transactionally without exposing private values;
+- source discovery reuses the existing Lever/Greenhouse secure transports and R2 persistence, while
+  a target-independent operation engine extends synthetic proofs to real-target child authority;
+- current-document generation reuses the fact-bound resume engine and writes only to the ignored
+  private artifact root; packet binding reuses current job/profile/evaluation/document digest checks.
+
+Data flow: parent grant record -> bounded child scope derivation -> immutable child ledger -> source or
+target runner -> evidence-only persistence -> terminal child state -> aggregate readiness projection.
+Dependencies remain Zod, SQLite, existing source adapters/transports, application runner, resume engine,
+and current R2 version bindings. No network request occurs while implementing or testing the authority
+primitive.
+
+Risks are parent-scope escalation, accidental submit exposure, stale packet/document use, candidate
+data disclosure, capability reuse after expiry, and source/target retry. Mitigations are closed enums,
+canonical digest comparison, strict subset checks, current-version joins, one-use terminal children,
+short expiries, route-level caps, privacy audits, synthetic hostile fixtures, and explicit submit
+exclusion tests. Rollback is a normal revert plus tested backup restore; old capability and inspection
+history remain immutable.
+
+Testing strategy: parent/child digest and scope-escalation unit tests; migration fresh/upgrade/restore
+tests; synthetic source and target child lifecycle tests; stale packet/document/answer/disclosure
+tests; negative submit, expiry, replay, and terminal-state tests; then the complete format/lint/
+typecheck/unit/integration/build/E2E/privacy/dependency/preflight/release/diff/fsck matrix. Live
+action counts during authority implementation are `0/0/0/0`.
+
+Acceptance criteria: a valid parent can derive only allowed short-lived children; every broadened child
+or `SUBMIT` request fails closed; child expiry/revocation is terminal and replay-free; schema and FKs
+remain valid; exact-head CI is green; no private data or network action is introduced by the offline
+PR. After merge, use the parent to discover a suitable Australian technical role, generate a verified
+engineering CV, freeze a packet, inspect the selected target, and prove controlled real fill-preview.
+Stop at `# 🟢 **WE ARE READY**` only when every stated criterion is evidenced; otherwise stop only at
+an irreducible owner-only factual blocker.
+
+Implementation steps: (1) encode this blueprint; (2) add migration 0009 and immutable grant domain;
+(3) add repository and synthetic scope/replay tests; (4) run full gates, commit, push, open one PR,
+wait for exact-head CI, self-review and merge under the standing grant; (5) refresh main; (6) create
+the parent grant record privately; (7) derive and execute bounded source children until a suitable role
+exists; (8) generate/freeze the evidence-backed current CV and packet; (9) extend/validate real target
+MAP/FILL/UPLOAD offline and with one controlled fill-preview; (10) record exact results and stop at
+green readiness or a single consolidated owner-only factual blocker.
+
+### Continuation result - bounded source discovery
+
+The private database was backed up and migrated additively to schema 9 before execution. The parent grant
+was initialized privately and remained ACTIVE. A first launch failed before any network request because
+the orchestration helper was imported from the wrong package; the stale child was revoked through the
+normal immutable workflow. The corrected child then performed one bounded public Shield AI Lever run:
+four GET requests, four pages, 100 provider records, and 83 persisted observations/job versions. No
+candidate data was sent. The source capability was revoked and its child consumed after completion;
+active approved source capabilities returned to zero.
+
+The source-to-R2 handoff initially used the legacy importer evaluator and stopped before queue completion.
+This was diagnosed offline, corrected to use the current R2 normalization/evaluation/queue repositories,
+and replayed without another network request. All 83 records now have current R2 evaluations and queue
+decisions; replay is idempotent. All three Melbourne roles are `REVIEW_REQUIRED` (not recommended) because
+current extraction coverage and eligibility evidence are incomplete; the two technical candidates are
+`Engineer II, Autonomy (R5713)` and `Computer Vision Engineer (C++) (R4633)`. Unknown work-rights,
+experience, skills, hours, licences, certifications, education, schedule, and vehicle facts remain
+unknown and were not inferred. Lever `lists[]`, workplace type, and inert text handling were observed in
+the persisted source payloads without rendering or retaining raw payloads in reports.
+
+Safe run evidence: source run `0dba8b34-fb59-4cc8-a7ef-c3b97e8d5bbf` is COMPLETE with request/page/record
+counts `4/4/100`; accepted/persisted counts are `100/83`; R2 evaluations/queue decisions are `83/83`.
+Lifetime real-action counts are source `13`, employer visits `8`, uploads `0`, submissions `0` (the source
+count includes the four requests in this run). No employer target was visited. The next task is to
+prepare a private local packet for the best reviewable Melbourne technical role, then continue the
+standing-grant target/packet readiness gates without submitting.
+
+### Continuation result - private document and passive target inspection
+
+For `Computer Vision Engineer (C++) (R4633)` (`2cfe6692-a266-4d27-8832-ef652fa57ee4`), a current
+fact-bound CV was generated privately as PDF and DOCX, validated, and approved locally. A review-only
+packet was frozen with the exact Lever apply URL and current job/profile/legacy-evaluation bindings;
+its readiness remains `REVIEW_REQUIRED` because the source expiry is unknown and the R2 result is not
+eligible/recommended. This did not authorize fill or submission.
+
+Under the standing grant, one parent-derived `OPEN_AND_INSPECT_ONLY` child and one matching short-lived
+runner capability were used for exactly one real employer inspection of that non-validation Shield AI
+role. The inspection completed safely: 46 controls were inventoried, with 27 unsupported controls and
+one document-required control. No candidate values were entered or sent; clicks, writes, uploads, and
+submissions were all zero. The target capability was revoked and the child consumed immediately;
+current active approved real-target capabilities are zero. Historical expired/revoked capability rows
+remain immutable and are not active.
+
+This establishes passive target compatibility only. Fill-preview cannot proceed without owner facts for
+the unresolved review blockers and safe answers for required/unsupported controls. No answer was
+invented and no protection was bypassed. Lifetime counts are now source `13`, employer visits `9`,
+uploads `0`, submissions `0`.
+
+### Validation and release checkpoint
+
+After the live evidence was persisted, the full local matrix passed: Prettier, ESLint, TypeScript,
+unit (`52` files / `575` tests), integration (`3` files / `21` tests), production local and showcase
+builds, E2E (`44` passed), privacy audit, dependency audits (zero vulnerabilities), doctor, preflight,
+database status, restore preview and confirmed restore, `git diff --check`, and strict fsck inspection.
+The real database is schema 9 with zero pending migrations, integrity PASS, and zero foreign-key issues;
+the schema-9 backup restored successfully with a recovery backup. Migrations `0000`-`0008` remain
+unchanged; `0009` is additive only. Release summary classified Source-enabled Personal Beta READY and
+Personal Live V1 NOT_READY with `REAL_RUNNER_TARGET_APPROVAL_REQUIRED` plus the unresolved role facts
+above. The worktree remains intentionally dirty until this coherent offline implementation is committed
+and reviewed; no final-submit consent was issued and no submission occurred.

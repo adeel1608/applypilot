@@ -118,6 +118,7 @@ describe("database foundation", () => {
       "0006_r2_calibration_qualification.sql",
       "0007_personal_live_v1_enablement.sql",
       "0008_real_target_inspection_scope.sql",
+      "0009_green_banner_session_grant.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -156,7 +157,7 @@ describe("database foundation", () => {
         "runner_inspection_bindings",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(8);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(9);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
@@ -275,6 +276,39 @@ describe("database foundation", () => {
         .get(),
     ).toEqual({ count: 1 });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("upgrades schema v8 with an immutable green-banner parent and child ledger", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+      "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
+      "0008_real_target_inspection_scope.sql",
+    ]) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    sqlite.exec(
+      readFileSync(
+        new URL("../drizzle/0009_green_banner_session_grant.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(9);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM sqlite_master WHERE type='table' AND name IN ('green_banner_parent_grants','green_banner_parent_grant_events','green_banner_child_capabilities','green_banner_child_events')",
+        )
+        .get(),
+    ).toEqual({ count: 4 });
     sqlite.close();
   });
 

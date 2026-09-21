@@ -13,6 +13,7 @@ export * from "./r2-repository";
 export * from "./r2-corrections";
 export * from "./source-enablement-repository";
 export * from "./runner-enablement-repository";
+export * from "./green-banner-repository";
 
 export function openApplyPilotDatabase(path: string) {
   const sqlite = new BetterSqlite3(path);

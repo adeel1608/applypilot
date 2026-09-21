@@ -6,6 +6,7 @@ export * from "./inspection-runner";
 export * from "./lever-inspection-adapter";
 export * from "./target-runner";
 export * from "./private-target-allowlist";
+export * from "./green-banner-grant";
 
 export const ApplicationRunnerMode = {
   DISCOVERY_ONLY: "DISCOVERY_ONLY",
