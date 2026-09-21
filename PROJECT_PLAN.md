@@ -7264,5 +7264,31 @@ The real database is schema 9 with zero pending migrations, integrity PASS, and 
 the schema-9 backup restored successfully with a recovery backup. Migrations `0000`-`0008` remain
 unchanged; `0009` is additive only. Release summary classified Source-enabled Personal Beta READY and
 Personal Live V1 NOT_READY with `REAL_RUNNER_TARGET_APPROVAL_REQUIRED` plus the unresolved role facts
-above. The worktree remains intentionally dirty until this coherent offline implementation is committed
-and reviewed; no final-submit consent was issued and no submission occurred.
+above. No final-submit consent was issued and no submission occurred.
+
+### Post-merge persistent grant checkpoint - 2026-09-22
+
+PR #42 (`feat: add persistent green banner readiness grant`) was reviewed at exact head
+`cfc92088dd2eed295117efe3e378cf4aae148057`. Both exact-head GitHub quality workflows passed
+(`35667558221` and `35667575630`), and the pull request was merged normally as
+`467e288959edd6983c5086bbee979aad23e434d8`. Local `main` was refreshed with fast-forward only and
+matches `origin/main` at that merge commit; the worktree is clean. The additive schema-9 grant
+implementation is now on `main`; migrations `0000`-`0008` remain immutable.
+
+Post-merge offline checks passed: database schema 9, pending migrations 0, integrity `PASS`, foreign
+key issues 0; privacy audit; doctor/preflight; release summary; `git diff --check`; and strict fsck
+inspection (only previously known dangling objects). The release classification is
+`SOURCE_ENABLED_PERSONAL_BETA_READY`; source and target authorities are inactive. Lifetime real-action
+counts remain source `13`, employer visits `9`, uploads `0`, submissions `0`.
+
+The persistent parent grant remains submit-excluded. Its completed bounded source discovery, current
+engineering CV generation, private packet freeze, and one passive inspection are preserved locally;
+no further live source or employer action was taken after the merged implementation. Personal Live V1
+is still `NOT_READY`: the selected Melbourne technical role remains `REVIEW_REQUIRED` because material
+eligibility/application facts are unsupported or unknown (including job expiry, work rights or
+sponsorship, experience/skills, education/certifications/licences, hours/schedule, and vehicle where
+applicable), and the inspected form contains unsupported controls plus a required document control.
+No candidate answer was invented, no fill-preview or upload was attempted, and no submit consent was
+issued. These are now the sole owner-only factual gates; the next step requires the owner to provide
+truthful answers/evidence for the required fields and explicitly resolve any unsupported control before
+any bounded MAP/FILL/UPLOAD preview can be considered. Final submission remains separately excluded.
