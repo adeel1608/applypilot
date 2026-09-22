@@ -1449,8 +1449,9 @@ private database migration or restore is permitted.
 ## 23. PR #46 integrated offline proof closeout (2026-09-22)
 
 Correction scope is complete on `chore/p2-current-role-readiness` as an open, unmerged PR #46.
-Starting reviewed head was `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; the final exact head and
-GitHub CI identifiers are recorded after the same-branch push. No live source/employer request,
+Starting reviewed head was `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; implementation head
+`f2237756a1a8da6f22382085f0bdcff506d75c4d` has exact-head push CI `35721673256` and PR CI
+`35721677924`, both `success`. No live source/employer request,
 candidate transmission, private runtime mutation, grant/capability activation, upload, or submission
 occurred; this iteration remains `0/0/0/0`, with lifetime counters `14/9/0/0`.
 
@@ -1463,8 +1464,8 @@ occurred; this iteration remains `0/0/0/0`, with lifetime counters `14/9/0/0`.
 | R46-05  | `VERIFIED (single discoverable browser proof)` by `source-to-preview.spec.ts`: fictional source/ledger/R2 identifiers bind a current packet to map/fill/upload/verify/preview/reload; all target traffic is allowlisted loopback. Existing adversarial synthetic suites remain green.                                                                                  | The source/R2 evidence in this proof is fictional and disposable; it is not Personal Live V1 readiness.                                                              |
 | R46-06  | `VERIFIED` local implementation gates: unit 53 files/592 tests, integration 3 files/21 tests, E2E 45 tests, build/showcase/audit, lint, typecheck, privacy, preflight, dependency audit, diff-check, fsck, and disposable migration/recovery tests.                                                                                                                    | Repository-wide `format:check` remains blocked by 11 pre-existing files; targeted changed-file formatting passes. Full release check is therefore not claimed green. |
 
-Migration boundary: `0000`-`0009` remain immutable. Unmerged disposable `0010` changed from the
-reviewed pre-correction blob (recorded by the parent commit) to SHA-256
+Migration boundary: `0000`-`0009` remain immutable. Unmerged disposable `0010` changed from blob
+`37dfdd5bb70273eef8836ea981a2df92f9a8a922` to SHA-256
 `80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; fresh schema-9 upgrade,
 integrity/FK, future-schema refusal, and backup/restore tests use in-memory/disposable databases.
 The private local database remains schema 9 with pending migration 1, integrity `PASS`, and FK
