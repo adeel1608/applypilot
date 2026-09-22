@@ -1656,6 +1656,9 @@ runtime remains schema 9, pending migration 1, integrity `PASS`, foreign-key iss
   sequence with conflict/order validation, and reopens an interrupted `CLAIMED` upload as
   `PAUSED/UPLOAD_OUTCOME_UNKNOWN` without retransmission. A tampered completed effect remains a hard
   `NON_SUBMIT_SNAPSHOT_CORRUPT` failure.
+- The database regression now uses a temporary file-backed SQLite database, two independent
+  connections for pre-completion claim contention, and close/reopen recovery for an upload claim;
+  it also asserts wrong packet/binding rejection and ordered checkpoint uniqueness.
 - The decisive E2E now reloads the packet through the shared loader in an independent SQLite context;
   the child process uses `scripts/r46-08-load-packet.ts` (loader plus durable store), not raw packet
   columns. It exercises the currentness callback with a fresh resolver and verifies exact 15-minute

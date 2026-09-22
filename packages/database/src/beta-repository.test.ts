@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 import { describe, expect, it } from "vitest";
@@ -26,8 +29,8 @@ function migratedDatabase(): BetterSqlite3.Database {
   return sqlite;
 }
 
-function migratedR2Database(): BetterSqlite3.Database {
-  const sqlite = new BetterSqlite3(":memory:");
+function migratedR2Database(path = ":memory:"): BetterSqlite3.Database {
+  const sqlite = new BetterSqlite3(path);
   for (const name of [
     "0000_applypilot_foundation.sql",
     "0001_real_world_job_intake.sql",
@@ -48,7 +51,8 @@ function migratedR2Database(): BetterSqlite3.Database {
 
 describe("Beta repository", () => {
   it("round-trips a current R2 packet without treating a legacy evaluation as current", () => {
-    const sqlite = migratedR2Database();
+    const databasePath = join(tmpdir(), `applypilot-r46-08-${randomUUID()}.sqlite`);
+    const sqlite = migratedR2Database(databasePath);
     const now = "2026-09-22T00:00:00.000Z";
     sqlite
       .prepare(
@@ -204,6 +208,17 @@ describe("Beta repository", () => {
     expect(
       () => new SqliteNonSubmitRunStore(sqlite, runId, "f".repeat(64), () => new Date(now)),
     ).toThrow("PACKET_BINDING_MISMATCH");
+    const competingSqlite = new BetterSqlite3(databasePath);
+    competingSqlite.pragma("foreign_keys = ON");
+    expect(
+      new SqliteNonSubmitRunStore(
+        competingSqlite,
+        runId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).claim(bindingDigest, "MAP_FOR_FILL"),
+    ).toBe(false);
+    competingSqlite.close();
     durable.save(bindingDigest, {
       state: "MAPPED",
       sequence: 1,
@@ -285,11 +300,24 @@ describe("Beta repository", () => {
     );
     const recoveryBinding = "f".repeat(64);
     expect(recoveryStore.claim(recoveryBinding, "UPLOAD")).toBe(true);
-    expect(recoveryStore.load(recoveryBinding)).toMatchObject({
+    sqlite.close();
+    const reopenedSqlite = new BetterSqlite3(databasePath);
+    reopenedSqlite.pragma("foreign_keys = ON");
+    expect(
+      new SqliteNonSubmitRunStore(
+        reopenedSqlite,
+        recoveryRunId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).load(recoveryBinding),
+    ).toMatchObject({
       state: "PAUSED",
       checkpoints: [expect.objectContaining({ stopReason: "UPLOAD_OUTCOME_UNKNOWN" })],
     });
-    sqlite.close();
+    reopenedSqlite.close();
+    rmSync(databasePath, { force: true });
+    rmSync(`${databasePath}-wal`, { force: true });
+    rmSync(`${databasePath}-shm`, { force: true });
   });
 
   it("supersedes prior artifact approvals without overwriting either version", () => {
