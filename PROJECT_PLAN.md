@@ -322,7 +322,9 @@ Acceptance: archive Git blob remains `9ad8a46ded3205fee063dae0bbaa3162fd5d905b` 
 continues to pass normal Prettier checks; exact-head GitHub CI is the final external P0 gate.
 Local verification: archive hash/blob checked before and after; active-plan formatting, privacy,
 diff, and fsck checks run.
-Evidence: local `IMPLEMENTED_UNVERIFIED` pending the new exact-head workflow result.
+Evidence: exact-head GitHub Actions quality passed at head `c52a0b8adca4375d86f7c28d141ea4e9d87ed7dd`
+(runs `35681670888` and `35681673460`). P0 remains `IMPLEMENTED_UNVERIFIED` until reviewer
+acceptance and merge establish the verified merged baseline.
 Failure/recovery: if the archive hash changes, stop and restore it from the committed PR state;
 if CI fails for another reason, investigate only that exact failure and stop before unrelated fixes.
 Invalidation: any archive content change or base/head drift invalidates this record.
@@ -805,18 +807,20 @@ Temporary read-only diagnostic scripts were deleted before handoff.
 Follow-up before commit: `npx.cmd prettier --check PROJECT_PLAN.md` PASS and `git diff --check`
 PASS (the only output is Git's LF/CRLF normalization warning).
 
-GitHub PR #44 had a known P0 CI blocker: repository-wide `prettier --check .` rejected only the
-required byte-identical historical archive. P0-004 is remediating that exact failure with the sole
-`.prettierignore` exception above; exact-head GitHub CI remains the final external P0 gate.
+GitHub PR #44's known P0 CI blocker was remediated by the sole `.prettierignore` exception above;
+exact-head quality passed at `c52a0b8adca4375d86f7c28d141ea4e9d87ed7dd` (runs `35681670888` and
+`35681673460`). P0 remains `IMPLEMENTED_UNVERIFIED` pending reviewer acceptance and merge.
 
 No backup, restore, migration, source request, employer request, browser session, document generation,
 packet generation, capability mutation, deployment, or application action was performed in this
 iteration. Action counters added by this iteration are source/employer/upload/submission `0/0/0/0`.
 
-Exactly one recommended next task:
+Exactly one recommended next action:
 
-`P4-001 — Implement and verify the real non-submit operation lane` (parked until PR #44 is reviewed,
-merged, and P0 is recorded fully VERIFIED against the merged baseline).
+`PROJECT REVIEW — PR #44 merge decision`
+
+`P4-001 — Implement and verify the real non-submit operation lane` remains parked until that review,
+merge, and a fully VERIFIED P0 merged baseline.
 
 Dependencies: P1 architecture audit complete; P2 current provider evidence and role decision;
 current profile/evaluation/document bindings; a newly generated private packet only after those
