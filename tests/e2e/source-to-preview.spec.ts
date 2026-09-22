@@ -971,6 +971,7 @@ test("persists source verification through canonical R2 and packet services to a
         )
         .run(runId);
       expect(() => reopenedStore.load(bindingDigest)).toThrow("NON_SUBMIT_SNAPSHOT_CORRUPT");
+      expect(() => reopenedStore.checkpoints()).toThrow("NON_SUBMIT_SNAPSHOT_CORRUPT");
       expect(transportCounts).toEqual({ dns: 2, requests: 2 });
       expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
         count: 1,

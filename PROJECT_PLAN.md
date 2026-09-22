@@ -1541,7 +1541,8 @@ calls (initial plus unchanged replay), one fictional upload, and zero submission
 
 - The decisive test closes the adapter and SQLite connection, verifies the preview from a fresh child
   Node process, reopens SQLite/store objects, checks `FILL_PREVIEW` and foreign keys, then corrupts the
-  stored effect and proves `NON_SUBMIT_SNAPSHOT_CORRUPT` rather than silently restarting.
+  stored effect and proves both `load()` and `checkpoints()` return `NON_SUBMIT_SNAPSHOT_CORRUPT` rather
+  than silently restarting.
 - An independent SQLite connection cannot claim the completed `MAP_FOR_FILL` operation.
 - A real queue transition away from `PREPARING` makes a new runner stop as `PAUSED/PAGE_CHANGED`
   before another upload; counters remain unchanged.

@@ -184,12 +184,13 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
       )
       .all(this.runId) as Array<{ effectJson: string }>;
     return rows.flatMap(({ effectJson }) => {
+      let parsed: unknown;
       try {
-        const snapshot = JSON.parse(effectJson) as NonSubmitDurableSnapshot;
-        return snapshot.checkpoints ?? [];
+        parsed = JSON.parse(effectJson) as unknown;
       } catch {
-        return [];
+        throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
       }
+      return parseSnapshot(parsed).checkpoints;
     });
   }
 }
