@@ -96,7 +96,7 @@ ApplyPilot must support a safe, reproducible, single-owner production workflow:
 
 ### Green banner
 
-`GREEN_BANNER_RELEASE_MARKER`
+`# 🟢 **WE ARE READY**`
 
 means:
 
@@ -338,11 +338,12 @@ Exit: one consistent active plan.
 
 ### P1 — Production scope and architecture verification
 
-Status: `VERIFIED`
+Status: `IMPLEMENTED_UNVERIFIED`
 
-Evidence: code-reviewed merged main `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`, existing
-architecture/security documentation, read-only runtime gates, and the matrices below. This closes
-architecture definition only; it does not make P2/P3/P4 or Personal Live V1 ready.
+Evidence: architecture work and local/code evidence are complete on branch head
+`5266a11436a6289bbfa924797f886bab55d4dc79`; exact-head CI passed and the matrices below are
+preserved. Final project review, PR #45 merge, and merged-baseline verification remain pending; this
+does not make P2/P3/P4 or Personal Live V1 ready.
 
 - [x] Component capability matrix (read-only code review).
 - [x] End-to-end data-flow map (source/R2/document/packet/runner boundaries recorded).
@@ -379,6 +380,28 @@ incorrect. No runtime rollback or migration is applicable.
 
 Invalidation: code, migration, authority, deployment, or trust-boundary changes invalidate this
 P1 evidence and require a new architecture review.
+
+#### P1-002 execution blueprint and evidence
+
+Objective: correct active-plan release-marker wording and phase-status semantics without changing the
+architecture evidence, runtime behavior, authority, data, migrations, tests, workflow, or dependencies.
+
+Required corrections: restore the exact green-banner phrase at both active-plan definition/emission
+locations; keep overall P1 `IMPLEMENTED_UNVERIFIED` until PR #45 is reviewed, merged, and its merged
+tree is verified; keep overall P5 blocked by P4 while preserving its verified synthetic safety evidence
+as `P5-SYN-001`.
+
+Scope: `PROJECT_PLAN.md` only. The immutable historical archive remains untouched. No source,
+employer, browser, document, packet, database, capability, grant, candidate-profile, deployment, or
+application action is permitted.
+
+Acceptance: zero obsolete placeholder-marker occurrences; exact phrase appears in both intended
+active-plan locations; P1 is `IMPLEMENTED_UNVERIFIED`; P5 is `BLOCKED`; `P5-SYN-001` is `VERIFIED`;
+P4 remains `BLOCKED`; Personal Live V1 remains `NOT_READY`; exact-head CI independently passes.
+
+Rollback: revert this documentation-only commit on `docs/p1-production-architecture`; no runtime
+rollback or migration is applicable. Invalidation: any runtime/architecture change or merged-main
+drift requires a fresh P1 review.
 
 ### P1 production topology decision
 
@@ -545,10 +568,11 @@ parent grant; no protection bypass; `OUTCOME_UNKNOWN` for ambiguity; and no blin
 
 ### P1 exit and dependency review
 
-P1 exit is satisfied: the merged P0 baseline is accepted; component/capability/data-flow matrices,
+P1 architecture work is complete on the reviewed branch: component/capability/data-flow matrices,
 private/public boundary, parent/child authority path, real-runner limitation, topology, trust model,
-and implemented-vs-proposed distinction are explicit. P1 does not complete P2, P3, P4, Personal Live
-V1, or the green banner.
+and implemented-vs-proposed distinction are explicit. Overall P1 remains `IMPLEMENTED_UNVERIFIED`
+until PR #45 is technically accepted, merged, and the merged baseline is verified. P1 does not
+complete P2, P3, P4, Personal Live V1, or the green banner.
 
 Next dependency order (read-only decision, not execution): P2 provider freshness/current role and
 packet evidence must be resolved before P4; P3 restart/replay, changed/duplicate handling, and
@@ -603,9 +627,19 @@ Exit: real non-submit engine implemented and synthetically/integration verified.
 
 ### P5 — Final review and submission safety
 
+Status: `BLOCKED`
+
+Reason: production P5 integration cannot complete until P4 provides the real non-submit execution
+path, real preview, and current target/packet bindings. The synthetic safety evidence is retained and
+verified below, but it does not satisfy the overall P5 production phase.
+
+#### P5-SYN-001 — Synthetic final-review / consent / outcome safety
+
 Status: `VERIFIED`
 
-Evidence qualifier: synthetic safety only; this does not make production submission ready.
+Evidence scope: frozen synthetic final-review state; one-use consent; material-change invalidation;
+concurrent/double-consumption prevention; synthetic submit-control binding; `SUBMITTED`;
+`FAILED_PRE_SUBMIT`; `OUTCOME_UNKNOWN`; and no blind retry after ambiguous outcome.
 
 - [x] Freeze exact final-review state (synthetic runner).
 - [x] Fresh one-use consent (synthetic runner).
@@ -615,27 +649,31 @@ Evidence qualifier: synthetic safety only; this does not make production submiss
 - [x] Define `SUBMITTED`, `FAILED_PRE_SUBMIT`, `OUTCOME_UNKNOWN`.
 - [x] No retry after ambiguous result.
 
-Exit: synthetic submit lifecycle verified.
+This synthetic subtask is reusable evidence for P5 but does not satisfy the overall P5 production
+phase while P4 is incomplete.
+
+Exit: synthetic submit lifecycle verified; production P5 remains blocked by P4.
 
 ### Phase task-record index
 
 Each P0-P11 checklist above is an actionable task record. The following fields apply to every
 checklist item; item-specific exceptions are recorded in the phase evidence and blocker register.
 
-| Task | Owner                             | Dependencies                  | Objective/components                      | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                  | Blockers/invalidation                       |
-| ---- | --------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------- |
-| P0   | Codex                             | repository baseline           | reconcile plan/history/docs               | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash | invalidated by baseline drift               |
-| P1   | Codex + owner review              | P0                            | architecture, trust boundaries, authority | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | architecture evidence on revision `3cc75df`        | P2/P3 evidence and P4 operation gaps remain |
-| P2   | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness        | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                 | BLK-003/004/005                             |
-| P3   | Codex                             | P1/P2                         | source-to-R2 traceability                 | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                 | BLK-006; partial restart test pending       |
-| P4   | Codex + security review           | P1/P2/P3                      | real non-submit operation lane            | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review               | BLK-001/002/005/007/008                     |
-| P5   | Codex + owner review              | P4                            | final review/consent/outcome              | freeze exact state and one-use consent; acceptance is synthetic safety plus later real evidence        | concurrency/ambiguous-outcome tests; invalidate on change               | synthetic verified, revision `010cbe9`             | production path remains unverified          |
-| P6   | Codex + owner decision            | P1-P5                         | reproducible release candidate            | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                        | deployment/configuration decision           |
-| P7   | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                        | P4 and current packet required              |
-| P8   | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                       | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                        | P4/P7/P5 gaps                               |
-| P9   | Owner + operations                | P6/P8                         | approved deployment                       | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                        | topology/secrets/security policy            |
-| P10  | Owner + Codex                     | P8/P9                         | first supervised submission               | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                        | explicit owner final approval               |
-| P11  | Codex + operations                | P9/P10                        | recovery and handover                     | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                        | deployment and real-operation evidence      |
+| Task       | Owner                             | Dependencies                  | Objective/components                          | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                             | Blockers/invalidation                                        |
+| ---------- | --------------------------------- | ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| P0         | Codex                             | repository baseline           | reconcile plan/history/docs                   | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash            | invalidated by baseline drift                                |
+| P1         | Codex + owner review              | P0                            | architecture, trust boundaries, authority     | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | architecture evidence on PR #45 head `5266a11`; merge pending | P2/P3 evidence and P4 operation gaps remain                  |
+| P2         | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness            | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                            | BLK-003/004/005                                              |
+| P3         | Codex                             | P1/P2                         | source-to-R2 traceability                     | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                            | BLK-006; partial restart test pending                        |
+| P4         | Codex + security review           | P1/P2/P3                      | real non-submit operation lane                | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review                          | BLK-001/002/005/007/008                                      |
+| P5         | Codex + owner review              | P4                            | final review/consent/outcome                  | production phase remains blocked until P4 real non-submit execution and real final-review integration  | concurrency/ambiguous-outcome tests; invalidate on change               | overall BLOCKED; `P5-SYN-001` synthetic evidence VERIFIED     | P4 real non-submit execution + real final-review integration |
+| P5-SYN-001 | Codex + owner review              | P5                            | synthetic final-review/consent/outcome safety | frozen state, one-use consent, invalidation, double-consumption prevention, outcome taxonomy           | synthetic concurrency and ambiguous-outcome tests; no blind retry       | VERIFIED synthetic evidence                                   | does not unblock production P5; P4 remains required          |
+| P6         | Codex + owner decision            | P1-P5                         | reproducible release candidate                | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                                   | deployment/configuration decision                            |
+| P7         | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation     | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                                   | P4 and current packet required                               |
+| P8         | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                           | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                                   | P4/P7/P5 gaps                                                |
+| P9         | Owner + operations                | P6/P8                         | approved deployment                           | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                                   | topology/secrets/security policy                             |
+| P10        | Owner + Codex                     | P8/P9                         | first supervised submission                   | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                                   | explicit owner final approval                                |
+| P11        | Codex + operations                | P9/P10                        | recovery and handover                         | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                                   | deployment and real-operation evidence                       |
 
 ### P6 — Reproducible staging/release candidate
 
@@ -688,7 +726,7 @@ Require all:
 - [ ] no release blocker.
 
 Only then emit:
-`GREEN_BANNER_RELEASE_MARKER`
+`# 🟢 **WE ARE READY**`
 
 ### P9 — Production deployment
 
@@ -972,10 +1010,10 @@ Examples:
 ## 17. Current iteration handoff
 
 Current task:
-`P1-001 — production scope and architecture verification`
+`P1-002 — active plan release-contract/status correction`
 
 Scope:
-documentation, architecture evidence, and read-only verification only.
+active-plan documentation and status semantics only; no architecture/runtime implementation.
 
 No:
 
@@ -989,34 +1027,41 @@ No:
 - deployment;
 - secret/config mutation;
 - application-code change.
+- historical-archive edit;
+- database/capability/grant mutation;
+- candidate, document, packet, source, or employer state change.
 
 Required PR:
-`docs: verify Personal Live V1 production architecture`
+`docs: verify Personal Live V1 production architecture` (existing PR #45)
+
+PR #45 remains OPEN / UNMERGED at its reviewed branch. P1 remains `IMPLEMENTED_UNVERIFIED` pending
+technical review, merge, and merged-baseline verification. P5 remains `BLOCKED`, with
+`P5-SYN-001 VERIFIED` retained as synthetic evidence. Personal Live V1 remains `NOT_READY`.
 
 Baseline: PR #44 is approved and squash-merged as `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`.
-P0 is `VERIFIED` under the documented squash-tree equivalence rule. This branch must remain
-OPEN/UNMERGED for review; no runtime or capability mutation is part of this task.
+P0 is `VERIFIED` under the documented squash-tree equivalence rule. No runtime or capability
+mutation is part of this correction.
 
-This iteration's architecture evidence is complete. No source/employer request, browser or target
+This iteration corrects active-plan semantics only. No source/employer request, browser or target
 visit, fill, upload, submission, capability/grant mutation, candidate-fact mutation, document/packet
-generation, migration, restore, deployment, secret/config change, application-code change, or
-dependency/workflow change was performed. Temporary read-only diagnostic scripts were deleted before
-handoff.
+generation, migration, restore, deployment, secret/config change, application-code change, test,
+dependency/workflow change, or historical-archive edit was performed.
 
-### Read-only verification record (2026-09-22)
+### P1-002 validation record (2026-09-22)
 
-| Check                                                     | Result                                                                           |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `git status --short --branch`, baseline/origin comparison | PASS at branch start; only this documentation plan changed                       |
-| `npm.cmd run db:status`                                   | PASS — schema 9, pending 0, integrity PASS, FK issues 0                          |
-| `npm.cmd run privacy:audit`                               | PASS — tracked/history/build-private-data audit completed without private values |
-| `npm.cmd run preflight`                                   | PASS — profile, DB, loopback, authority, backup, beta gates                      |
-| `npx.cmd prettier --check PROJECT_PLAN.md`                | PASS — all matched files use Prettier code style                                 |
-| `git diff --check`                                        | PASS — only Git LF/CRLF normalization warning                                    |
-| `git fsck --strict`                                       | PASS — known dangling historical objects only; no fsck errors                    |
+| Check                                                  | Result                                                           |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| obsolete placeholder-marker search                     | PASS — 0 matches                                                 |
+| exact green-banner phrase locations                    | PASS — 2 active-plan matches                                     |
+| P1/P5/P5-SYN-001/P4/Personal Live V1 status assertions | PASS — IMPLEMENTED_UNVERIFIED/BLOCKED/VERIFIED/BLOCKED/NOT_READY |
+| `npx.cmd prettier --check PROJECT_PLAN.md`             | PASS — all matched files use Prettier code style                 |
+| `npm.cmd run privacy:audit`                            | PASS — tracked/history/build-private-data audit completed        |
+| `git diff --check`                                     | PASS — only Git LF/CRLF normalization warning                    |
+| `git fsck --strict`                                    | PASS — known dangling historical objects only; no fsck errors    |
+| diff scope                                             | PASS — PROJECT_PLAN.md only                                      |
 
-Checks above are read-only and were run before commit; Git's LF/CRLF normalization warning is not a
-content failure.
+These checks are read-only; known historical dangling objects and Git's LF/CRLF normalization warning
+were unchanged and non-fatal.
 
 P0 archive evidence remains immutable: reviewed PR #44 head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`,
 exact-head CI runs `35681958007` and `35681961078`, merged commit
@@ -1031,14 +1076,10 @@ iteration adds `0/0/0/0`.
 
 Exactly one recommended next action:
 
-`P2-001 — Verify current role/provider evidence and refresh the application packet`
+`PROJECT REVIEW — PR #45 merge decision`
 
-Dependencies: P0 verified merged baseline; owner-validated current private profile; fresh bounded
-provider evidence; current R2 evaluation; current document/profile/job bindings; no real employer or
-source action unless separately authorized. P3 replay/currentness checks must remain before any P4
-mutation design, and P4 stays parked.
+Dependencies: corrected active-plan contract; exact-head CI green; technical review acceptance; PR #45
+merge and merged-tree verification. Do not start P2/P3/P4 or merge PR #45 in this task.
 
-Acceptance: establish a fresh, owner-approved role/provider evidence record; re-run conservative R2
-evaluation with unknowns preserved; refresh or explicitly reject the stale packet; record current
-job/profile/evaluation/document digests and reasons; run local privacy/currentness gates; do not
-perform any employer interaction. Do not start P3/P4 from this task.
+Acceptance: reviewer confirms the exact readiness phrase, P1/P5 semantics, retained P5-SYN-001 evidence,
+P4 blocker, and clean exact-head CI before deciding whether to merge PR #45.
