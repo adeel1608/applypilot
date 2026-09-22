@@ -96,7 +96,7 @@ ApplyPilot must support a safe, reproducible, single-owner production workflow:
 
 ### Green banner
 
-`# 🟢 **WE ARE READY**`
+`GREEN_BANNER_RELEASE_MARKER`
 
 means:
 
@@ -688,7 +688,7 @@ Require all:
 - [ ] no release blocker.
 
 Only then emit:
-`# 🟢 **WE ARE READY**`
+`GREEN_BANNER_RELEASE_MARKER`
 
 ### P9 — Production deployment
 
