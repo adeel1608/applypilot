@@ -5,3 +5,5 @@ package-lock.json
 playwright-report
 test-results
 packages/database/drizzle
+# Byte-identical historical plan archive; intentionally excluded from formatting.
+docs/project-history/PROJECT_PLAN.before-production-rebaseline.md

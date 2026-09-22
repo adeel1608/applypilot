@@ -295,7 +295,7 @@ Verify:
 
 ### P0 — Baseline reconciliation and plan rebase
 
-Status: `VERIFIED`
+Status: `IMPLEMENTED_UNVERIFIED`
 
 - [x] Archive old plan at `docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`.
 - [x] Record source commit/blob/hash.
@@ -304,6 +304,28 @@ Status: `VERIFIED`
 - [x] Add old-to-new crosswalk.
 - [x] Separate reported vs verified evidence.
 - [x] Open documentation-only PR #44 and leave unmerged (https://github.com/adeel1608/applypilot/pull/44).
+
+#### P0-004 — Historical archive formatting-policy closure
+
+Status: `IMPLEMENTED_UNVERIFIED`
+Owner: Codex
+Depends on: P0 baseline archive and exact-head repository CI
+Objective: preserve the byte-identical historical snapshot while allowing repository-wide formatting
+checks to cover all active files.
+Root cause: `prettier --check .` correctly rejected the immutable historical snapshot even though
+the active plan was formatted. Formatting, editing, regenerating, or line-ending-normalizing the
+archive would destroy its evidence value.
+Authorized change: add exactly this `.prettierignore` entry and no broader pattern:
+`docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`
+Acceptance: archive Git blob remains `9ad8a46ded3205fee063dae0bbaa3162fd5d905b` and SHA-256 remains
+`51BE6553983760CAB1AD8C39F29EC444006F7B5983C7150AE8DB6BCD4B44DC93`; active `PROJECT_PLAN.md`
+continues to pass normal Prettier checks; exact-head GitHub CI is the final external P0 gate.
+Local verification: archive hash/blob checked before and after; active-plan formatting, privacy,
+diff, and fsck checks run.
+Evidence: local `IMPLEMENTED_UNVERIFIED` pending the new exact-head workflow result.
+Failure/recovery: if the archive hash changes, stop and restore it from the committed PR state;
+if CI fails for another reason, investigate only that exact failure and stop before unrelated fixes.
+Invalidation: any archive content change or base/head drift invalidates this record.
 
 Exit: one consistent active plan.
 
@@ -783,10 +805,9 @@ Temporary read-only diagnostic scripts were deleted before handoff.
 Follow-up before commit: `npx.cmd prettier --check PROJECT_PLAN.md` PASS and `git diff --check`
 PASS (the only output is Git's LF/CRLF normalization warning).
 
-GitHub PR #44 quality CI currently fails only at repository-wide `prettier --check .` because the
-required byte-identical historical archive is intentionally not reformatted. Adding a formatter
-exclusion or changing the archive would violate this iteration's authorized file/scope boundary;
-the discrepancy is left explicit for review.
+GitHub PR #44 had a known P0 CI blocker: repository-wide `prettier --check .` rejected only the
+required byte-identical historical archive. P0-004 is remediating that exact failure with the sole
+`.prettierignore` exception above; exact-head GitHub CI remains the final external P0 gate.
 
 No backup, restore, migration, source request, employer request, browser session, document generation,
 packet generation, capability mutation, deployment, or application action was performed in this
@@ -794,7 +815,8 @@ iteration. Action counters added by this iteration are source/employer/upload/su
 
 Exactly one recommended next task:
 
-`P4-001 — Implement and verify the real non-submit operation lane`
+`P4-001 — Implement and verify the real non-submit operation lane` (parked until PR #44 is reviewed,
+merged, and P0 is recorded fully VERIFIED against the merged baseline).
 
 Dependencies: P1 architecture audit complete; P2 current provider evidence and role decision;
 current profile/evaluation/document bindings; a newly generated private packet only after those
