@@ -1196,6 +1196,9 @@ that merged tree. P2 remains `IMPLEMENTED_UNVERIFIED` because the selected role 
 | focused source/capability tests            | PASS — 2 files, 124 tests                                                                                |
 | full regression/build/E2E/release suite    | Not run; no claim of full regression coverage                                                            |
 
+PR #46 is OPEN / UNMERGED at exact head `49b2db732f4dce1cc572d385ce1b20036255e9f9`; both exact-head
+GitHub Quality checks passed (runs `35707471505` and `35707507468`).
+
 Historical lifetime counters are now source/employer/upload/submission `14/9/0/0`; this iteration adds
 `1/0/0/0`. Exact source run and packet/readiness evidence are recorded in the P2 section above.
 
