@@ -3,7 +3,7 @@
 Last updated: 2026-09-22
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `010cbe909b7d7b2b4ed88c413f270f7ff1ff75ac`
+Expected current main: `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
@@ -12,7 +12,11 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ### Current checkpoint (read-only reconciled 2026-09-22)
 
-- Repository `adeel1608/applypilot` is on clean `main` at `010cbe909b7d7b2b4ed88c413f270f7ff1ff75ac`; `origin/main` matches.
+- Repository `adeel1608/applypilot` is on clean `main` at `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`; `origin/main` matches.
+- PR #44 was approved and squash-merged normally. Reviewed head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`
+  and merged main have the same Git tree; strict commit ancestry is intentionally absent for the squash merge.
+- Squash verification rule: expected reviewed head + exact-head CI + approved squash merge + merged parent equal
+  pre-merge main + merged tree equal reviewed head tree + approved scope + archive digest preservation.
 - PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 merged as the current main commit.
 - Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
 - Historical lifetime action counters reconcile to source/employer/upload/submission = `13/9/0/0`; this iteration adds `0/0/0/0`.
@@ -295,7 +299,7 @@ Verify:
 
 ### P0 — Baseline reconciliation and plan rebase
 
-Status: `IMPLEMENTED_UNVERIFIED`
+Status: `VERIFIED`
 
 - [x] Archive old plan at `docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`.
 - [x] Record source commit/blob/hash.
@@ -303,11 +307,12 @@ Status: `IMPLEMENTED_UNVERIFIED`
 - [x] Add stable task IDs.
 - [x] Add old-to-new crosswalk.
 - [x] Separate reported vs verified evidence.
-- [x] Open documentation-only PR #44 and leave unmerged (https://github.com/adeel1608/applypilot/pull/44).
+- [x] Open documentation-only PR #44; exact-head CI passed, review approved, and squash merge recorded
+      at `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc` (https://github.com/adeel1608/applypilot/pull/44).
 
 #### P0-004 — Historical archive formatting-policy closure
 
-Status: `IMPLEMENTED_UNVERIFIED`
+Status: `VERIFIED`
 Owner: Codex
 Depends on: P0 baseline archive and exact-head repository CI
 Objective: preserve the byte-identical historical snapshot while allowing repository-wide formatting
@@ -322,9 +327,9 @@ Acceptance: archive Git blob remains `9ad8a46ded3205fee063dae0bbaa3162fd5d905b` 
 continues to pass normal Prettier checks; exact-head GitHub CI is the final external P0 gate.
 Local verification: archive hash/blob checked before and after; active-plan formatting, privacy,
 diff, and fsck checks run.
-Evidence: exact-head GitHub Actions quality passed at head `c52a0b8adca4375d86f7c28d141ea4e9d87ed7dd`
-(runs `35681670888` and `35681673460`). P0 remains `IMPLEMENTED_UNVERIFIED` until reviewer
-acceptance and merge establish the verified merged baseline.
+Evidence: exact-head GitHub Actions quality passed at reviewed head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`
+(runs `35681958007` and `35681961078`); PR #44 was accepted and squash-merged as
+`3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`. Archive blob/SHA are preserved on merged main.
 Failure/recovery: if the archive hash changes, stop and restore it from the committed PR state;
 if CI fails for another reason, investigate only that exact failure and stop before unrelated fixes.
 Invalidation: any archive content change or base/head drift invalidates this record.
@@ -333,7 +338,11 @@ Exit: one consistent active plan.
 
 ### P1 — Production scope and architecture verification
 
-Status: `IMPLEMENTED_UNVERIFIED`
+Status: `VERIFIED`
+
+Evidence: code-reviewed merged main `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`, existing
+architecture/security documentation, read-only runtime gates, and the matrices below. This closes
+architecture definition only; it does not make P2/P3/P4 or Personal Live V1 ready.
 
 - [x] Component capability matrix (read-only code review).
 - [x] End-to-end data-flow map (source/R2/document/packet/runner boundaries recorded).
@@ -341,10 +350,210 @@ Status: `IMPLEMENTED_UNVERIFIED`
 - [x] Real `MAP_FOR_FILL/FILL/UPLOAD/VERIFY/FILL_PREVIEW` architecture audit.
 - [x] Parent/child authority enforcement audit.
 - [x] Runner target capability enforcement audit.
-- [ ] Deployment topology decision.
+- [x] Deployment topology decision: `LOCAL_SINGLE_OWNER_V1`.
 - [x] Trust-boundary review of current local-first implementation.
 
 Exit: explicit implemented-vs-proposed capability map.
+
+#### P1-001 execution blueprint and evidence
+
+Objective: document the narrowest supported Personal Live V1 architecture, ownership, trust
+boundaries, authority limits, and future P4 design inputs without changing runtime behavior.
+
+Scope/components: `apps/web`, `apps/showcase`, candidate profile/runtime, source readers and
+transport, source/R2 repositories, eligibility/fit, documents/packets, target inspection and
+synthetic runner, tracker/outcomes, SQLite/migrations, backup/restore, and browser/private roots.
+
+Steps completed: inspect merged code and existing architecture/security/runbook docs; trace data and
+authority flow; classify each capability as implemented, synthetic-only, locally verified, live
+verified, engineering, or missing verification; select `LOCAL_SINGLE_OWNER_V1`; record failure
+ownership and P2/P3/P4 dependencies; run non-mutating checks.
+
+Acceptance: component and capability matrices complete; private/public boundary explicit; parent/child
+authority and real-target restriction documented; failure model assigned; topology selected; no P1
+unknown remains that would force P4 to guess. No source/employer/runtime action or database mutation
+was performed.
+
+Rollback: documentation-only branch; revert the P1 documentation commit before review if evidence is
+incorrect. No runtime rollback or migration is applicable.
+
+Invalidation: code, migration, authority, deployment, or trust-boundary changes invalidate this
+P1 evidence and require a new architecture review.
+
+### P1 production topology decision
+
+Selected topology: `LOCAL_SINGLE_OWNER_V1` on an owner-controlled Windows host.
+
+```text
+OWNER WINDOWS HOST (private, loopback-first)
+├── apps/web — private operational UI, loopback/local access
+├── local Node/TypeScript runner — scoped source and target orchestration
+│   └── Playwright Chromium only when an approved browser capability requires it
+├── local SQLite — profile versions, jobs/evidence, R2, queue, grants, capabilities, audits
+├── data/private — profile, generated documents, packets, reports, backups, browser/session state
+└── local recovery storage — verified SQLite-safe backups and restore runbook
+
+SEPARATE PUBLIC SYSTEM
+└── apps/showcase — static fictional demo only; no private DB/profile/session/authority/network
+```
+
+Personal Live V1 requires no hosted database, cloud browser, remote worker, multi-tenancy,
+multi-user authentication, SaaS queue, Kubernetes, Redis, cloud document storage, or paid AI API.
+The local runner is the only place permitted to hold private candidate data, authenticated state, or
+future employer interaction. External actions remain default-deny and require operation-scoped,
+short-lived authority. `apps/showcase` is not Personal Live V1 and cannot trigger actions.
+
+### P1 component ownership and maturity matrix
+
+| Component / path                                                                            | Responsibility; inputs → outputs; state                                                   | Trust / side effects / authority                                                              | Maturity and remaining work                                                                          |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `packages/candidate-profile`, `apps/web/lib/candidate-profile-provider.ts`                  | Zod profile truth store; private/demo resolution → verified facts/status DTO              | Private local boundary; no network; profile context gate prevents demo facts for real imports | `LOCAL_RUNTIME_VERIFIED`; owner facts remain P2-scoped                                               |
+| `packages/job-model`                                                                        | Canonical job, source, eligibility, application enums → typed domain objects              | Untrusted boundary after schema validation; no side effect                                    | `LOCAL_RUNTIME_VERIFIED`; provider freshness remains P2                                              |
+| `packages/job-sources/src/source-capability.ts`, `private-allowlist.ts`                     | Source capability schema/digest/readiness → approved source scope                         | Private authority; no call by itself; exact host/path/operation/budget/expiry                 | `LOCAL_RUNTIME_VERIFIED`; cumulative cross-run budget remains engineering                            |
+| `packages/job-sources/src/secure-source-transport.ts`, `source-runner.ts`, Lever readers    | Approved source capability → bounded HTTPS requests, inert records, stop diagnostics      | Public source boundary; GET only through capability, HTTPS/SSRF/query/redirect/retry guards   | `LIVE_VERIFIED` for bounded Lever list evidence; no new live action in P1                            |
+| `apps/web/lib/source-workspace.ts`, `packages/database/src/source-enablement-repository.ts` | Owner source view/orchestration; runs/pages/observations/audits → R2 handoff              | Private UI + DB; capability currentness checked before pages and completion                   | `LOCAL_RUNTIME_VERIFIED`/bounded beta live evidence; restart per-record audit gap is P3              |
+| `packages/job-importer`                                                                     | User-supplied content, inert HTML/text, URL policy → validated import batches             | Private import boundary; no source fetch; explicit confirmation before canonical writes       | `LOCAL_RUNTIME_VERIFIED`; no architecture gap for P1                                                 |
+| `packages/job-normalizer`, source observation tables                                        | Raw source record → normalized job version, conservative identity/dedup candidates        | Untrusted data becomes immutable provenance; no external side effect                          | `LOCAL_RUNTIME_VERIFIED`; changed/duplicate/restart tests remain P3                                  |
+| `packages/eligibility-engine`, `packages/fit-scorer`                                        | Current profile + evidence/job → eligibility, fit, explanations, coverage                 | Deterministic local computation; unknown stays review; no external side effect                | `LOCAL_RUNTIME_VERIFIED`; calibration remains uncalibrated and P2/P3 evidence-gated                  |
+| `packages/database/src/r2-repository.ts`, `r2a-repository.ts`                               | Immutable evidence/evaluation/queue/correction records → currentness and audit events     | Private SQLite; transactions/FKs and stale invalidation; no network                           | `LOCAL_RUNTIME_VERIFIED`; current packet/evaluation alignment remains P2                             |
+| `packages/resume-engine`, `cover-letter-engine`, `apps/web/lib/private-document.ts`         | Verified profile/job → private PDF/DOCX artifacts and digests                             | Private filesystem; no outbound transfer; approval binds content digest                       | `LOCAL_RUNTIME_VERIFIED`; regeneration remains P2-gated                                              |
+| `packages/database/src/beta-repository.ts` packet functions                                 | Current job/profile/evaluation/docs/answers → frozen packet/readiness                     | Private DB; rejects stale versions and invalidates on material changes                        | `LOCAL_RUNTIME_VERIFIED` synthetic/private; selected packet is stale for application operations (P2) |
+| `packages/application-runner/src/inspection-runner.ts`, `lever-inspection-adapter.ts`       | Frozen packet + real inspection capability → passive DOM field inventory                  | Employer boundary; one navigation/evaluation, zero writes/data; target capability required    | `LIVE_VERIFIED` for inspection history; no mutation API                                              |
+| `packages/application-runner/src/target-runner.ts`                                          | Target capability schema; synthetic packet binding/map/fill/consent/outcome → checkpoints | Real target schema permits only `OPEN_AND_INSPECT_ONLY`; synthetic adapter is loopback        | Inspection `LIVE_VERIFIED`; real MAP/FILL `ENGINEERING`, real UPLOAD/VERIFY/PREVIEW missing          |
+| `apps/web/lib/runner-workspace.ts`, `runner-enablement-repository.ts`                       | Private target proposal/allowlist, capability persistence, inspection/recovery views      | Private authority + DB; digest/packet/currentness checks; no automatic approval               | `LOCAL_RUNTIME_VERIFIED` for inspection; future P4 lifecycle required                                |
+| `packages/application-runner/src/green-banner-grant.ts`, green-banner repository            | Parent grant digest/scope → source/target child capabilities and terminal events          | Private authority; child TTL, scope, main SHA, packet/document bindings; SUBMIT excluded      | `LOCAL_RUNTIME_VERIFIED`; cumulative cross-run budget unresolved                                     |
+| `packages/application-tracker` and `application_events`                                     | Validated lifecycle events → append-only timeline/outcome projection                      | Private DB; no network; ambiguous outcome modeled                                             | `LOCAL_RUNTIME_VERIFIED` synthetic; real operation events await P4/P7                                |
+| `packages/database/src/schema.ts`, migrations `0000`–`0009`                                 | SQLite schema, FKs, immutable migration history → durable local state                     | Private local boundary; no auto-migrate in production                                         | `LOCAL_RUNTIME_VERIFIED`; backup/restore rehearsal is P11                                            |
+| `scripts/backup.ts`, `scripts/restore.ts`, database maintenance                             | SQLite-safe backup manifest/preview/confirmed restore → recovery state                    | Private filesystem; restore requires explicit confirmation and recovery backup                | `IMPLEMENTED_UNVERIFIED`; operational rehearsal deferred P11                                         |
+| `apps/web`                                                                                  | Loopback operational UI/server actions; safe DTOs → local views/mutations                 | Loopback Host/Origin/session/nonce gate; private profile server-only                          | `LOCAL_RUNTIME_VERIFIED`; deployment topology selected, no hosted exposure                           |
+| `apps/showcase`, `scripts/audit-public-showcase.ts`                                         | Static fictional pages/assets → public demo export                                        | Public boundary; audit rejects private imports, DB/fs/network/server actions                  | `LOCAL_RUNTIME_VERIFIED`; independently deployable, never operational                                |
+| Playwright/browser lifecycle (`start-e2e-server.ts`, inspection adapter)                    | Synthetic server or approved inspection session → bounded browser observations            | Browser/session private; protection/auth/CAPTCHA/MFA stop; no bypass                          | Synthetic + inspection live evidence; real mutation lifecycle is P4                                  |
+| Private filesystem roots (`scripts/lib/runtime-safety.ts`, ignored `data/private`)          | Profile, DB, documents, packets, backups, sessions → local artifacts                      | Outside Git/CI; secrets/cookies never logged or committed                                     | `LOCAL_RUNTIME_VERIFIED`; permissions/recovery thresholds remain P6/P11                              |
+
+### P1 capability matrix
+
+| Operation                       | Exists / evidence                                                                  | Authority, persistence, adapter                                                         | Personal Live V1 status                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `DISCOVER` / `SOURCE_LIST_JOBS` | Lever source runner and source UI; bounded live run evidence                       | SourceCapabilityV2 + private allowlist + source pages/observations/audits; Lever reader | `READY_BOUNDED_PERSONAL_BETA`, not unattended                       |
+| `NORMALIZE`                     | Source/import normalizers and immutable job versions; local/live source evidence   | Schema boundary and source repository; no external side effect                          | `LOCAL_RUNTIME_VERIFIED`                                            |
+| `EVALUATE`                      | R2 eligibility/fit/evidence engines and persisted evaluations                      | Current private profile/evidence; R2 audit; no external side effect                     | `LOCAL_RUNTIME_VERIFIED`, calibration not production-calibrated     |
+| `QUEUE`                         | Queue decisions and PREPARING currentness gates                                    | R2 repository + audit; no external side effect                                          | `LOCAL_RUNTIME_VERIFIED`                                            |
+| `DOCUMENT_GENERATE`             | Resume/cover-letter engines and private artifact digests                           | Private filesystem and profile provenance; no authority/network                         | `LOCAL_RUNTIME_VERIFIED`                                            |
+| `PACKET_FREEZE`                 | ApplicationPacket schema/repository, digest/currentness/readiness                  | Private DB, document approvals, current job/profile/evaluation bindings                 | `LOCAL_RUNTIME_VERIFIED`; selected packet stale for application use |
+| `OPEN_AND_INSPECT_ONLY`         | TargetInspectionRunner + Lever passive adapter; real inspection history            | REAL_TARGET capability, FrozenInspectionBinding, inspection persistence/audits          | `LIVE_VERIFIED` for bounded inspection only                         |
+| `MAP_FOR_FILL`                  | Synthetic `TargetIndependentApplicationRunner.map`; real capability schema rejects | Synthetic binding only; no real lifecycle persistence                                   | `ENGINEERING`                                                       |
+| `FILL`                          | Synthetic runner fill path; real capability schema rejects                         | Synthetic binding only; disclosure boundary not real-enabled                            | `ENGINEERING`                                                       |
+| `UPLOAD`                        | Parent enum and synthetic document checks only; no adapter method                  | No real runtime/persistence path                                                        | `MISSING_VERIFICATION`                                              |
+| `VERIFY`                        | Parent vocabulary only; no runner/adapter method                                   | No real runtime/persistence path                                                        | `MISSING_VERIFICATION`                                              |
+| `FILL_PREVIEW`                  | Parent vocabulary only; no runner/adapter method                                   | No real runtime/persistence path                                                        | `MISSING_VERIFICATION`                                              |
+| `FINAL_REVIEW`                  | Synthetic `readyForFinalReview` checkpoint                                         | Frozen synthetic binding and packet readiness                                           | `SYNTHETICALLY_VERIFIED`, real preview absent                       |
+| `SUBMIT_CONSENT`                | Synthetic one-use final consent and concurrent-use tests                           | Binding digest/token/expiry/used state; parent grant excludes SUBMIT                    | `SYNTHETICALLY_VERIFIED`, real submit unavailable                   |
+| `SUBMIT`                        | Synthetic adapter outcome model only; no real-target capability                    | Real schema rejects application scope; ambiguous result becomes `OUTCOME_UNKNOWN`       | `DISABLED_REAL`                                                     |
+| `OUTCOME_TRACKING`              | Application tracker and append-only events                                         | Private SQLite; no external side effect                                                 | `LOCAL_RUNTIME_VERIFIED` model, real action evidence absent         |
+
+Implemented is not production-ready: only bounded source ingestion and passive inspection have live
+evidence; real application mutation remains blocked.
+
+### P1 trust-boundary and data-flow model
+
+```mermaid
+flowchart LR
+  subgraph PRIVATE[Private local boundary]
+    PROFILE[Candidate truth/profile]
+    DB[(SQLite + audit state)]
+    DOCS[CV/documents]
+    PACKET[Frozen packet + answers/disclosures]
+    AUTH[Parent/child grants + capabilities]
+    SESSION[Browser/session storage]
+    WEB[apps/web loopback UI]
+    RUNNER[Local runner]
+  end
+  subgraph PUBLIC[Public external boundary]
+    SOURCE[Job-source APIs/pages]
+    ATS[Employer ATS pages]
+    SUBMIT[Employer submission endpoint]
+  end
+  subgraph REPO[Public repository / CI / showcase]
+    CODE[Code + fictional fixtures + static showcase]
+  end
+  WEB -->|safe DTOs| PROFILE
+  PROFILE --> DB
+  SOURCE -->|bounded source GET, no candidate data| RUNNER
+  RUNNER --> DB
+  DB -->|R2/evaluation/queue| PACKET
+  PROFILE --> DOCS
+  DOCS --> PACKET
+  AUTH --> RUNNER
+  PACKET -->|inspection only| ATS
+  PACKET -->|future FILL disclosure| ATS
+  DOCS -->|future UPLOAD disclosure| ATS
+  PACKET -->|future reviewed SUBMIT| SUBMIT
+  SESSION --> RUNNER
+  CODE -. fictional only .-> WEB
+  CODE -. static fictional only .-> REPO
+```
+
+Candidate data first crosses the private boundary at target `FILL` (answers), `UPLOAD` (documents),
+or `SUBMIT`; all three are disclosure operations, and FILL/UPLOAD require their own authority and
+auditable verification even though they precede final submission. Source discovery sends no candidate
+data. The showcase never receives profile, DB, session, grant, or runner authority.
+
+### P1 parent/child authority findings
+
+- Parent `GREEN_BANNER_SESSION_GRANT_V1` is persisted with canonical digest, immutable scope,
+  `mainSha`, and submit excluded from its operation vocabulary.
+- Child derivation persists deterministic child digest and parent digest; source children require
+  provider/tenant/host/path and `SOURCE_LIST_JOBS`; target children require origin/path/packet.
+- `assertGreenBannerChildWithinParent` enforces parent scope, operation ceiling, main SHA equality,
+  expiry, and maximum child TTL. Packet binding is mandatory for MAP/FILL/FILL_PREVIEW/VERIFY; packet
+  plus document digest is mandatory for UPLOAD.
+- Database repositories persist parent/child events, reject duplicate digests, reject inactive or
+  mismatched parents, and expose active-child/recovery state. Target/source repositories separately
+  recheck current capability digest/version before execution.
+- Target inspection has its own immutable binding and lifecycle/audit tables. Real application
+  operations remain rejected by `RunnerTargetCapabilitySchema`; parent vocabulary alone is not an
+  executor.
+- Restart semantics are durable for source runs and inspection/recovery checkpoints. A cumulative
+  cross-run action budget is not implemented and remains engineering work.
+
+### P1 external-boundary failure ownership
+
+| Failure / signal                                                         | Required behavior now                                                                    | Owning future phase |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------- |
+| Network timeout, DNS/TLS/connection failure                              | bounded stop with safe code and lifecycle stage; no blind retry beyond capability budget | P3/P6               |
+| Redirect, destination drift, SSRF/host/path/query mismatch               | reject/stop before or at transport; never mutate approved semantics                      | P3/P4               |
+| Popup/new window or browser context loss                                 | inspection/runner stop with diagnostic; no unmanaged navigation                          | P4/P7               |
+| Form/schema drift or unsupported control                                 | fail closed, retain safe diagnostic only, require review                                 | P4/P7               |
+| Browser/process crash or partial write                                   | durable checkpoint/recovery; reconcile authority before resume                           | P6/P11              |
+| Stale packet/form/document/profile/evaluation                            | reject binding and invalidate dependent state; regenerate only after gates               | P2/P4               |
+| Expired/revoked/changed capability or duplicate invocation               | reject currentness check; consume/revoke terminal child; no replay                       | P4/P7               |
+| CAPTCHA, MFA, authentication, bot protection, rate limit, access control | stop immediately; no bypass, retry, or credential action                                 | P4/P7               |
+| Ambiguous submission/lost response                                       | terminal `OUTCOME_UNKNOWN`; never blind retry                                            | P5/P10              |
+
+### P1 deployment and security requirements
+
+`LOCAL_SINGLE_OWNER_V1` uses an owner-controlled Windows host, pinned Node/npm and Playwright where
+needed, local SQLite, ignored private document/browser roots, verified local backups, loopback-first
+web access, and no public private-dashboard exposure. Source requests require source authority;
+employer actions require target/application authority. The public showcase is separately static and
+fictional.
+
+P4/P6/P9 must preserve: least-privilege filesystem access; private data outside Git; secrets outside
+Git; no cookies/raw candidate values in generic telemetry; operation-specific short-lived authorities;
+fail-closed stale/changed bindings; immutable/auditable external-action history; no SUBMIT under the
+parent grant; no protection bypass; `OUTCOME_UNKNOWN` for ambiguity; and no blind retry.
+
+### P1 exit and dependency review
+
+P1 exit is satisfied: the merged P0 baseline is accepted; component/capability/data-flow matrices,
+private/public boundary, parent/child authority path, real-runner limitation, topology, trust model,
+and implemented-vs-proposed distinction are explicit. P1 does not complete P2, P3, P4, Personal Live
+V1, or the green banner.
+
+Next dependency order (read-only decision, not execution): P2 provider freshness/current role and
+packet evidence must be resolved before P4; P3 restart/replay, changed/duplicate handling, and
+staleness propagation must be verified before P4. Therefore the next implementation task is P2, not
+P4. P4 remains blocked by BLK-001, BLK-002, BLK-004, BLK-005, BLK-007, and BLK-008.
 
 ### P2 — Candidate, role, and evidence readiness
 
@@ -413,20 +622,20 @@ Exit: synthetic submit lifecycle verified.
 Each P0-P11 checklist above is an actionable task record. The following fields apply to every
 checklist item; item-specific exceptions are recorded in the phase evidence and blocker register.
 
-| Task | Owner                             | Dependencies                  | Objective/components                      | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                 | Blockers/invalidation                                    |
-| ---- | --------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
-| P0   | Codex                             | repository baseline           | reconcile plan/history/docs               | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | local verified, revision `010cbe9` + archive hash | PR still pending; invalidated by baseline drift          |
-| P1   | Codex + owner review              | P0                            | architecture, trust boundaries, authority | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | code reviewed, revision `010cbe9`                 | deployment topology and real operation policy unresolved |
-| P2   | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness        | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                | BLK-003/004/005                                          |
-| P3   | Codex                             | P1/P2                         | source-to-R2 traceability                 | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                | BLK-006; partial restart test pending                    |
-| P4   | Codex + security review           | P1/P2/P3                      | real non-submit operation lane            | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review              | BLK-001/002/005/007/008                                  |
-| P5   | Codex + owner review              | P4                            | final review/consent/outcome              | freeze exact state and one-use consent; acceptance is synthetic safety plus later real evidence        | concurrency/ambiguous-outcome tests; invalidate on change               | synthetic verified, revision `010cbe9`            | production path remains unverified                       |
-| P6   | Codex + owner decision            | P1-P5                         | reproducible release candidate            | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                       | deployment/configuration decision                        |
-| P7   | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                       | P4 and current packet required                           |
-| P8   | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                       | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                       | P4/P7/P5 gaps                                            |
-| P9   | Owner + operations                | P6/P8                         | approved deployment                       | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                       | topology/secrets/security policy                         |
-| P10  | Owner + Codex                     | P8/P9                         | first supervised submission               | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                       | explicit owner final approval                            |
-| P11  | Codex + operations                | P9/P10                        | recovery and handover                     | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                       | deployment and real-operation evidence                   |
+| Task | Owner                             | Dependencies                  | Objective/components                      | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                  | Blockers/invalidation                       |
+| ---- | --------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------- |
+| P0   | Codex                             | repository baseline           | reconcile plan/history/docs               | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash | invalidated by baseline drift               |
+| P1   | Codex + owner review              | P0                            | architecture, trust boundaries, authority | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | architecture evidence on revision `3cc75df`        | P2/P3 evidence and P4 operation gaps remain |
+| P2   | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness        | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                 | BLK-003/004/005                             |
+| P3   | Codex                             | P1/P2                         | source-to-R2 traceability                 | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                 | BLK-006; partial restart test pending       |
+| P4   | Codex + security review           | P1/P2/P3                      | real non-submit operation lane            | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review               | BLK-001/002/005/007/008                     |
+| P5   | Codex + owner review              | P4                            | final review/consent/outcome              | freeze exact state and one-use consent; acceptance is synthetic safety plus later real evidence        | concurrency/ambiguous-outcome tests; invalidate on change               | synthetic verified, revision `010cbe9`             | production path remains unverified          |
+| P6   | Codex + owner decision            | P1-P5                         | reproducible release candidate            | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                        | deployment/configuration decision           |
+| P7   | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                        | P4 and current packet required              |
+| P8   | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                       | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                        | P4/P7/P5 gaps                               |
+| P9   | Owner + operations                | P6/P8                         | approved deployment                       | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                        | topology/secrets/security policy            |
+| P10  | Owner + Codex                     | P8/P9                         | first supervised submission               | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                        | explicit owner final approval               |
+| P11  | Codex + operations                | P9/P10                        | recovery and handover                     | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                        | deployment and real-operation evidence      |
 
 ### P6 — Reproducible staging/release candidate
 
@@ -763,10 +972,10 @@ Examples:
 ## 17. Current iteration handoff
 
 Current task:
-`P0 — baseline reconciliation and production-plan rebase`
+`P1-001 — production scope and architecture verification`
 
 Scope:
-documentation/evidence reconciliation only.
+documentation, architecture evidence, and read-only verification only.
 
 No:
 
@@ -782,52 +991,54 @@ No:
 - application-code change.
 
 Required PR:
-`docs: reconcile readiness and rebuild the production project plan`
+`docs: verify Personal Live V1 production architecture`
 
-PR #44 is open and unmerged; the exact pushed head is recorded in the final task handoff.
+Baseline: PR #44 is approved and squash-merged as `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`.
+P0 is `VERIFIED` under the documented squash-tree equivalence rule. This branch must remain
+OPEN/UNMERGED for review; no runtime or capability mutation is part of this task.
 
-This iteration's read-only evidence is complete. No source/employer request, capability
-mutation, candidate-fact mutation, document/packet mutation, migration, restore, deployment,
-secret/config change, application-code change, or dependency/workflow change was performed.
-Temporary read-only diagnostic scripts were deleted before handoff.
+This iteration's architecture evidence is complete. No source/employer request, browser or target
+visit, fill, upload, submission, capability/grant mutation, candidate-fact mutation, document/packet
+generation, migration, restore, deployment, secret/config change, application-code change, or
+dependency/workflow change was performed. Temporary read-only diagnostic scripts were deleted before
+handoff.
 
 ### Read-only verification record (2026-09-22)
 
-| Check                                                             | Result                                                                                                |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `git status --short --branch`, baseline/origin comparison         | PASS before this documentation branch; no application-code diff introduced                            |
-| `npm.cmd run db:status`                                           | PASS — schema 9, pending 0, integrity PASS, FK issues 0                                               |
-| `npm.cmd run privacy:audit`                                       | PASS — tracked/history/build-private-data audit completed without printing private values             |
-| `npm.cmd run preflight`                                           | PASS — profile, database, loopback/output-root, source/target authority, backup readiness gates       |
-| `npx.cmd tsx scripts/release-summary.ts --quality-gates-complete` | PASS for reconciled baseline; this branch's expected worktree dirt is documentation-only until commit |
-| `npx.cmd prettier --check PROJECT_PLAN.md`                        | REQUIRED before commit                                                                                |
-| `git diff --check`                                                | REQUIRED before commit                                                                                |
-| `git fsck --strict`                                               | PASS on baseline; known dangling historical objects only                                              |
+| Check                                                     | Result                                                                           |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `git status --short --branch`, baseline/origin comparison | PASS at branch start; only this documentation plan changed                       |
+| `npm.cmd run db:status`                                   | PASS — schema 9, pending 0, integrity PASS, FK issues 0                          |
+| `npm.cmd run privacy:audit`                               | PASS — tracked/history/build-private-data audit completed without private values |
+| `npm.cmd run preflight`                                   | PASS — profile, DB, loopback, authority, backup, beta gates                      |
+| `npx.cmd prettier --check PROJECT_PLAN.md`                | PASS — all matched files use Prettier code style                                 |
+| `git diff --check`                                        | PASS — only Git LF/CRLF normalization warning                                    |
+| `git fsck --strict`                                       | PASS — known dangling historical objects only; no fsck errors                    |
 
-Follow-up before commit: `npx.cmd prettier --check PROJECT_PLAN.md` PASS and `git diff --check`
-PASS (the only output is Git's LF/CRLF normalization warning).
+Checks above are read-only and were run before commit; Git's LF/CRLF normalization warning is not a
+content failure.
 
-GitHub PR #44's known P0 CI blocker was remediated by the sole `.prettierignore` exception above;
-exact-head quality passed at `c52a0b8adca4375d86f7c28d141ea4e9d87ed7dd` (runs `35681670888` and
-`35681673460`). P0 remains `IMPLEMENTED_UNVERIFIED` pending reviewer acceptance and merge.
+P0 archive evidence remains immutable: reviewed PR #44 head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`,
+exact-head CI runs `35681958007` and `35681961078`, merged commit
+`3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`, archive blob
+`9ad8a46ded3205fee063dae0bbaa3162fd5d905b`, SHA-256
+`51BE6553983760CAB1AD8C39F29EC444006F7B5983C7150AE8DB6BCD4B44DC93`.
 
 No backup, restore, migration, source request, employer request, browser session, document generation,
 packet generation, capability mutation, deployment, or application action was performed in this
-iteration. Action counters added by this iteration are source/employer/upload/submission `0/0/0/0`.
+iteration. Historical action counters remain source/employer/upload/submission `13/9/0/0`; this
+iteration adds `0/0/0/0`.
 
 Exactly one recommended next action:
 
-`PROJECT REVIEW — PR #44 merge decision`
+`P2-001 — Verify current role/provider evidence and refresh the application packet`
 
-`P4-001 — Implement and verify the real non-submit operation lane` remains parked until that review,
-merge, and a fully VERIFIED P0 merged baseline.
+Dependencies: P0 verified merged baseline; owner-validated current private profile; fresh bounded
+provider evidence; current R2 evaluation; current document/profile/job bindings; no real employer or
+source action unless separately authorized. P3 replay/currentness checks must remain before any P4
+mutation design, and P4 stays parked.
 
-Dependencies: P1 architecture audit complete; P2 current provider evidence and role decision;
-current profile/evaluation/document bindings; a newly generated private packet only after those
-gates pass; explicit future security-policy review for any real operation beyond inspection.
-
-Acceptance: real-target authority permits only explicitly reviewed non-submit operations; MAP,
-FILL, UPLOAD, VERIFY, and FILL_PREVIEW have separate adapter/runner entry points, packet/document
-and answer/disclosure bindings, durable lifecycle/audit records, stale/replay/interruption/protection
-stops, and synthetic/integration negative tests; SUBMIT remains unavailable; no live action is run
-as part of implementation.
+Acceptance: establish a fresh, owner-approved role/provider evidence record; re-run conservative R2
+evaluation with unknowns preserved; refresh or explicitly reject the stale packet; record current
+job/profile/evaluation/document digests and reasons; run local privacy/currentness gates; do not
+perform any employer interaction. Do not start P3/P4 from this task.
