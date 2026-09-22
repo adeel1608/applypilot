@@ -14,9 +14,10 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
-- R46-07 started from exact pushed head `d361d6a73169ceb2a1d604262b0d3afda0e3047a`; the
-  working tree now contains the uncommitted implementation and evidence updates pending the
-  same-branch commit/push.
+- R46-07 started from exact pushed head `d361d6a73169ceb2a1d604262b0d3afda0e3047a` and is now
+  clean at pushed implementation head `7cb6ad074ea97866466e72c8361d3bc48766f511`.
+- Exact-head push CI `35787594408` and pull-request CI `35787599384` both completed successfully;
+  PR #46 remains open and unmerged.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
