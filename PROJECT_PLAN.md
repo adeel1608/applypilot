@@ -15,9 +15,9 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
 - R46-07 started from exact pushed head `d361d6a73169ceb2a1d604262b0d3afda0e3047a` and is now
-  clean at pushed implementation head `7cb6ad074ea97866466e72c8361d3bc48766f511`.
-- Exact-head push CI `35787594408` and pull-request CI `35787599384` both completed successfully;
-  PR #46 remains open and unmerged.
+  clean at the final pushed implementation head recorded in the PR/handoff below.
+- The final exact-head push and pull-request CI runs completed successfully; PR #46 remains open and
+  unmerged.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
@@ -1524,7 +1524,7 @@ was not opened for write, migrated, restored, or copied.
 | Packet                | `BetaRepository` persists a separate legacy compatibility evaluation tied to the actual job/profile while the packet retains the actual `r2EvaluationId`. The packet is reloaded from the same database and its canonical nonzero `r2-packet-v2` digest is compared with the durable preview row. Provider expiry is not invented: preparation `ACTIVE` is derived from fresh qualified ledger evidence plus the explicit fictional 24h/15m policy. |
 | Browser lane          | `LoopbackNonSubmitAdapter` and `TargetIndependentNonSubmitRunner` execute MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW only against owned loopback. DOM read-back is independent; the upload server hashes received fictional bytes and returns one acknowledgement; preview links run/packet/preview digests. No submit method exists.                                                                                                                      |
 
-Decisive test: `tests/e2e/source-to-preview.spec.ts:522`,
+Decisive test: `tests/e2e/source-to-preview.spec.ts:521`,
 `persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit`.
 Reproduce with:
 
@@ -1547,7 +1547,7 @@ calls (initial plus unchanged replay), one fictional upload, and zero submission
 - A real queue transition away from `PREPARING` makes a new runner stop as `PAUSED/PAGE_CHANGED`
   before another upload; counters remain unchanged.
 - Exact unchanged source replay creates no new observation, job version, R2 evaluation, or queue work.
-- `tests/e2e/source-to-preview.spec.ts:435`,
+- `tests/e2e/source-to-preview.spec.ts:431`,
   `stops after an accepted upload when checkpoint persistence is interrupted`, accepts one upload at
   the fixture server, injects one durable checkpoint-write failure, records `UPLOAD_OUTCOME_UNKNOWN`,
   and proves a restarted runner performs no second upload.
