@@ -11,6 +11,8 @@ import {
 import { extractRequirementEvidence } from "@applypilot/job-importer";
 import { fixtureJob } from "../../../tests/fixture-data";
 import { BetaRepository } from "./beta-repository";
+import { SqliteNonSubmitRunStore } from "./non-submit-run-store";
+import { R2Repository } from "./r2-repository";
 
 function migratedDatabase(): BetterSqlite3.Database {
   const sqlite = new BetterSqlite3(":memory:");
@@ -107,10 +109,10 @@ describe("Beta repository", () => {
           evidence_contract_version,duplicate_resolution_version,coverage_version,actor,reason_code,
           supersedes_decision_id,created_at)
          VALUES ('queue:r2-current','job:r2-packet',1,'PREPARING','CURRENT','job:r2-packet:v1',
-          'profile:r2-packet:v2','r2:current','r2-contract-v1','detector-v1:empty','r2-coverage-v1',
+          'profile:r2-packet:v2','r2:current','r2-contract-v1',?,'r2-coverage-v1',
           'OWNER','OWNER_PREPARING',NULL,?)`,
       )
-      .run(now);
+      .run(new R2Repository(sqlite).duplicateResolutionVersion("job:r2-packet"), now);
     const repository = new BetaRepository(sqlite, () => new Date(now));
     repository.recordDocumentArtifact({
       id: "document:r2-packet",
@@ -183,6 +185,41 @@ describe("Beta repository", () => {
     expect(() => repository.persistApplicationPacket({ ...packet, id: "packet:r2-stale" })).toThrow(
       "PACKET_R2_BINDING_MISMATCH",
     );
+    const runId = repository.registerApplicationRun({
+      packetId: "packet:r2-current",
+      targetKind: "SYNTHETIC_LOCAL",
+      targetHost: "127.0.0.1",
+      formVersion: "fixture-form-v1",
+    });
+    const durable = new SqliteNonSubmitRunStore(
+      sqlite,
+      runId,
+      packetDigest(packet),
+      () => new Date(now),
+    );
+    const bindingDigest = "d".repeat(64);
+    expect(durable.claim(bindingDigest, "MAP_FOR_FILL")).toBe(true);
+    expect(durable.claim(bindingDigest, "FILL")).toBe(false);
+    durable.save(bindingDigest, {
+      state: "MAPPED",
+      sequence: 1,
+      claimedOperations: ["MAP_FOR_FILL"],
+      checkpoints: [
+        {
+          sequence: 1,
+          state: "MAPPED",
+          stopReason: null,
+          occurredAt: now,
+          targetUrl: packet.targetUrl!,
+          formVersion: "fixture-form-v1",
+          adapterVersion: "fixture-adapter-v1",
+          fieldReadBack: [],
+          uploadEvidence: null,
+          previewDigest: null,
+        },
+      ],
+    });
+    expect(durable.load(bindingDigest)).toMatchObject({ state: "MAPPED", sequence: 1 });
     sqlite.close();
   });
 

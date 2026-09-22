@@ -50,16 +50,14 @@ export function assessVerificationFreshness(input: {
   evidenceQualified: boolean;
   providerExpiresAt: string | null;
   operation: VerificationFreshnessOperation;
-  policy?: VerificationFreshnessPolicy;
+  policy: VerificationFreshnessPolicy;
   now?: Date;
 }): VerificationFreshnessResult {
   let policy: VerificationFreshnessPolicy;
   try {
-    policy = VerificationFreshnessPolicySchema.parse(
-      input.policy ?? PROPOSED_LOCAL_VERIFICATION_POLICY,
-    );
+    policy = VerificationFreshnessPolicySchema.parse(input.policy);
   } catch {
-    throw new Error("FRESHNESS_POLICY_INVALID");
+    throw new Error(input.policy ? "FRESHNESS_POLICY_INVALID" : "FRESHNESS_POLICY_REQUIRED");
   }
   const now = input.now ?? new Date();
   const providerExpiry = input.providerExpiresAt ? Date.parse(input.providerExpiresAt) : null;
@@ -117,8 +115,15 @@ export function assessVerificationFreshness(input: {
     input.operation === "PREPARATION"
       ? policy.preparationMaxAgeMs
       : policy.preExternalActionMaxAgeMs;
-  const validUntil = new Date(verifiedAt + maxAge).toISOString();
-  if (now.getTime() >= verifiedAt + maxAge) {
+  const localValidUntil = verifiedAt + maxAge;
+  const applicableProviderExpiry =
+    providerExpiry !== null && Number.isFinite(providerExpiry) ? providerExpiry : null;
+  const validUntilMs =
+    applicableProviderExpiry === null
+      ? localValidUntil
+      : Math.min(localValidUntil, applicableProviderExpiry);
+  const validUntil = new Date(validUntilMs).toISOString();
+  if (now.getTime() >= validUntilMs) {
     return {
       state: "STALE",
       reasonCode: "VERIFICATION_STALE",
@@ -134,4 +139,14 @@ export function assessVerificationFreshness(input: {
     validUntil,
     policyVersion: policy.version,
   };
+}
+
+/**
+ * Compatibility helper for legacy callers. New packet/preparation paths must
+ * call assessVerificationFreshness with an explicitly reviewed policy.
+ */
+export function assessLegacyVerificationFreshness(
+  input: Omit<Parameters<typeof assessVerificationFreshness>[0], "policy">,
+) {
+  return assessVerificationFreshness({ ...input, policy: PROPOSED_LOCAL_VERIFICATION_POLICY });
 }

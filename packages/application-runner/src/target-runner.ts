@@ -586,6 +586,29 @@ export const TargetObservationSchema = z
     adapterVersion: z.string().min(1).max(100),
     documentDigests: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(20),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
+    fieldReadBack: z
+      .array(
+        z.object({
+          questionId: z.string().min(1),
+          value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
+        }),
+      )
+      .max(100)
+      .default([]),
+    uploadEvidence: z
+      .object({
+        documentId: z.string().min(1),
+        expectedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+        receivedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+        acknowledgementId: z.string().min(1),
+      })
+      .nullable()
+      .default(null),
+    previewDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 
@@ -869,6 +892,48 @@ export interface NonSubmitTargetAdapter {
   fillPreview(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
 }
 
+export interface NonSubmitDurableSnapshot {
+  state: NonSubmitRunnerState;
+  sequence: number;
+  checkpoints: NonSubmitRunnerCheckpoint[];
+  claimedOperations: string[];
+  activeOperation?: RunnerTargetOperation | null;
+}
+
+export interface NonSubmitDurableStore {
+  load(bindingDigest: string): NonSubmitDurableSnapshot | null;
+  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean;
+  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void;
+}
+
+export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
+  private readonly snapshots = new Map<string, NonSubmitDurableSnapshot>();
+
+  load(bindingDigest: string): NonSubmitDurableSnapshot | null {
+    const value = this.snapshots.get(bindingDigest);
+    return value ? structuredClone(value) : null;
+  }
+
+  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean {
+    const snapshot = this.snapshots.get(bindingDigest) ?? {
+      state: "PREPARED",
+      sequence: 0,
+      checkpoints: [],
+      claimedOperations: [],
+      activeOperation: null,
+    };
+    if (snapshot.claimedOperations.includes(operation) || snapshot.activeOperation) return false;
+    snapshot.activeOperation = operation;
+    snapshot.claimedOperations.push(operation);
+    this.snapshots.set(bindingDigest, snapshot);
+    return true;
+  }
+
+  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void {
+    this.snapshots.set(bindingDigest, structuredClone({ ...snapshot, activeOperation: null }));
+  }
+}
+
 export interface NonSubmitRunnerCheckpoint {
   sequence: number;
   state: NonSubmitRunnerState;
@@ -877,12 +942,17 @@ export interface NonSubmitRunnerCheckpoint {
   targetUrl: string;
   formVersion: string;
   adapterVersion: string;
+  fieldReadBack: ReadonlyArray<{ questionId: string; value: string | number | boolean | null }>;
+  uploadEvidence: TargetObservation["uploadEvidence"];
+  previewDigest: string | null;
 }
 
 export class TargetIndependentNonSubmitRunner {
   private state: NonSubmitRunnerState = "PREPARED";
   private sequence = 0;
   private readonly checkpoints: NonSubmitRunnerCheckpoint[] = [];
+  private readonly claimedOperations: string[] = [];
+  private readonly bindingDigest: string;
 
   constructor(
     private readonly packet: ApplicationPacket,
@@ -891,10 +961,20 @@ export class TargetIndependentNonSubmitRunner {
     private readonly adapter: NonSubmitTargetAdapter,
     private readonly currentBinding: () => FrozenRunnerBinding,
     private readonly now: () => Date = () => new Date(),
+    private readonly durableStore?: NonSubmitDurableStore,
   ) {
     ApplicationPacketSchema.parse(packet);
     RunnerTargetCapabilitySchema.parse(capability);
     FrozenRunnerBindingSchema.parse(binding);
+    this.bindingDigest = runnerBindingDigest(binding);
+    const recovered = this.durableStore?.load(this.bindingDigest);
+    if (recovered) {
+      this.state = recovered.state;
+      this.sequence = recovered.sequence;
+      this.checkpoints.push(...recovered.checkpoints);
+      this.claimedOperations.push(...recovered.claimedOperations);
+      return;
+    }
     if (
       adapter.targetKind !== capability.targetKind ||
       !targetCapabilitySupportsNonSubmit(capability) ||
@@ -910,42 +990,57 @@ export class TargetIndependentNonSubmitRunner {
 
   async map(): Promise<NonSubmitRunnerCheckpoint> {
     this.assertState("PREPARED");
-    return this.observe("MAPPED", () => this.adapter.map(this.packet, this.binding));
+    return this.observe("MAPPED", "MAP_FOR_FILL", () =>
+      this.adapter.map(this.packet, this.binding),
+    );
   }
 
   async fill(): Promise<NonSubmitRunnerCheckpoint> {
     this.assertState("MAPPED");
-    return this.observe("FILLED", () => this.adapter.fill(this.packet, this.binding));
+    return this.observe("FILLED", "FILL", () => this.adapter.fill(this.packet, this.binding));
   }
 
   async upload(): Promise<NonSubmitRunnerCheckpoint> {
     this.assertState("FILLED");
-    return this.observe("UPLOADED", () => this.adapter.upload(this.packet, this.binding));
+    return this.observe("UPLOADED", "UPLOAD", () => this.adapter.upload(this.packet, this.binding));
   }
 
   async verify(): Promise<NonSubmitRunnerCheckpoint> {
     this.assertState("UPLOADED");
-    return this.observe("VERIFIED", () => this.adapter.verify(this.packet, this.binding));
+    return this.observe("VERIFIED", "VERIFY", () => this.adapter.verify(this.packet, this.binding));
   }
 
   async fillPreview(): Promise<NonSubmitRunnerCheckpoint> {
     this.assertState("VERIFIED");
-    return this.observe("FILL_PREVIEW", () => this.adapter.fillPreview(this.packet, this.binding));
+    return this.observe("FILL_PREVIEW", "FILL_PREVIEW", () =>
+      this.adapter.fillPreview(this.packet, this.binding),
+    );
   }
 
   snapshot() {
     return {
       state: this.state,
       checkpoints: this.checkpoints.map((checkpoint) => ({ ...checkpoint })),
+      claimedOperations: [...this.claimedOperations],
       submitEnabled: false as const,
     };
   }
 
   private async observe(
     state: Exclude<NonSubmitRunnerState, "PREPARED" | "OPENED" | "PAUSED">,
+    operationName: RunnerTargetOperation,
     operation: () => Promise<TargetObservation>,
   ): Promise<NonSubmitRunnerCheckpoint> {
     if (!this.bindingsCurrent()) return this.pause("PAGE_CHANGED");
+    if (this.claimedOperations.includes(operationName)) {
+      return this.pause("OPERATION_REPLAYED");
+    }
+    if (this.durableStore && !this.durableStore.claim(this.bindingDigest, operationName)) {
+      return this.pause(
+        operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
+      );
+    }
+    this.claimedOperations.push(operationName);
     try {
       const observation = TargetObservationSchema.parse(await operation());
       const signal = observation.protectionSignals[0];
@@ -964,9 +1059,9 @@ export class TargetIndependentNonSubmitRunner {
           return this.pause("DOCUMENT_DIGEST_CHANGED");
         }
       }
-      return this.record(state, null);
+      return this.record(state, null, observation);
     } catch {
-      return this.pause("PAGE_CHANGED");
+      return this.pause(operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "PAGE_CHANGED");
     }
   }
 
@@ -992,7 +1087,11 @@ export class TargetIndependentNonSubmitRunner {
     return this.record("PAUSED", reason);
   }
 
-  private record(state: NonSubmitRunnerState, stopReason: SyntheticStopReason | null) {
+  private record(
+    state: NonSubmitRunnerState,
+    stopReason: SyntheticStopReason | null,
+    observation?: TargetObservation,
+  ) {
     this.state = state;
     const checkpoint: NonSubmitRunnerCheckpoint = {
       sequence: ++this.sequence,
@@ -1002,8 +1101,17 @@ export class TargetIndependentNonSubmitRunner {
       targetUrl: this.binding.targetUrl,
       formVersion: this.binding.formVersion,
       adapterVersion: this.binding.adapterVersion,
+      fieldReadBack: observation?.fieldReadBack ?? [],
+      uploadEvidence: observation?.uploadEvidence ?? null,
+      previewDigest: observation?.previewDigest ?? null,
     };
     this.checkpoints.push(checkpoint);
+    this.durableStore?.save(this.bindingDigest, {
+      state: this.state,
+      sequence: this.sequence,
+      checkpoints: this.checkpoints,
+      claimedOperations: this.claimedOperations,
+    });
     return checkpoint;
   }
 }

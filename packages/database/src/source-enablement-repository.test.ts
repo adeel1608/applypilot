@@ -9,6 +9,8 @@ import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit } from "@applypilot/fi
 import { JobSchema } from "@applypilot/job-model";
 import {
   SourceCapabilityV2Schema,
+  SourceRunBudget,
+  readLeverPageV2,
   sourceCapabilityDigest,
   type SourceCapabilityV2,
   type SecureSourceTransportDependencies,
@@ -862,6 +864,21 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(first.records.map(({ externalId }) => externalId)).toEqual(
       values.slice(0, 24).map(({ id }) => id),
     );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT record_index AS recordIndex,disposition,external_id AS externalId
+           FROM source_record_verifications WHERE run_id=? ORDER BY record_index,disposition`,
+        )
+        .all(first.runId),
+    ).toEqual([
+      ...values.slice(0, 24).map(({ id }, recordIndex) => ({
+        recordIndex,
+        disposition: "ACCEPTED",
+        externalId: id,
+      })),
+      { recordIndex: 24, disposition: "UNUSABLE", externalId: null },
+    ]);
     expect(first.queuedJobIds).toHaveLength(24);
     expect(pipeline.evaluated).toHaveLength(24);
     expect(pipeline.queued).toHaveLength(24);
@@ -1783,6 +1800,144 @@ describe("offline source-to-R2 queue persistence", () => {
         )
         .get(),
     ).toEqual({ count: 1 });
+    sqlite.close();
+  });
+
+  it("accounts identical content at distinct cursors as distinct page operations", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `cursor:${++id}`,
+    );
+    const approved = capability({ requestBudget: 3, recordCap: 2, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    const originalPersistPage = repository.persistPage.bind(repository);
+    let conflictChecked = false;
+    vi.spyOn(repository, "persistPage").mockImplementation((input) => {
+      originalPersistPage(input);
+      if (!conflictChecked) {
+        conflictChecked = true;
+        expect(() =>
+          originalPersistPage({
+            ...input,
+            page: { ...input.page, pageDigest: "f".repeat(64) },
+          }),
+        ).toThrow("SOURCE_PAGE_REPLAY_CONFLICT");
+      }
+    });
+    const body = Buffer.from(JSON.stringify([posting(1)]));
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ url, pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: new URL(url).searchParams.get("skip") === "2" ? Buffer.from("[]") : body,
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result).toMatchObject({ status: "COMPLETE", requestCount: 2, pageCount: 2 });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE run_id=? AND disposition='ACCEPTED'",
+        )
+        .get(result.runId),
+    ).toEqual({ count: 2 });
+    sqlite.close();
+  });
+
+  it("rolls back terminal completion on qualification interruption and reconciles safely", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `qualification:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const runId = repository.start({
+      capability: approved,
+      capabilityDigest: sourceCapabilityDigest(approved),
+      operation: "LIST_JOBS",
+      startedAt: instant.toISOString(),
+    });
+    const budget = new SourceRunBudget(approved, instant);
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1)])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+    });
+    repository.persistPage({
+      runId,
+      capability: approved,
+      page,
+      budget,
+      observedAt: instant.toISOString(),
+    });
+    const interrupted = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `interrupted:${++id}`,
+      {
+        beforeQualification: () => {
+          throw new Error("QUALIFICATION_INTERRUPTED");
+        },
+      },
+    );
+    expect(() =>
+      interrupted.complete({ runId, budget, completedAt: instant.toISOString() }),
+    ).toThrow("QUALIFICATION_INTERRUPTED");
+    expect(
+      sqlite.prepare("SELECT status FROM source_run_checkpoints WHERE id=?").get(runId),
+    ).toEqual({
+      status: "RUNNING",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT qualification_state AS state,verified_at AS verifiedAt FROM source_record_verifications WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ state: "PAGE_PERSISTED", verifiedAt: instant.toISOString() });
+    repository.complete({ runId, budget, completedAt: instant.toISOString() });
+    expect(repository.reconcileCompletedRun(runId)).toBe(0);
+    expect(
+      sqlite.prepare("SELECT status FROM source_run_checkpoints WHERE id=?").get(runId),
+    ).toEqual({
+      status: "COMPLETE",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT qualification_state AS state FROM source_record_verifications WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ state: "QUALIFIED" });
     sqlite.close();
   });
 

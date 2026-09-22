@@ -6,7 +6,10 @@ import { z } from "zod";
 import {
   ApplicationPacketSchema,
   SyntheticStopReasonSchema,
+  VerificationEvidenceSchema,
+  assessVerificationFreshness,
   assessPacketReadiness,
+  packetDigest,
   type ApplicationPacket,
   type FinalActionConsent,
   type RunnerCheckpoint,
@@ -658,35 +661,32 @@ export class BetaRepository {
         | undefined;
       let r2BindingCurrent = false;
       if (packet.r2EvaluationId) {
+        if (!new R2Repository(this.sqlite, this.now, this.id).available()) {
+          throw new Error("PACKET_R2_SCHEMA_REQUIRED");
+        }
+        try {
+          // Keep one canonical currentness gate for queue, evaluation, profile,
+          // evidence/coverage versions, duplicate resolution, eligibility, and
+          // recommendation. Packet persistence must not maintain a weaker copy.
+          new R2Repository(this.sqlite, this.now, this.id).assertCurrentPreparing(
+            packet.jobId,
+            packet.r2EvaluationId,
+          );
+        } catch {
+          throw new Error("PACKET_R2_BINDING_MISMATCH");
+        }
         const r2State = this.sqlite
           .prepare(
             `SELECT e.job_id AS jobId,e.job_version_id AS jobVersionId,
-                    e.profile_version_id AS profileVersionId,e.eligibility_status AS eligibilityStatus,
-                    e.recommended,e.stale,
-                    q.state AS queueState,q.freshness AS queueFreshness,q.r2_evaluation_id AS queueEvaluationId,
-                    (SELECT id FROM job_versions WHERE job_id=? ORDER BY version DESC LIMIT 1)
-                      AS currentJobVersionId,
-                    EXISTS(SELECT 1 FROM candidate_profiles WHERE active_version_id=e.profile_version_id)
-                      AS currentProfile
-             FROM r2_evaluation_versions e
-             LEFT JOIN r2_queue_decision_versions q
-               ON q.job_id=e.job_id AND q.version=(SELECT max(version)
-                  FROM r2_queue_decision_versions WHERE job_id=e.job_id)
-             WHERE e.id=?`,
+                    e.profile_version_id AS profileVersionId,e.eligibility_status AS eligibilityStatus
+             FROM r2_evaluation_versions e WHERE e.id=?`,
           )
-          .get(packet.jobId, packet.r2EvaluationId) as
+          .get(packet.r2EvaluationId) as
           | {
               jobId: string;
               jobVersionId: string;
               profileVersionId: string;
               eligibilityStatus: string;
-              recommended: number;
-              stale: number;
-              queueState: string | null;
-              queueFreshness: string | null;
-              queueEvaluationId: string | null;
-              currentJobVersionId: string | null;
-              currentProfile: number;
             }
           | undefined;
         if (
@@ -694,14 +694,8 @@ export class BetaRepository {
           r2State.jobId !== packet.jobId ||
           r2State.jobVersionId !== packet.jobVersionId ||
           r2State.profileVersionId !== packet.profileVersionId ||
-          r2State.currentJobVersionId !== packet.jobVersionId ||
-          !r2State.currentProfile ||
           r2State.eligibilityStatus !== packet.eligibilityStatus ||
-          !r2State.recommended ||
-          r2State.stale ||
-          r2State.queueState !== "PREPARING" ||
-          r2State.queueFreshness !== "CURRENT" ||
-          r2State.queueEvaluationId !== packet.r2EvaluationId
+          packet.duplicateState !== "CLEAR"
         ) {
           throw new Error("PACKET_R2_BINDING_MISMATCH");
         }
@@ -728,6 +722,55 @@ export class BetaRepository {
       );
       if (packet.versionsCurrent !== versionsActuallyCurrent) {
         throw new Error("PACKET_VERSION_STATE_MISMATCH");
+      }
+      if (packet.verificationEvidence) {
+        const verification = VerificationEvidenceSchema.parse(packet.verificationEvidence);
+        const ledger = this.sqlite
+          .prepare(
+            `SELECT v.id, v.verified_at AS verifiedAt, v.content_hash AS contentHash,
+                    v.qualification_state AS qualificationState,
+                    o.expires_at AS providerExpiresAt
+             FROM source_record_verifications v
+             JOIN job_versions jv ON jv.id=v.job_version_id
+             LEFT JOIN source_observations o ON o.id=v.source_observation_id
+             WHERE v.id=? AND v.disposition='ACCEPTED' AND jv.job_id=? AND jv.id=?`,
+          )
+          .get(verification.verificationId, packet.jobId, packet.jobVersionId) as
+          | {
+              id: string;
+              verifiedAt: string;
+              contentHash: string | null;
+              qualificationState: string;
+              providerExpiresAt: string | null;
+            }
+          | undefined;
+        if (
+          !ledger ||
+          ledger.qualificationState !== "QUALIFIED" ||
+          ledger.contentHash !== verification.contentHash ||
+          ledger.verifiedAt !== verification.verifiedAt
+        ) {
+          throw new Error("PACKET_VERIFICATION_EVIDENCE_MISMATCH");
+        }
+        const freshness = assessVerificationFreshness({
+          verifiedAt: verification.verifiedAt,
+          evidenceQualified: true,
+          providerExpiresAt: ledger.providerExpiresAt,
+          operation: verification.operation,
+          policy: {
+            version: verification.policyVersion,
+            preparationMaxAgeMs: verification.preparationMaxAgeMs,
+            preExternalActionMaxAgeMs: verification.preExternalActionMaxAgeMs,
+          },
+          now: this.now(),
+        });
+        if (
+          freshness.state !== "FRESH" ||
+          freshness.validUntil !== verification.validUntil ||
+          freshness.policyVersion !== verification.policyVersion
+        ) {
+          throw new Error("PACKET_VERIFICATION_FRESHNESS_INVALID");
+        }
       }
       const documentState = this.sqlite.prepare(
         `SELECT d.content_digest AS contentDigest, d.stale,
@@ -784,7 +827,11 @@ export class BetaRepository {
             packet.targetUrl,
             packet.targetHost,
             readiness.status,
-            JSON.stringify(readiness),
+            JSON.stringify({
+              ...readiness,
+              packetDigest: packetDigest(packet),
+              verificationEvidence: packet.verificationEvidence ?? null,
+            }),
             version,
             now,
             now,
@@ -806,7 +853,11 @@ export class BetaRepository {
             packet.targetUrl,
             packet.targetHost,
             readiness.status,
-            JSON.stringify(readiness),
+            JSON.stringify({
+              ...readiness,
+              packetDigest: packetDigest(packet),
+              verificationEvidence: packet.verificationEvidence ?? null,
+            }),
             version,
             now,
             now,

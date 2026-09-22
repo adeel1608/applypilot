@@ -834,6 +834,35 @@ export const runnerCheckpoints = sqliteTable("runner_checkpoints", {
   createdAt: text("created_at").notNull(),
 });
 
+export const applicationRunOperations = sqliteTable(
+  "application_run_operations",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => applicationRuns.id, { onDelete: "restrict" }),
+    bindingDigest: text("binding_digest").notNull(),
+    operation: text("operation").notNull(),
+    operationKey: text("operation_key").notNull(),
+    state: text("state").notNull(),
+    effectJson: text("effect_json").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [index("application_run_operations_run_idx").on(table.runId, table.operation)],
+);
+
+export const applicationRunPreviews = sqliteTable("application_run_previews", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => applicationRuns.id, { onDelete: "restrict" }),
+  packetDigest: text("packet_digest").notNull(),
+  previewDigest: text("preview_digest").notNull(),
+  snapshotJson: text("snapshot_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const finalActionConsents = sqliteTable("final_action_consents", {
   id: text("id").primaryKey(),
   runId: text("run_id")
@@ -1183,6 +1212,8 @@ export const schema = {
   applicationEventsV2,
   applicationRuns,
   runnerCheckpoints,
+  applicationRunOperations,
+  applicationRunPreviews,
   finalActionConsents,
   capabilityConfigs,
   discoveryRuns,

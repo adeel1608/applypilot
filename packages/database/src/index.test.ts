@@ -51,6 +51,8 @@ describe("database foundation", () => {
         "sourceRunCheckpoints",
         "sourceRunPages",
         "sourceRecordVerifications",
+        "applicationRunOperations",
+        "applicationRunPreviews",
         "sourceObservationPayloads",
         "runnerTargetCapabilityVersions",
         "runnerRunBindings",

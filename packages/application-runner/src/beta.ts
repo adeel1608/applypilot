@@ -32,6 +32,21 @@ export const PacketAnswerSchema = z.object({
   factReferences: z.array(z.string().min(1)),
 });
 
+export const VerificationEvidenceSchema = z
+  .object({
+    verificationId: z.string().min(1),
+    verifiedAt: z.iso.datetime(),
+    providerExpiresAt: z.iso.datetime().nullable(),
+    policyVersion: z.string().min(1),
+    preparationMaxAgeMs: z.number().int().positive().finite(),
+    preExternalActionMaxAgeMs: z.number().int().positive().finite(),
+    validUntil: z.iso.datetime(),
+    operation: z.enum(["PREPARATION", "PRE_EXTERNAL_ACTION"]),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+export type VerificationEvidence = z.infer<typeof VerificationEvidenceSchema>;
+
 export const ApplicationPacketSchema = z
   .object({
     id: z.string().min(1),
@@ -40,6 +55,7 @@ export const ApplicationPacketSchema = z
     profileVersionId: z.string().min(1),
     evaluationVersionId: z.string().min(1),
     r2EvaluationId: z.string().min(1).nullable().default(null),
+    verificationEvidence: VerificationEvidenceSchema.nullable().optional(),
     eligibilityStatus: z.enum(["ELIGIBLE", "INELIGIBLE", "REVIEW_REQUIRED"]),
     targetUrl: z.url().nullable(),
     targetHost: z.string().min(1).nullable(),
@@ -148,9 +164,20 @@ function canonical(value: unknown): string {
 }
 
 export function packetDigest(packet: ApplicationPacket): string {
-  return createHash("sha256")
-    .update(canonical(ApplicationPacketSchema.parse(packet)))
-    .digest("hex");
+  const parsed = ApplicationPacketSchema.parse(packet);
+  // The pre-R2 packet contract did not contain r2EvaluationId or freshness
+  // evidence. Preserve historical digests exactly; new R2 packets use an
+  // explicit contract version so the digest change is intentional and visible.
+  const digestInput =
+    parsed.r2EvaluationId || parsed.verificationEvidence
+      ? { packetContractVersion: "r2-packet-v2", ...parsed }
+      : (() => {
+          const legacy = { ...parsed } as Record<string, unknown>;
+          Reflect.deleteProperty(legacy, "r2EvaluationId");
+          Reflect.deleteProperty(legacy, "verificationEvidence");
+          return legacy;
+        })();
+  return createHash("sha256").update(canonical(digestInput)).digest("hex");
 }
 
 export const SyntheticStopReasonSchema = z.enum([
@@ -172,6 +199,9 @@ export const SyntheticStopReasonSchema = z.enum([
   "CONSENT_EXPIRED",
   "CONSENT_REPLAYED",
   "TARGET_APPROVAL_REQUIRED",
+  "OPERATION_REPLAYED",
+  "OPERATION_IN_PROGRESS",
+  "UPLOAD_OUTCOME_UNKNOWN",
 ]);
 export type SyntheticStopReason = z.infer<typeof SyntheticStopReasonSchema>;
 

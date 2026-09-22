@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ApplicationPacketSchema,
+  InMemoryNonSubmitDurableStore,
   InMemoryFinalConsentStore,
   RunnerTargetCapabilitySchema,
   TargetIndependentApplicationRunner,
@@ -113,6 +114,9 @@ class FixtureAdapter implements ApplicationTargetAdapter {
       adapterVersion: this.target.adapterVersion,
       documentDigests: this.value.documents.map(({ digest }) => digest),
       protectionSignals: this.signal,
+      fieldReadBack: [],
+      uploadEvidence: null,
+      previewDigest: null,
     };
   }
 
@@ -148,6 +152,9 @@ class NonSubmitFixtureAdapter implements NonSubmitTargetAdapter {
       adapterVersion: this.target.adapterVersion,
       documentDigests: this.value.documents.map(({ digest }) => digest),
       protectionSignals: this.signal,
+      fieldReadBack: [],
+      uploadEvidence: null,
+      previewDigest: null,
     } satisfies TargetObservation;
   }
 
@@ -213,6 +220,37 @@ describe("target-independent application runner", () => {
     expect(adapter.writes).toEqual(["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"]);
     expect(runner.snapshot()).toMatchObject({ state: "FILL_PREVIEW", submitEnabled: false });
     expect((runner as unknown as { submit?: unknown }).submit).toBeUndefined();
+  });
+
+  it("durably claims operations so concurrent instances cannot replay a write", async () => {
+    const value = packet();
+    const target = nonSubmitCapability();
+    const binding = freezeRunnerBinding(value, target);
+    const store = new InMemoryNonSubmitDurableStore();
+    const firstAdapter = new NonSubmitFixtureAdapter(value, target);
+    const secondAdapter = new NonSubmitFixtureAdapter(value, target);
+    const first = new TargetIndependentNonSubmitRunner(
+      value,
+      target,
+      binding,
+      firstAdapter,
+      () => binding,
+      () => now,
+      store,
+    );
+    const second = new TargetIndependentNonSubmitRunner(
+      value,
+      target,
+      binding,
+      secondAdapter,
+      () => binding,
+      () => now,
+      store,
+    );
+    const [firstResult, secondResult] = await Promise.all([first.map(), second.map()]);
+    expect([firstResult.state, secondResult.state].sort()).toEqual(["MAPPED", "PAUSED"]);
+    expect([firstResult.stopReason, secondResult.stopReason]).toContain("OPERATION_IN_PROGRESS");
+    expect(firstAdapter.writes.concat(secondAdapter.writes)).toEqual(["MAP_FOR_FILL"]);
   });
 
   it("fails closed when a non-submit capability is real or the packet becomes stale", async () => {

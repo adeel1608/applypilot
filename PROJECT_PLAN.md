@@ -10,7 +10,19 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ## 1. Resume here
 
-### Current checkpoint (read-only reconciled 2026-09-22)
+### Active correction checkpoint (2026-09-22)
+
+- Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
+  `feat: implement verified source-to-packet and non-submit foundations`.
+- Correction work started from reviewed head `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; the
+  current working tree is intentionally uncommitted while R46-01 through R46-06 gates run.
+- Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
+- Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
+  `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
+- This correction iteration remains offline-only and adds source/employer/upload/submission
+  actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
+
+### Historical baseline (read-only reconciled 2026-09-22)
 
 - Repository `adeel1608/applypilot` is on clean `main` at `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; `origin/main` matches.
 - PR #45 was approved and squash-merged as `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; its merged tree
@@ -1381,7 +1393,7 @@ Rollback: revert the implementation commits and discard only disposable schema-1
 restore or migrate `data/applypilot.local.sqlite` in this task. The private runtime continues to be
 reported separately as schema 9 until an explicitly approved operational migration.
 
-## 21. Consolidated offline implementation evidence (2026-09-22)
+## 21. Historical consolidated offline implementation evidence (2026-09-22)
 
 Branch/PR: `chore/p2-current-role-readiness`, PR #46 (open and intentionally unmerged). Starting
 head was `50f1a2f3de46b74547828d6efffe264929433e85`; the final implementation head is recorded in
@@ -1408,3 +1420,58 @@ historical reviewed bounded evidence; Personal Live V1 `NOT_READY`; real MAP/FIL
 FILL_PREVIEW and SUBMIT remain disabled pending separate reviewed authority and real-role evidence.
 The next reviewed task is exactly one owner-approved offline review of PR #46; it must not merge or
 activate live application operations.
+
+## 22. PR #46 review-correction implementation blueprint (2026-09-22)
+
+This correction iteration stays on PR #46 at the reconciled head `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`.
+It is offline-only: fictional candidates/documents, disposable databases, mocked source transport, and
+isolated loopback browser fixtures are permitted; real source/employer/upload/submission actions remain
+`0/0/0/0`. The private runtime remains schema 9 with one pending disposable-only migration, integrity
+`PASS`, foreign-key issues `0`, and no profile/evaluation/queue/document/packet/capability/grant mutation.
+PR #46 remains open and unmerged.
+
+| Work ID | Dependencies                            | Files/functions                                                                       | Reproduction and acceptance                                                                                                                                                                                                                      | Evidence level / limitation                                               |
+| ------- | --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| R46-01  | Existing source ledger                  | `source-enablement-repository.ts`, migration/schema/tests                             | Preserve provider record positions, distinguish logical page replay from identical later requests, surface conflicts, transactionally/recoverably qualify terminal evidence, and recover schema-9 interrupted work without fabricating freshness | `LOCAL_RUNTIME_VERIFIED` only after focused tests; no historical backfill |
+| R46-02  | R2 repository currentness               | `r2-repository.ts`, `beta-repository.ts`, packet tests                                | Reuse one canonical current-preparing validator; produce positive fictional R2 through normal APIs; preserve frozen legacy packet/digest compatibility; reject all mismatches and corruptions                                                    | Synthetic/local only; legacy semantics remain compatibility-only          |
+| R46-03  | R46-01/R46-02 ledger and packet binding | `freshness.ts`, packet/readiness services, freshness tests                            | Require explicit policy input, cap validity at known provider expiry, resolve qualified ledger evidence from persistence, retain provider expiry UNKNOWN, and keep private route default-disabled                                                | Proposed fictional policy only; no live activation                        |
+| R46-04  | Foundation gates                        | `target-runner.ts`, loopback adapter/fixtures, durable run persistence, browser tests | Exercise real DOM controls, read-back, bounded upload acknowledgement/hash, durable preview, restart/concurrency/uncertain outcomes, and fixture-side submit counter zero                                                                        | Synthetic loopback only; real target authority remains rejected           |
+| R46-05  | R46-01 through R46-04                   | integrated source-to-preview test and adversarial cases                               | One discoverable test crosses mocked source → ledger → canonical R2 → packet → browser map/fill/upload/verify/preview/reload, with stale/protection/destination/unknown-control/duplicate/crash cases                                            | Fictional disposable evidence; not Personal Live V1 readiness             |
+| R46-06  | All corrections                         | migration/recovery scripts, plan, PR metadata, CI                                     | Rehearse clean/schema-9 upgrade/rollback/WAL backup-restore/future-schema refusal, run full local matrix and exact-head CI, and record formatter/release limitations separately                                                                  | Private DB untouched; PR remains OPEN/UNMERGED                            |
+
+Implementation sequence: reproduce review findings first; implement R46-01 through R46-03; build the
+isolated loopback browser adapter and durable non-submit lifecycle for R46-04; add the integrated proof
+and adversarial matrix for R46-05; then run R46-06 gates, update this section with exact evidence, and
+push normally on the same branch. Rollback is limited to reverting correction commits and deleting only
+disposable test databases. No released migration may be edited without a documented hash audit; no
+private database migration or restore is permitted.
+
+## 23. PR #46 integrated offline proof closeout (2026-09-22)
+
+Correction scope is complete on `chore/p2-current-role-readiness` as an open, unmerged PR #46.
+Starting reviewed head was `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; the final exact head and
+GitHub CI identifiers are recorded after the same-branch push. No live source/employer request,
+candidate transmission, private runtime mutation, grant/capability activation, upload, or submission
+occurred; this iteration remains `0/0/0/0`, with lifetime counters `14/9/0/0`.
+
+| Work ID | Result and evidence                                                                                                                                                                                                                                                                                                                                                    | Evidence boundary                                                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R46-01  | `VERIFIED` in `source-enablement-repository.test.ts`: mixed provider positions, identical content at distinct cursors, conflicting logical replay, two-page failure/restart, and terminal qualification interruption/recovery. `0010` rebuilds disposable `source_run_pages` without the old per-run digest uniqueness so distinct cursors remain distinct operations. | Fictional/disposable only; no historical ledger backfill or live replay.                                                                                             |
+| R46-02  | `VERIFIED` in `beta-repository.test.ts`: packet persistence calls `R2Repository.assertCurrentPreparing`, legacy evaluation remains a same-job/profile compatibility reference, fabricated/stale references fail closed, packet digest preserves the pre-R2 shape and versions new R2 hashes.                                                                           | Synthetic seeded rows exercise the canonical gate; no private packet was changed.                                                                                    |
+| R46-03  | `VERIFIED` for the explicit helper and repository evidence path: policy is required, provider expiry caps validity, unknown provider expiry remains `UNKNOWN`, and packet persistence validates qualified ledger identity/content/timestamps when evidence is supplied.                                                                                                | Proposed fictional policy only; the private route remains default-disabled and no real activation is granted.                                                        |
+| R46-04  | `VERIFIED (loopback)` by `tests/e2e/source-to-preview.spec.ts` plus durable-store and concurrency tests: actual DOM fill/read-back, independently hashed upload acknowledgement, durable preview/reload, operation claim, and fixture submit count `0`.                                                                                                                | Loopback fixture only; no real target capability or submit method.                                                                                                   |
+| R46-05  | `VERIFIED (single discoverable browser proof)` by `source-to-preview.spec.ts`: fictional source/ledger/R2 identifiers bind a current packet to map/fill/upload/verify/preview/reload; all target traffic is allowlisted loopback. Existing adversarial synthetic suites remain green.                                                                                  | The source/R2 evidence in this proof is fictional and disposable; it is not Personal Live V1 readiness.                                                              |
+| R46-06  | `VERIFIED` local implementation gates: unit 53 files/592 tests, integration 3 files/21 tests, E2E 45 tests, build/showcase/audit, lint, typecheck, privacy, preflight, dependency audit, diff-check, fsck, and disposable migration/recovery tests.                                                                                                                    | Repository-wide `format:check` remains blocked by 11 pre-existing files; targeted changed-file formatting passes. Full release check is therefore not claimed green. |
+
+Migration boundary: `0000`-`0009` remain immutable. Unmerged disposable `0010` changed from the
+reviewed pre-correction blob (recorded by the parent commit) to SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; fresh schema-9 upgrade,
+integrity/FK, future-schema refusal, and backup/restore tests use in-memory/disposable databases.
+The private local database remains schema 9 with pending migration 1, integrity `PASS`, and FK
+issues `0`; it was not migrated or restored.
+
+Current classification is unchanged: Source-enabled Personal Beta `READY` only on the historical
+reviewed bounded evidence; Personal Live V1 `NOT_READY`; real target operations remain approval- and
+target-dependent. Remaining blockers are real-role/provider currentness, approved real target
+authority, and a separate reviewed live operation. Exactly one next reviewed task is recommended:
+review PR #46's correction diff and exact-head CI; do not merge or activate live operations.

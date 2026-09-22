@@ -8,6 +8,7 @@ export * from "./target-runner";
 export * from "./private-target-allowlist";
 export * from "./green-banner-grant";
 export * from "./freshness";
+export * from "./loopback-non-submit-adapter";
 
 export const ApplicationRunnerMode = {
   DISCOVERY_ONLY: "DISCOVERY_ONLY",
