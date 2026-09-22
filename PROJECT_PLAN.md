@@ -1,6 +1,6 @@
 # ApplyPilot Production Verification Project Plan
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
 Expected current main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`
@@ -10,16 +10,17 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ## 1. Resume here
 
-### Active correction checkpoint (2026-09-22)
+### Active R46-07 checkpoint (2026-09-23)
 
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
-- Correction work started from reviewed head `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; the
-  current working tree is intentionally uncommitted while R46-01 through R46-06 gates run.
+- R46-07 started from exact pushed head `d361d6a73169ceb2a1d604262b0d3afda0e3047a`; the
+  working tree now contains the uncommitted implementation and evidence updates pending the
+  same-branch commit/push.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
-- This correction iteration remains offline-only and adds source/employer/upload/submission
+- This R46-07 iteration remains offline-only and adds source/employer/upload/submission
   actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
 
 ### Historical baseline (read-only reconciled 2026-09-22)
@@ -1461,7 +1462,7 @@ occurred; this iteration remains `0/0/0/0`, with lifetime counters `14/9/0/0`.
 | R46-02  | `VERIFIED` in `beta-repository.test.ts`: packet persistence calls `R2Repository.assertCurrentPreparing`, legacy evaluation remains a same-job/profile compatibility reference, fabricated/stale references fail closed, packet digest preserves the pre-R2 shape and versions new R2 hashes.                                                                           | Synthetic seeded rows exercise the canonical gate; no private packet was changed.                                                                                    |
 | R46-03  | `VERIFIED` for the explicit helper and repository evidence path: policy is required, provider expiry caps validity, unknown provider expiry remains `UNKNOWN`, and packet persistence validates qualified ledger identity/content/timestamps when evidence is supplied.                                                                                                | Proposed fictional policy only; the private route remains default-disabled and no real activation is granted.                                                        |
 | R46-04  | `VERIFIED (loopback)` by `tests/e2e/source-to-preview.spec.ts` plus durable-store and concurrency tests: actual DOM fill/read-back, independently hashed upload acknowledgement, durable preview/reload, operation claim, and fixture submit count `0`.                                                                                                                | Loopback fixture only; no real target capability or submit method.                                                                                                   |
-| R46-05  | `VERIFIED (single discoverable browser proof)` by `source-to-preview.spec.ts`: fictional source/ledger/R2 identifiers bind a current packet to map/fill/upload/verify/preview/reload; all target traffic is allowlisted loopback. Existing adversarial synthetic suites remain green.                                                                                  | The source/R2 evidence in this proof is fictional and disposable; it is not Personal Live V1 readiness.                                                              |
+| R46-05  | `VERIFIED (actual repository-to-browser proof)` by the R46-07 discoverable Playwright test: real source persistence, qualified verification ledger, real R2 eligibility/fit/evaluation/queue, packet persistence, SQLite non-submit runner, loopback DOM/upload/preview, reopen/new-process recovery, replay, stale stop, malformed snapshot, and concurrent claim.    | Three fresh disposable file-backed runs with fictional content only; this is not Personal Live V1 or real employer readiness.                                        |
 | R46-06  | `VERIFIED` local implementation gates: unit 53 files/592 tests, integration 3 files/21 tests, E2E 45 tests, build/showcase/audit, lint, typecheck, privacy, preflight, dependency audit, diff-check, fsck, and disposable migration/recovery tests.                                                                                                                    | Repository-wide `format:check` remains blocked by 11 pre-existing files; targeted changed-file formatting passes. Full release check is therefore not claimed green. |
 
 Migration boundary: `0000`-`0009` remain immutable. Unmerged disposable `0010` changed from blob
@@ -1476,3 +1477,111 @@ reviewed bounded evidence; Personal Live V1 `NOT_READY`; real target operations 
 target-dependent. Remaining blockers are real-role/provider currentness, approved real target
 authority, and a separate reviewed live operation. Exactly one next reviewed task is recommended:
 review PR #46's correction diff and exact-head CI; do not merge or activate live operations.
+
+## 24. R46-07 actual source-to-browser pipeline and disk recovery blueprint (2026-09-23)
+
+R46-07 stays on PR #46 and the same branch, offline-only. It closes the prior R46-05 evidence gap by
+running the real source discovery, source verification ledger, R2 evaluation/queue, packet persistence,
+and loopback non-submit runner against one fresh file-backed disposable SQLite database. The only
+mocked boundary is the fictional source transport response; no real source/employer/upload/submission
+action is permitted (`0/0/0/0`). The private runtime remains schema 9 with pending 1, integrity `PASS`,
+foreign-key issues `0`, and is neither migrated nor restored.
+
+| Work ID  | Dependencies          | Authorized change                                                                                                                                                                                                                                                                     | Acceptance evidence                                                                                                                                                                              |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R46-07-A | R46-01 through R46-06 | Add explicit isolated fixture-root/database helpers and a plainly named Playwright proof using migrations `0000`-`0010`; keep provider identity separate from `SYNTHETIC_LOCAL`.                                                                                                      | Fresh file-backed schema 10 DB, explicit roots, no fallback to private paths, source transport mock called exactly at the boundary.                                                              |
+| R46-07-B | R46-07-A              | Use `runLeverSourceToQueue`, `SourceEnablementRepository`, real R2 eligibility/fit services, `R2Repository`, and normal Beta packet persistence; create fictional profile, source capability, document, approvals, answers, and PREPARING transition through supported APIs/fixtures. | Actual run/page/observation/job-version/verification/evaluation/queue/packet identifiers are captured and linked; no fabricated readiness or evaluation IDs.                                     |
+| R46-07-C | R46-07-B              | Feed the persisted/reloaded packet to `LoopbackNonSubmitAdapter` + `TargetIndependentNonSubmitRunner` with `SqliteNonSubmitRunStore`; revalidate current bindings and explicit freshness policy.                                                                                      | MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW succeeds on loopback only; received upload digest, acknowledgement, checkpoints, and preview linkage are independently asserted; submit remains unavailable. |
+| R46-07-D | R46-07-C              | Reopen SQLite/store/browser with fresh objects and add deterministic replay, stale-state, unknown-control/protection, interrupted-upload, malformed-snapshot, preview-interruption, and concurrent-worker cases.                                                                      | Disk reopen and fresh-process recovery are distinguished; no repeated upload, no silent corrupt-state restart, no losing-worker overwrite, and stale/revoked bindings stop before writes.        |
+| R46-07-E | R46-07-D              | Run three fresh fixture directories with retries disabled, full local gates, disposable migration/backup/restore checks, isolated LF release attempt, and exact-head CI; update PR metadata and this plan.                                                                            | R46-05 status reflects the exact evidence achieved; 0010 hash and private schema-9 state are separately reported; PR #46 remains open/unmerged.                                                  |
+
+Implementation order: establish isolated roots and migration helpers; build the actual source-to-R2
+orchestration and packet lineage; run the browser lane from the reloaded packet; add recovery/negative
+variants; then execute validation and update this section with exact IDs, counts, failures, hashes, and
+CI. No threshold, calibration, authority, dependency, visibility, or unrelated application behavior
+may be changed to make the proof pass. Rollback is limited to reverting R46-07 commits and deleting
+disposable fixture directories; never migrate or restore the private database.
+
+Evidence boundary: a successful R46-07 proof establishes offline fictional service integration and
+disk-backed non-submit recovery only. It does not establish real employer application readiness,
+real upload readiness, production deployment, or the green banner.
+
+## 25. R46-07 actual pipeline and disk recovery closeout (2026-09-23)
+
+R46-07 is now implemented on the same PR/branch and remains offline-only. The prior R46-05 gap is
+closed by a discoverable Playwright proof that uses the real source, ledger, R2, packet, and durable
+runner services with a fictional transport boundary and fresh file-backed SQLite. The private runtime
+was not opened for write, migrated, restored, or copied.
+
+### Actual lineage and browser evidence
+
+| Stage                 | Evidence carried forward                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Disposable authority  | `source-r46-07-fictional` v1 is persisted and validated through `SourceEnablementRepository`; the fixture uses deterministic `source-r46-07:*` IDs.                                                                                                                                                                                                                                                                                                 |
+| Source run and ledger | `runLeverSourceToQueue` creates real run/page/verification rows. The first run persists one observation and one job version, qualifies one accepted verification, and invokes the real parser/normalization path. Provider expiry remains `NULL`/`UNKNOWN`.                                                                                                                                                                                         |
+| Job/R2                | The persisted `source-job-*` / `source-job-version-*` rows are reloaded; `evaluateR2Eligibility`, `scoreR2JobFit`, `R2Repository.recordEvaluation`, and `recordQueueDecision` produce actual `ELIGIBLE`/recommended state. The queue is transitioned through real `PREPARING` and checked by `assertCurrentPreparing`.                                                                                                                              |
+| Packet                | `BetaRepository` persists a separate legacy compatibility evaluation tied to the actual job/profile while the packet retains the actual `r2EvaluationId`. The packet is reloaded from the same database and its canonical nonzero `r2-packet-v2` digest is compared with the durable preview row. Provider expiry is not invented: preparation `ACTIVE` is derived from fresh qualified ledger evidence plus the explicit fictional 24h/15m policy. |
+| Browser lane          | `LoopbackNonSubmitAdapter` and `TargetIndependentNonSubmitRunner` execute MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW only against owned loopback. DOM read-back is independent; the upload server hashes received fictional bytes and returns one acknowledgement; preview links run/packet/preview digests. No submit method exists.                                                                                                                      |
+
+Decisive test: `tests/e2e/source-to-preview.spec.ts:522`,
+`persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit`.
+Reproduce with:
+
+```text
+npx.cmd playwright test tests/e2e/source-to-preview.spec.ts --grep "persists source verification" --retries=0 --reporter=line
+```
+
+It creates three unique disposable roots with explicit `database/documents/reports` directories,
+applies migrations `0000` through `0010`, uses one DB through every service, and repeats the complete
+scenario three times with retries disabled. Each repetition makes two fictional source transport
+calls (initial plus unchanged replay), one fictional upload, and zero submissions.
+
+### Recovery and negative evidence
+
+- The decisive test closes the adapter and SQLite connection, verifies the preview from a fresh child
+  Node process, reopens SQLite/store objects, checks `FILL_PREVIEW` and foreign keys, then corrupts the
+  stored effect and proves `NON_SUBMIT_SNAPSHOT_CORRUPT` rather than silently restarting.
+- An independent SQLite connection cannot claim the completed `MAP_FOR_FILL` operation.
+- A real queue transition away from `PREPARING` makes a new runner stop as `PAUSED/PAGE_CHANGED`
+  before another upload; counters remain unchanged.
+- Exact unchanged source replay creates no new observation, job version, R2 evaluation, or queue work.
+- `tests/e2e/source-to-preview.spec.ts:435`,
+  `stops after an accepted upload when checkpoint persistence is interrupted`, accepts one upload at
+  the fixture server, injects one durable checkpoint-write failure, records `UPLOAD_OUTCOME_UNKNOWN`,
+  and proves a restarted runner performs no second upload.
+- `packages/database/src/beta-repository.test.ts` injects a SQLite preview-insert failure after the
+  operation update and proves the transaction leaves the operation `CLAIMED/{}`; the retry after the
+  trigger is removed persists exactly one preview linkage.
+- Existing `source-enablement-repository.test.ts` covers page-one success/page-two failure/restart/
+  completion/replay; existing runner and inspection suites cover protection, changed controls,
+  destination/form drift, and real-target denial. These component cases remain separate from the
+  whole-pipeline proof.
+
+The demonstrated defects fixed in this run were zero/default packet digest acceptance, malformed
+snapshot fallback, non-atomic operation/preview persistence, and duplicate/mismatched fictional
+fixture evidence. No eligibility threshold, calibration rule, authority, network policy, migration,
+or real-target behavior changed.
+
+### Validation and boundaries
+
+- Unit: 53 files / 592 tests passed. Integration: 3 files / 21 tests passed.
+- Full E2E after the failure-injection addition: 47 / 47 passed with retries disabled.
+- Production/local and showcase builds plus showcase audit passed; strict typecheck, lint, privacy,
+  dependency audits, schema/maintenance tests, `git diff --check`, and `git fsck --strict` passed.
+  Targeted changed-file formatting passed.
+- Repository-wide `format:check` and `release:check` stop at the same 11 pre-existing files (including
+  `package.json` and historical green-banner files); unrelated formatting was not applied. A clean LF
+  release checkout was not run because release scripts intentionally resolve the private profile/database
+  and have no safe disposable schema-10 override. This is a reported limitation, not a green release claim.
+- No real source/employer/form/upload/submission action occurred: historical lifetime `14/9/0/0`,
+  this iteration `0/0/0/0`; fictional repetitions are 6 source requests, 3 uploads, 0 submissions.
+
+Migration evidence: `0010_verified_source_packet_binding.sql` remains SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; `0000`-`0009` remain
+byte-for-byte unchanged. Disposable proof databases reached schema 10 with integrity/FKs passing.
+The private DB remains schema 9, pending 1, integrity `PASS`, FK issues `0`, and was not migrated/restored.
+
+Evidence boundary: R46-07 proves fictional offline source-to-packet integration and disk-backed
+non-submit recovery only. It does not prove a real employer application, real upload, deployment,
+green-banner activation, or Personal Live V1. Exactly one next reviewed task is recommended: review
+PR #46 at its exact pushed head and CI result for merge approval; do not merge or activate live operations.

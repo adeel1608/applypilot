@@ -220,6 +220,52 @@ describe("Beta repository", () => {
       ],
     });
     expect(durable.load(bindingDigest)).toMatchObject({ state: "MAPPED", sequence: 1 });
+    const previewBindingDigest = "e".repeat(64);
+    expect(durable.claim(previewBindingDigest, "FILL_PREVIEW")).toBe(true);
+    sqlite.exec(`
+      CREATE TRIGGER synthetic_preview_persistence_failure
+      BEFORE INSERT ON application_run_previews
+      BEGIN SELECT RAISE(ABORT, 'synthetic preview persistence interruption'); END;
+    `);
+    const previewSnapshot = {
+      state: "FILL_PREVIEW" as const,
+      sequence: 2,
+      claimedOperations: ["MAP_FOR_FILL", "FILL_PREVIEW"],
+      checkpoints: [
+        {
+          sequence: 2,
+          state: "FILL_PREVIEW" as const,
+          stopReason: null,
+          occurredAt: now,
+          targetUrl: packet.targetUrl!,
+          formVersion: "fixture-form-v1",
+          adapterVersion: "fixture-adapter-v1",
+          fieldReadBack: [],
+          uploadEvidence: null,
+          previewDigest: "e".repeat(64),
+        },
+      ],
+    };
+    expect(() => durable.save(previewBindingDigest, previewSnapshot)).toThrow(
+      "synthetic preview persistence interruption",
+    );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT state, effect_json AS effectJson FROM application_run_operations
+           WHERE run_id=? AND binding_digest=?`,
+        )
+        .get(runId, previewBindingDigest),
+    ).toEqual({ state: "CLAIMED", effectJson: "{}" });
+    sqlite.exec("DROP TRIGGER synthetic_preview_persistence_failure");
+    durable.save(previewBindingDigest, previewSnapshot);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT packet_digest AS packetDigest, preview_digest AS previewDigest FROM application_run_previews WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ packetDigest: packetDigest(packet), previewDigest: "e".repeat(64) });
     sqlite.close();
   });
 
