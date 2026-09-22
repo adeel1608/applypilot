@@ -972,21 +972,29 @@ test("persists source verification through canonical R2 and packet services to a
       competingSqlite.close();
       await adapter.close();
       sqlite.close();
-      const child = spawnSync(
-        process.env.ComSpec ?? "cmd.exe",
-        [
-          "/d",
-          "/s",
-          "/c",
-          "npx.cmd tsx scripts/r46-08-load-packet.ts",
-          fixture.databasePath,
-          packet.id,
-          persistedPacketDigest,
-          runId,
-          bindingDigest,
-        ],
-        { cwd: process.cwd(), encoding: "utf8" },
-      );
+      const childArgs = [
+        fixture.databasePath,
+        packet.id,
+        persistedPacketDigest,
+        runId,
+        bindingDigest,
+      ];
+      const child =
+        process.platform === "win32"
+          ? spawnSync(
+              process.env.ComSpec ?? "cmd.exe",
+              ["/d", "/s", "/c", "npx.cmd tsx scripts/r46-08-load-packet.ts", ...childArgs],
+              { cwd: process.cwd(), encoding: "utf8" },
+            )
+          : spawnSync(
+              process.execPath,
+              [
+                join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
+                "scripts/r46-08-load-packet.ts",
+                ...childArgs,
+              ],
+              { cwd: process.cwd(), encoding: "utf8" },
+            );
       expect(child.status, child.stderr).toBe(0);
       expect(JSON.parse(child.stdout.trim())).toMatchObject({
         packetDigest: persistedPacketDigest,
