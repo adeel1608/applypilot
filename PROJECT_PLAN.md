@@ -16,6 +16,8 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
   `feat: implement verified source-to-packet and non-submit foundations`.
 - R46-08 starts from exact clean head `2baa6d014778fcc0b8975f425228335fc0f4f994`; PR #46 remains
   `OPEN / UNMERGED` and the implementation must stay on this same branch.
+- The implementation is now committed at exact head `4a50683bc9c788076cba46df7d4885b59aafd757`;
+  exact-head push and PR CI are still running and must be rechecked before handoff.
 - The final exact-head push and pull-request CI runs completed successfully; PR #46 remains open and
   unmerged.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
@@ -1632,7 +1634,8 @@ head and CI satisfy all documented gates; otherwise report the specific blocker.
 ## 27. R46-08 implementation closeout (2026-09-23)
 
 R46-08 is implemented on the same PR/branch from start head
-`2baa6d014778fcc0b8975f425228335fc0f4f994`. No live source/employer/form/upload/submission action,
+`2baa6d014778fcc0b8975f425228335fc0f4f994` to final implementation head
+`4a50683bc9c788076cba46df7d4885b59aafd757`. No live source/employer/form/upload/submission action,
 private database write/migration/restore/copy, capability mutation, or merge occurred. The private
 runtime remains schema 9, pending migration 1, integrity `PASS`, foreign-key issues `0`.
 
