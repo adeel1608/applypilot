@@ -50,6 +50,7 @@ describe("database foundation", () => {
         "sourceCapabilityVersions",
         "sourceRunCheckpoints",
         "sourceRunPages",
+        "sourceRecordVerifications",
         "sourceObservationPayloads",
         "runnerTargetCapabilityVersions",
         "runnerRunBindings",
@@ -119,6 +120,7 @@ describe("database foundation", () => {
       "0007_personal_live_v1_enablement.sql",
       "0008_real_target_inspection_scope.sql",
       "0009_green_banner_session_grant.sql",
+      "0010_verified_source_packet_binding.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -157,7 +159,7 @@ describe("database foundation", () => {
         "runner_inspection_bindings",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(9);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(10);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
@@ -309,6 +311,59 @@ describe("database foundation", () => {
         )
         .get(),
     ).toEqual({ count: 4 });
+    sqlite.close();
+  });
+
+  it("upgrades schema v9 to v10 additively and preserves history", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+      "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
+      "0008_real_target_inspection_scope.sql",
+      "0009_green_banner_session_grant.sql",
+    ]) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+         (id,title,company,category,location,employment_type,normalized_json,application_status,
+          date_discovered,created_at,updated_at)
+         VALUES ('schema9-job','Fictional','Fictional','Fixture','Melbourne VIC','PART_TIME',
+          '{}','NEW','2026-09-22T00:00:00.000Z','2026-09-22T00:00:00.000Z','2026-09-22T00:00:00.000Z')`,
+      )
+      .run();
+    const before = Number(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get());
+    sqlite.exec(
+      readFileSync(
+        new URL("../drizzle/0010_verified_source_packet_binding.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(10);
+    expect(Number(sqlite.prepare("SELECT count(*) FROM jobs").pluck().get())).toBe(before);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+        )
+        .get(),
+    ).toEqual({ name: "source_record_verifications" });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT name FROM pragma_table_info('application_packets') WHERE name='r2_evaluation_id'",
+        )
+        .get(),
+    ).toEqual({ name: "r2_evaluation_id" });
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
 

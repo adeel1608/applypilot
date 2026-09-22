@@ -335,19 +335,40 @@ export class SourceEnablementRepository implements SourceRunSink {
         capabilityVersion: capability.version,
         capabilityDigest: sourceCapabilityDigest(capability),
       });
+      const capabilityRow = this.sqlite
+        .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
+        .get(capability.capabilityId, capability.version) as { id: string } | undefined;
+      if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
+      // A replay of the same successful page in the same run is a no-op. The
+      // page digest is the immutable operation/page identity; do not create a
+      // second membership row or refresh verification time for it.
+      if (
+        this.sqlite
+          .prepare("SELECT 1 FROM source_run_pages WHERE run_id=? AND page_digest=?")
+          .get(input.runId, input.page.pageDigest)
+      ) {
+        return { createdJobIds: [], duplicateObservationCount: input.page.acceptedRecords.length };
+      }
       const createdJobIds: string[] = [];
       let duplicateObservationCount = 0;
-      for (const record of input.page.acceptedRecords) {
+      const persistedRecords: Array<{
+        record: LeverPostingRecordV2;
+        recordIndex: number;
+        persisted: ReturnType<SourceEnablementRepository["persistLeverObservation"]>;
+      }> = [];
+      for (const [recordIndex, record] of input.page.acceptedRecords.entries()) {
         const persisted = this.persistLeverObservation(
           record,
           capability,
           input.runId,
           input.observedAt,
         );
+        persistedRecords.push({ record, recordIndex, persisted });
         if (persisted.created) createdJobIds.push(persisted.jobId);
         else duplicateObservationCount += 1;
       }
       const pageNumber = input.budget.pages;
+      const pageId = this.id();
       this.sqlite
         .prepare(
           `INSERT INTO source_run_pages
@@ -356,7 +377,7 @@ export class SourceEnablementRepository implements SourceRunSink {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          this.id(),
+          pageId,
           input.runId,
           pageNumber,
           String(input.page.cursor),
@@ -367,6 +388,52 @@ export class SourceEnablementRepository implements SourceRunSink {
           input.page.byteCount,
           input.observedAt,
         );
+      if (this.hasVerificationLedger()) {
+        for (const { record, recordIndex, persisted } of persistedRecords) {
+          this.recordVerification({
+            id: this.id(),
+            runId: input.runId,
+            capabilityVersionId: capabilityRow.id,
+            pageId,
+            source: capability.source,
+            tenant: capability.tenant,
+            externalId: record.externalId,
+            recordIndex,
+            pageDigest: input.page.pageDigest,
+            contentHash: record.contentDigest,
+            sourceObservationId: persisted.observationId,
+            jobVersionId: persisted.jobVersionId,
+            disposition: "ACCEPTED",
+            qualificationState: "PAGE_PERSISTED",
+            parserVersion: capability.parserVersion,
+            policyVersion: capability.policyVersion,
+            verifiedAt: input.observedAt,
+            createdAt: input.observedAt,
+          });
+        }
+        for (const diagnostic of input.page.safeUnusableDiagnostics) {
+          this.recordVerification({
+            id: this.id(),
+            runId: input.runId,
+            capabilityVersionId: capabilityRow.id,
+            pageId,
+            source: capability.source,
+            tenant: capability.tenant,
+            externalId: null,
+            recordIndex: diagnostic.recordIndex,
+            pageDigest: input.page.pageDigest,
+            contentHash: null,
+            sourceObservationId: null,
+            jobVersionId: null,
+            disposition: "UNUSABLE",
+            qualificationState: "PAGE_PERSISTED",
+            parserVersion: capability.parserVersion,
+            policyVersion: capability.policyVersion,
+            verifiedAt: input.observedAt,
+            createdAt: input.observedAt,
+          });
+        }
+      }
       const digests = this.sqlite
         .prepare("SELECT page_digest FROM source_run_pages WHERE run_id = ? ORDER BY page_number")
         .all(input.runId)
@@ -420,6 +487,15 @@ export class SourceEnablementRepository implements SourceRunSink {
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
     this.finish(input.runId, "COMPLETE", input.budget, null, null, null, null, input.completedAt);
+    if (this.hasVerificationLedger()) {
+      this.sqlite
+        .prepare(
+          `UPDATE source_record_verifications
+           SET qualification_state='QUALIFIED'
+           WHERE run_id=? AND disposition='ACCEPTED' AND qualification_state='PAGE_PERSISTED'`,
+        )
+        .run(input.runId);
+    }
   }
 
   stop(input: {
@@ -444,6 +520,24 @@ export class SourceEnablementRepository implements SourceRunSink {
   }
 
   jobIdsForRun(runId: string): string[] {
+    if (
+      this.sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+        )
+        .get()
+    ) {
+      return (
+        this.sqlite
+          .prepare(
+            `SELECT DISTINCT j.job_id AS jobId
+             FROM source_record_verifications v JOIN job_versions j ON j.id=v.job_version_id
+             WHERE v.run_id=? AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+             ORDER BY j.job_id`,
+          )
+          .all(runId) as Array<{ jobId: string }>
+      ).map(({ jobId }) => jobId);
+    }
     return (
       this.sqlite
         .prepare(
@@ -468,15 +562,32 @@ export class SourceEnablementRepository implements SourceRunSink {
     if (!run || run.status !== "COMPLETE") throw new Error("SOURCE_RUN_NOT_COMPLETE");
     const jobs = this.sqlite
       .prepare(
-        `SELECT DISTINCT o.job_id AS jobId
-         FROM source_observations o
-         JOIN source_run_checkpoints historical_run ON historical_run.id=o.run_id
-         JOIN source_capability_versions historical_capability
-           ON historical_capability.id=historical_run.capability_version_id
-         WHERE historical_capability.capability_id=? AND o.job_id IS NOT NULL
-         ORDER BY o.observed_at,o.id`,
+        this.sqlite
+          .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+          )
+          .get()
+          ? `SELECT DISTINCT j.job_id AS jobId
+             FROM source_record_verifications v JOIN job_versions j ON j.id=v.job_version_id
+             WHERE v.run_id=? AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+             ORDER BY j.job_id`
+          : `SELECT DISTINCT o.job_id AS jobId
+             FROM source_observations o
+             JOIN source_run_checkpoints historical_run ON historical_run.id=o.run_id
+             JOIN source_capability_versions historical_capability
+               ON historical_capability.id=historical_run.capability_version_id
+             WHERE historical_capability.capability_id=? AND o.job_id IS NOT NULL
+             ORDER BY o.observed_at,o.id`,
       )
-      .all(run.capabilityId) as Array<{ jobId: string }>;
+      .all(
+        this.sqlite
+          .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+          )
+          .get()
+          ? runId
+          : run.capabilityId,
+      ) as Array<{ jobId: string }>;
     const work: Array<{ jobId: string; evaluationId: string | null }> = [];
     for (const { jobId } of jobs) {
       const version = this.sqlite
@@ -623,12 +734,77 @@ export class SourceEnablementRepository implements SourceRunSink {
       .get(capabilityId) as { id: string; version: number; digest: string } | undefined;
   }
 
+  private hasVerificationLedger(): boolean {
+    return Boolean(
+      this.sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+        )
+        .get(),
+    );
+  }
+
+  private recordVerification(input: {
+    id: string;
+    runId: string;
+    capabilityVersionId: string;
+    pageId: string;
+    source: string;
+    tenant: string;
+    externalId: string | null;
+    recordIndex: number;
+    pageDigest: string;
+    contentHash: string | null;
+    sourceObservationId: string | null;
+    jobVersionId: string | null;
+    disposition: "ACCEPTED" | "UNUSABLE";
+    qualificationState: "PAGE_PERSISTED" | "QUALIFIED";
+    parserVersion: string;
+    policyVersion: string | null;
+    verifiedAt: string;
+    createdAt: string;
+  }): void {
+    this.sqlite
+      .prepare(
+        `INSERT OR IGNORE INTO source_record_verifications
+         (id,run_id,capability_version_id,page_id,source,tenant,external_id,record_index,
+          page_digest,content_hash,source_observation_id,job_version_id,disposition,
+          qualification_state,parser_version,policy_version,verified_at,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        input.id,
+        input.runId,
+        input.capabilityVersionId,
+        input.pageId,
+        input.source,
+        input.tenant,
+        input.externalId,
+        input.recordIndex,
+        input.pageDigest,
+        input.contentHash,
+        input.sourceObservationId,
+        input.jobVersionId,
+        input.disposition,
+        input.qualificationState,
+        input.parserVersion,
+        input.policyVersion,
+        input.verifiedAt,
+        input.createdAt,
+      );
+  }
+
   private persistLeverObservation(
     record: LeverPostingRecordV2,
     capability: SourceCapabilityV2,
     runId: string,
     observedAt: string,
-  ): { jobId: string; created: boolean } {
+  ): {
+    jobId: string;
+    created: boolean;
+    observationId: string;
+    jobVersionId: string | null;
+  } {
     const location = record.location ?? record.allLocations[0] ?? null;
     if (!location || !record.description.trim())
       throw new Error("SOURCE_RECORD_REQUIRED_FIELD_MISSING");
@@ -638,7 +814,20 @@ export class SourceEnablementRepository implements SourceRunSink {
     const existingObservation = this.sqlite
       .prepare("SELECT 1 FROM source_observations WHERE id = ?")
       .get(observationId);
-    if (existingObservation) return { jobId, created: false };
+    if (existingObservation) {
+      const existingVersion = this.sqlite
+        .prepare(
+          `SELECT id FROM job_versions
+           WHERE source_observation_id=? ORDER BY version DESC LIMIT 1`,
+        )
+        .get(observationId) as { id: string } | undefined;
+      return {
+        jobId,
+        created: false,
+        observationId,
+        jobVersionId: existingVersion?.id ?? null,
+      };
+    }
     const structured = structuredLeverRecord(record, capability);
     const sourceText = JSON.stringify(structured);
     const fields = ParsedJobFieldsSchema.parse({
@@ -829,7 +1018,7 @@ export class SourceEnablementRepository implements SourceRunSink {
     });
     new R2ARepository(this.sqlite, this.now).recordNormalization(jobVersionId, normalization);
     this.suggestCrossSourceDuplicates(observationId, capability.source, capability.tenant);
-    return { jobId, created: true };
+    return { jobId, created: true, observationId, jobVersionId };
   }
 
   private observationIdentity(observationId: string): ObservationIdentity {

@@ -33,6 +33,8 @@ export const RunnerTargetOperationSchema = z.enum([
   "MAP_FOR_FILL",
   "FILL",
   "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
   "SUBMIT",
 ]);
 export type RunnerTargetOperation = z.infer<typeof RunnerTargetOperationSchema>;
@@ -99,6 +101,21 @@ function hasExactOperations(
 
 export function targetCapabilitySupportsApplication(capability: RunnerTargetCapability): boolean {
   return hasExactOperations(capability.allowedOperations, applicationOperations);
+}
+
+const nonSubmitOperations: RunnerTargetOperation[] = [
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
+];
+
+export function targetCapabilitySupportsNonSubmit(capability: RunnerTargetCapability): boolean {
+  return (
+    capability.targetKind === "SYNTHETIC_LOCAL" &&
+    hasExactOperations(capability.allowedOperations, nonSubmitOperations)
+  );
 }
 
 export const RunnerTargetCapabilitySchema = z
@@ -497,7 +514,10 @@ export function freezeRunnerBinding(
 ): FrozenRunnerBinding {
   const packet = ApplicationPacketSchema.parse(packetInput);
   const capability = RunnerTargetCapabilitySchema.parse(capabilityInput);
-  if (!targetCapabilitySupportsApplication(capability)) {
+  if (
+    !targetCapabilitySupportsApplication(capability) &&
+    !targetCapabilitySupportsNonSubmit(capability)
+  ) {
     throw new Error("TARGET_OPERATION_SCOPE_INVALID");
   }
   if (!packet.targetUrl) throw new Error("APPLICATION_DESTINATION_INVALID");
@@ -822,6 +842,166 @@ export class TargetIndependentApplicationRunner {
       state,
       stopReason,
       occurredAt: this.now().toISOString(),
+    };
+    this.checkpoints.push(checkpoint);
+    return checkpoint;
+  }
+}
+
+export const NonSubmitRunnerStateSchema = z.enum([
+  "PREPARED",
+  "OPENED",
+  "MAPPED",
+  "FILLED",
+  "UPLOADED",
+  "VERIFIED",
+  "FILL_PREVIEW",
+  "PAUSED",
+]);
+export type NonSubmitRunnerState = z.infer<typeof NonSubmitRunnerStateSchema>;
+
+export interface NonSubmitTargetAdapter {
+  readonly targetKind: "SYNTHETIC_LOCAL";
+  map(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  fill(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  upload(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  verify(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  fillPreview(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+}
+
+export interface NonSubmitRunnerCheckpoint {
+  sequence: number;
+  state: NonSubmitRunnerState;
+  stopReason: SyntheticStopReason | null;
+  occurredAt: string;
+  targetUrl: string;
+  formVersion: string;
+  adapterVersion: string;
+}
+
+export class TargetIndependentNonSubmitRunner {
+  private state: NonSubmitRunnerState = "PREPARED";
+  private sequence = 0;
+  private readonly checkpoints: NonSubmitRunnerCheckpoint[] = [];
+
+  constructor(
+    private readonly packet: ApplicationPacket,
+    private readonly capability: RunnerTargetCapability,
+    private readonly binding: FrozenRunnerBinding,
+    private readonly adapter: NonSubmitTargetAdapter,
+    private readonly currentBinding: () => FrozenRunnerBinding,
+    private readonly now: () => Date = () => new Date(),
+  ) {
+    ApplicationPacketSchema.parse(packet);
+    RunnerTargetCapabilitySchema.parse(capability);
+    FrozenRunnerBindingSchema.parse(binding);
+    if (
+      adapter.targetKind !== capability.targetKind ||
+      !targetCapabilitySupportsNonSubmit(capability) ||
+      runnerTargetReadiness(capability, now()).status !== "TARGET_ENABLED"
+    ) {
+      this.pause("TARGET_APPROVAL_REQUIRED");
+    } else if (binding.unresolvedCount > 0 || assessPacketReadiness(packet).blockers.length > 0) {
+      this.pause("PACKET_NOT_READY");
+    } else {
+      this.record("PREPARED", null);
+    }
+  }
+
+  async map(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("PREPARED");
+    return this.observe("MAPPED", () => this.adapter.map(this.packet, this.binding));
+  }
+
+  async fill(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("MAPPED");
+    return this.observe("FILLED", () => this.adapter.fill(this.packet, this.binding));
+  }
+
+  async upload(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("FILLED");
+    return this.observe("UPLOADED", () => this.adapter.upload(this.packet, this.binding));
+  }
+
+  async verify(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("UPLOADED");
+    return this.observe("VERIFIED", () => this.adapter.verify(this.packet, this.binding));
+  }
+
+  async fillPreview(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("VERIFIED");
+    return this.observe("FILL_PREVIEW", () => this.adapter.fillPreview(this.packet, this.binding));
+  }
+
+  snapshot() {
+    return {
+      state: this.state,
+      checkpoints: this.checkpoints.map((checkpoint) => ({ ...checkpoint })),
+      submitEnabled: false as const,
+    };
+  }
+
+  private async observe(
+    state: Exclude<NonSubmitRunnerState, "PREPARED" | "OPENED" | "PAUSED">,
+    operation: () => Promise<TargetObservation>,
+  ): Promise<NonSubmitRunnerCheckpoint> {
+    if (!this.bindingsCurrent()) return this.pause("PAGE_CHANGED");
+    try {
+      const observation = TargetObservationSchema.parse(await operation());
+      const signal = observation.protectionSignals[0];
+      if (signal) return this.pause(SyntheticStopReasonSchema.parse(signal));
+      if (observation.targetUrl !== this.binding.targetUrl)
+        return this.pause("DESTINATION_CHANGED");
+      if (
+        observation.formVersion !== this.binding.formVersion ||
+        observation.adapterVersion !== this.binding.adapterVersion
+      ) {
+        return this.pause("FORM_CHANGED");
+      }
+      if (state === "UPLOADED") {
+        const expected = this.packet.documents.map(({ digest }) => digest).sort();
+        if (canonical([...observation.documentDigests].sort()) !== canonical(expected)) {
+          return this.pause("DOCUMENT_DIGEST_CHANGED");
+        }
+      }
+      return this.record(state, null);
+    } catch {
+      return this.pause("PAGE_CHANGED");
+    }
+  }
+
+  private bindingsCurrent(): boolean {
+    try {
+      return (
+        runnerTargetReadiness(this.capability, this.now()).status === "TARGET_ENABLED" &&
+        canonical(FrozenRunnerBindingSchema.parse(this.currentBinding())) ===
+          canonical(this.binding)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private assertState(expected: NonSubmitRunnerState): void {
+    if (this.state === "PAUSED") throw new Error("RUN_PAUSED");
+    if (this.state !== expected) throw new Error(`RUN_STATE_REQUIRED:${expected}`);
+  }
+
+  private pause(reason: SyntheticStopReason): NonSubmitRunnerCheckpoint {
+    this.state = "PAUSED";
+    return this.record("PAUSED", reason);
+  }
+
+  private record(state: NonSubmitRunnerState, stopReason: SyntheticStopReason | null) {
+    this.state = state;
+    const checkpoint: NonSubmitRunnerCheckpoint = {
+      sequence: ++this.sequence,
+      state,
+      stopReason,
+      occurredAt: this.now().toISOString(),
+      targetUrl: this.binding.targetUrl,
+      formVersion: this.binding.formVersion,
+      adapterVersion: this.binding.adapterVersion,
     };
     this.checkpoints.push(checkpoint);
     return checkpoint;

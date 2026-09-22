@@ -39,6 +39,7 @@ export const ApplicationPacketSchema = z
     jobVersionId: z.string().min(1),
     profileVersionId: z.string().min(1),
     evaluationVersionId: z.string().min(1),
+    r2EvaluationId: z.string().min(1).nullable().default(null),
     eligibilityStatus: z.enum(["ELIGIBLE", "INELIGIBLE", "REVIEW_REQUIRED"]),
     targetUrl: z.url().nullable(),
     targetHost: z.string().min(1).nullable(),

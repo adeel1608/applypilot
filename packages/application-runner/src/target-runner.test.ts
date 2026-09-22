@@ -5,6 +5,7 @@ import {
   InMemoryFinalConsentStore,
   RunnerTargetCapabilitySchema,
   TargetIndependentApplicationRunner,
+  TargetIndependentNonSubmitRunner,
   assertRunnerTargetCapabilityIdentity,
   deriveNextRunnerTargetCapability,
   deterministicRunnerTargetCapabilityId,
@@ -15,6 +16,7 @@ import {
   validateRunnerAuditMetadata,
   type ApplicationPacket,
   type ApplicationTargetAdapter,
+  type NonSubmitTargetAdapter,
   type RunnerTargetCapability,
   type TargetObservation,
 } from "./index";
@@ -85,6 +87,14 @@ function capability(overrides: Partial<RunnerTargetCapability> = {}) {
   });
 }
 
+function nonSubmitCapability(overrides: Partial<RunnerTargetCapability> = {}) {
+  return capability({
+    capabilityId: "runner:synthetic-non-submit-fixture",
+    allowedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
+    ...overrides,
+  });
+}
+
 class FixtureAdapter implements ApplicationTargetAdapter {
   readonly targetKind = "SYNTHETIC_LOCAL" as const;
   signal: TargetObservation["protectionSignals"] = [];
@@ -121,6 +131,48 @@ class FixtureAdapter implements ApplicationTargetAdapter {
   }
 }
 
+class NonSubmitFixtureAdapter implements NonSubmitTargetAdapter {
+  readonly targetKind = "SYNTHETIC_LOCAL" as const;
+  readonly writes: string[] = [];
+  signal: TargetObservation["protectionSignals"] = [];
+
+  constructor(
+    private readonly value: ReturnType<typeof packet>,
+    private readonly target: ReturnType<typeof nonSubmitCapability>,
+  ) {}
+
+  private observation() {
+    return {
+      targetUrl: this.value.targetUrl!,
+      formVersion: this.target.formVersion,
+      adapterVersion: this.target.adapterVersion,
+      documentDigests: this.value.documents.map(({ digest }) => digest),
+      protectionSignals: this.signal,
+    } satisfies TargetObservation;
+  }
+
+  async map() {
+    this.writes.push("MAP_FOR_FILL");
+    return this.observation();
+  }
+  async fill() {
+    this.writes.push("FILL");
+    return this.observation();
+  }
+  async upload() {
+    this.writes.push("UPLOAD");
+    return this.observation();
+  }
+  async verify() {
+    this.writes.push("VERIFY");
+    return this.observation();
+  }
+  async fillPreview() {
+    this.writes.push("FILL_PREVIEW");
+    return this.observation();
+  }
+}
+
 function readyRunner() {
   const value = packet();
   const target = capability();
@@ -140,6 +192,50 @@ function readyRunner() {
 }
 
 describe("target-independent application runner", () => {
+  it("runs the dormant synthetic non-submit path without exposing submit", async () => {
+    const value = packet();
+    const target = nonSubmitCapability();
+    const binding = freezeRunnerBinding(value, target);
+    const adapter = new NonSubmitFixtureAdapter(value, target);
+    const runner = new TargetIndependentNonSubmitRunner(
+      value,
+      target,
+      binding,
+      adapter,
+      () => binding,
+      () => now,
+    );
+    expect((await runner.map()).state).toBe("MAPPED");
+    expect((await runner.fill()).state).toBe("FILLED");
+    expect((await runner.upload()).state).toBe("UPLOADED");
+    expect((await runner.verify()).state).toBe("VERIFIED");
+    expect((await runner.fillPreview()).state).toBe("FILL_PREVIEW");
+    expect(adapter.writes).toEqual(["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"]);
+    expect(runner.snapshot()).toMatchObject({ state: "FILL_PREVIEW", submitEnabled: false });
+    expect((runner as unknown as { submit?: unknown }).submit).toBeUndefined();
+  });
+
+  it("fails closed when a non-submit capability is real or the packet becomes stale", async () => {
+    const value = packet();
+    const target = capability({
+      targetKind: "REAL_TARGET",
+      allowedOrigin: "https://jobs.example.test",
+      allowedPathPrefix: "/apply",
+      allowedOperations: ["OPEN_AND_INSPECT_ONLY"],
+    });
+    const binding = freezeRunnerBinding(value, capability());
+    const adapter = new NonSubmitFixtureAdapter(value, nonSubmitCapability());
+    const runner = new TargetIndependentNonSubmitRunner(
+      value,
+      target,
+      binding,
+      adapter,
+      () => binding,
+      () => now,
+    );
+    expect(runner.snapshot()).toMatchObject({ state: "PAUSED", submitEnabled: false });
+  });
+
   it("permits only closed safe runner audit metadata", () => {
     expect(
       validateRunnerAuditMetadata("runner.run.bound", {

@@ -15,7 +15,7 @@ function fakeDatabase(input: {
 }) {
   return {
     pragma(statement: string) {
-      if (statement === "user_version") return input.schema ?? 9;
+      if (statement === "user_version") return input.schema ?? 10;
       if (statement === "integrity_check") return input.integrity ?? "ok";
       if (statement === "foreign_key_check") return input.foreignKeys ?? [];
       throw new Error(`UNEXPECTED_PRAGMA:${statement}`);

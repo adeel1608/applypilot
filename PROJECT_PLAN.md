@@ -20,8 +20,10 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 - Squash verification rule: expected reviewed head + exact-head CI + approved squash merge + merged parent equal
   pre-merge main + merged tree equal reviewed head tree + approved scope + archive digest preservation.
 - PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 and PR #45 are merged into the current main baseline.
-- Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
-- Historical lifetime action counters reconcile to source/employer/upload/submission = `14/9/0/0`; this iteration adds `1/0/0/0` (one bounded public-provider GET, no employer/application actions).
+- Private runtime read-only checks: schema 9, pending migrations 1 (the disposable-only `0010`
+  implementation is intentionally not applied), integrity `PASS`, foreign-key issues 0.
+- Historical lifetime action counters reconcile to source/employer/upload/submission = `14/9/0/0`; this
+  offline implementation iteration adds `0/0/0/0` (no source, employer, upload, or submission actions).
 - Active source capability count: 0. Active target capability count: 0. The historical parent grant is unchanged and submit-excluded; the ordinary P2-001 source capability completed its documented create/use/revoke lifecycle, and no active authority remains.
 - First real employer target validation is historically proven; the selected role's later inspection is passive evidence only.
 - Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
@@ -938,14 +940,14 @@ Robotics hardware: `NOT_APPLICABLE` unless a real dependency is introduced.
 
 ## 10. Database/migration/backup/recovery
 
-Expected current state to verify:
+Private runtime state (must remain untouched in this task):
 
 - schema 9;
-- pending 0;
+- pending 1 for disposable-only `0010`;
 - integrity PASS;
 - FK issues 0;
 - migrations 0000-0008 immutable;
-- 0009 additive.
+- 0009 additive; `0010` is additive and rehearsal-only here.
 
 Checklist:
 
@@ -1349,3 +1351,60 @@ Exactly one recommended next action remains P2-003: implement the typed R2-to-pa
 projection and durable successful-verification freshness ledger, fictional tests first. Do not
 obtain another live provider request until that design is reviewed and the owner authorizes a new
 bounded operation.
+
+## 20. Consolidated offline implementation blueprint (P2-003 through VERIFY-INT-001)
+
+This is the active implementation plan for the approved offline continuation. It remains strictly
+synthetic/local: historical action counters are `14/9/0/0`, and this iteration must add `0/0/0/0`.
+The private runtime database remains untouched at schema 9; any schema-10 rehearsal uses disposable
+databases only. No source capability, target capability, grant, approval, packet, profile, document,
+evaluation, queue, or application record is created or changed in the private runtime.
+
+| Work package   | Deliverable and dependency                                                                                        | Acceptance evidence                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| P2-003A        | Strong fictional reproductions for persisted R2, replayed verification, failed/partial runs, and stale references | Tests prove actual rows/clock/transport activity, not early-return mocks                          |
+| P2-003B        | Additive append-only exact-record verification ledger with run/page/record/content/disposition provenance         | Successful later verification is queryable; replay is idempotent; failed/partial is not qualified |
+| P2-003C        | Typed R2 packet binding and round-trip validation                                                                 | R2 is canonical; legacy packets remain readable; wrong/stale/fabricated references fail closed    |
+| P2-003D        | Explicit versioned freshness assessment (24h preparation, 15m pre-external-action, fictional only)                | Provider expiry, local freshness, eligibility, integrity, and authority remain independent        |
+| P3-INT-001     | Source-to-packet integration, restart/replay, invalidation, concurrency, and recovery matrix                      | No silent loss or stale shortcut; integrity/FK checks pass                                        |
+| P4-OFFLINE-001 | Dormant synthetic-only MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW lane using shared binding services                     | Fictional end-to-end succeeds without any submit operation; real execution remains disabled       |
+| VERIFY-INT-001 | Full tests, disposable migration/backup/restore rehearsal, UI evidence, audits, exact-head CI                     | One reviewable PR, open/unmerged, no private runtime mutation                                     |
+
+Implementation files/components: `packages/database/drizzle/0010_*` (additive ledger and packet R2
+binding), database schema/repositories, `packages/application-runner` freshness and dormant
+non-submit contracts, existing application workspace diagnostics, fictional unit/integration/E2E
+fixtures, and this plan. Migrations 0000-0009 remain byte-for-byte immutable. The proposed 0010
+relations use foreign keys, uniqueness on run/page/record disposition, immutable content references,
+and no raw payload or candidate-value columns.
+
+Rollback: revert the implementation commits and discard only disposable schema-10 databases. Never
+restore or migrate `data/applypilot.local.sqlite` in this task. The private runtime continues to be
+reported separately as schema 9 until an explicitly approved operational migration.
+
+## 21. Consolidated offline implementation evidence (2026-09-22)
+
+Branch/PR: `chore/p2-current-role-readiness`, PR #46 (open and intentionally unmerged). Starting
+head was `50f1a2f3de46b74547828d6efffe264929433e85`; the final implementation head is recorded in
+the handoff after the same-branch push. No capability, grant, profile, document, packet, evaluation,
+queue, or real runtime database write occurred.
+
+| Package | Status | Evidence |
+| --- | --- | --- |
+| P2-003A | `VERIFIED` | Fictional R2 packet fixtures persist an actual current R2 row plus a separate historical legacy row; fabricated, stale, and mismatched references fail closed. Unchanged replay uses a real second transport call with an injected clock. |
+| P2-003B | `VERIFIED` | Additive `source_record_verifications` ledger binds run/page/index/content/observation/job-version/disposition/qualification/time/parser/policy. New content versions, unchanged later verification, same-operation replay, and page-one-failure restart are covered. |
+| P2-003C | `VERIFIED` | `application_packets.r2_evaluation_id` is a typed FK; packet persistence requires current R2 evaluation + CURRENT PREPARING queue and only treats the legacy column as a same-job/profile compatibility reference. |
+| P2-003D | `VERIFIED` | Versioned fictional local policy: 24h preparation and 15m pre-external-action. Provider expiry, local verification age, qualification, and authority remain separate. |
+| P3-INT-001 | `VERIFIED` | Source page membership -> observation/job version -> R2 evaluation -> queue path passes restart/replay/invalidation and integrity/FK coverage; incomplete pages are not qualified. |
+| P4-OFFLINE-001 | `VERIFIED (synthetic only)` | Shared frozen binding supports MAP_FOR_FILL, FILL, UPLOAD, VERIFY, and FILL_PREVIEW on a synthetic-local capability; read-back/document/protection checks pass and the lane exposes no submit method. Real capabilities remain inspection-only. |
+| VERIFY-INT-001 | `IN_PROGRESS` | Local unit/integration/E2E/build/privacy/dependency/diff/fsck gates pass. Disposable schema-10 migration and backup/restore rehearsal pass. Exact-head CI is pending the final push. |
+
+Migration `0010_verified_source_packet_binding.sql` is additive only: it adds the R2 packet FK/index
+and the append-only verification ledger. Migrations `0000`-`0009` were not edited. The private local
+database is still schema 9 with one pending migration and remains integrity `PASS` / FK `0`; clean
+schema-10 and backup/restore checks use isolated fictional databases only.
+
+Current production classification is unchanged: Source-enabled Personal Beta `READY` only on the
+historical reviewed bounded evidence; Personal Live V1 `NOT_READY`; real MAP/FILL/UPLOAD/VERIFY/
+FILL_PREVIEW and SUBMIT remain disabled pending separate reviewed authority and real-role evidence.
+The next reviewed task is exactly one owner-approved offline review of PR #46; it must not merge or
+activate live application operations.

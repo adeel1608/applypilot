@@ -24,7 +24,168 @@ function migratedDatabase(): BetterSqlite3.Database {
   return sqlite;
 }
 
+function migratedR2Database(): BetterSqlite3.Database {
+  const sqlite = new BetterSqlite3(":memory:");
+  for (const name of [
+    "0000_applypilot_foundation.sql",
+    "0001_real_world_job_intake.sql",
+    "0002_personal_live_beta_core.sql",
+    "0003_r2a_evidence_normalization.sql",
+    "0004_r2_matching_quality.sql",
+    "0005_r2_matching_quality_hardening.sql",
+    "0006_r2_calibration_qualification.sql",
+    "0007_personal_live_v1_enablement.sql",
+    "0008_real_target_inspection_scope.sql",
+    "0009_green_banner_session_grant.sql",
+    "0010_verified_source_packet_binding.sql",
+  ]) {
+    sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+  }
+  return sqlite;
+}
+
 describe("Beta repository", () => {
+  it("round-trips a current R2 packet without treating a legacy evaluation as current", () => {
+    const sqlite = migratedR2Database();
+    const now = "2026-09-22T00:00:00.000Z";
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+          (id,title,company,category,location,employment_type,normalized_json,application_status,
+           date_discovered,created_at,updated_at)
+         VALUES ('job:r2-packet','Fictional Robotics Engineer','Fictional Robotics','Engineering',
+           'Melbourne VIC','FULL_TIME','{}','NEW',?,?,?)`,
+      )
+      .run(now, now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO candidate_profiles (id,active_version_id,created_at,updated_at)
+         VALUES ('profile:r2-packet','profile:r2-packet:v2',?,?)`,
+      )
+      .run(now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO candidate_profile_versions
+         (id,profile_id,version,schema_version,snapshot_json,content_hash,created_at)
+         VALUES ('profile:r2-packet:v2','profile:r2-packet',2,1,'{}',?,?)`,
+      )
+      .run("a".repeat(64), now);
+    sqlite
+      .prepare(
+        `INSERT INTO job_versions
+         (id,job_id,version,normalized_json,content_digest,created_at)
+         VALUES ('job:r2-packet:v1','job:r2-packet',1,'{}',?,?)`,
+      )
+      .run("b".repeat(64), now);
+    sqlite
+      .prepare(
+        `INSERT INTO evaluation_versions
+         (id,job_id,job_version_id,profile_version_id,evaluation_context,eligibility_status,
+          eligibility_reasons_json,fit_score,fit_contributions_json,coverage_json,
+          eligibility_engine_version,fit_engine_version,weight_version,stale,evaluated_at)
+         VALUES ('legacy:r2-packet','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2',
+          'DEMO_PROFILE','ELIGIBLE','[]',40,'[]','{}','legacy-v1','legacy-v1','legacy-v1',1,?)`,
+      )
+      .run(now);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_evaluation_versions
+         (id,job_id,job_version_id,profile_version_id,evidence_contract_version,normalization_version,
+          coverage_version,eligibility_status,eligibility_reasons_json,fit_score,fit_contributions_json,
+          eligibility_engine_version,fit_scorer_version,weight_version,calibration_state,
+          calibration_context_version,calibration_run_id,recommended,coverage_percent,
+          unresolved_unknown_count,unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
+         VALUES ('r2:current','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2','r2-contract-v1',
+          'r2-normalization-v1','r2-coverage-v1','ELIGIBLE','[]',90,'[]','r2-eligibility-v1',
+          'r2-fit-v1','r2-weight-v1','UNCALIBRATED','r2-calibration-context-v1',NULL,1,100,0,0,0,0,?)`,
+      )
+      .run(now);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_queue_decision_versions
+         (id,job_id,version,state,freshness,job_version_id,profile_version_id,r2_evaluation_id,
+          evidence_contract_version,duplicate_resolution_version,coverage_version,actor,reason_code,
+          supersedes_decision_id,created_at)
+         VALUES ('queue:r2-current','job:r2-packet',1,'PREPARING','CURRENT','job:r2-packet:v1',
+          'profile:r2-packet:v2','r2:current','r2-contract-v1','detector-v1:empty','r2-coverage-v1',
+          'OWNER','OWNER_PREPARING',NULL,?)`,
+      )
+      .run(now);
+    const repository = new BetaRepository(sqlite, () => new Date(now));
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "CV",
+      template: "fictional",
+      format: "PDF",
+      fileName: "fictional-r2.pdf",
+      localPath: "documents/fictional-r2.pdf",
+      contentDigest: "c".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    repository.approveDocument({
+      documentArtifactId: "document:r2-packet",
+      contentDigest: "c".repeat(64),
+    });
+    const packet = ApplicationPacketSchema.parse({
+      id: "packet:r2-current",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      evaluationVersionId: "legacy:r2-packet",
+      r2EvaluationId: "r2:current",
+      eligibilityStatus: "ELIGIBLE",
+      targetUrl: "http://127.0.0.1:4123/synthetic-application",
+      targetHost: "127.0.0.1",
+      jobExpiryState: "ACTIVE",
+      duplicateState: "CLEAR",
+      versionsCurrent: true,
+      documents: [
+        {
+          id: "document:r2-packet",
+          type: "CV",
+          fileName: "fictional-r2.pdf",
+          digest: "c".repeat(64),
+          approved: true,
+          stale: false,
+          required: true,
+        },
+      ],
+      answers: [],
+    });
+    expect(
+      sqlite.prepare("SELECT id FROM r2_evaluation_versions WHERE id='r2:current'").get(),
+    ).toEqual({
+      id: "r2:current",
+    });
+    expect(repository.persistApplicationPacket(packet)).toMatchObject({
+      packetId: "packet:r2-current",
+      status: "READY_TO_APPLY",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT r2_evaluation_id AS id FROM application_packets WHERE id='packet:r2-current'",
+        )
+        .get(),
+    ).toEqual({ id: "r2:current" });
+    expect(() =>
+      repository.persistApplicationPacket({
+        ...packet,
+        id: "packet:r2-fabricated",
+        r2EvaluationId: "r2:nope",
+      }),
+    ).toThrow("PACKET_R2_BINDING_MISMATCH");
+    sqlite.prepare("UPDATE r2_evaluation_versions SET stale=1 WHERE id='r2:current'").run();
+    expect(() => repository.persistApplicationPacket({ ...packet, id: "packet:r2-stale" })).toThrow(
+      "PACKET_R2_BINDING_MISMATCH",
+    );
+    sqlite.close();
+  });
+
   it("supersedes prior artifact approvals without overwriting either version", () => {
     const sqlite = migratedDatabase();
     const job = fixtureJob("job-retail-sales-assistant");

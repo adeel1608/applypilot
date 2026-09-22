@@ -8,16 +8,16 @@ import {
 
 describe("database schema readiness", () => {
   it("accepts the current R2 schema without a pending migration", () => {
-    expect(CURRENT_DATABASE_SCHEMA_VERSION).toBe(9);
-    expect(databaseSchemaStatus(9)).toEqual({ pendingMigrations: 0, unsupported: false });
+    expect(CURRENT_DATABASE_SCHEMA_VERSION).toBe(10);
+    expect(databaseSchemaStatus(10)).toEqual({ pendingMigrations: 0, unsupported: false });
   });
 
   it("reports older and future schemas conservatively", () => {
-    expect(databaseSchemaStatus(2)).toEqual({ pendingMigrations: 7, unsupported: false });
-    expect(databaseSchemaStatus(10)).toEqual({ pendingMigrations: 0, unsupported: true });
-    expect(() => assertMigrationSchemaSupported(10)).toThrow(
+    expect(databaseSchemaStatus(2)).toEqual({ pendingMigrations: 8, unsupported: false });
+    expect(databaseSchemaStatus(11)).toEqual({ pendingMigrations: 0, unsupported: true });
+    expect(() => assertMigrationSchemaSupported(11)).toThrow(
       "DATABASE_SCHEMA_NEWER_THAN_APPLICATION",
     );
-    expect(() => assertMigrationSchemaSupported(9)).not.toThrow();
+    expect(() => assertMigrationSchemaSupported(10)).not.toThrow();
   });
 });
