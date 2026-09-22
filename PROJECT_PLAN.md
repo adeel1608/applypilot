@@ -760,7 +760,7 @@ No:
 Required PR:
 `docs: reconcile readiness and rebuild the production project plan`
 
-PR #44 is open and unmerged at head `f92cf1b` (full head recorded by Git after push).
+PR #44 is open and unmerged at exact head `74c4d066b852c689fa3a02ef051fa63c8b60b36a`.
 
 This iteration's read-only evidence is complete. No source/employer request, capability
 mutation, candidate-fact mutation, document/packet mutation, migration, restore, deployment,
