@@ -1761,6 +1761,61 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("does not treat an unchanged replay as a fresh provider observation", async () => {
+    const sqlite = database();
+    let id = 0;
+    let current = instant;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => current,
+      () => `unchanged:${++id}`,
+    );
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    const body = Buffer.from(JSON.stringify([posting(1)]));
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body,
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const run = () =>
+      runLeverSourceToQueue({
+        capability: approved,
+        repository,
+        now: () => current,
+        dependencies,
+        evaluateJob: async (jobId) => `evaluation:${jobId}`,
+        queueJob: () => undefined,
+      });
+    await run();
+    const first = sqlite
+      .prepare(
+        `SELECT observed_at AS observedAt, content_hash AS contentHash
+         FROM source_observations WHERE external_id='fictional-1'`,
+      )
+      .get() as { observedAt: string; contentHash: string };
+    current = new Date(instant.getTime() + 24 * 60 * 60 * 1000);
+    await run();
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT observed_at AS observedAt, content_hash AS contentHash
+           FROM source_observations WHERE external_id='fictional-1'`,
+        )
+        .get(),
+    ).toEqual(first);
+    expect(first.contentHash).toHaveLength(64);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("rejects changed or out-of-sequence immutable capability versions", () => {
     const sqlite = database();
     let id = 0;

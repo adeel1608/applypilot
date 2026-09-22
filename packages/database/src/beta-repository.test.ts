@@ -317,6 +317,13 @@ describe("Beta repository", () => {
       version: 1,
       status: "READY_TO_APPLY",
     });
+    expect(() =>
+      repository.persistApplicationPacket({
+        ...packet,
+        id: "packet:r2-evaluation-cannot-cross-legacy-boundary",
+        evaluationVersionId: "r2-evaluation:fictional-current",
+      }),
+    ).toThrow("PACKET_VERSION_STATE_MISMATCH");
     const runId = repository.registerApplicationRun({
       packetId: packet.id,
       targetKind: "SYNTHETIC_LOCAL",

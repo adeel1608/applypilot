@@ -22,7 +22,7 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 - PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 and PR #45 are merged into the current main baseline.
 - Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
 - Historical lifetime action counters reconcile to source/employer/upload/submission = `14/9/0/0`; this iteration adds `1/0/0/0` (one bounded public-provider GET, no employer/application actions).
-- Active source capability count: 0. Active target capability count: 0. Parent grant is immutable and submit-excluded; no authority was mutated.
+- Active source capability count: 0. Active target capability count: 0. The historical parent grant is unchanged and submit-excluded; the ordinary P2-001 source capability completed its documented create/use/revoke lifecycle, and no active authority remains.
 - First real employer target validation is historically proven; the selected role's later inspection is passive evidence only.
 - Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
 - No final-submit consent has been issued and no real application has been submitted.
@@ -1166,10 +1166,11 @@ P4 blocker, and clean exact-head CI before deciding whether to merge PR #45.
 ## 18. Current iteration handoff
 
 Current task:
-`P2-001 — verify current role/provider evidence and refresh application packet`
+`P2-002 - verify currentness and R2 packet contracts offline`
 
-Scope: P2 role currentness, provider evidence, current R2 linkage, document currentness, packet
-readiness, and unsupported-control classification only. No P3/P4 work and no application operation.
+Scope: offline provider temporal guarantees, unchanged-content currentness evidence, R2-to-packet
+contract alignment, and fictional characterization tests only. No P3/P4 work and no application
+operation.
 
 This iteration used the ordinary `SourceCapabilityV2` owner-authorisation path because the immutable
 green-banner parent is bound to an older main SHA. It executed exactly one bounded Shield AI Lever
@@ -1209,10 +1210,138 @@ Acceptance: reviewer confirms the one-request source run, role `CURRENTLY_OBSERV
 `PACKET_REFRESH_BLOCKED` dependency, unchanged private documents, active-capability count 0, and
 zero employer/application actions. Do not start P3/P4 or merge this PR in this task.
 
+#### P2-002 execution blueprint: currentness and R2 packet contract review
+
+Objective: determine offline whether the P2-001 provider verification proves a bounded current role,
+and whether the current R2 evaluation/queue records can safely feed the existing private packet
+contract. This is an investigation and characterization pass only. It must not activate a policy,
+create a packet, mutate real SQLite state, or broaden source/target authority.
+
+Starting state: PR #46 branch `chore/p2-current-role-readiness`, expected reviewed head
+`8606d8aefa8c2142d87b986d15cf327f370ce84f`, merged main
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`, and the P2-001 evidence recorded above.
+
+Questions and evidence to resolve:
+
+1. Compare the supported Lever public Postings contract with the parser and persistence path. The
+   official contract documents posting content, lists, URLs, and `workplaceType`, but does not
+   provide a documented posting/closing timestamp in the supported response contract. The parser
+   therefore preserves the role as `CURRENTLY_OBSERVED`; it must not invent `expires_at` or turn
+   page observation time into an employer closing date.
+2. Trace `LeverPostingV2Schema` -> source observation/job version -> R2A normalization/evaluation
+   -> R2 queue -> `getBetaJob`/`preparePrivatePacket` -> expiry/readiness -> packet persistence.
+   Characterize missing, stale, legacy, duplicate, failed, and partial evidence with fictional
+   tests only.
+3. Verify what P2-001 actually proves about currentness. A complete run and page digest provide an
+   ordered accepted-record identity/content summary; they do not provide durable per-record page
+   membership, a fresh observation timestamp for unchanged content, or an independently queryable
+   latest-verification relation. A failed or partial run must never be treated as a completed
+   verification; absence from one limited page is inconclusive.
+4. Verify the packet boundary. The current R2 evaluation/queue row is separate from the legacy
+   `evaluation_versions` row consumed by `persistApplicationPacket` and document-generation tuple
+   checks. Copying an R2 UUID into the legacy field is invalid; no typed R2-to-packet bridge exists.
+
+Proposed remediation (design only; do not implement here): use a finite, explicitly labelled local
+verification freshness window as a verification assertion, never as an inferred employer closing
+date; persist provenance for exact run/capability/page digest/external ID/content hash; revalidate
+that ledger immediately before packet preparation or any external action; represent closure/expiry,
+conflict, partial, failed, and unchanged-content outcomes explicitly; and add a typed additive
+R2-to-packet compatibility projection that enforces the same job/profile/job-version/eligibility,
+current queue/preparing, document, and expiry gates. Unchanged content needs either an immutable
+re-observation or a separate verification relation so freshness is not silently conflated with a
+new source observation. No migration is required or authorized in this review.
+
+Acceptance: provider guarantees, currentness evidence limits, and the R2/legacy packet mismatch are
+documented with file/function evidence; focused fictional characterization tests pass; privacy and
+action counters remain unchanged; P2 stays `IMPLEMENTED_UNVERIFIED`; and exactly one next
+implementation task is recommended. Rollback is limited to reverting this documentation/tests
+commit; no runtime or database rollback is needed.
+
 Exactly one recommended next action:
 
-`P2-002 — obtain provider temporal evidence or owner-reselect a role with explicit temporal bounds, then re-evaluate and freeze a new packet`
+`P2-003 - implement the typed R2-to-packet compatibility projection and durable successful-verification freshness ledger (fictional tests first)`
 
-Acceptance for the next task: the selected role has provider-supported temporal evidence (or is
-explicitly reselected), current job/profile/evaluation/document bindings are consistent, and a new
-private packet is either frozen with all blockers resolved or rejected with a precise immutable reason.
+Acceptance for P2-003: no real provider/employer activity; additive migration only if demonstrably
+required and never a rewrite of 0000-0008; packet preparation validates a typed current R2 bridge
+instead of copying IDs; the verification ledger distinguishes completed fresh exact-record evidence
+from page-only, unchanged, partial, and failed runs; unknown expiry remains `JOB_EXPIRY_UNKNOWN`;
+and focused/full local gates plus exact-head CI are green.
+
+#### P2-002 validation record (2026-09-22)
+
+Provider contract result: the official Lever Postings API documentation
+(`https://hire.lever.co/developer/documentation`) supports posting content/lists, URLs, and the
+`workplaceType` enum. The supported `LeverPostingV2Schema` and mapper preserve those fields, freeze
+the raw payload, inert HTML to text, and intentionally map undocumented `createdAt`/temporal values
+to `postedAt: null`; the persistence path therefore stores `posted_at`/`expires_at` as unknown rather
+than deriving an employer closing date. Existing fictional tests cover all official workplace values,
+country string/null, absent optionals, lists evidence, inert HTML, and malformed structural values.
+
+Offline source evidence: read-only inspection of `data/applypilot.local.sqlite` found P2-001 run
+`d45a752f-641b-49d6-ad43-b28b0b445694` `COMPLETE`, one request, one page, and 25 records. Its page
+digest is `79e8b9957204a1fa5bf23d9bfee30f91fbd6ec55945214ff3dd2406229bad6fc`. The selected external
+ID `2cfe6692-a266-4d27-8832-ef652fa57ee4` has one immutable observation with `posted_at` and
+`expires_at` both null; the observation is linked to the prior successful run, not the unchanged
+P2-001 run. The schema has no durable per-record page-membership relation or latest-verification
+relation, so page-digest equivalence is evidence of an ordered page summary, not proof of a fresh
+record timestamp. A failed/partial run remains incomplete; absence from a bounded page is
+inconclusive. Historical local action counters remain `14/9/0/0`; this review adds `0/0/0/0`.
+
+R2/packet contract result: current R2 evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5` is
+`REVIEW_REQUIRED`, not recommended, `UNCALIBRATED`, and its queue projection is `REVIEWING/CURRENT`.
+The same identifier is absent from legacy `evaluation_versions`. `apps/web/lib/beta-workspace.ts`
+keeps both `evaluationVersionId` (R2) and `legacyEvaluationVersionId`, but
+`preparePrivatePacket`/`packages/database/src/beta-repository.ts::persistApplicationPacket` and
+document tuple checks consume the legacy identifier. The characterization test proves an R2 UUID
+cannot be copied into that legacy field: it fails closed with `PACKET_VERSION_STATE_MISMATCH`.
+`packages/database/src/r2-repository.ts::assertCurrentPreparing` separately enforces the exact
+current R2 PREPARING decision; no typed bridge exists between those contracts. The existing packet
+remains immutable historical state and no packet/database/profile/document was changed.
+
+Focused fictional characterization tests: `150 passed` across the application-runner, source
+capability, source-enablement, and beta-repository suites. They cover unknown/expired expiry,
+undocumented provider timestamps, official workplace/country variants, partial page failure then
+restart/replay, unchanged-content idempotency without a fresh observation timestamp, and the R2
+identifier/legacy packet boundary. No production source, schema, migration, dependency, or CI file
+was changed; no real source/employer request occurred.
+
+Local read-only gates: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
+The proposed freshness ledger and typed R2 projection remain design-only. P2 stays
+`IMPLEMENTED_UNVERIFIED`; P3/P4 remain incomplete or blocked as recorded above.
+
+## 19. P2-002 current iteration handoff
+
+Branch: `chore/p2-current-role-readiness`. Starting reviewed head: `8606d8aefa8c2142d87b986d15cf327f370ce84f`.
+No live provider request, employer visit, capability/grant mutation, packet/evaluation/profile/document
+mutation, application operation, migration, dependency change, production-code change, or archive edit
+was performed. Historical action counters remain `14/9/0/0`; this iteration adds `0/0/0/0`.
+
+The only changed implementation artifacts are this plan and fictional characterization tests. The
+provider contract and packet findings are recorded in the P2-002 validation record above. PR #46
+remains OPEN and UNMERGED; it must not be merged in this task. Local focused tests passed; full
+regression/build/E2E/release checks are listed in the execution report and must be distinguished from
+exact-head GitHub CI.
+
+Execution gates for this head:
+
+- Focused characterization: PASS, 4 files / 150 tests.
+- Unit regression: PASS, 52 files / 576 tests.
+- Integration: PASS, 3 files / 21 tests.
+- Typecheck and lint: PASS.
+- Production local + public showcase build and showcase audit: PASS.
+- E2E: PASS, 44 tests (synthetic/local only).
+- Privacy audit, doctor, preflight, schema/integrity/FK checks: PASS (schema 9, pending 0,
+  integrity `PASS`, foreign-key issues 0).
+- Dependency audits: PASS (`npm audit` and production audit both report 0 vulnerabilities).
+- Migration immutability: PASS; no `packages/database/drizzle` file changed.
+- `git diff --check`: PASS with the repository's known LF/CRLF normalization warning.
+- `git fsck --strict`: PASS; only known dangling historical objects are reported.
+- Repository-wide `format:check`: baseline FAIL in 21 pre-existing files; all three files changed
+  by this task pass targeted Prettier checks. No unrelated formatting was applied.
+- Real database backup/restore and migration were not run because this review forbids modifying the
+  real local database; in-memory/synthetic backup/restore coverage remains in the passing test suite.
+
+Exactly one recommended next action remains P2-003: implement the typed R2-to-packet compatibility
+projection and durable successful-verification freshness ledger, fictional tests first. Do not
+obtain another live provider request until that design is reviewed and the owner authorizes a new
+bounded operation.
