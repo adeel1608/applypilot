@@ -3,7 +3,7 @@
 Last updated: 2026-09-22
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`
+Expected current main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
@@ -12,14 +12,16 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ### Current checkpoint (read-only reconciled 2026-09-22)
 
-- Repository `adeel1608/applypilot` is on clean `main` at `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`; `origin/main` matches.
+- Repository `adeel1608/applypilot` is on clean `main` at `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; `origin/main` matches.
+- PR #45 was approved and squash-merged as `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; its merged tree
+  equals reviewed head `41c12123fab1a044aec765040cd3eb90aa78aa91` and P1 is now `VERIFIED` against this baseline.
 - PR #44 was approved and squash-merged normally. Reviewed head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`
   and merged main have the same Git tree; strict commit ancestry is intentionally absent for the squash merge.
 - Squash verification rule: expected reviewed head + exact-head CI + approved squash merge + merged parent equal
   pre-merge main + merged tree equal reviewed head tree + approved scope + archive digest preservation.
-- PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 merged as the current main commit.
+- PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 and PR #45 are merged into the current main baseline.
 - Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
-- Historical lifetime action counters reconcile to source/employer/upload/submission = `13/9/0/0`; this iteration adds `0/0/0/0`.
+- Historical lifetime action counters reconcile to source/employer/upload/submission = `14/9/0/0`; this iteration adds `1/0/0/0` (one bounded public-provider GET, no employer/application actions).
 - Active source capability count: 0. Active target capability count: 0. Parent grant is immutable and submit-excluded; no authority was mutated.
 - First real employer target validation is historically proven; the selected role's later inspection is passive evidence only.
 - Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
@@ -338,12 +340,12 @@ Exit: one consistent active plan.
 
 ### P1 — Production scope and architecture verification
 
-Status: `IMPLEMENTED_UNVERIFIED`
+Status: `VERIFIED`
 
-Evidence: architecture work and local/code evidence are complete on branch head
-`5266a11436a6289bbfa924797f886bab55d4dc79`; exact-head CI passed and the matrices below are
-preserved. Final project review, PR #45 merge, and merged-baseline verification remain pending; this
-does not make P2/P3/P4 or Personal Live V1 ready.
+Evidence: architecture work and local/code evidence were accepted on PR #45; exact-head CI passed,
+the reviewed tree equals the squash-merged tree, and merged main is
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`. This verifies architecture only; it does not make P2/P3/P4
+or Personal Live V1 ready.
 
 - [x] Component capability matrix (read-only code review).
 - [x] End-to-end data-flow map (source/R2/document/packet/runner boundaries recorded).
@@ -568,16 +570,49 @@ parent grant; no protection bypass; `OUTCOME_UNKNOWN` for ambiguity; and no blin
 
 ### P1 exit and dependency review
 
-P1 architecture work is complete on the reviewed branch: component/capability/data-flow matrices,
-private/public boundary, parent/child authority path, real-runner limitation, topology, trust model,
-and implemented-vs-proposed distinction are explicit. Overall P1 remains `IMPLEMENTED_UNVERIFIED`
-until PR #45 is technically accepted, merged, and the merged baseline is verified. P1 does not
-complete P2, P3, P4, Personal Live V1, or the green banner.
+P1 architecture work is complete and `VERIFIED` against merged main
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`: component/capability/data-flow matrices, private/public
+boundary, parent/child authority path, real-runner limitation, topology, trust model, and
+implemented-vs-proposed distinction are explicit. P1 does not complete P2, P3, P4, Personal Live V1,
+or the green banner.
 
 Next dependency order (read-only decision, not execution): P2 provider freshness/current role and
 packet evidence must be resolved before P4; P3 restart/replay, changed/duplicate handling, and
 staleness propagation must be verified before P4. Therefore the next implementation task is P2, not
 P4. P4 remains blocked by BLK-001, BLK-002, BLK-004, BLK-005, BLK-007, and BLK-008.
+
+#### P2-001 execution blueprint and evidence
+
+Objective: verify the selected Melbourne role against one owner-authorized, bounded public-provider
+freshness operation; preserve truthful unknowns; refresh R2 and packet bindings only when currentness
+gates pass; otherwise reject/defer the role with a precise blocker.
+
+Starting state: merged main `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; selected role
+`Computer Vision Engineer (C++) (R4633)`; old packet evaluation binding is stale and historical only.
+
+Allowed boundary: existing safe Lever transport, exact Shield AI tenant/host/path, HTTPS GET-only,
+no login/cookies/candidate data, concurrency 1, no redirect, smallest practical request budget, no
+employer/browser interaction. The standing parent grant must remain immutable; its `mainSha` must match
+the current main before any child derivation. If it does not, use only the normal ordinary
+`SourceCapabilityV2` owner-approval path or record a blocker; never bypass the check.
+
+Evidence rules: provider date/expiry absent means `CURRENTLY_OBSERVED`, not `EXPIRY_VERIFIED`; missing
+extraction is `PROVIDER_REQUIREMENT_UNKNOWN`, not an owner-fact gap; restricted work-right evidence is
+not unrestricted work rights; unknown candidate facts remain `REVIEW_REQUIRED`.
+
+Steps: inspect private evidence and current authority; perform at most the exact bounded provider
+freshness request(s) required; persist any changed observation/job version immutably; run current R2;
+check document digests/currentness; reject the legacy packet; freeze a new private packet only if every
+prerequisite is current; otherwise record `PACKET_REFRESH_BLOCKED`; classify retained unsupported
+controls without revisiting the employer; run non-destructive privacy/currentness checks.
+
+Acceptance: either a fresh internally consistent private packet bound to current job/profile/evaluation/
+documents, or a precise `NOT_CURRENT / RESELECT_REQUIRED` or `PACKET_REFRESH_BLOCKED` outcome with the
+exact remaining dependency. No P3/P4 work, migration, code fix, employer action, or application action.
+
+Rollback: source capability/run terminalization and immutable historical evidence; no runtime rollback
+or migration. Invalidation: provider drift, profile/evaluation/document change, stale packet binding,
+or main-SHA mismatch requires re-evaluation.
 
 ### P2 — Candidate, role, and evidence readiness
 
@@ -588,13 +623,57 @@ Status: `IMPLEMENTED_UNVERIFIED`
 - [x] Verify work-right evidence and temporal bounds.
 - [x] Verify selected-role suitability against available provider evidence.
 - [x] Keep Shield AI London validation role excluded.
-- [ ] Verify job freshness via provider evidence (provider date/expiry absent).
+- [x] Verify provider presence/currentness via one bounded Shield AI Lever LIST_JOBS run; provider supplied no
+      temporal date/expiry, so role state remains `CURRENTLY_OBSERVED`, not `EXPIRY_VERIFIED`.
 - [x] Verify current R2/evaluation/duplicate/queue state.
 - [x] Verify engineering CV provenance, digests, approval, currentness.
 - [x] Classify each unsupported form control at the available evidence level.
-- [ ] Create one minimal role-specific owner questionnaire only for genuinely missing facts.
+- [x] No owner questionnaire at P2: missing requirements/eligibility fields remain provider or candidate
+      `UNKNOWN` and are not converted into owner assertions.
 
-Exit: evidence-backed suitable role and current packet, or precise blocker register.
+Exit: evidence-backed suitable role and current packet, or precise blocker register. This execution is the
+blocker path: the role was observed in the fresh page, but `JOB_EXPIRY_UNKNOWN` and the stale packet
+evaluation binding prevent a new application packet.
+
+#### P2-001 validation record (2026-09-22)
+
+- Starting main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; branch:
+  `chore/p2-current-role-readiness`.
+- Parent compatibility: the immutable `GREEN_BANNER_SESSION_GRANT_V1` remains bound to main SHA
+  `227df70175f6beed75e4812fa0aee6668216de2f`, so no child was derived and the parent was not mutated.
+  The ordinary `SourceCapabilityV2` path was used instead.
+- Capability: `lever_p2_r4633_20260922` v1, `LEVER/shieldai/GLOBAL`, host `api.lever.co`, path
+  `/v0/postings/shieldai`, `LIST_JOBS` only, parser `lever-v2:2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`,
+  one request/25-record cap/25-page cap/2 MB response/30 s request/60 s run/zero redirects/zero retries/
+  concurrency 1. Configuration digest:
+  `237f84e73577c16ac0f5b380de77350e7fae6dc9507384a04e5bb3a3be4b6fe3`.
+- Source run: `d45a752f-641b-49d6-ad43-b28b0b445694`, terminal `COMPLETE`; exactly 1 GET, 1 page,
+  25 provider records, 25 accepted, 0 unusable, 364692 response bytes. Page digest
+  `79e8b9957204a1fa5bf23d9bfee30f91fbd6ec55945214ff3dd2406229bad6fc` matched the prior page containing
+  the selected provider identity. Twenty nonfatal provider workplace-enum drift warnings were retained.
+  The selected external ID `2cfe6692-a266-4d27-8832-ef652fa57ee4` was present in that exact page identity;
+  no alternate role was selected and no provider expiry was invented.
+- Source persistence: unchanged records safely no-op under the immutable content identity, so this run
+  created no duplicate observations or job versions. The capability was terminally revoked as v2 at
+  `2026-09-22T08:45:42.908Z`; active source capabilities returned to 0.
+- Selected role: `Computer Vision Engineer (C++) (R4633)`, Melbourne, Shield AI; role state
+  `CURRENTLY_OBSERVED` only. Provider dates remain absent; `JOB_EXPIRY_UNKNOWN` remains binding.
+- Current R2: job version
+  `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953`, profile
+  `6cd565c1-552b-436c-941c-2cd49d228123`, evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5`,
+  `REVIEW_REQUIRED`, not recommended, `UNCALIBRATED`, current queue `REVIEWING/CURRENT` with the same
+  evaluation. Unknown work-right/vehicle/hours evidence remains unknown; no inference was made.
+- Documents: existing engineering CV artifacts remain the private, previously reviewed digests
+  `28e64de248ff757a247ba789baea7692aae92372f3dd6ebac6019a9ad241b0e8` (PDF) and
+  `d83d607cf9ae3d9bdadc468660d942d86f14b1394be4c678d5f413406f2139ca` (DOCX); no regeneration occurred.
+- Packet: old `inspection_packet_30b9ccd8be182240003401c7` remains immutable historical state and is
+  rejected for application use because it binds evaluation `b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`.
+  No new packet was created: `PACKET_REFRESH_BLOCKED` (`JOB_EXPIRY_UNKNOWN` plus stale evaluation
+  binding). Retained passive inspection has 46 controls, including 27 unsupported and 1 document-required;
+  no employer revisit occurred. Questionnaire: `NONE AT P2`.
+- Result: P2 remains `IMPLEMENTED_UNVERIFIED`, not artificially promoted to `VERIFIED`; the precise
+  remaining dependency is provider temporal evidence (or owner reselecting a role with such evidence),
+  followed by a fresh current evaluation and packet binding.
 
 ### P3 — Source-to-application integrity
 
@@ -659,21 +738,21 @@ Exit: synthetic submit lifecycle verified; production P5 remains blocked by P4.
 Each P0-P11 checklist above is an actionable task record. The following fields apply to every
 checklist item; item-specific exceptions are recorded in the phase evidence and blocker register.
 
-| Task       | Owner                             | Dependencies                  | Objective/components                          | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                             | Blockers/invalidation                                        |
-| ---------- | --------------------------------- | ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| P0         | Codex                             | repository baseline           | reconcile plan/history/docs                   | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash            | invalidated by baseline drift                                |
-| P1         | Codex + owner review              | P0                            | architecture, trust boundaries, authority     | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | architecture evidence on PR #45 head `5266a11`; merge pending | P2/P3 evidence and P4 operation gaps remain                  |
-| P2         | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness            | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                            | BLK-003/004/005                                              |
-| P3         | Codex                             | P1/P2                         | source-to-R2 traceability                     | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                            | BLK-006; partial restart test pending                        |
-| P4         | Codex + security review           | P1/P2/P3                      | real non-submit operation lane                | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review                          | BLK-001/002/005/007/008                                      |
-| P5         | Codex + owner review              | P4                            | final review/consent/outcome                  | production phase remains blocked until P4 real non-submit execution and real final-review integration  | concurrency/ambiguous-outcome tests; invalidate on change               | overall BLOCKED; `P5-SYN-001` synthetic evidence VERIFIED     | P4 real non-submit execution + real final-review integration |
-| P5-SYN-001 | Codex + owner review              | P5                            | synthetic final-review/consent/outcome safety | frozen state, one-use consent, invalidation, double-consumption prevention, outcome taxonomy           | synthetic concurrency and ambiguous-outcome tests; no blind retry       | VERIFIED synthetic evidence                                   | does not unblock production P5; P4 remains required          |
-| P6         | Codex + owner decision            | P1-P5                         | reproducible release candidate                | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                                   | deployment/configuration decision                            |
-| P7         | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation     | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                                   | P4 and current packet required                               |
-| P8         | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                           | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                                   | P4/P7/P5 gaps                                                |
-| P9         | Owner + operations                | P6/P8                         | approved deployment                           | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                                   | topology/secrets/security policy                             |
-| P10        | Owner + Codex                     | P8/P9                         | first supervised submission                   | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                                   | explicit owner final approval                                |
-| P11        | Codex + operations                | P9/P10                        | recovery and handover                         | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                                   | deployment and real-operation evidence                       |
+| Task       | Owner                             | Dependencies                  | Objective/components                          | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                         | Blockers/invalidation                                        |
+| ---------- | --------------------------------- | ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
+| P0         | Codex                             | repository baseline           | reconcile plan/history/docs                   | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash        | invalidated by baseline drift                                |
+| P1         | Codex + owner review              | P0                            | architecture, trust boundaries, authority     | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | VERIFIED on merged main `2b9e44f`                         | P2/P3 evidence and P4 operation gaps remain                  |
+| P2         | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness            | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | P2-001 run `d45a752f`; blocker path recorded above        | BLK-003/004/005                                              |
+| P3         | Codex                             | P1/P2                         | source-to-R2 traceability                     | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                        | BLK-006; partial restart test pending                        |
+| P4         | Codex + security review           | P1/P2/P3                      | real non-submit operation lane                | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review                      | BLK-001/002/005/007/008                                      |
+| P5         | Codex + owner review              | P4                            | final review/consent/outcome                  | production phase remains blocked until P4 real non-submit execution and real final-review integration  | concurrency/ambiguous-outcome tests; invalidate on change               | overall BLOCKED; `P5-SYN-001` synthetic evidence VERIFIED | P4 real non-submit execution + real final-review integration |
+| P5-SYN-001 | Codex + owner review              | P5                            | synthetic final-review/consent/outcome safety | frozen state, one-use consent, invalidation, double-consumption prevention, outcome taxonomy           | synthetic concurrency and ambiguous-outcome tests; no blind retry       | VERIFIED synthetic evidence                               | does not unblock production P5; P4 remains required          |
+| P6         | Codex + owner decision            | P1-P5                         | reproducible release candidate                | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                               | deployment/configuration decision                            |
+| P7         | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation     | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                               | P4 and current packet required                               |
+| P8         | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                           | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                               | P4/P7/P5 gaps                                                |
+| P9         | Owner + operations                | P6/P8                         | approved deployment                           | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                               | topology/secrets/security policy                             |
+| P10        | Owner + Codex                     | P8/P9                         | first supervised submission                   | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                               | explicit owner final approval                                |
+| P11        | Codex + operations                | P9/P10                        | recovery and handover                         | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                               | deployment and real-operation evidence                       |
 
 ### P6 — Reproducible staging/release candidate
 
@@ -1007,7 +1086,7 @@ Examples:
 - security/recovery -> P6/P9/P11
 - optional scheduling/notifications/analytics/AI -> DEFERRED unless needed for narrow production scope
 
-## 17. Current iteration handoff
+## 17. Historical P1-002 handoff
 
 Current task:
 `P1-002 — active plan release-contract/status correction`
@@ -1083,3 +1162,54 @@ merge and merged-tree verification. Do not start P2/P3/P4 or merge PR #45 in thi
 
 Acceptance: reviewer confirms the exact readiness phrase, P1/P5 semantics, retained P5-SYN-001 evidence,
 P4 blocker, and clean exact-head CI before deciding whether to merge PR #45.
+
+## 18. Current iteration handoff
+
+Current task:
+`P2-001 — verify current role/provider evidence and refresh application packet`
+
+Scope: P2 role currentness, provider evidence, current R2 linkage, document currentness, packet
+readiness, and unsupported-control classification only. No P3/P4 work and no application operation.
+
+This iteration used the ordinary `SourceCapabilityV2` owner-authorisation path because the immutable
+green-banner parent is bound to an older main SHA. It executed exactly one bounded Shield AI Lever
+`LIST_JOBS` GET under a fresh v1 capability, then revoked that capability as v2. No employer page,
+browser, form, fill, upload, submission, candidate-data transmission, migration, dependency change,
+application-code change, or historical-archive edit occurred.
+
+Baseline: PR #45 is merged as `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; P1 is `VERIFIED` against
+that merged tree. P2 remains `IMPLEMENTED_UNVERIFIED` because the selected role is only
+`CURRENTLY_OBSERVED` (`JOB_EXPIRY_UNKNOWN`) and the historical packet binds stale evaluation
+`b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`. P3 remains `IMPLEMENTED_UNVERIFIED`; P4/P5 remain `BLOCKED`;
+`P5-SYN-001` remains `VERIFIED`; Personal Live V1 remains `NOT_READY`.
+
+### P2-001 validation gates (2026-09-22)
+
+| Check                                      | Result                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `npm.cmd run db:status`                    | PASS — schema 9, pending 0, integrity PASS, FK issues 0                                                  |
+| `npm.cmd run privacy:audit`                | PASS — tracked/history/build-private-data audit completed                                                |
+| `npm.cmd run preflight`                    | PASS — profile valid, source capability active count 0 after revocation, runner target approval required |
+| `npx.cmd prettier --check PROJECT_PLAN.md` | PASS                                                                                                     |
+| `git diff --check`                         | PASS — only the known LF/CRLF normalization warning                                                      |
+| `git fsck --strict`                        | PASS — known dangling historical objects only; no fsck errors                                            |
+| focused source/capability tests            | PASS — 2 files, 124 tests                                                                                |
+| full regression/build/E2E/release suite    | Not run; no claim of full regression coverage                                                            |
+
+Historical lifetime counters are now source/employer/upload/submission `14/9/0/0`; this iteration adds
+`1/0/0/0`. Exact source run and packet/readiness evidence are recorded in the P2 section above.
+
+Required PR:
+`chore: verify current role and packet readiness`
+
+Acceptance: reviewer confirms the one-request source run, role `CURRENTLY_OBSERVED` outcome,
+`PACKET_REFRESH_BLOCKED` dependency, unchanged private documents, active-capability count 0, and
+zero employer/application actions. Do not start P3/P4 or merge this PR in this task.
+
+Exactly one recommended next action:
+
+`P2-002 — obtain provider temporal evidence or owner-reselect a role with explicit temporal bounds, then re-evaluate and freeze a new packet`
+
+Acceptance for the next task: the selected role has provider-supported temporal evidence (or is
+explicitly reselected), current job/profile/evaluation/document bindings are consistent, and a new
+private packet is either frozen with all blockers resolved or rejected with a precise immutable reason.
