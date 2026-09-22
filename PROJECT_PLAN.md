@@ -303,7 +303,7 @@ Status: `VERIFIED`
 - [x] Add stable task IDs.
 - [x] Add old-to-new crosswalk.
 - [x] Separate reported vs verified evidence.
-- [ ] Open documentation-only PR and leave unmerged (this task's final handoff).
+- [x] Open documentation-only PR #44 and leave unmerged (https://github.com/adeel1608/applypilot/pull/44).
 
 Exit: one consistent active plan.
 
@@ -760,7 +760,7 @@ No:
 Required PR:
 `docs: reconcile readiness and rebuild the production project plan`
 
-Leave OPEN and UNMERGED.
+PR #44 is open and unmerged at head `f92cf1b` (full head recorded by Git after push).
 
 This iteration's read-only evidence is complete. No source/employer request, capability
 mutation, candidate-fact mutation, document/packet mutation, migration, restore, deployment,
