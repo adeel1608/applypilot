@@ -200,6 +200,10 @@ describe("Beta repository", () => {
     const bindingDigest = "d".repeat(64);
     expect(durable.claim(bindingDigest, "MAP_FOR_FILL")).toBe(true);
     expect(durable.claim(bindingDigest, "FILL")).toBe(false);
+    expect(() => durable.load("f".repeat(64))).toThrow("BINDING_DIGEST_MISMATCH");
+    expect(
+      () => new SqliteNonSubmitRunStore(sqlite, runId, "f".repeat(64), () => new Date(now)),
+    ).toThrow("PACKET_BINDING_MISMATCH");
     durable.save(bindingDigest, {
       state: "MAPPED",
       sequence: 1,
@@ -220,6 +224,7 @@ describe("Beta repository", () => {
       ],
     });
     expect(durable.load(bindingDigest)).toMatchObject({ state: "MAPPED", sequence: 1 });
+    expect(durable.checkpoints()).toHaveLength(1);
     const previewBindingDigest = "e".repeat(64);
     expect(durable.claim(previewBindingDigest, "FILL_PREVIEW")).toBe(true);
     sqlite.exec(`
@@ -266,6 +271,24 @@ describe("Beta repository", () => {
         )
         .get(runId),
     ).toEqual({ packetDigest: packetDigest(packet), previewDigest: "e".repeat(64) });
+    const recoveryRunId = repository.registerApplicationRun({
+      packetId: "packet:r2-current",
+      targetKind: "SYNTHETIC_LOCAL",
+      targetHost: "127.0.0.1",
+      formVersion: "fixture-form-v1",
+    });
+    const recoveryStore = new SqliteNonSubmitRunStore(
+      sqlite,
+      recoveryRunId,
+      packetDigest(packet),
+      () => new Date(now),
+    );
+    const recoveryBinding = "f".repeat(64);
+    expect(recoveryStore.claim(recoveryBinding, "UPLOAD")).toBe(true);
+    expect(recoveryStore.load(recoveryBinding)).toMatchObject({
+      state: "PAUSED",
+      checkpoints: [expect.objectContaining({ stopReason: "UPLOAD_OUTCOME_UNKNOWN" })],
+    });
     sqlite.close();
   });
 
