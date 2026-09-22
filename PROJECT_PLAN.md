@@ -783,6 +783,11 @@ Temporary read-only diagnostic scripts were deleted before handoff.
 Follow-up before commit: `npx.cmd prettier --check PROJECT_PLAN.md` PASS and `git diff --check`
 PASS (the only output is Git's LF/CRLF normalization warning).
 
+GitHub PR #44 quality CI currently fails only at repository-wide `prettier --check .` because the
+required byte-identical historical archive is intentionally not reformatted. Adding a formatter
+exclusion or changing the archive would violate this iteration's authorized file/scope boundary;
+the discrepancy is left explicit for review.
+
 No backup, restore, migration, source request, employer request, browser session, document generation,
 packet generation, capability mutation, deployment, or application action was performed in this
 iteration. Action counters added by this iteration are source/employer/upload/submission `0/0/0/0`.
