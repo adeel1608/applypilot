@@ -1,7294 +1,802 @@
-# ApplyPilot Project Plan
+# ApplyPilot Production Verification Project Plan
+
+Last updated: 2026-09-22
+Owner: `adeel1608`
+Repository: `adeel1608/applypilot`
+Expected current main: `010cbe909b7d7b2b4ed88c413f270f7ff1ff75ac`
+Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
+
+> This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
+
+## 1. Resume here
+
+### Current checkpoint (read-only reconciled 2026-09-22)
+
+- Repository `adeel1608/applypilot` is on clean `main` at `010cbe909b7d7b2b4ed88c413f270f7ff1ff75ac`; `origin/main` matches.
+- PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 merged as the current main commit.
+- Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
+- Historical lifetime action counters reconcile to source/employer/upload/submission = `13/9/0/0`; this iteration adds `0/0/0/0`.
+- Active source capability count: 0. Active target capability count: 0. Parent grant is immutable and submit-excluded; no authority was mutated.
+- First real employer target validation is historically proven; the selected role's later inspection is passive evidence only.
+- Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
+- No final-submit consent has been issued and no real application has been submitted.
+- Pre-rebase active-plan blob: `9ad8a46ded3205fee063dae0bbaa3162fd5d905b`; SHA-256 `51BE6553983760CAB1AD8C39F29EC444006F7B5983C7150AE8DB6BCD4B44DC93`; archived losslessly at `docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`.
+
+### Reconciliation result
+
+The earlier statement that only owner facts remained was too broad. Code review proves that the
+green-banner operation enum is an authority vocabulary, not a production executor. `RunnerTargetCapabilitySchema`
+rejects every `REAL_TARGET` capability whose operations are not exactly `[OPEN_AND_INSPECT_ONLY]`;
+`freezeRunnerBinding` and `TargetIndependentApplicationRunner` therefore cannot bind a real application
+capability. The runner adapter interface has `open`, `map`, `fill`, and `submit`, but no `upload`,
+`verify`, or `fillPreview` entry point, and there is no real-target persistence/audit lifecycle for
+those operations. Synthetic tests cover map/fill/one-use synthetic submit and unknown outcomes only.
+Consequently real `MAP_FOR_FILL`, `FILL`, `UPLOAD`, `VERIFY`, and `FILL_PREVIEW` are `ENGINEERING` /
+`MISSING_VERIFICATION`, not owner-fact blockers.
+
+### Latest selected target evidence
+
+Latest recorded Melbourne target:
+`Computer Vision Engineer (C++) (R4633)`
+
+Recorded evidence:
+
+- fact-bound engineering CV generated privately as PDF/DOCX;
+- locally validated/approved;
+- review-only packet frozen;
+- packet reportedly used a legacy evaluation binding;
+- passive employer inspection completed;
+- 46 controls inventoried;
+- 27 unsupported controls;
+- 1 document-required control;
+- zero candidate values;
+- zero writes;
+- zero uploads;
+- zero submissions.
 
-Last updated: 2026-09-14
-Owner: `adeel1608`  
-Repository: `adeel1608/applypilot`  
-Working branch: `fix/lever-dom-snapshot-boundary`
+This proves passive compatibility only, not fill/upload/submission readiness. The packet binds legacy
+evaluation `b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`, while the current R2 evaluation is
+`a95c2f2f-8175-4602-92c2-667f04a099b5`; the packet is therefore stale for any application operation.
+The current CV artifacts remain approved, non-stale, private-only, and bound to the current job/profile:
+PDF digest `28e64de248ff757a247ba789baea7692aae92372f3dd6ebac6019a9ad241b0e8` and DOCX digest
+`d83d607cf9ae3d9bdadc468660d942d86f14b1394be4c678d5f413406f2139ca`.
+
+### Source accounting reconciliation
 
-Repository visibility: `PUBLIC` (owner-authorized on 2026-09-07; private local data remains excluded).
+Run `0dba8b34-fb59-4cc8-a7ef-c3b97e8d5bbf` is durably `COMPLETE`: 4 requests, 4 pages, 100 provider
+records (25 per page), 100 accepted, 0 unusable, 83 newly persisted observations/job versions,
+83 current R2 evaluations, and 83 queue decisions. The 17-record difference is not silent loss:
+`persistLeverObservation` deterministically returns `created: false` when the observation identity
+already exists; the page audit records accepted and persisted counts, while the repository does not
+retain a per-record duplicate disposition. The redacted evidence therefore supports exactly
+`100 accepted = 83 created + 17 deterministic duplicate/no-op dispositions`, but cannot identify those
+17 records individually without the discarded provider payload. No rejected/unusable records are
+present in this run, and replay remained idempotent.
 
-Current forward baseline: PR #13 passed final human review at exact head `22798673e785723840d88e66a0dce6f8ff1d4d8f` and merged normally as `d5a613ce156a6c719b9d9e1caec381e7e616ca4c` on 2026-09-10. R2A, R2B, R2C, and R2D software are merged; calibration remains truthfully `UNCALIBRATED`. This branch implements the approved final offline Personal Live V1 enablement train. Manual-intake Personal Beta remains `READY`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; Personal Live V1 and hosted production remain `NOT_READY` until the offline train and later owner-gated real source/target steps are separately accepted; and the real runner remains `TARGET_APPROVAL_REQUIRED`. Historical phase/checkpoint evidence below remains intentionally unchanged. Historical references to a private GitHub repository describe their original checkpoints; current GitHub visibility is PUBLIC. Every npm package publication guard remains unchanged.
+### Candidate evidence correction
 
-## 1. Vision
+The private profile contains verified C++, OpenCV/stereo-vision and related robotics skills, verified
+engineering education/employment/certification/licence evidence, and verified restricted Australian
+work-right evidence. The selected role is still `REVIEW_REQUIRED` because provider
+evidence is incomplete: `datePosted`/expiry is absent, extracted requirements are empty, and job-level
+work-rights, vehicle, hours, schedule, licence/certification and extraction-coverage dimensions remain
+unknown. These are not equivalent to missing candidate experience or skills; classify them as
+`PROVIDER_EVIDENCE`/`MISSING_VERIFICATION` unless a later owner fact is genuinely required by a concrete
+form question.
 
-ApplyPilot is a local-first job discovery, job matching, document preparation, assisted application, and outcome-tracking platform. It should help a candidate move safely from discovered vacancies to reviewed applications while keeping sensitive profile data and authenticated browser state under the candidate's control.
+## 2. Final production objective
 
-The intended workflow is:
+ApplyPilot must support a safe, reproducible, single-owner production workflow:
 
-`discover -> normalize -> deduplicate -> evaluate eligibility -> score fit -> shortlist -> select CV template -> tailor from verified facts -> create cover letter when required -> prepare application -> assisted form filling -> human review -> submit -> track outcome`
+`discover -> normalize -> deduplicate -> evaluate -> shortlist -> generate/freeze documents -> inspect -> map -> fill -> upload -> human review -> fresh submit consent -> submit once -> track outcome`
 
-Human approval before final submission is a permanent initial invariant. A later phase may propose changing it, but may not do so silently.
+### Green banner
 
-## 2. Goals
+`# 🟢 **WE ARE READY**`
 
-- Provide a professional TypeScript monorepo foundation for incremental development.
-- Store structured candidate facts locally and distinguish verified, unknown, unsupported, and forbidden claims.
-- Normalize jobs from multiple sources behind a common adapter contract.
-- Produce deterministic, explainable eligibility and fit results.
-- Generate ATS-friendly documents from verified facts only.
-- Provide a usable local dashboard for review and tracking.
-- Maintain privacy, auditability, testability, and human control.
-- Remain useful without paid APIs; make future AI providers optional.
+means:
 
-## 3. Non-goals
+- ready for the first supervised real submission;
+- suitable current role selected;
+- candidate facts supported;
+- current CV and packets frozen;
+- actual target inspected;
+- real map/fill/upload verified;
+- filled preview reviewed;
+- exact submit control identified;
+- one-use consent mechanism verified;
+- no unresolved material blocker.
 
-- Live scraping, CAPTCHA solving, protection bypasses, or unattended applications in Phase 0/1.
-- Automatic final submission.
-- Production deployment in Phase 0/1.
-- Advanced semantic deduplication or AI rewriting in Phase 0/1.
-- Treating missing, ambiguous, or inferred candidate data as verified.
-- Fully automating LinkedIn discovery before technical and policy evaluation.
+It does NOT mean an application has already been submitted.
 
-## 4. User workflow
+### Permanent safety boundaries
 
-The dashboard summarizes fixture-backed jobs and application states. A user opens a normalized job, reviews deterministic eligibility reasons and fit explanations, then chooses to skip or shortlist it. Document actions select an appropriate resume category and create deterministic content from verified profile facts. Future phases add source discovery and assisted form filling, with an explicit human checkpoint immediately before submission.
+- Unknown facts remain unknown.
+- Never infer citizenship, visa/work rights, sponsorship, clearance, experience, education, certifications, licences, availability, or other material application facts.
+- Never bypass CAPTCHA, MFA, authentication, bot controls, rate limits, access controls, or website restrictions.
+- No blind retry after ambiguous submission.
+- Final submit always requires fresh one-use owner consent.
+- Private profile, documents, DB, cookies, sessions, secrets, and live payloads remain local/ignored.
+- Public showcase is not operational production.
 
-## 5. Functional requirements
+## 3. Working agreement
 
-- Validate and version candidate profiles.
-- Model forbidden claims and unsupported experience explicitly.
-- Normalize job data and retain source records for provenance.
-- Expose adapter capabilities and placeholders for SEEK, Indeed, LinkedIn, Employment Hero, Workday, Greenhouse, Lever, and generic company sites.
-- Represent deduplication candidates without over-engineering the matcher.
-- Evaluate hard blockers deterministically and surface ambiguity as `REVIEW_REQUIRED`.
-- Calculate an explainable 0-100 fit score.
-- Persist the Phase 0/1 domain in SQLite-compatible Drizzle tables and migrations.
-- Render a fixture-backed dashboard, jobs list/detail, applications, profile, and settings pages.
-- Select resume templates and render one deterministic ATS-friendly demonstration.
-- Prepare a basic deterministic cover-letter representation and application-runner contract.
-- Record application events and audit events.
+For every future Codex iteration:
 
-## 6. Non-functional requirements
+1. Read `AGENTS.md`, this plan, and relevant history.
+2. Verify branch, HEAD, origin/main, worktree, DB/schema compatibility, and dependencies.
+3. Select only the authorized task.
+4. Update the task blueprint before application/runtime code changes.
+5. Implement only within scope.
+6. Run acceptance checks.
+7. Record evidence, failures, blockers, and decisions.
+8. Update current state and next dependency.
+9. Return the updated plan and handoff.
+10. Wait for review where required.
 
-- TypeScript strict mode and Zod boundary validation.
-- Deterministic engines with no required network or paid API.
-- Accessible server-rendered React UI with responsive layouts.
-- Local-first storage and explicit cloud/local trust boundaries.
-- Reproducible installs, lint, formatting checks, tests, typecheck, and build in CI.
-- Small, composable packages with source-specific logic isolated behind interfaces.
-- Dates serialized as ISO 8601 strings at persistence and interchange boundaries.
+### Status values
 
-## 7. Security/privacy requirements
+`NOT_STARTED`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `BLOCKED`, `VERIFIED`, `DEFERRED`, `NOT_APPLICABLE`
 
-- Commit only `data/profile.example.json`; ignore `data/profile.private.json` and common variants.
-- Ignore databases, write-ahead logs, secrets, environment files, browser profiles, cookies, storage state, generated application documents, personal CVs, identity/visa/tax/bank records, and private referee material.
-- Keep authenticated browser work and sensitive documents in a future local runner.
-- Never log secrets or full private profiles. Audit state transitions and redacted identifiers instead.
-- Validate source data before it reaches deterministic engines.
-- Stop and request legitimate human action on CAPTCHA, MFA, access-control, authentication, or website restriction boundaries.
-- Do not commit seeded real personal information; examples must be fictional.
+### Evidence values
 
-## 8. Candidate truth-store architecture
+`REPORTED`, `CODE_REVIEWED`, `SYNTHETICALLY_VERIFIED`, `LOCAL_RUNTIME_VERIFIED`, `LIVE_VERIFIED`, `DEPLOYMENT_VERIFIED`
 
-`@applypilot/candidate-profile` owns the Zod schema, inferred TypeScript types, safe parsing, and truth-claim helpers. Facts with material application impact use explicit verification state (`VERIFIED`, `USER_CONFIRMATION_REQUIRED`, or `UNKNOWN`) rather than bare truthy values. Employment, education, achievements, skills, licences, certifications, availability, work rights, transport, preferences, referees, unsupported experience, and forbidden claims are modeled directly.
+Every verified task must record revision, environment, command/observation, timestamp, result, evidence location, and invalidation conditions.
 
-Content engines receive a validated `CandidateProfile`, build a set of permitted fact references, and reject statements that cite missing or forbidden facts. Candidate profile versions are append-only persistence records so that a generated document can point to the exact source version.
+## 4. Verified-state ledger
 
-## 9. Multi-site job adapter architecture
+### BASE-001 — Repository baseline
 
-`@applypilot/job-sources` defines `JobSourceAdapter`, adapter capability flags, discovery/fetch inputs, and normalized results. Every adapter reports capabilities rather than implying support. Phase 0/1 exports non-networked placeholders for `seek`, `indeed`, `linkedin`, `employment-hero`, `workday`, `greenhouse`, `lever`, and `generic-company-site`. LinkedIn reports `MANUAL_ONLY` and assisted behavior only. Fixture adapters support tests; live HTTP and browser implementations belong to later phases.
+Status: `VERIFIED`
+Owner: Codex
 
-## 10. Job normalization architecture
+Checklist:
 
-`@applypilot/job-model` owns the normalized job schema and enums. `@applypilot/job-normalizer` owns source-record normalization contracts and a conservative deduplication-candidate interface. Raw payloads remain in source records for provenance, while normalized records provide consistent location, schedule, requirements, salary, hours, application status, and assessment fields. Deduplication signals include canonical URL, source identifiers, normalized company/title/location, posting date, and optional future description similarity.
+- [x] Verify local HEAD, `origin/main`, and clean worktree.
+- [x] Verify PR #42/#43 ancestry and merge commits.
+- [x] Record current draft blob/hash and archive it losslessly.
+- [x] No repository file named `PROJECT_PLAN(7).md` was supplied or present; comparison is `NOT_AVAILABLE`, not assumed equal.
+- [x] Preserve unresolved historical work in the archive.
 
-## 11. Eligibility engine
+Acceptance: one non-contradictory baseline.
 
-`@applypilot/eligibility-engine` evaluates a validated job and candidate profile into `ELIGIBLE`, `INELIGIBLE`, or `REVIEW_REQUIRED`. Explicit missing mandatory qualifications, licences, vehicle access, work rights, fixed availability, fixed-hour limits, maximum commute, specialist healthcare qualifications, and mandatory experience are hard blockers. Unknown job or candidate facts never pass silently; material ambiguity produces review. Each rule emits a stable code, severity, human-readable explanation, and supporting field references.
+### BASE-002 — Private runtime baseline
 
-## 12. Fit scoring engine
+Status: `VERIFIED`
+Depends on: `BASE-001`
 
-`@applypilot/fit-scorer` applies deterministic weighted signals after eligibility evaluation. Initial categories cover location/commute, availability, employment type, skills, experience, education, customer-service relevance, technical relevance, training, preferred requirements, mandatory requirements, and category preference. Scores are clamped to 0-100 and return positive and negative explanations plus per-category contributions. An ineligible job may still be scored for diagnosis, but is never represented as a recommended application.
+Read-only checks:
 
-## 13. Resume engine
+- [x] schema version 9, pending migrations 0, integrity `PASS`, foreign keys 0;
+- [x] migrations `0000`-`0008` unchanged and `0009` additive;
+- [x] parent/child ledger, active authority counts, and historical action counters;
+- [x] selected role, current profile/evaluation/document/packet bindings, and inspection evidence.
 
-`@applypilot/resume-engine` defines ten template categories, a deterministic selector, truth-safe resume document data, HTML/CSS rendering, file naming, and Playwright PDF output. Phase 0/1 demonstrates one `casual-general` layout. CSS fixes A4 size, black Times New Roman text, minimum 10 pt body text, professional bullets, no icons/graphics/skill bars/photo/colored sidebars, and selectable text. Casual output targets one page; engineering output targets two pages unless configured otherwise.
+Acceptance: safe current-state summary with no private values printed.
 
-## 14. Cover-letter engine
+### BASE-003 — Source accounting
 
-`@applypilot/cover-letter-engine` defines deterministic document data and a basic generator. Employer, role title, and cited requirements come from the normalized job. Candidate statements are assembled only from verified facts. Missing support is omitted or surfaced for review, never invented. Advanced rewriting remains out of scope until Phase 11.
+Status: `VERIFIED`
+Depends on: `BASE-002`
 
-## 15. Application runner
+Latest recorded run:
 
-`@applypilot/application-runner` defines modes `DISCOVERY_ONLY`, `ASSISTED_FILL`, `HUMAN_REVIEW_REQUIRED`, and `SUBMISSION_SUPPORTED`; answer certainty; security-stop reasons; preparation results; and runner capabilities. The Phase 0/1 implementation is a no-submit preparation runner. The global policy gate requires human confirmation before any future final submission.
+- 4 requests;
+- 4 pages;
+- 100 provider records;
+- 100 accepted;
+- 83 persisted/evaluated/queued.
 
-## 16. Application tracking
+Checklist:
 
-`@applypilot/application-tracker` defines application statuses, allowed transition helpers, and analytics-ready event fields. Applications link source, job, candidate-profile version, generated documents, and event timestamps. Event data supports later analysis by source, CV template, role category, company, location, and time-to-response.
+- [x] Account for all 100 records and four 25-record pages.
+- [x] Explain the 17-record difference as deterministic duplicate/no-op dispositions; individual identities are not retained.
+- [x] Confirm zero unusable/rejected records in this run and no silent persistence failure.
+- [x] Verify current R2/evaluation/queue counts are 83/83/83 and replay is idempotent.
 
-## 17. Browser automation strategy
+Acceptance: every provider record has a deterministic disposition.
 
-Playwright is the planned browser layer. Discovery and application capabilities are adapter-specific and policy-aware. Authenticated state, cookies, downloaded personal documents, and sessions live only in the future local runner. Automation pauses on CAPTCHA, MFA, unexpected authentication, rate limiting, bot detection, access controls, or unsupported page changes. The initial repository uses fixtures and browser tests only; it does not visit job boards.
+## 5. Architecture and trust boundaries
 
-## 18. Data model
+Document actual ownership for:
 
-SQLite with Drizzle ORM contains at least:
+- `apps/web`;
+- `apps/showcase`;
+- candidate profile/truth store;
+- job sources;
+- importer;
+- R2 normalization/evidence;
+- eligibility/fit;
+- duplicate/queue/corrections;
+- documents;
+- application runner;
+- tracker;
+- database;
+- green-banner parent/child authority.
 
-- `candidate_profiles` and append-only `candidate_profile_versions`.
-- `jobs`, `job_sources`, and provenance-preserving `job_source_records`.
-- `eligibility_results` and `fit_scores` with structured explanation JSON.
-- `generated_documents` with profile version, template, hashes, and local path metadata.
-- `applications`, append-only `application_events`, and tri-state `application_answers`.
-- append-only `audit_events` and typed `settings`.
+### Parent grant
 
-Local database files are runtime artifacts and ignored. The schema stores JSON as text where SQLite has no dedicated type and timestamps as ISO strings. A dedicated `packages/database` package is added beyond the suggested tree because persistence is shared by the web app, future local runner, tests, and analytics; isolating it prevents the UI from owning domain storage.
+Current operation ceiling includes:
 
-## 19. Dashboard architecture
+- `SOURCE_LIST_JOBS`
+- `OPEN_AND_INSPECT_ONLY`
+- `MAP_FOR_FILL`
+- `FILL`
+- `UPLOAD`
+- `VERIFY`
+- `FILL_PREVIEW`
 
-`apps/web` is a Next.js App Router application. Server components render fixture-backed pages for `/`, `/dashboard`, `/jobs`, `/jobs/[id]`, `/applications`, `/profile`, and `/settings`. Shared UI styles live in the app; business rules stay in packages. The job detail page displays eligibility, score, reasons, requirements, missing skills, work rights, schedule, commute, template recommendation, recommended action, and intentionally inert Phase 0/1 action controls.
+`SUBMIT` remains excluded.
 
-## 20. Deployment strategy
+Audit:
 
-There is no Phase 0/1 deployment. The preferred future topology is a cloud-hosted dashboard/backend for non-sensitive coordination plus a local ApplyPilot Runner for authenticated browser automation, browser sessions, private candidate profiles, and personal documents. A fully local deployment maximizes privacy but limits remote access and scheduling. A fully cloud-hosted runner improves availability but creates unacceptable credential and personal-data exposure without substantial hardening. The hybrid plan requires authenticated, encrypted, least-privilege communication and explicit data classification before Phase 19.
+- [x] parent persistence/digest;
+- [x] child derivation/scope;
+- [x] child expiry/replay;
+- [x] code SHA binding (the persisted parent is bound to the pre-merge implementation SHA; no child was created after the merge);
+- [x] parent submit exclusion and terminal child evidence;
+- [x] source-run restart/replay evidence;
+- [ ] cumulative cross-run action budget (not implemented; `ENGINEERING`).
 
-## 21. Testing strategy
+### Runner authority
 
-- Unit tests validate candidate profiles, forbidden-claim enforcement, normalization contracts, eligibility branches, score bounds/explanations, resume selection/content, application transitions, and runner safety gates.
-- Fixture scenarios cover retail, hospitality/fast food, receptionist, customer service, robotics and automation internships, registered nurse, sonographer, MR truck driver, own-vehicle roles, unrestricted work-right roles, timetable conflicts, fixed-hour excess, warehouse, and administration.
-- Integration tests exercise the fixture pipeline from profile/job parsing through eligibility and scoring.
-- Next.js production build validates server rendering and route generation.
-- Playwright browser tests validate key dashboard routes and, where practical, A4 PDF output/selectable text/page count.
-- Required checks are `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run test:e2e`, and `npm run build`.
+Audit result (revision `010cbe909b7d7b2b4ed88c413f270f7ff1ff75ac`, code reviewed 2026-09-22):
 
-## 22. Risks
+| Operation               | Authority enforcement                           | Adapter/runtime entry point                                               | Packet binding                  | Persistence/audit                           | Verification/tests            | Current evidence       |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------- | ----------------------------- | ---------------------- |
+| `OPEN_AND_INSPECT_ONLY` | `REAL_TARGET` schema + inspection identity      | Lever passive inspection adapter + `TargetInspectionRunner`               | `FrozenInspectionBinding`       | `runner_inspection_bindings` + audit events | live validated; synthetic/E2E | `LIVE_VERIFIED`        |
+| `MAP_FOR_FILL`          | enum/parent only; real target schema rejects it | no real adapter; synthetic `TargetIndependentApplicationRunner.map` only  | synthetic `FrozenRunnerBinding` | no real operation lifecycle                 | unit synthetic only           | `ENGINEERING`          |
+| `FILL`                  | enum/parent only; real target schema rejects it | no real adapter; synthetic `TargetIndependentApplicationRunner.fill` only | synthetic binding only          | no real operation lifecycle                 | unit synthetic only           | `ENGINEERING`          |
+| `UPLOAD`                | enum/parent only; real target schema rejects it | no `upload` adapter method                                                | none                            | none                                        | no upload-stage test          | `MISSING_VERIFICATION` |
+| `VERIFY`                | parent enum only                                | no runner method or adapter method                                        | none                            | none                                        | none                          | `MISSING_VERIFICATION` |
+| `FILL_PREVIEW`          | parent enum only                                | no runner method or adapter method                                        | none                            | none                                        | none                          | `MISSING_VERIFICATION` |
 
-- Job-board markup and policies change: isolate sources, expose capabilities, use fixtures, and add policy review per adapter.
-- Candidate hallucination or overclaiming: require typed verified facts, forbidden-claim checks, provenance, and negative tests.
-- Ambiguous requirements: return `REVIEW_REQUIRED`; never coerce unknown to true.
-- SQLite concurrency limits future hosted scale: keep repository contracts separable and revisit during deployment design.
-- Browser automation leaks credentials: keep it local, ignore state artifacts, redact logs, and pause at security boundaries.
-- Resume layout can vary across Chromium versions: pin dependencies, validate page size/count, and visually inspect reference output when document work expands.
-- Monorepo configuration drift: centralize scripts and CI checks, and keep package boundaries documented.
-- Fixture bias can make scoring seem more accurate than it is: keep weights transparent and validate against user-reviewed outcomes in later phases.
+The existing synthetic runner does have a frozen binding, protection stops, document digest check,
+one-use synthetic consent, and `OUTCOME_UNKNOWN` behavior. Those proofs do not establish a production
+real-target operation path. The next engineering task must address this gap before any owner-fact
+question can be treated as the sole blocker.
 
-## 23. Open questions
+## 6. Environment/configuration/secrets
 
-- Which candidate fields should be encrypted at rest beyond filesystem-level protections?
-- Which geocoding provider, if any, can support commute calculations without a required paid API?
-- What exact job-board terms and technical constraints apply to each future adapter?
-- Should profile versions store full snapshots, normalized relational facts, or both after Phase 1?
-- Which PDF archival metadata and signing requirements are useful to the candidate?
-- What human-confirmation UX is sufficiently explicit for eventual assisted submission?
-- Which deployment functions can safely leave the local runner after threat modeling?
+### ENV-001 — Supported host
 
-## 24. Phase roadmap
+Verify:
 
-Roadmap statuses use `NOT_STARTED`, `AWAITING_HUMAN_REVIEW`, `IN_PROGRESS`, `COMPLETE`, or `BLOCKED`.
+- Windows/PowerShell;
+- Node/npm;
+- native SQLite;
+- Playwright Chromium;
+- filesystem permissions;
+- loopback ports;
+- timezone/DST;
+- sleep/reboot;
+- disk space;
+- process concurrency.
 
-| Phase | Objective                                  | Tasks                                                                                               | Acceptance criteria                                                                                                            | Key risks                                                              | Dependencies                                   | Validation requirements                                             | Status      |
-| ----- | ------------------------------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------- | ----------- |
-| 0     | Bootstrap repository and architecture      | Private GitHub repo, branch, workspace, docs, CI, security baseline                                 | Required docs/config exist; CI design covers quality gates; private repo and feature branch verified                           | Premature architecture lock-in                                         | GitHub CLI, Node LTS                           | Lint, typecheck, tests, build, Git/GitHub audit                     | COMPLETE    |
-| 1     | Establish candidate/domain/data foundation | Truth store, normalized jobs, database, fixtures, eligibility, scoring, basic documents, dashboard  | All Phase 0/1 acceptance criteria in this plan pass                                                                            | Incorrect rules or unsafe claims                                       | Phase 0, Zod, Drizzle, fixtures                | Unit/integration/E2E tests and production build                     | COMPLETE    |
-| 2     | Add SEEK discovery                         | Policy review, discovery/detail mapping, fixture replay, throttling/error model                     | SEEK jobs normalize with provenance; no protection bypass                                                                      | Site/policy changes, rate limits                                       | Phases 0-1                                     | Contract tests, fixture replay, manual policy audit                 | COMPLETE    |
-| 2.5   | Add real-world job intake                  | Source-neutral paste, multi-job, HTML, upload, preview, confirmation, and policy-gated URL intake   | Real ads enter one validated local pipeline and are evaluated only with a valid private profile; no scraping or invented facts | Untrusted content, demo-profile leakage, false splits, duplicate drift | Phase 2 normalization and persistence patterns | Parser/profile/security fixtures, integration/E2E, migration review | COMPLETE    |
-| 2.5A  | Validate local real-world activation       | One private local profile, one user-supplied vacancy, migration, evaluation, UI, and privacy checks | The real local workflow is truthful and leak-free; no source fetch or application action                                       | Private-data leakage, parser mismatch, demo fallback, invalid profile  | Merged Phase 2.5 implementation                | Manual comparison, isolation/privacy audit, full regression suite   | COMPLETE    |
-| 3     | Add Indeed discovery                       | Policy review, discovery/detail adapter, fixture replay                                             | Indeed jobs normalize with provenance and safe failures                                                                        | Site/policy changes, bot controls                                      | Phases 0-2 patterns                            | Contract tests, fixture replay, manual audit                        | NOT_STARTED |
-| 4     | Add Employment Hero adapter                | Model public listings/details and capability boundaries                                             | Supported public jobs normalize; unsupported flows declared                                                                    | Tenant variation                                                       | Adapter contracts                              | Contract/integration tests                                          | NOT_STARTED |
-| 5     | Add generic ATS adapters                   | Greenhouse, Lever, Workday, generic company sites                                                   | Each adapter passes common contract suite and retains raw provenance                                                           | Vendor/tenant variation                                                | Phases 2-4 lessons                             | Per-adapter fixtures and policy/security checks                     | NOT_STARTED |
-| 6     | Refine normalization and deduplication     | Canonical fields, similarity signals, merge review UX                                               | Duplicate clusters are explainable and source records remain intact                                                            | False merges                                                           | Multi-source fixtures                          | Precision/recall fixture suite and manual review                    | NOT_STARTED |
-| 7     | Refine eligibility                         | Expand rules, confidence, override/audit workflow                                                   | Hard blockers and overrides are deterministic and audited                                                                      | False negatives                                                        | Candidate feedback and normalized data         | Rule matrix, regression tests                                       | NOT_STARTED |
-| 8     | Refine fit scoring                         | Calibrate weights and preference signals                                                            | Scores remain explainable and calibrated against reviewed outcomes                                                             | Misleading precision/bias                                              | Outcome samples                                | Golden cases, sensitivity and bounds tests                          | NOT_STARTED |
-| 9     | Complete CV template engine                | Implement categories and reusable layout validation                                                 | ATS-safe categories render within configured page limits                                                                       | Layout drift                                                           | Truth store, Playwright                        | PDF structure, page-count, visual QA                                | NOT_STARTED |
-| 10    | Add automatic CV tailoring                 | Deterministic tailoring first; optional provider boundary                                           | Every claim has profile provenance; unsupported claims fail closed                                                             | Hallucination                                                          | Phase 9 and truth provenance                   | Adversarial truth-compliance tests                                  | NOT_STARTED |
-| 11    | Complete cover-letter generation           | Requirement selection, tone configuration, layouts                                                  | Employer/role accurate, fact-safe, non-generic output                                                                          | Unsupported claims                                                     | Phase 10 patterns                              | Content provenance and PDF validation                               | NOT_STARTED |
-| 12    | Build application preparation              | Question mapping, answer store, document checklist                                                  | Prepared packet identifies every unknown and required review                                                                   | Incorrect answers                                                      | Documents and normalized jobs                  | Workflow integration tests                                          | NOT_STARTED |
-| 13    | Add assisted browser filling               | Local runner, field mapping, pause/resume, confirmation gate                                        | Safe assisted filling works on approved fixtures; no unattended final submit                                                   | Credential leakage, site controls                                      | Phase 12, security review                      | Synthetic-site E2E, threat-model review                             | NOT_STARTED |
-| 14    | Complete tracking dashboard                | Persistent queues, timelines, status actions                                                        | Applications and events are filterable and auditable                                                                           | State inconsistency                                                    | Database and runner events                     | Transition and UI tests                                             | NOT_STARTED |
-| 15    | Add scheduled discovery                    | Local/cloud schedules, checkpoints, idempotency                                                     | Runs are resumable and deduplicated without duplicate notifications                                                            | Rate limiting, missed runs                                             | Source adapters                                | Scheduler/idempotency tests                                         | NOT_STARTED |
-| 16    | Add notifications                          | Local/email/push option analysis and preferences                                                    | Opt-in notifications contain minimal sensitive data                                                                            | Privacy and alert fatigue                                              | Phase 15                                       | Preference and redaction tests                                      | NOT_STARTED |
-| 17    | Add analytics                              | Conversion, source/template/category/company/location/time metrics                                  | Metrics derive reproducibly from event data                                                                                    | Small-sample bias                                                      | Tracking history                               | Query fixtures and metric reconciliation                            | NOT_STARTED |
-| 18    | Add optional AI providers                  | Provider-neutral interface, redaction, consent, deterministic fallback                              | Base app works without AI; provider use is explicit and auditable                                                              | Privacy, cost, hallucination                                           | Mature truth-safe engines                      | Contract, redaction, fallback tests                                 | NOT_STARTED |
-| 19    | Deploy approved topology                   | Hybrid runner/cloud implementation, migrations, operations                                          | Threat model approved; rollback and recovery tested                                                                            | Secrets, availability, migration loss                                  | Prior phases and hosting choice                | Staging, backup/restore, security tests                             | NOT_STARTED |
-| 20    | Production security hardening              | Pen test, dependency policy, incident response, release gates                                       | Critical findings resolved and operational controls documented                                                                 | Unknown vulnerabilities                                                | Deployment candidate                           | SAST/dependency/manual security audits                              | NOT_STARTED |
+### ENV-002 — Configuration inventory
 
-## 25. Current phase status
+Create:
+`variable | purpose | environment | default | secret? | owner | validation | rotation/recovery`
 
-### Phase 0/1 implementation blueprint
+Never record secret values.
 
-**State at the start of Phase 0/1**
+### ENV-003 — Secrets
 
-- GitHub CLI authenticated as `adeel1608`.
-- Private repository `adeel1608/applypilot` created on 2026-09-05.
-- `main` contained only the repository initialization commit.
-- Phase 0/1 work was performed on `feat/bootstrap-applypilot`.
-- The workspace contained no pre-existing source files or user changes.
-- Node `v24.18.0` is available; npm must be invoked as `npm.cmd` in this PowerShell environment because script execution policy blocks `npm.ps1`.
+Verify:
 
-**Objective**
+- ignored env files;
+- no credentials in Git/history;
+- no secrets in CI artifacts;
+- cookies/browser state local only;
+- documented provisioning, rotation, revocation, leak response.
 
-Complete only Phase 0 and Phase 1: establish the repository, domain models, local database schema, deterministic engines, fixture-backed dashboard, document foundations, automated checks, CI, security documentation, and an unmerged pull request.
+## 7. Dependency-ordered implementation plan
 
-**Assumptions**
+### P0 — Baseline reconciliation and plan rebase
 
-- Node 24 is the current installed LTS-compatible runtime for this repository.
-- Fixture identities and employers are fictional.
-- Distances in fixtures are precomputed; no geocoding service is introduced.
-- Phase 0/1 document generation may demonstrate one layout while defining all requested categories.
-- Job detail action controls are non-submitting UI affordances.
-- SQLite schema acceptance requires Drizzle schema and a checked-in SQL migration; local database files are not committed.
+Status: `VERIFIED`
 
-**Requirements**
+- [x] Archive old plan at `docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`.
+- [x] Record source commit/blob/hash.
+- [x] Replace stale front-page state.
+- [x] Add stable task IDs.
+- [x] Add old-to-new crosswalk.
+- [x] Separate reported vs verified evidence.
+- [ ] Open documentation-only PR and leave unmerged (this task's final handoff).
 
-- Satisfy every Phase 0/1 acceptance criterion listed below.
-- Preserve the candidate truth and human-confirmation invariants.
-- Use the specified TypeScript, Next.js, React, SQLite, Drizzle, Zod, Playwright, Vitest, ESLint, Prettier, and GitHub Actions stack.
-- Do not perform live job-board access, deploy, or submit applications.
-
-**Architecture**
-
-- npm workspaces coordinate `apps/*` and `packages/*` without an additional task-runner dependency.
-- `apps/web` owns routing and presentation only.
-- Domain packages own schemas and pure deterministic behavior.
-- `packages/database` owns Drizzle persistence definitions and migrations.
-- Static fictional fixtures seed the initial UI and tests.
-- Playwright is used for web E2E tests and Chromium-backed PDF generation.
-
-**Proposed file changes**
-
-- Root: repository policy, plan, architecture/security/contribution/readme docs, npm/TypeScript/ESLint/Prettier/Vitest/Playwright configuration, environment sample, ignore rules, CI workflow.
-- `apps/web`: App Router layout, home redirect/landing behavior, dashboard, jobs list/detail, applications, profile, settings, fixtures/view-model helpers, accessible CSS.
-- `packages/candidate-profile`: candidate schema, truth helpers, tests.
-- `packages/job-model`: normalized job schema and status enums.
-- `packages/job-sources`: shared adapter contract and eight offline placeholders.
-- `packages/job-normalizer`: normalization/deduplication contracts.
-- `packages/eligibility-engine`: deterministic rule engine and tests.
-- `packages/fit-scorer`: deterministic weighted scorer and tests.
-- `packages/resume-engine`: category selection, truth-safe document model, ATS HTML/CSS, Playwright PDF function, tests.
-- `packages/cover-letter-engine`: deterministic fact-safe foundation.
-- `packages/application-runner`: preparation-only safe runner contract.
-- `packages/application-tracker`: statuses and transitions.
-- `packages/shared`: shared assertion/date/result utilities as needed.
-- `packages/database`: Drizzle schema, database factory/config, and initial migration.
-- `data`: fictional example profile only.
-- `fixtures/jobs`: fifteen requested fictional job records.
-- `tests`: cross-package fixture pipeline tests and Playwright UI checks.
-- `docs`: required focused architecture documents.
-
-**Data flow**
-
-`source fixture/adapter -> source record validation -> normalized Job -> deduplication signals -> eligibility(candidate profile, job) -> fit score(candidate profile, job, eligibility) -> dashboard review -> shortlist -> resume/cover-letter preparation from verified facts -> application preparation -> human review gate -> future submission -> application/audit events`
-
-Candidate profile versions and raw job source records remain linked to downstream results for provenance.
-
-**Dependencies**
-
-- Runtime: Next.js, React, React DOM, Zod, Drizzle ORM, and a SQLite driver.
-- Development: TypeScript, ESLint, Next ESLint config, Prettier, Vitest, Playwright Test, `tsx`, and supporting type definitions. Drizzle Kit was removed after its stable release retained vulnerable legacy build tooling; the checked-in SQL migration is executed directly in an in-memory SQLite test instead.
-- External: private GitHub repository and GitHub Actions. No paid API or runtime cloud dependency.
-
-**Risks**
-
-- Native SQLite installation may be incompatible with the installed Node version; prefer a currently supported driver and validate install/build early.
-- Next.js workspace transpilation and server/client boundaries can surface build-only failures; validate production build before UI polish.
-- Large fixture schemas can become brittle; centralize parsers and fail with actionable paths.
-- PDF rendering may require a separate Chromium binary; install and record validation precisely.
-
-**Security/privacy concerns**
-
-- Example data must remain fictional and contain no actual candidate contact details.
-- Ensure ignore rules cover private profiles, databases, generated PDFs, browser state, sessions, credentials, identity and financial documents.
-- Avoid client-bundling private profile data in future database-backed work; Phase 0/1 uses only the committed fictional example.
-- Do not expose a submission implementation or misleading active submit control.
-
-**Testing strategy**
-
-- Create focused unit tests beside domain packages.
-- Run a cross-package integration suite over all fifteen job fixtures.
-- Cover explicit eligible retail, hospitality, receptionist, engineering internship, missing qualification, missing licence, own vehicle, unrestricted work rights, schedule conflict, excessive hours, and ambiguous-review cases.
-- Assert score bounds and positive/negative explanations.
-- Assert invalid/unverified claims are rejected or omitted.
-- Use Playwright against a production-like local server for main dashboard/job routes.
-- Run lint, format check, typecheck, all tests, and build locally and in CI.
+Exit: one consistent active plan.
 
-**Rollback strategy**
+### P1 — Production scope and architecture verification
 
-- Phase 0/1 work remained isolated on `feat/bootstrap-applypilot`; `main` stayed at its initialization commit until the reviewed pull request was merged.
-- Commits are organized by concern so a problematic layer can be reverted without rewriting history.
-- Database evolution begins with migration `0000`; since Phase 0/1 has no real data, rollback is removal of the disposable ignored local database and checkout/revert of the migration commit.
-- No deployment or external application state is created.
+Status: `IMPLEMENTED_UNVERIFIED`
 
-**Phase 0/1 acceptance criteria**
+- [x] Component capability matrix (read-only code review).
+- [x] End-to-end data-flow map (source/R2/document/packet/runner boundaries recorded).
+- [x] Private app vs showcase boundary.
+- [x] Real `MAP_FOR_FILL/FILL/UPLOAD/VERIFY/FILL_PREVIEW` architecture audit.
+- [x] Parent/child authority enforcement audit.
+- [x] Runner target capability enforcement audit.
+- [ ] Deployment topology decision.
+- [x] Trust-boundary review of current local-first implementation.
 
-- Private repository exists at `adeel1608/applypilot`; feature branch exists and is pushed.
-- `AGENTS.md`, this plan, architecture, security, contribution, README, and focused docs exist and reflect reality.
-- Candidate truth-store and forbidden claims schemas exist with tests and fictional example data.
-- Normalized job schema, SQLite/Drizzle schema and migration, adapter interfaces/placeholders, deduplication types, and all fifteen fixtures exist.
-- Eligibility and fit engines pass required deterministic scenarios with explanations.
-- Resume foundation and one deterministic ATS-safe demonstration exist; cover-letter and safe application-runner foundations exist.
-- Required dashboard routes build and run from fixture data.
-- Lint, format check, typecheck, unit tests, integration tests, E2E tests, and production build pass.
-- CI runs install, lint, typecheck, tests, and build on push and pull request.
-- Final audit confirms ignored sensitive artifacts, clean status, private visibility, pushed branch, open unmerged PR, and no critical practical dependency finding left undocumented.
+Exit: explicit implemented-vs-proposed capability map.
 
-**Exact implementation steps**
+### P2 — Candidate, role, and evidence readiness
 
-1. Commit the plan-first repository policy and blueprint.
-2. Add root workspace/tooling configuration and aggressive ignore/environment templates.
-3. Add shared, candidate-profile, job-model, and database packages plus migration.
-4. Add adapter, normalization, application tracking, and application runner contracts/placeholders.
-5. Add fictional candidate and fifteen job fixtures.
-6. Implement and unit-test eligibility and fit scoring.
-7. Implement and unit-test resume and cover-letter foundations, including truth checks and PDF renderer.
-8. Build fixture-backed Next.js routes and styling.
-9. Add integration and Playwright tests plus GitHub Actions.
-10. Complete all required documentation.
-11. Install dependencies/Chromium as needed; run formatting, lint, typecheck, unit, integration, E2E, and production build checks.
-12. Audit security, dependency findings, dead code, Git status, repository visibility, branch, docs, and architecture.
-13. Update this plan with actual results and limitations; make clean commits, push the branch, and open but do not merge the pull request.
+Status: `IMPLEMENTED_UNVERIFIED`
 
-## 26. Completed work
+- [x] Inventory existing candidate evidence before asking owner.
+- [x] Classify verified/stale/conflicting/unknown facts.
+- [x] Verify work-right evidence and temporal bounds.
+- [x] Verify selected-role suitability against available provider evidence.
+- [x] Keep Shield AI London validation role excluded.
+- [ ] Verify job freshness via provider evidence (provider date/expiry absent).
+- [x] Verify current R2/evaluation/duplicate/queue state.
+- [x] Verify engineering CV provenance, digests, approval, currentness.
+- [x] Classify each unsupported form control at the available evidence level.
+- [ ] Create one minimal role-specific owner questionnaire only for genuinely missing facts.
 
-- Verified GitHub authentication belongs to `adeel1608`.
-- Confirmed `adeel1608/applypilot` did not already exist.
-- Created `adeel1608/applypilot` with private visibility and the required description.
-- Initialized and pushed `main` with commit `dd39c7f`.
-- Created and pushed feature branch `feat/bootstrap-applypilot`.
-- Added permanent plan-first instructions, the full 21-phase roadmap, architecture/security/contribution documentation, and focused domain documentation.
-- Bootstrapped the npm/TypeScript/Next.js workspace with strict type checking, flat ESLint configuration, Prettier, Vitest, Playwright, and GitHub Actions.
-- Added the strongly typed candidate truth store, fictional example profile, verification states, unsupported experience, forbidden claims, and provenance helpers.
-- Added the normalized job model, all fifteen fictional job scenarios, eight offline adapter placeholders, capability flags, source-record contracts, and conservative deduplication structures.
-- Added all thirteen required SQLite/Drizzle tables, indexes, foreign keys, an initial SQL migration, and an in-memory migration execution test.
-- Implemented deterministic eligibility and 0-100 fit engines with stable reason codes and positive/negative explanations.
-- Added all ten resume categories, deterministic selection, provenance-bound resume claims, forbidden-claim validation, A4 ATS HTML, Chromium PDF rendering, safe filenames, and a deterministic cover-letter foundation.
-- Added the preparation-only application runner, tri-state answer model, automation stop reasons, human-confirmation invariant, tracking statuses, and transition validation.
-- Built `/`, `/dashboard`, `/jobs`, `/jobs/[id]`, `/applications`, `/profile`, and `/settings` as responsive Next.js server-rendered fixture views. The job preparation controls are intentionally disabled.
-- Generated and inspected the fictional `JORDAN CV (Northside Homewares).pdf`: one A4 page at 594.96 by 841.92 points, 722 extractable characters, zero replacement characters, black Times text, minimum 10 pt, professional bullets, and no clipping or decorative elements. Poppler was unavailable locally, so PyMuPDF rendered the inspection PNG and pypdf performed structural/text checks; the temporary PNG was removed after review.
-- Merged pull request [#1](https://github.com/adeel1608/applypilot/pull/1) from `feat/bootstrap-applypilot` into `main` with normal merge commit `d4f15f862cbc0a976a82241a9a2ef76fda7099c0` at `2026-09-05T05:07:44Z`; the remote feature branch was deleted.
+Exit: evidence-backed suitable role and current packet, or precise blocker register.
 
-### Validation results
+### P3 — Source-to-application integrity
 
-Validated on 2026-09-05 with Node `v24.18.0`:
+Status: `IMPLEMENTED_UNVERIFIED`
 
-- `npm run format:check`: passed.
-- `npm run lint`: passed with zero warnings.
-- `npm run typecheck`: passed in strict mode.
-- `npm test`: 37 tests passed across 9 files.
-- `npm run test:integration`: the full 15-job pipeline passed with 6 eligible, 1 review-required, and 8 ineligible results.
-- `npm run build`: passed; 23 static pages generated, including all 15 job details.
-- `npm run test:e2e`: 4 Chromium tests passed, including dashboard navigation, disabled submission control, private-profile messaging, and live A4 PDF style/structure checks.
-- `npm audit`: 0 vulnerabilities across production and development dependencies after upgrading Vitest and removing Drizzle Kit.
-- Git ignore audit: private profile, `.env`, browser-session state, SQLite files, and generated candidate PDFs are ignored.
-- Secret-pattern audit: no credential-like assignments found outside dependencies/build output.
-- GitHub Actions: both push and pull-request `quality` runs passed after correcting a Bash glob-expansion issue in the Vitest exclusions. The failed runs and their cause were not skipped.
-- GitHub audit: `adeel1608/applypilot` is private, `main` is the default branch, and PR #1 is merged with merge commit `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`.
+- [x] Reconcile 100/83.
+- [ ] Test partial-page restart/replay.
+- [ ] Test unchanged/changed/duplicate records.
+- [x] Verify current R2 linkage for the selected role.
+- [ ] Verify staleness/invalidation propagation.
+- [x] Verify demo/private separation.
 
-Phase 0/1 acceptance criteria are complete. No live job-board access, deployment, or application submission occurred.
+Exit: deterministic traceability with no silent loss or stale shortcut.
 
-## 27. Blocked work
+### P4 — Real map/fill/upload implementation
 
-No Phase 0/1 work is blocked.
+Status: `BLOCKED`
 
-Intentional boundaries remain: source adapters are offline placeholders; persistence is schema/migration foundation rather than dashboard-backed CRUD; deduplication is a contract rather than a fuzzy matcher; only one common resume layout is rendered; cover-letter support is basic and deterministic; job actions are disabled; and all discovery, deployment, notification, analytics, AI-provider, and browser-assisted submission work remains assigned to later phases.
+- [ ] Prove concrete real-target authority path (current schema intentionally rejects real application operations).
+- [ ] Separate MAP/FILL/UPLOAD/VERIFY.
+- [ ] Keep SUBMIT unavailable.
+- [ ] Bind target/form/adapter/packet/answers/disclosures/document digests.
+- [ ] Support only known controls.
+- [ ] Block unknown required controls.
+- [ ] Verify post-fill values.
+- [ ] Verify exact uploaded document.
+- [ ] Test stale bindings, replay, changed form, wrong document, interruption, redirect, popup, protection signals.
 
-## 28. Next recommended task
+Exit: real non-submit engine implemented and synthetically/integration verified.
 
-Phase 2 is the next recommended task: implement a policy-reviewed SEEK discovery adapter using captured fixtures and contract tests, without live application submission or protection bypass.
+### P5 — Final review and submission safety
 
-Exact recommended implementation prompt after human approval (do not execute during this blueprint checkpoint):
+Status: `VERIFIED`
 
-```text
-PROJECT: ApplyPilot
-PHASE: 2 - SEEK job discovery adapter
+Evidence qualifier: synthetic safety only; this does not make production submission ready.
 
-Continue from the merged Phase 0/1 foundation. Follow AGENTS.md and read PROJECT_PLAN.md in full. Inspect the repository and current GitHub state, then update the Phase 2 implementation blueprint in PROJECT_PLAN.md before changing application code. Work on a new feature branch named feat/seek-discovery-adapter.
+- [x] Freeze exact final-review state (synthetic runner).
+- [x] Fresh one-use consent (synthetic runner).
+- [x] Invalidate consent after material change (synthetic runner).
+- [x] Prevent concurrent/double consumption (synthetic runner).
+- [x] Bind exact submit control (synthetic runner).
+- [x] Define `SUBMITTED`, `FAILED_PRE_SUBMIT`, `OUTCOME_UNKNOWN`.
+- [x] No retry after ambiguous result.
 
-Implement only the SEEK discovery and job-details phase behind the existing JobSourceAdapter contract. First document a current technical and policy assessment of permitted access, authentication boundaries, robots/rate-limit considerations, and failure/stop conditions. Prefer an official/publicly permitted interface if one is available. Do not bypass CAPTCHA, MFA, bot detection, access controls, authentication protections, rate limits, robots guidance, or website restrictions. Do not implement job application submission, unattended form filling, credential storage, or LinkedIn automation.
+Exit: synthetic submit lifecycle verified.
 
-Use fictional, redacted, or safely captured fixtures and mocks for deterministic development. Add SEEK source-record validation, discovery pagination/checkpoint contracts, job-detail mapping into the normalized Job schema, raw provenance retention, idempotency, conservative retry/error classification, and explicit capability reporting. Unknown or ambiguous source fields must remain unknown and flow to REVIEW_REQUIRED where material; never invent candidate or job information. Keep the core usable without a paid API.
+### Phase task-record index
 
-Add contract, unit, integration, and fixture-replay tests for successful discovery, pagination, job details, malformed records, missing/ambiguous requirements, rate limiting, authentication/security stops, duplicates, and normalization provenance. Update relevant adapter/normalization/security documentation and the dashboard only as needed to display fixture-derived SEEK provenance; do not silently change architecture.
+Each P0-P11 checklist above is an actionable task record. The following fields apply to every
+checklist item; item-specific exceptions are recorded in the phase evidence and blocker register.
 
-Run format check, lint, strict typecheck, unit tests, integration tests, Playwright tests, production build, and npm audit. Update PROJECT_PLAN.md with exact results, limitations, rollback, blocked items, and the next recommended phase. Push the feature branch and open an unmerged pull request into main. Never claim live SEEK support unless it was actually validated within the documented policy boundaries.
-```
+| Task | Owner                             | Dependencies                  | Objective/components                      | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                 | Blockers/invalidation                                    |
+| ---- | --------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
+| P0   | Codex                             | repository baseline           | reconcile plan/history/docs               | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | local verified, revision `010cbe9` + archive hash | PR still pending; invalidated by baseline drift          |
+| P1   | Codex + owner review              | P0                            | architecture, trust boundaries, authority | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | code reviewed, revision `010cbe9`                 | deployment topology and real operation policy unresolved |
+| P2   | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness        | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                | BLK-003/004/005                                          |
+| P3   | Codex                             | P1/P2                         | source-to-R2 traceability                 | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                | BLK-006; partial restart test pending                    |
+| P4   | Codex + security review           | P1/P2/P3                      | real non-submit operation lane            | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review              | BLK-001/002/005/007/008                                  |
+| P5   | Codex + owner review              | P4                            | final review/consent/outcome              | freeze exact state and one-use consent; acceptance is synthetic safety plus later real evidence        | concurrency/ambiguous-outcome tests; invalidate on change               | synthetic verified, revision `010cbe9`            | production path remains unverified                       |
+| P6   | Codex + owner decision            | P1-P5                         | reproducible release candidate            | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                       | deployment/configuration decision                        |
+| P7   | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                       | P4 and current packet required                           |
+| P8   | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                       | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                       | P4/P7/P5 gaps                                            |
+| P9   | Owner + operations                | P6/P8                         | approved deployment                       | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                       | topology/secrets/security policy                         |
+| P10  | Owner + Codex                     | P8/P9                         | first supervised submission               | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                       | explicit owner final approval                            |
+| P11  | Codex + operations                | P9/P10                        | recovery and handover                     | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                       | deployment and real-operation evidence                   |
 
-# Phase 2.5A Activation Blocker Fix
+### P6 — Reproducible staging/release candidate
 
-- Status: `COMPLETE`; dedicated bugfix PR #7 was reviewed and merged before Phase 2.5A execution began.
-- Working branch: `fix/ignore-sqlite-migration-backups`.
-- Fresh base: merged Phase 2.5A blueprint PR #6 at `48a5cf73a83a27dc2dea2d749d79cb3da45e0fe0`; local `main` and `origin/main` matched that commit with a clean worktree before this branch was created.
-- Blueprint merge: PR #6 merged normally at `2026-09-06T06:41:46Z`. The merged planning branch was deleted locally and remotely only after ancestry and ref equality were verified.
-- Objective: prevent the timestamped safety copy produced by the explicit local migration command from becoming trackable, lock the policy with a deterministic fictional-path regression, and stop at an unmerged human-review PR.
+Status: `NOT_STARTED`
 
-## Problem
+- [ ] Clean checkout install/build/test.
+- [ ] Separate staging DB/grants/docs/browser/ports.
+- [ ] Same production build/config model.
+- [ ] No real external actions in CI.
+- [ ] Record release artifact digest, SHA, schema/config versions.
+- [ ] Define and verify stability/recovery thresholds.
 
-When the selected database already exists, `scripts/migrate-local-database.ts` creates a sibling backup by appending a colon-normalized ISO timestamp and `.backup` to `databasePath`. For the supported ApplyPilot filename this produces `data/applypilot.local.sqlite.<timestamp>.backup`. The existing `.gitignore` covers active `.sqlite`, `.sqlite-wal`, and `.sqlite-shm` files, but not that appended backup form. A real migration could therefore leave a private local database copy visible to Git.
+Exit: identifiable release candidate.
 
-Phase 2.5A real-data activation was **BLOCKED** until this fix was reviewed and merged. The bugfix task did not create a profile, inspect a CV, run the migration, create a backup, import a vacancy, or operate on real candidate/job data.
+### P7 — Controlled live non-submit validation
 
-## Evidence and assumptions
+Status: `BLOCKED`
 
-- `scripts/migrate-local-database.ts` resolves `APPLYPILOT_DB_PATH` or defaults to `data/applypilot.local.sqlite`; for an existing file it copies `databasePath` to a sibling named by appending the colon-normalized ISO timestamp and `.backup`.
-- `apps/web/lib/local-database.ts` defaults to `applypilot.local.sqlite` and rejects filenames that do not end in `.sqlite`. The actual application database/backup suffix under the coordinated supported path is therefore `.sqlite.<YYYY-MM-DDTHH-MM-SS.sssZ>.backup`.
-- `.gitignore` also contains active-file rules for `.db` and `.sqlite3`, but no application runtime or separate backup path was found that produces timestamped `.db` or `.sqlite3` backups. The migration path override is unconstrained and must remain an explicitly coordinated/reviewed path; this fix does not speculate about unsupported filename suffixes.
-- On the fresh merged base, `git check-ignore -v -- data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` returned exit `1` with no matching rule. The probe is a fictional non-existent path; no database or backup was created.
-- On the same base, the active fictional path `data/applypilot.local.sqlite` matched `.gitignore` rule `*.sqlite`, while `packages/database/drizzle/0001_real_world_job_intake.sql` remained non-ignored/trackable.
+Requires P2/P4/P6.
 
-## Security and privacy impact
+- [ ] Revalidate suitable live role.
+- [ ] Revalidate target/form.
+- [ ] Run one bounded real mapping.
+- [ ] Run controlled fill.
+- [ ] Upload exact approved document if required.
+- [ ] Verify all material fields/documents.
+- [ ] Freeze reviewable preview.
+- [ ] Stop on protection/uncertainty.
 
-Migration backups may contain private candidate facts, supplied vacancy text, normalized records, evaluation results, and audit state. Leaving a backup trackable creates an accidental-commit and remote-disclosure risk even though the active database is ignored. The fix must protect the exact supported backup form without broadly ignoring ordinary `.backup` files, source code, documentation, or reviewed migration SQL. No sensitive content is required to reproduce or validate this policy.
+Exit: verified real non-submit preview.
 
-## Architecture, data flow, and dependencies
+### P8 — Green-banner review
 
-This is a repository-boundary fix only. The runtime data flow remains `explicit migration confirmation -> sibling timestamped copy when the database exists -> transactional migration and verification`. Git classification changes after the copy is named; migration behavior, database contents, schema, application runtime, source adapters, profile resolution, and submission gates do not change. The regression uses Node's standard child-process API and the repository's existing Git executable through Vitest; it adds no package or external-service dependency.
+Status: `BLOCKED`
 
-## Exact proposed fix and file changes
+Require all:
 
-- `PROJECT_PLAN.md`: record the plan-first evidence, security analysis, implementation contract, actual validation, rollback, and remaining human gate.
-- `.gitignore`: add only `*.sqlite.*.backup` beside the existing SQLite rules. Do not add broad `*.backup`, database-directory, or generated-content patterns.
-- `tests/security/gitignore-policy.test.ts`: add a permanent fictional-path test that invokes `git check-ignore --no-index` and proves both protected and trackable cases.
+- [ ] suitable current role;
+- [ ] supported material facts;
+- [ ] current approved CV;
+- [ ] frozen answer/disclosure packets;
+- [ ] current target inspection;
+- [ ] real mapping;
+- [ ] real fill;
+- [ ] required upload;
+- [ ] verified fill preview;
+- [ ] exact submit control;
+- [ ] one-use consent mechanism;
+- [ ] outcome handling;
+- [ ] no release blocker.
 
-## Regression-test plan
+Only then emit:
+`# 🟢 **WE ARE READY**`
 
-The dedicated test must prove:
+### P9 — Production deployment
 
-1. reviewed migration SQL remains trackable;
-2. an active `.sqlite` database is ignored;
-3. its `-wal` and `-shm` journals are ignored;
-4. `data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` is ignored; and
-5. ordinary TypeScript source and Markdown documentation remain trackable.
+Status: `NOT_STARTED`
 
-All paths are fictional or already tracked source/document paths. The test must not create, read, copy, migrate, or delete a database. Run the focused regression plus `npm.cmd run format:check`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run test:integration`, `npm.cmd run build`, `npm.cmd run test:e2e`, `npm.cmd audit`, `npm.cmd run audit:production`, and `git diff --check`. Direct `git check-ignore` probes must confirm the exact new backup path is ignored and a normal source path is not.
+- [ ] Approve topology.
+- [ ] Disable overlapping runners.
+- [ ] Verify consistent backup.
+- [ ] Apply migration only if required.
+- [ ] Install/start approved artifact.
+- [ ] Verify version/schema/config.
+- [ ] Keep external actions default-deny until checks pass.
+- [ ] Verify browser runtime/private storage.
+- [ ] Define monitoring and rollback triggers.
+
+Exit: production runtime deployed reproducibly.
+
+### P10 — First real submission
+
+Status: `BLOCKED`
+
+- [ ] Recheck target/job/profile/docs/form/preview.
+- [ ] Owner reviews exact application.
+- [ ] Generate fresh one-use final consent.
+- [ ] Submit exactly once.
+- [ ] Record truthful outcome.
+- [ ] Verify consent consumed/capability terminal/tracker updated.
+- [ ] Verify runtime health.
+
+Exit: first supervised production application has durable outcome evidence.
+
+### P11 — Recovery, maintenance, handover
+
+Status: `NOT_STARTED`
 
-## Risks and mitigations
-
-- A rule that is too broad could conceal legitimate backup documentation or source artifacts. Mitigation: constrain the rule to names containing the supported `.sqlite` suffix before the appended backup segment and test non-database source/docs explicitly.
-- A test that checks tracked files without `--no-index` could produce a false negative because Git normally suppresses tracked matches. Mitigation: use `--no-index` for every assertion and check process exit status only.
-- Platform-specific shell behavior could weaken the regression. Mitigation: call `git` directly from Node without a shell and use repository-relative forward-slash paths.
-- The ignore rule prevents new accidental tracking but does not remove already committed secrets. Mitigation: audit reachable Git paths for private profiles and timestamped database backups before handoff.
-
-## Rollback
-
-Leave the bugfix PR unmerged and delete the branch, or normally revert its commits after merge. Removing the single ignore rule and regression restores the prior repository policy; no database/schema/runtime/data rollback is involved. No real database or backup may be deleted as part of rollback.
-
-## Acceptance criteria
-
-- The exact fresh-base bug is reproduced with exit `1`, and the post-fix exact fictional path is ignored specifically by `*.sqlite.*.backup`.
-- The permanent regression proves the migration SQL, ordinary source, and ordinary docs remain trackable while `.sqlite`, WAL, SHM, and timestamped SQLite backups are ignored.
-- No broad `*.backup` rule, application/schema/migration behavior change, real profile/job content, SQLite file, backup, credential, cookie, session, or generated application artifact is introduced.
-- Reachable-history and changed-file audits find no committed private profile or database backup.
-- All local quality gates and both dependency audits pass; GitHub CI is green at the final pushed head.
-- The bugfix branch is pushed and its pull request into `main` remains unmerged for explicit human review.
-- Operational status becomes `READY_FOR_ACTIVATION_PENDING_HUMAN_REVIEW`; Phase 2.5A remains not complete and real activation remains blocked until this PR is approved and merged.
-
-## Scope exclusions
-
-No real candidate profile creation or reading, CV inspection, real database migration/backup, real vacancy import, UI smoke test with real data, live job-board access, document generation, application preparation/form fill/status advance/submission, Phase 2.6, Phase 3, scoring change, schema change, or cleanup/export/delete capability is authorized here. The future Phase 2.5A implementation PR must not be merged automatically.
-
-## Exact implementation steps
-
-1. Commit this plan-first checkpoint before changing `.gitignore`.
-2. Add the single supported SQLite timestamped-backup ignore rule.
-3. Add the fictional-path Git policy regression and run it directly.
-4. Run the complete local validation and dependency-audit matrix.
-5. Perform changed-file, reachable-history, secret/runtime-artifact, and direct ignore-policy audits.
-6. Update this section with exact commands, results, commit SHAs, files changed, rollback state, and remaining blocker.
-7. Push the focused commits, open an unmerged PR into `main`, wait for final-head CI, and stop for human review.
-
-## Implementation and validation record
-
-- Operational status: `COMPLETE`. The repository fix was implemented, locally validated, explicitly reviewed, and merged as PR #7 before Phase 2.5A execution. Phase 2.5A itself remains separately in progress.
-- Blueprint closeout: PR #6 was reverified `OPEN`, non-draft, `MERGEABLE`, and `CLEAN` at approved head `5922bf5aad413530b59bde7648e728db8ac609a1`; both final `quality` runs `33957728933` and `33957730885` passed, the repository was private, and the diff was limited to `PROJECT_PLAN.md`, `README.md`, and `docs/PRIVATE_PROFILE_SETUP.md`. It merged normally as `48a5cf73a83a27dc2dea2d749d79cb3da45e0fe0` at `2026-09-06T06:41:46Z`. Fresh local `main` matched `origin/main`, and the merged planning branch was then deleted locally/remotely.
-- Bug confirmation: before the ignore edit, fictional path `data/applypilot.local.sqlite.2026-09-06T12-00-00.000Z.backup` was not ignored (`git check-ignore` exit `1`). The migration's actual supported application backup format is `data/<name>.sqlite.<YYYY-MM-DDTHH-MM-SS.sssZ>.backup`, produced by appending the colon-normalized ISO timestamp and `.backup` to the `.sqlite` database path.
-- Exact fix: `.gitignore` now contains only `*.sqlite.*.backup` for the appended migration backup form. The same direct fictional probe now matches `.gitignore` line 46 and exits `0`; a generic `notes/recovery.backup`, migration SQL, normal source, and normal documentation all exit `1` and remain trackable. No broad `*.backup` rule was added.
-- Suffix review: the active web runtime permits only `.sqlite` filenames, and the migration defaults to the same suffix. No separate `.db` or `.sqlite3` timestamped-backup producer exists. `.env.example` contains a legacy unused `APPLYPILOT_DATABASE_PATH` `.db` example, but repository search found no code consumer for that variable. The unconstrained migration override remains an explicitly reviewed coordination case rather than a basis for speculative broad ignore rules.
-- Regression: `tests/security/gitignore-policy.test.ts` calls Git directly without a shell and uses only fictional or existing repository paths. The focused run passed 7/7 assertions covering active SQLite, WAL, SHM, timestamped backup, reviewed migration SQL, TypeScript source, and Markdown documentation.
-- Files changed from the merged blueprint base: `.gitignore`, `PROJECT_PLAN.md`, and `tests/security/gitignore-policy.test.ts` only. The implementation did not change migration/database/schema/application/source/profile/evaluation/submission behavior.
-- Focused commits: plan-first checkpoint `689e850d26bf2363f151300f29f59ce6ca8cbf73`; narrow ignore fix `56ce37a85dfdee73f6c4daf5d5d7d3a5b4d1e322`; permanent regression `f16009ed0fac0ecfe1d0d6de6a4580407a2dc748`.
-- Formatting: the first `npm.cmd run format:check` stopped on the two freshly merged documentation files with the known Windows line-ending mismatch. Prettier normalized `README.md` and `docs/PRIVATE_PROFILE_SETUP.md`; Git comparison confirmed no substantive or staged diff. The full rerun passed.
-- Successful local gates on Node 24: `npm.cmd run lint` passed; strict `npm.cmd run typecheck` passed; `npm.cmd test` passed 87 tests across 17 files; `npm.cmd run test:integration` passed 9 tests across 3 files; `npm.cmd run build` compiled the production application and generated 31 static segments across the eight routes; `npm.cmd run test:e2e` passed all 9 browser tests; `npm.cmd audit` and `npm.cmd run audit:production` each reported 0 vulnerabilities; and `git diff --check` passed. Browser execution emitted only the existing non-fatal `NO_COLOR`/`FORCE_COLOR` warnings.
-- Security/privacy audit: the changed-file set is exact, high-confidence secret scan count is zero, and tracked-tree plus all-reachable-ref path checks found no private profile, SQLite/database/journal, migration backup, cookie, or browser/session artifact. Direct checks prove the timestamped backup is ignored without hiding generic backups/source/docs. Required E2E created only its fictional `applypilot.e2e.sqlite` plus WAL/SHM files; the repository-owned controlled shutdown removed those exact artifacts, port 3100 is closed, and the final local private/runtime-file count is zero. No real candidate profile, CV, vacancy, database, migration backup, credential, browser state, job-board request, document/application action, or submission was created, read, performed, or committed.
-- Rollback remains the normal unmerged-PR/branch deletion or commit revert described above. There is no database, schema, real-data, runtime, network, or application state to undo.
-- Pull request and CI checkpoint: bugfix PR #7 (`https://github.com/adeel1608/applypilot/pull/7`) was opened into `main` with title `fix: ignore local migration backups before activation` and intentionally left unmerged. At implementation/results head `0f853e90c19d23498acf0d61183e2a61a2556d2c`, push `quality` run `34017740553` passed in 2m0s and pull-request run `34017743172` passed in 1m51s. This checkpoint-record-only commit must also pass its new final-head runs; those final IDs belong in the handoff rather than a recursive plan update.
-- Completed gate: the owner explicitly approved PR #7, which merged normally as `6f42b8f1edd5813d34c398aad56248555fae044d` at `2026-09-06T07:09:44Z`; the fresh-main Phase 2.5A execution branch was then created. No activation action occurred on the bugfix branch.
-
-# Phase 2 — SEEK Discovery Adapter Blueprint
-
-- Blueprint status: `APPROVED`
-- Phase roadmap status: `COMPLETE`
-- Prepared on: 2026-09-05
-- Blueprint branch: `feat/seek-discovery-adapter`
-- Approved implementation branch: `feat/seek-discovery-implementation`
-
-Implementation checkpoint:
-
-- Blueprint PR #2 was approved and merged normally into `main` with merge commit `90a9eafaad32780a81653b3739c19ce95a22d951` at `2026-09-05T05:34:50Z`.
-- The remote blueprint branch was deleted after merge.
-- Implementation started at `2026-09-05T15:35:08+10:00` on `feat/seek-discovery-implementation`, created and pushed from the merged blueprint commit.
-- The evidence-dated access assessment is recorded in `docs/SEEK_ADAPTER.md`. SEEK's official API is conditional on SEEK approval, OAuth credentials, and authorised hirer relationships; no approved public candidate-discovery API was established. Current website terms prohibit automated access outside a provided interface. Phase 2 therefore enables only `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`; `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` remain disabled.
-
-At blueprint approval, this section was an implementation design only. Preparing it did not access SEEK, fetch a live job page, write browser automation, change submission behaviour, or implement Phase 2 source code. The later implementation result is recorded after the blueprint checkpoint below.
-
-## A. State at blueprint approval
-
-- Phase 0/1 is merged into `main`. Pull request #1 (`feat/bootstrap-applypilot` -> `main`) was merged normally at `2026-09-05T05:07:44Z`; merge commit and current merged baseline are `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`. The remote bootstrap branch was deleted.
-- The repository is the private GitHub repository `adeel1608/applypilot`. Phase 0/1 was revalidated immediately before merge with green local and GitHub checks, no reviews or unresolved review blockers, and no unexpected drift from the original `main` commit `dd39c7f9d313081d8b983c5b3a9644c7ce19d0c4`.
-- The architecture is a strict TypeScript/npm-workspaces monorepo. `apps/web` is presentation-only; domain packages own schemas and deterministic behaviour; `packages/database` owns SQLite/Drizzle persistence; committed fixtures are fictional; authenticated browser state and candidate-private data remain local and ignored.
-- `JobSourceAdapter` currently provides `sourceName`, `capabilities()`, `discoverJobs()`, `fetchJob()`, and `normalizeJob()`. The SEEK entry is an offline `PlaceholderAdapter` that throws `AdapterNotImplementedError` for every operation. Its declared `DISCOVERY` and `JOB_DETAILS` capabilities are design targets rather than proof of live support; Phase 2 must make operational availability explicit.
-- `DiscoveryQuery` currently contains keyword and location arrays plus an optional opaque page cursor. `DiscoveryPage` contains source records plus an optional next cursor. These types need conservative, source-neutral extension for filters, limits, resumability, and validated checkpoint state.
-- `JobSchema` is the normalized boundary. It already models source identity, source URL, location, employment flags, salary, hours, schedule, explicit and preferred requirements, experience, education, licences, vehicle, work rights, physical requirements, dates, source metadata, document requirements, eligibility, fit, and application state. Several presentation fields such as title, company, location, category, and description are required strings; a source record missing one of these cannot be silently filled and must fail normalization safely.
-- `RawJobSourceRecord` currently preserves source, external ID, source URL, discovery time, and an unknown payload. `job_source_records` persists external ID, source URL, raw payload JSON, payload hash, discovery time, and fetch time against a normalized job. The `sourceId + externalId` unique index supplies a strong idempotency key.
-- The database already has `jobs`, `job_sources`, `job_source_records`, `settings`, and append-only `audit_events`. It has no dedicated discovery-run or checkpoint table.
-- The dashboard reads fifteen normalized `FIXTURE` jobs directly, evaluates eligibility and fit deterministically, and displays lists/details with disabled preparation controls. It is not database-backed and does not show refresh time, source URL, raw-record status, or adapter mode/readiness.
-- Current limitations are: no SEEK-specific raw schema, no source client, no access-method decision, no query validation beyond TypeScript, no page/checkpoint orchestration, no retry/error taxonomy, no SEEK mapper, no source-specific fixture replay, no persistence service, and no live source support.
-
-## B. Phase 2 objective
-
-Enable ApplyPilot to discover and normalize SEEK job listings safely and reliably while preserving raw provenance and respecting access, security, privacy, policy, and rate boundaries. Phase 2 covers discovery and job details only. It does not cover application preparation, form interaction, or submission.
-
-The implementation must remain useful in `FIXTURE_ONLY` and user-supplied-content modes if no public automated access method is approved. A public or browser-assisted mode is optional and may be implemented only after the research gate below records sufficient evidence and human approval.
-
-## C. Non-goals
-
-Phase 2 explicitly excludes:
-
-- applying to jobs, filling SEEK forms, submitting applications, or changing the human-confirmation invariant;
-- CAPTCHA, MFA, login, access-control, bot-detection, or rate-limit bypass;
-- stealth browser techniques, fingerprint manipulation, proxy rotation, or credential/session storage;
-- LinkedIn, Indeed, or any other source adapter;
-- production deployment or scheduled unattended discovery;
-- AI-generated candidate content, probabilistic requirement invention, semantic fuzzy merging, or inference that unknown fields are satisfied.
-
-## D. SEEK technical research plan
-
-No SEEK access was performed while preparing this blueprint. At implementation start, create an evidence-dated decision record in `docs/SEEK_ADAPTER.md` and investigate the following in order. Stop at the first method that is sufficiently complete, stable, and legitimately usable; do not assume scraping or authenticated access is required.
-
-1. Officially documented or public interfaces.
-2. Public listing pages.
-3. Server-rendered structured data.
-4. JSON-LD/schema.org `JobPosting` data.
-5. Network responses made by publicly accessible job pages, inspected without defeating controls.
-6. Browser-assisted discovery in a user-controlled local browser where legitimate.
-7. User-supplied URLs or content as a fallback.
-
-Every candidate method must be recorded with:
-
-- evidence URL, evidence retrieval date, reviewer, and decision (`ALLOWED`, `CONDITIONAL`, `NOT_ALLOWED`, or `UNKNOWN`);
-- whether authentication is required and whether any credential/session data would cross a trust boundary;
-- stability/versioning, field completeness, pagination behaviour, and whether details require a second fetch;
-- published limits and conservative request pacing, `Retry-After` handling, robots guidance, relevant terms/policy considerations, and acceptable use constraints;
-- observed access denials, login walls, CAPTCHA, bot protection, or other stop signals;
-- maintenance risk, failure visibility, and suitability for local automation;
-- an explicit statement of what evidence would invalidate or require re-review of the decision.
-
-The research matrix starts with every method marked `UNKNOWN/NOT_VALIDATED`. Reading public documentation does not by itself authorise page automation, and a technically reachable response is not automatically an approved interface. Network inspection must not replay private tokens, undocumented authenticated requests, or session-bound identifiers. If the review cannot establish a permitted automated path, Phase 2 proceeds with fixtures and user-supplied content only.
-
-## E. Access modes
-
-The SEEK implementation will use a runtime mode separate from capability names:
-
-| Mode                    | Intended behaviour                                                                  | Initial state   | Phase 2 disposition                                       |
-| ----------------------- | ----------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------- |
-| `FIXTURE_ONLY`          | Replay fictional/redacted local records with no network                             | Not implemented | Required first; default for development and CI            |
-| `PUBLIC_DISCOVERY`      | Discover jobs through an approved unauthenticated public method                     | Not validated   | Conditional on the research and human-review gates        |
-| `PUBLIC_JOB_DETAILS`    | Fetch details through an approved unauthenticated public method                     | Not validated   | Conditional on the research and human-review gates        |
-| `ASSISTED_BROWSER`      | Read a user-visible page in a local, user-controlled browser and stop on protection | Not validated   | Optional; no stealth, login automation, or session export |
-| `USER_SUPPLIED_URL`     | Process a URL explicitly supplied by the user through an otherwise approved method  | Not validated   | Conditional; a supplied URL does not waive access rules   |
-| `USER_SUPPLIED_CONTENT` | Parse content the user provides locally without retrieving it                       | Not implemented | Required fallback if the input can be safely validated    |
-
-Configuration must reject an unvalidated or disabled mode. Adapter/status UI and logs must distinguish `FIXTURE_ONLY`, `AVAILABLE`, `DISABLED`, `REQUIRES_REVIEW`, and `SECURITY_STOP`; no label may imply live SEEK support until it was actually validated.
-
-## F. Capability matrix
-
-| Capability             | Phase 2 target | Constraint                                                                                      |
-| ---------------------- | -------------- | ----------------------------------------------------------------------------------------------- |
-| `DISCOVERY`            | Yes            | Only in fixture mode and in a separately approved public/assisted mode that passed its contract |
-| `JOB_DETAILS`          | Yes            | Only in fixture mode and in a separately approved public/assisted mode that passed its contract |
-| `ASSISTED_APPLICATION` | No             | Out of scope                                                                                    |
-| `FORM_FILLING`         | No             | Must not be returned or implemented                                                             |
-| `APPLICATION_STATUS`   | No             | Must not be returned or implemented                                                             |
-| `SUBMISSION_SUPPORTED` | No             | Must not be introduced, returned, or implied                                                    |
-
-`capabilities()` must describe operations that work in the configured mode, not aspirational support. A richer status report may be added without weakening the shared `JobSourceAdapter` boundary. The adapter must never fall through from one mode to another silently.
-
-## G. Discovery query model
-
-Introduce a Zod-validated, source-neutral discovery query while retaining adapter compatibility:
-
-- `keywords: string[]`: trimmed, non-empty terms, de-duplicated case-insensitively.
-- `location`: optional object with `text`, `suburb`, four-digit `postcode`, Australian `state`, and `radiusKm`.
-- `employmentTypes`: zero or more of `CASUAL`, `PART_TIME`, `FULL_TIME`, `CONTRACT`, and `INTERNSHIP`; individual booleans must not contradict this list.
-- `datePostedWithinDays`: optional positive integer; an unsupported source filter must be rejected or applied locally and reported, never ignored silently.
-- `sortOrder`: `RELEVANCE` or `DATE_POSTED`.
-- `pageCursor`: optional opaque cursor bound to the canonical query fingerprint.
-- `pageSize`: optional positive integer with a local maximum of 100; the source-specific client may apply a smaller documented cap.
-
-The initial configured use case is `keywords: []`, `suburb: Preston`, `postcode: 3072`, `state: VIC`, with a user-configurable radius. The local default is 25 km until reviewed; the adapter must map it only to a validated source option or fail with an explicit unsupported-filter result. Canonical query serialization sorts set-like arrays and hashes the normalized value so retries and checkpoints cannot be attached to a different query.
-
-## H. Pagination and checkpointing
-
-Use an opaque, versioned cursor and a durable checkpoint with no credentials:
-
-- Cursor fields: schema version, source, access mode, query fingerprint, source cursor/page token, logical page number, and previous-page identity hash.
-- Checkpoint fields: schema version, run/query ID, source/mode, query fingerprint, next cursor, last successful fetch timestamp, last successfully committed page, processed page identities, discovered/added/updated/duplicate/failed counts, and expiry timestamp.
-- Validate every decoded cursor/checkpoint with Zod. Reject version, source, mode, or query-fingerprint mismatches.
-- Commit normalized jobs and source records transactionally; advance the checkpoint only after the page transaction succeeds. A process crash may replay the last page, which idempotency must make safe.
-- Compute a page identity from ordered external IDs/canonical URLs plus the page cursor. If the same page identity reappears without progress, stop with `DUPLICATE_PAGE` instead of looping.
-- Default limits: 10 pages and 200 distinct jobs per run. Both are locally configurable only within documented caps; reaching a cap returns a safe partial completion and resumable checkpoint.
-- A checkpoint older than 24 hours is stale by default. Resume requires the same canonical query and mode; otherwise start a new run while retaining a redacted audit event for the stale checkpoint.
-- Store checkpoints under a namespaced `settings` key such as `discovery.seek.checkpoint.<queryHash>` and never include URLs containing sensitive query parameters, cookies, headers, HTML, or browser state.
-
-## I. Rate-limit and failure model
-
-Add a typed `SeekAdapterError` with `code`, `retryable`, `humanActionRequired`, `safeRetryAfter` (an ISO 8601 timestamp or `null`), sanitized `sourceUrl`, redacted diagnostic code/message, and optional cause class without raw response content.
-
-| Code                     | Default retryable | Human action  | Required behaviour                                                           |
-| ------------------------ | ----------------- | ------------- | ---------------------------------------------------------------------------- |
-| `RATE_LIMITED`           | Yes               | No            | Honour valid `Retry-After`; stop the run; never evade the limit              |
-| `AUTH_REQUIRED`          | No                | Yes           | Stop; do not request, store, or replay credentials                           |
-| `CAPTCHA_DETECTED`       | No                | Yes           | Immediate security stop; no solver or alternate path                         |
-| `BOT_PROTECTION`         | No                | Yes           | Immediate security stop; do not disguise automation                          |
-| `ACCESS_DENIED`          | No                | Yes           | Stop and require policy/access review                                        |
-| `PAGE_CHANGED`           | No                | Yes           | Quarantine the record/fixture and require parser review                      |
-| `NETWORK_ERROR`          | Yes               | No            | Bounded retry with jitter; no retry when a protection signal is suspected    |
-| `MALFORMED_RESPONSE`     | No                | Yes           | Preserve safe provenance/hash, reject normalization, continue only by policy |
-| `JOB_REMOVED`            | No                | No            | Mark the source record unavailable; do not synthesize a replacement          |
-| `NOT_FOUND`              | No                | No            | Record a safe miss and stop retrying                                         |
-| `UNSUPPORTED_PAGE`       | No                | Yes           | Do not guess a parser                                                        |
-| `RETRYABLE_SERVER_ERROR` | Yes               | No            | Bounded retry using conservative backoff                                     |
-| `NON_RETRYABLE_ERROR`    | No                | As classified | Stop or skip according to the explicit run policy                            |
-| `DUPLICATE_PAGE`         | No                | Yes           | Stop pagination to prevent an infinite loop                                  |
-| `CHECKPOINT_MISMATCH`    | No                | Yes           | Refuse resume and keep the stale checkpoint for review                       |
-
-Retries are capped at three per request and five retryable failures per run. `safeRetryAfter` is the later of a valid server instruction and the local conservative backoff. Repeated rate limiting ends the run. Logs must never contain cookies, authorization headers, tokens, complete response bodies, or unredacted query strings.
-
-## J. Raw SEEK source record
-
-Create a Zod schema for a versioned `SeekRawJobRecord`. It will contain, where available:
-
-- source fixed to `SEEK`, schema/parser version, access mode, external job ID, canonical job URL, and discovery source-page URL;
-- title, company, advertiser, location, salary text, employment type/work type, classification, subclassification, posting text/date, description, and any source-provided requirements;
-- `discoveredAt`, `fetchedAt`, raw byte/content hash, content type, and retrieval result;
-- the untouched raw payload or locally supplied source content, plus a `fieldProvenance` map identifying the structured-data/visible-text/payload path used for each extracted field;
-- safe parser warnings and an `unknownFields` object. The Zod boundary should use deliberate passthrough/capture so newly observed source fields are retained rather than silently discarded.
-
-Hash the raw bytes before parsing. Successful persisted records retain the raw payload and hash in `job_source_records`; fixtures retain their fictional source content in Git. Live/user-supplied raw content remains local and is never logged or uploaded. Fields that are absent stay absent. A confidential employer label may be retained only if the source explicitly supplies it; a missing employer must not become a fabricated company.
-
-## K. Normalization mapping
-
-The SEEK mapper must produce a `JobSchema` value or a typed safe failure:
-
-| Normalized field                 | SEEK input/mapping rule                                                                                         |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `title`                          | Trim the explicit listing title; absence is `MALFORMED_RESPONSE`                                                |
-| `company`                        | Use explicit company/advertiser display text; if truly absent, fail safely rather than inventing a company      |
-| `location/suburb/postcode/state` | Preserve full text; populate components only from explicit structured fields or an unambiguous validated parser |
-| `employmentType` + flags         | Map explicit work-type text; otherwise `UNKNOWN` with all flags false                                           |
-| `salary`                         | Preserve salary text; parse bounds/currency/period only when syntax is deterministic, otherwise keep `null`     |
-| `hours`                          | Populate weekly/fortnightly ranges only from explicit numeric statements; otherwise `null`                      |
-| `schedule`                       | Preserve summary; set fixed/shifts only for explicit days/times, otherwise nullable/empty                       |
-| `requirements`                   | Include only spans classified `EXPLICIT_REQUIREMENT`                                                            |
-| `preferredRequirements`          | Include only spans classified `PREFERRED_REQUIREMENT`                                                           |
-| `experienceRequirements`         | Extract explicit description, mandatory marker, and numeric minimum only when stated                            |
-| `educationRequirements`          | Extract stated qualification text/keywords without equating related qualifications                              |
-| `licences`                       | Map explicitly named licence/check requirements; role title alone is not evidence                               |
-| `vehicleRequirement`             | `REQUIRED` only for explicit own-vehicle language; otherwise `NOT_REQUIRED` only if explicit, else `UNKNOWN`    |
-| `workRightsRequirement`          | Map explicit unrestricted/valid Australian work-right language; otherwise `NOT_SPECIFIED`/`UNKNOWN`             |
-| `physicalRequirements`           | Preserve explicit physical-duty/ability text without medical inference                                          |
-| `datePosted`                     | Use an explicit timestamp or the deterministic relative-date rule below; otherwise `null`                       |
-| `dateDiscovered`                 | Copy the validated discovery timestamp                                                                          |
-| `coverLetterRequired`            | `true` only from explicit source instruction; otherwise `false` plus raw unknown metadata if ambiguous          |
-
-`sourceMetadata` carries SEEK classification/subclassification, advertiser, work-type text, posting text, fetch time, raw hash, parser version, access mode, and normalization warnings. Raw text remains in the source record even after a structured value is produced. No source text may be strengthened: “preferred” cannot become mandatory, “valid work rights” cannot become unrestricted, and an absent fact cannot become positive.
-
-## L. Requirement extraction
-
-Use a deterministic, auditable sentence/list-item pipeline:
-
-1. Extract visible/structured requirement spans without rewriting them.
-2. Normalize whitespace and punctuation for matching while retaining the original span.
-3. Apply negation rules before positive markers, including `experience not required`, `no experience required`, and `training provided`.
-4. Classify strong markers such as `must have`, `required`, and `essential` as `EXPLICIT_REQUIREMENT` only when they grammatically govern the same span.
-5. Classify `preferred` and `desirable` as `PREFERRED_REQUIREMENT`.
-6. Classify conflicting, incomplete, scope-unclear, or unmatched material language as `AMBIGUOUS_REQUIREMENT` and append the original span to `job.ambiguities`.
-7. Apply narrow extractors for `unrestricted work rights`, `valid Australian working rights`, named driver licences, own-vehicle requirements, Working With Children Check/`WWCC`, and police checks. Never infer a licence or vehicle requirement from a driver/warehouse role title alone.
-
-Every extracted item records its class, original text, normalized text, matched rule ID, source field/path, and parser version. Unmatched language is preserved. This is a rules engine with golden fixtures, not an NLP generation or hallucination system.
-
-## M. Date normalization
-
-- Preserve the exact original posting text in raw/source metadata.
-- Prefer an explicit machine timestamp when present and valid.
-- For exact relative forms such as `Listed one day ago`, `Listed three days ago`, or `Listed eighteen days ago`, map the supported number word/integer and subtract that many 24-hour periods from the immutable `discoveredAt` instant, returning an ISO 8601 UTC timestamp.
-- `Listed today` may map to `discoveredAt`; ambiguous forms such as `about a month ago`, malformed numbers, future dates, or unsupported language produce `datePosted: null` plus a parser warning/ambiguity.
-- Tests use a fixed discovery clock and cover midnight/time-zone boundaries. Retries reuse the original discovery timestamp so the same raw record cannot drift by a day.
-
-## N. Duplication and idempotency
-
-Use only strong deterministic signals in Phase 2:
-
-1. Primary identity: `(source = SEEK, externalId)`.
-2. Secondary exact identity: normalized canonical URL when the external ID is absent or under review. Derive an external ID from a URL only after an exact, validated URL-pattern match; otherwise fail safely.
-3. Change detection: raw payload hash.
-4. Existing cross-source deduplication signals remain review-only; do not add semantic or fuzzy merging.
-
-Canonicalization removes fragments and only documented tracking parameters, retains parameters that may identify a job, normalizes host/path casing where safe, and records the original URL. An unchanged repeat increments duplicate counters and does not add a job. A changed hash updates the normalized job/source record transactionally and writes a redacted audit event containing old/new hashes and timestamps. Concurrent insertion relies on the existing unique source/external index and resolves conflicts by rereading, never by creating a second job. The checkpoint advances only after this outcome is committed.
-
-## O. Database impact
-
-Planned migration requirement: **NO**.
-
-- `jobs` stores the current normalized SEEK job and evaluation fields.
-- `job_sources` stores the SEEK source, enabled state, and actual capability/status metadata.
-- `job_source_records` stores current raw provenance, exact source URL, external ID, payload hash, discovery time, and last fetch time; its unique source/external index supports idempotent upsert.
-- `settings` stores versioned, namespaced checkpoint JSON validated on read/write.
-- `audit_events` records run start/completion, refresh/hash transitions, errors, caps, and security stops using redacted metadata.
-
-The Phase 2 implementation must first prove this design with transaction and restart tests. A migration is not approved by this blueprint. If the implementation demonstrates a genuine need for raw fetch history, failed-record quarantine, or queryable discovery-run analytics that the current tables cannot safely represent, stop, amend this blueprint with the exact migration and rollback, and obtain human review before changing the schema.
-
-## P. Dashboard impact
-
-Plan only minimal provenance/status additions:
-
-- Jobs list: add a `Source` column/badge and preserve existing decision/score presentation.
-- Job detail: show source, safe source URL, date discovered, date posted or `Unknown`, last refreshed, and a raw-provenance-present indicator/hash prefix without rendering the raw payload.
-- Settings: show SEEK adapter mode and state (`fixture`, disabled, review required, available, or security stopped) and make unsupported capabilities explicit.
-- Dashboard: optionally add a small per-source count/status line; do not redesign the page or add application controls.
-
-External links use safe `https` URLs and clear labels. The UI must never display cookies, request headers, raw authenticated content, or a misleading “live” status. Existing eligibility, fit, and disabled application controls remain unchanged.
-
-## Q. Security and privacy
-
-- Never store SEEK passwords in SQLite, config, fixtures, logs, or Git.
-- Never commit or upload cookies, browser profiles, session/storage states, authorization headers, tokens, downloaded personal documents, or authenticated response bodies.
-- Never place browser session state in a cloud component. An approved future assisted mode may use only a user-controlled local browser and must not export its state.
-- CAPTCHA, MFA, login walls, access restrictions, bot protection, unexpected interstitials, and rate limits stop automation and emit a redacted human-action event.
-- Do not rotate identities/proxies, spoof fingerprints, replay hidden tokens, or use alternative endpoints to route around a stop.
-- Redact URL query values except documented non-sensitive filters, strip fragments, cap diagnostic lengths, and log hashes/IDs rather than full payloads.
-- Validate all queries, cursors, checkpoints, source records, database JSON, and normalized jobs with Zod at their boundaries.
-- Candidate truth data is not an adapter input. Discovery and normalization must not send or derive candidate facts, and evaluation occurs only after normalized persistence.
-
-## R. Fixture strategy
-
-Create fictional/redacted fixture records under `fixtures/seek/` with a manifest and expected normalized/error outcomes. Planned files are:
-
-- `retail-assistant.json`
-- `nandos-team-member.redacted.json`
-- `junior-receptionist.json`
-- `customer-service.json`
-- `engineering-internship.json`
-- `warehouse-role.json`
-- `driver-role.json`
-- `healthcare-qualified-role.json`
-- `unrestricted-work-right-role.json`
-- `missing-salary.json`
-- `missing-company.json`
-- `missing-requirements.json`
-- `malformed-job.json`
-- `removed-job.json`
-- `duplicate-job-page.json`
-- `manifest.ts`
-
-The Nando's-style case is safely redacted/reconstructed rather than copied from a live advert. The duplicate fixture includes repeated and changed-hash variants. Fixtures contain fixed timestamps, fictional IDs/URLs/employers/contact-free descriptions, raw field-path provenance, and expected classification/mapping outcomes. No live content is committed merely because it is publicly viewable.
-
-## S. Test plan
-
-- Unit tests: raw/query/cursor/checkpoint Zod schemas, URL canonicalization/redaction, hashing, relative dates, salary/hours parsing, work-type mapping, and deterministic requirement rules.
-- Adapter contract tests: source name, mode-specific capabilities, discover/fetch/normalize behaviour, explicit unsupported methods, and no form/submission capability.
-- Fixture replay: every manifest case parses deterministically and matches its checked expected normalized result or typed failure.
-- Normalization tests: every mapping in section K, field provenance, passthrough unknown fields, explicit-vs-preferred-vs-ambiguous requirements, and required-field failures.
-- Pagination tests: next-cursor progression, query-bound cursors, empty final page, max pages/jobs, repeated pages, reordered records, and partial completion.
-- Checkpoint tests: crash before/after transaction, resume, stale/mismatched/corrupt checkpoints, and deterministic counters.
-- Idempotency/duplicate tests: same external ID/hash, same external ID/changed hash, canonical URL fallback, concurrent conflict, and no semantic merge.
-- Error/rate tests: every error code and flags, valid/invalid `Retry-After`, bounded retry, repeated-limit stop, server errors, removed/not-found jobs, and redaction.
-- Security-stop tests: CAPTCHA, MFA/login wall, bot protection, access denial, unexpected page, and assurance that no fallback/retry bypass occurs.
-- Unknown-field tests: missing salary, requirements, work rights, schedule, date, and unsupported extra fields remain unknown/preserved; missing required company fails safely.
-- Integration: SEEK fixture -> adapter -> raw schema -> normalization -> transactional persistence -> eligibility -> fit, including restart and repeat runs.
-- Regression: all existing fifteen fixture results, eligibility status counts, fit score bounds/explanations, candidate truth rules, database migration test, and preparation-only runner remain unchanged.
-- Dashboard integration/E2E: source/provenance/status fields render safely; unknown dates/companies are honest; submission controls remain disabled; raw content is not exposed.
-- Quality gates: format check, lint, strict typecheck, unit tests, integration tests, E2E tests, production build, dependency audit, secret/ignored-artifact audit, and GitHub CI.
-
-All tests use fixed clocks, fixture transports, mocks, and a temporary/in-memory SQLite database. CI performs no SEEK network request.
-
-## T. Observability
-
-Emit structured local events for:
-
-- `discovery.run.started` with run ID, mode, query hash, and configured caps;
-- `discovery.page.completed` with page number and aggregate counts;
-- `discovery.job.added`, `updated`, `duplicate`, or `failed` with redacted source ID/hash;
-- `discovery.rate_limited` with safe retry time;
-- `discovery.security_stopped` with stop code and human-action flag;
-- `discovery.run.completed` or `partial` with pages processed, jobs discovered/added/updated/duplicated/failed, checkpoint presence, and duration.
-
-Run IDs are random local identifiers. Logs/audit records exclude raw payloads, source descriptions, cookies, tokens, headers, browser state, candidate data, and unredacted URLs. Error causes are allowlisted into short stable diagnostic codes rather than serialized wholesale.
-
-## U. Implementation file plan
-
-Expected files to create:
-
-- `docs/SEEK_ADAPTER.md`
-- `packages/job-sources/src/seek/index.ts`
-- `packages/job-sources/src/seek/types.ts`
-- `packages/job-sources/src/seek/schemas.ts`
-- `packages/job-sources/src/seek/errors.ts`
-- `packages/job-sources/src/seek/query.ts`
-- `packages/job-sources/src/seek/dates.ts`
-- `packages/job-sources/src/seek/requirements.ts`
-- `packages/job-sources/src/seek/normalizer.ts`
-- `packages/job-sources/src/seek/fixture-client.ts`
-- `packages/job-sources/src/seek/adapter.ts`
-- `packages/job-sources/src/seek/schemas.test.ts`
-- `packages/job-sources/src/seek/normalizer.test.ts`
-- `packages/job-sources/src/seek/adapter.contract.test.ts`
-- `packages/database/src/job-discovery-repository.ts`
-- `packages/database/src/job-discovery-repository.test.ts`
-- the sixteen fixture/manifest files listed in section R
-- `tests/integration/seek-fixture-pipeline.test.ts`
-
-Expected files to modify:
-
-- `PROJECT_PLAN.md`
-- `ARCHITECTURE.md`
-- `SECURITY.md`
-- `README.md`
-- `docs/JOB_SOURCE_ADAPTERS.md`
-- `docs/JOB_NORMALIZATION.md`
-- `packages/job-sources/src/index.ts`
-- `packages/job-sources/src/index.test.ts`
-- `packages/job-sources/package.json` if explicit workspace dependencies or exports are required
-- `packages/database/src/index.ts`
-- `packages/database/package.json` if explicit workspace dependencies are required
-- `apps/web/lib/data.ts`
-- `apps/web/app/jobs/page.tsx`
-- `apps/web/app/jobs/[id]/page.tsx`
-- `apps/web/app/settings/page.tsx`
-- `tests/e2e/dashboard.spec.ts`
-- `tests/fixture-data.ts` and `tests/integration/fixture-pipeline.test.ts` only if the shared fixture loader needs a source-neutral extension
-
-Conditional file, forbidden until the access review explicitly approves a public method:
-
-- `packages/job-sources/src/seek/public-client.ts`
-
-No database migration, application-runner change, application form/submission file, browser-auth state, live payload, or generated personal document is planned. Every created/modified TypeScript file above is covered by a direct unit/contract/integration test or by the production build/E2E suite. Before editing `apps/web`, the implementation must read the applicable Next.js 16 guidance under `node_modules/next/dist/docs/` as required by `apps/web/AGENTS.md`.
-
-## V. Implementation order
-
-1. Re-read repository instructions/blueprint and confirm the branch still starts from the approved merged baseline.
-2. Complete the dated technical/policy research matrix and obtain human approval for any non-fixture access mode.
-3. Add source-neutral query, cursor, checkpoint, capability-status, and error contracts with Zod tests.
-4. Add the SEEK raw schema, safe hashing, provenance capture, and redaction utilities.
-5. Add deterministic date and requirement extractors with golden tests.
-6. Add the SEEK mapper into the existing normalized `Job` contract, including unknown and malformed cases.
-7. Implement `FIXTURE_ONLY` and `USER_SUPPLIED_CONTENT` clients, then pass the common adapter contract and all fixture replay tests.
-8. Implement pagination, caps, checkpoint validation/resume, retry classification, and security stops using fixture transports.
-9. Add transactional persistence/idempotent upsert using existing tables and prove restart/concurrency behaviour.
-10. Only if separately approved, implement the lowest-risk validated public or assisted source method in `public-client.ts`; otherwise record it as blocked and keep fixture/content modes.
-11. Integrate normalized fixture-derived SEEK records with eligibility and fit and confirm candidate truth invariants.
-12. Add the minimal dashboard provenance/status fields after reading the local Next.js 16 documentation.
-13. Complete unit, contract, fixture, integration, security, rate, duplicate, dashboard, and E2E tests.
-14. Update architecture, adapter, normalization, security, README, and this plan with actual behaviour and limitations.
-15. Run all quality/security audits, push the feature branch, and open an unmerged PR for human review.
-
-## W. Risks and mitigations
-
-| Risk                                | Mitigation                                                                                                      |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| SEEK markup/structured data changes | Version parsers, validate boundaries, use fixture replay, emit `PAGE_CHANGED`, and require review before repair |
-| Policy or robots restrictions       | Evidence-dated access decision, fixture/content fallback, no access when status is unknown or disallowed        |
-| Anti-bot behaviour                  | Detect and stop; no stealth, proxy rotation, challenge solving, or alternate-route evasion                      |
-| Missing structured fields           | Preserve raw content, use null/`UNKNOWN`, fail required-field normalization safely, and surface review          |
-| Relative-date ambiguity             | Fixed discovery instant, narrow grammar, original text retention, and null plus warning for unsupported forms   |
-| Duplicate listings/pages            | Strong source ID/URL/hash keys, page identity, unique DB index, transactional checkpoint, no fuzzy merge        |
-| Removed listings                    | Typed terminal result and audit event; retain existing provenance without inventing current details             |
-| Location parsing                    | Prefer structured components, narrow Australian parser, preserve full text, and leave uncertain parts null      |
-| Salary parsing                      | Narrow deterministic grammar, raw text preservation, nullable structure, and currency/period validation         |
-| False requirement extraction        | Marker/negation precedence, original spans, rule IDs, ambiguity class, and golden/adversarial tests             |
-| Unexpected login walls              | `AUTH_REQUIRED` security stop; no credentials, session export, or automatic mode fallback                       |
-| Rate limiting/server instability    | Low caps, conservative pacing, `Retry-After`, bounded retries, resumable checkpoints, and run termination       |
-| Cursor/source drift                 | Version/query-bound cursors, stale expiry, duplicate-page detection, and explicit mismatch failures             |
-| Raw-content privacy/copyright       | Fictional/redacted committed fixtures; local-only user/live content; hashes/redacted metadata in logs           |
-| Existing-schema limits              | Prove current-table design first; stop and re-plan before any migration                                         |
-
-## X. Rollback plan
-
-- Keep the Phase 2 implementation on `feat/seek-discovery-implementation` and leave its implementation PR unmerged until review and gates pass.
-- The adapter remains dependency-injected and defaults to `FIXTURE_ONLY`; disabling/removing SEEK registration restores the Phase 0/1 offline placeholder without touching candidate data or other adapters.
-- Revert Phase 2 commits normally. Do not rewrite `main` history or reset user changes.
-- No schema migration is planned. If Phase 2 is reverted, namespaced checkpoint settings and SEEK job/source/audit rows can be ignored; any cleanup of a real local database requires an explicit backup and separate user-approved operation.
-- Fixture-driven dashboard data remains the fallback. UI provenance additions are additive and can be reverted independently of eligibility, fit, resume, cover-letter, application-runner, and tracker packages.
-- Because no submission behaviour, candidate schema, or generated-document format changes are planned, rollback cannot trigger an application, alter profile truth, or invalidate existing documents.
-
-## Y. Phase 2 acceptance criteria
-
-Phase 2 must not be marked `COMPLETE` unless:
-
-- the SEEK implementation remains behind `JobSourceAdapter`, and `capabilities()`/mode status report only verified behaviour;
-- raw source provenance, source URL, external ID, discovery/fetch timestamps, parser version, and payload hash are preserved;
-- no candidate fact is invented or supplied to discovery, and no job requirement is silently inferred;
-- `EXPLICIT_REQUIREMENT`, `PREFERRED_REQUIREMENT`, and `AMBIGUOUS_REQUIREMENT` remain distinguishable and traceable to raw spans;
-- CAPTCHA, MFA/auth, bot-protection, access-denied, page-change, and rate-limit stops work without bypass or silent fallback;
-- pagination, caps, checkpoints, crash recovery, and stale handling are deterministic;
-- repeated discovery and concurrent conflicts are idempotent by source/external ID, canonical URL, and payload hash;
-- malformed, removed, missing, and unknown data fail or degrade safely while preserving permitted provenance;
-- fixture replay and the common adapter contract pass without a SEEK network request in CI;
-- eligibility and fit integration remain deterministic and all Phase 0/1 regressions pass;
-- the dashboard exposes only safe provenance/status and retains disabled submission controls;
-- no password, cookie, browser state, credential, live private payload, personal CV, private profile, or local database is tracked;
-- documentation states the validated access modes and limitations without overstating live support;
-- `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, and `npm audit` pass;
-- `PROJECT_PLAN.md` records actual commands/results, unfinished work, blockers, rollback status, and the next task;
-- the feature branch is pushed and an unmerged pull request into `main` exists for human review.
-
-## Z. Human review checkpoint
-
-The blueprint was committed, pushed, and opened as documentation-only PR #2. The owner approved it on 2026-09-05 and authorised a normal merge followed by implementation on the new `feat/seek-discovery-implementation` branch. The later implementation PR must remain unmerged for a separate human review. Network-backed SEEK modes still require the independent access-research approval defined in section D.
-
-## Blueprint checkpoint execution record
-
-The Phase 0/1 merge gate was re-run on 2026-09-05 before merging:
-
-- `npm run format:check`: passed.
-- `npm run lint`: passed with zero warnings.
-- `npm run typecheck`: passed in strict mode.
-- `npm test`: 37 tests passed across 9 files.
-- `npm run test:integration`: 1 integration test passed across the 15-job fixture pipeline.
-- `npm run build`: passed; 23 static pages generated.
-- `npm run test:e2e`: 4 Chromium tests passed.
-- `npm audit`: passed with 0 vulnerabilities.
-- `git diff --check` and `git fsck --no-reflogs --full`: passed.
-- On the Phase 2 branch, `npm run format` normalized the Windows checkout's CRLF-only working-copy mismatch without introducing an application-file diff; the subsequent `npm run format:check` and staged `git diff --check` passed.
-- Git/history audit: no high-confidence committed secrets; no tracked private profile, generated PDF, database, cookie, browser-session, or auth-state artifacts. The one local demonstration PDF was ignored and untracked.
-- GitHub: repository remained private; PR #1 was `MERGEABLE`/`CLEAN`; both `quality` checks passed; no reviews or review blockers existed; `main` had not drifted.
-
-Merge/branch results:
-
-- PR #1 status: `MERGED`.
-- Merge commit/main baseline: `d4f15f862cbc0a976a82241a9a2ef76fda7099c0`.
-- Merge timestamp: `2026-09-05T05:07:44Z` (`2026-09-05 15:07:44 AEST`).
-- Remote `feat/bootstrap-applypilot`: deleted.
-- Phase 2 blueprint branch: `feat/seek-discovery-adapter`, created from the merged baseline and pushed.
-
-Unfinished work is the entire Phase 2 implementation described above. It is deliberately not started on the blueprint branch. Blueprint approval is complete; the access-method research decision remains an independent gate for any network-backed mode.
-
-## Phase 2 implementation execution record
-
-### State and access decision
-
-- Execution date: 2026-09-05 (Australia/Sydney).
-- Implementation branch: `feat/seek-discovery-implementation`, created and pushed from blueprint merge `90a9eafaad32780a81653b3739c19ce95a22d951`.
-- Implementation pull request: #3, `https://github.com/adeel1608/applypilot/pull/3`, opened into `main`, received the owner's explicit review/merge approval, and was merged normally at `2026-09-05T06:42:34Z`. The merge commit is `cd3e13699cef3e41b8e3edd56239435ca647d66b`. Focused implementation commits are `6613f126e94845313dec4d2666f85ec7a9eb8370` (adapter/fixtures), `1998f289cf6077e88a349b6d62ca081813e0419e` (database), `0dbcfa954e55494c9650a0eb8efe99019abc361c` (dashboard), `ad8c7aad0a0b7f1248a0ee5ec05f82f4f278352d` / `10a2e51c53934d378c8f26eb412250480ac14a93` (implementation/CI records), and `6ad9e987d8bc8d4ced6abf7d28fdad36f3003416` (final truthfulness/retry refinement).
-- Current Phase 2 status: `COMPLETE` and closed. Pull request #3 is merged, refreshed local `main` equals `origin/main` at the merge commit, and the implementation branch is deleted locally and remotely.
-- The evidence-dated research in `docs/SEEK_ADAPTER.md` completed the required method review in order. The official partner API remains `CONDITIONAL` and disabled because ApplyPilot has no SEEK approval/credentials and the reviewed documentation did not establish a permitted candidate-facing public discovery scope. SEEK website automation is `NOT_ALLOWED` under the reviewed terms. Robots guidance remains `UNKNOWN` and is not treated as permission.
-- Enabled modes are `FIXTURE_ONLY` and local `USER_SUPPLIED_CONTENT`. `PUBLIC_DISCOVERY`, `PUBLIC_JOB_DETAILS`, `USER_SUPPLIED_URL`, and `ASSISTED_BROWSER` are disabled and fail closed without fallback. No SEEK listing/page/network response was fetched, no `public-client.ts` was created, and live SEEK access is not claimed.
-
-### Actual architecture implemented
-
-- The shared `DiscoveryQuery` was extended source-neutrally with structured Australian location/radius, employment types, posting window, sort order, cursor, and bounded page size while preserving `JobSourceAdapter` compatibility.
-- `packages/job-sources/src/seek/` now owns Zod contracts for mode/status/query/cursor/checkpoint/raw records/provenance/warnings, typed errors, canonical query and payload hashing, dates, requirements, normalization, the injected fixture client, local user-content parsing, and bounded checkpointed orchestration.
-- The registered SEEK adapter defaults to an empty `FIXTURE_ONLY` transport. Its operational capability report exposes only fixture discovery/details or local content details for the configured mode; disabled modes expose no capabilities. No application, form, status, or submission capability was added.
-- User-supplied JSON/raw or schema.org `JobPosting` content is parsed locally only after a validated HTTPS SEEK job URL pattern. URL-only input and recognizable authentication/session material are rejected. Exact supplied content is hashed and retained locally as raw provenance; audit events receive no raw content.
-- Deterministic normalization preserves source ID/URL, raw hash, fixed discovery/fetch timestamps, parser version, source field paths, warning evidence, and captured unknown fields. Required title/company-or-explicit-advertiser/location/country/category/description absence is a typed safe failure.
-- Requirement rules preserve original text, normalized text, source path, rule ID, classification, and negation. Valid Australian work rights stay distinct from unrestricted rights. Narrow date, employment, salary, hours, location, experience, education, licence, vehicle, physical, and training mappings never guess unsupported facts.
-- Fixture discovery supports filtering, date sorting, postcode-3072 radius calculations from explicit fixture distance metadata, query-bound opaque cursors, 10-page/200-record defaults, configurable caps, 24-hour checkpoint expiry, resume, empty results, maximum-page/job partial results, and repeated-page protection.
-- `JobDiscoveryRepository` reuses `jobs`, `job_sources`, `job_source_records`, `settings`, and `audit_events`. A page transaction inserts/updates normalized jobs and raw records, resolves same-hash duplicates, records redacted job transitions, and only then advances the validated checkpoint. Concurrent checkpoint owners fail with `SEEK_CONCURRENT_CHECKPOINT_CONFLICT` rather than creating duplicate jobs.
-- Structured events cover run start/page/job outcomes, rate limits, security stops, partial runs, and completed runs using safe IDs, hashes, counts, durations, timestamps, and stable codes. Errors retain only a cause class, sanitized HTTPS source path, and safe retry time rather than raw causes or query values.
-- The server-rendered fixture dashboard now evaluates 11 unique normalized SEEK jobs alongside the original 15 fixtures. It displays source, source URL, discovered/posted/refreshed dates, provenance, mode/status, counts, failures, duplicates, and the explicit live-mode limitation. Application preparation/submission controls remain disabled.
-
-### Files created or changed
-
-- Created the 10 planned SEEK implementation files and three direct test files under `packages/job-sources/src/seek/`.
-- Created 15 fictional/redacted JSON fixture cases plus `fixtures/seek/manifest.ts` with fixed timestamps, safe `.example.test` URLs, expected normalization/classification/errors, malformed/removed coverage, and duplicate-page data.
-- Created `packages/database/src/job-discovery-repository.ts`, its unit test, and `tests/integration/seek-fixture-pipeline.test.ts`; exported the repository/raw SQLite handle without changing the schema or migration.
-- Updated shared adapter registration/contracts, dashboard data/pages/settings/styles/E2E, `README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `docs/SEEK_ADAPTER.md`, `docs/JOB_SOURCE_ADAPTERS.md`, `docs/JOB_NORMALIZATION.md`, and this living plan.
-
-### Tests and validation completed locally
-
-- `npm run format:check`: passed; all matched files use Prettier formatting.
-- `npm run lint`: passed with zero warnings.
-- `npm run typecheck`: passed in strict mode.
-- `npm test`: 63 tests passed across 13 files. This includes the 15-case fixture replay, raw/query/cursor/checkpoint boundaries, requirement/date semantics, mode gating, pagination/caps/duplicate pages, every typed error contract, rate/security stops, sensitive-input rejection, no-network assertions, unknown fields, database idempotency/update/rollback/concurrency, and Phase 0/1 regressions.
-- `npm run test:integration`: 3 tests passed across 2 files. The SEEK pipeline covers checkpoint resume, 14 active discoveries, 11 inserts, 1 duplicate, 2 typed normalization failures, transactional persistence, completed-run replay, and downstream eligibility/fit evaluation.
-- `npm run build`: passed with Next.js 16.3.4; 34 static pages were generated, including 26 fixture-derived job detail paths.
-- `npm run test:e2e`: 5 Chromium tests passed, including safe SEEK provenance/status, no raw-payload rendering, and disabled application preparation.
-- `npm audit`: passed with 0 vulnerabilities. `npm run audit:production` also passed with 0 vulnerabilities.
-- `git diff --check`: passed. High-confidence workspace secret-pattern scan, tracked sensitive-artifact scan, and tracked-ignored-file audit returned no matches. `git fsck --no-reflogs --full` returned success with one benign dangling blob. GitHub reported `adeel1608/applypilot` as `PRIVATE` with `main` as its default branch.
-- Final CI result before merge: pull request #3 (`feat/seek-discovery-implementation` -> `main`) was mergeable and clean. Both final `quality` checks passed (GitHub Actions runs `33950063807` and `33950064759`); the owner supplied explicit approval in the Phase 2 closeout instruction.
-
-### Errors encountered and fixes
-
-- Windows PowerShell blocked `npm.ps1`; all requested npm/npx commands were rerun successfully through `npm.cmd`/`npx.cmd`.
-- An exploratory `npm test -- --runInBand` invocation failed because Vitest 4 does not support that Jest option; the required repository command `npm test` was rerun and passed.
-- The first full fixture test found that a preferred customer-service experience statement was correctly retained as a non-mandatory experience rather than omitted; the assertion was corrected while keeping “no experience required” negated.
-- The first production build failed because a colon in the normalized SEEK job ID became an invalid Windows static-segment directory name. The deterministic separator was changed to a filesystem-safe hyphen; the subsequent build and E2E suite passed.
-- Final review identified that the required normalized boolean alone could display an absent cover-letter instruction as “not required.” The raw nullable value is now preserved in source metadata and the SEEK UI displays `Unknown`; bounded retries also use jitter while a future `Retry-After` still stops unscheduled retries. All local gates were rerun and passed after this refinement.
-
-### Database, migration, security, and rollback result
-
-- Database result: existing Phase 0/1 tables are sufficient. Transaction, restart/resume, same-hash duplicate, changed-hash update, rollback, and concurrent-owner behaviours are covered by tests.
-- Migration result: `NO`. `packages/database/drizzle/0000_applypilot_foundation.sql` is unchanged.
-- Security result: no CAPTCHA/MFA/access-control/bot/rate bypass, no silent access-mode fallback, no live source call, no candidate data in discovery, no weakened candidate truth or human-confirmation invariant, and no tracked credential/private profile/database/browser state/cookie/generated personal CV.
-- Rollback remains additive and ready: revert the Phase 2 implementation commits normally, restore the SEEK placeholder registration if required, and leave any local namespaced checkpoint/source/audit rows untouched unless the user separately approves a backed-up data cleanup. No schema rollback is needed.
-
-### Limitations, remaining work, and next task
-
-- Live SEEK discovery/details are unavailable. The official API requires a future approved integration and verified scope; website/URL/browser retrieval remains disabled. Fixture radius calculations are intentionally available only from postcode 3072 because the fixtures contain explicit distances from that origin; another origin fails as unsupported rather than being guessed.
-- `USER_SUPPLIED_CONTENT` is a programmatic local adapter entry point, not an upload/paste UI. It handles one validated raw/JSON-LD job record at a time and does not paginate or fetch links.
-- SQLite stores the current source payload per strong source/external ID, not raw version history. Cross-source/fuzzy semantic merging is intentionally deferred.
-- Remaining Phase 2 implementation work: none. The human review/merge checkpoint was satisfied, the normal merge completed, and Phase 2 is closed without enabling live SEEK access.
-- Exact next approved planning checkpoint after merge of the Phase 2 implementation PR: **Phase 2.5 — Real-World Job Intake**, creating a source-neutral local paste/upload pipeline before any Phase 3 Indeed work. Phase 3 is not started.
-
-# Phase 2.5 - Real-World Job Intake Blueprint
-
-- Blueprint status: `APPROVED`
-- Roadmap status at blueprint approval: `IN_PROGRESS` (historical); current status: `COMPLETE`
-- Prepared on: 2026-09-05
-- Amended on: 2026-09-05 after human review identified the candidate-profile, hostname, URL-policy, credential-detection, identity, provenance, and retention gates below.
-- Planning branch: `feat/real-world-job-intake-plan`
-- Planning base: Phase 2 merge commit `cd3e13699cef3e41b8e3edd56239435ca647d66b`
-- Scope: blueprint only; no importer, parser, upload route, profile loader/provider, URL fetcher, source adapter, migration, or application behaviour is implemented by this planning pull request.
-
-Historical implementation-start checkpoint (satisfied by the later closeout record):
-
-- The owner explicitly approved PR #4 and the amended Phase 2.5 blueprint on 2026-09-05 and authorised a normal merge plus implementation.
-- Immediately before merge, PR #4 head `09c872d8939a3a58aca9f2a46b7fc3e6b1e17639` was `MERGEABLE`/`CLEAN`; both final `quality` runs passed; `npm audit` reported 0 vulnerabilities; the repository was private; the diff contained only `PROJECT_PLAN.md`; `data/profile.private.json` remained ignored; and no tracked private/session/database artifact was found apart from the intentionally committed `.env.example` template.
-- PR #4 merged normally into `main` as `11185763b1679c35fecfcb45fbd9172a4a3a6de2` at `2026-09-05T07:44:09Z`. Refreshed local `main` exactly matched `origin/main`; the fully merged planning branch was deleted locally and remotely.
-- Implementation branch `feat/real-world-job-intake-implementation` was created and pushed from that fresh merge commit. Phase 2.5 implementation is now authorised on this branch; its future pull request must remain unmerged for separate human review.
-- No live job-board access, production URL fetch, application action, private candidate content, or Phase 2.6/3 work is authorised.
-
-## Blueprint framing
-
-### Current state
-
-- Pull request #3 (`feat/seek-discovery-implementation` -> `main`) was reviewed and merged normally on 2026-09-05 at `2026-09-05T06:42:34Z` (`2026-09-05 16:42:34 AEST`). The merge commit and refreshed `main` HEAD are `cd3e13699cef3e41b8e3edd56239435ca647d66b`; the implementation branch was deleted locally and remotely.
-- Immediately before merge, PR #3 was `OPEN`, `MERGEABLE`, and `CLEAN`, both GitHub `quality` checks passed, and its head was `2eabcb1475b0adbfb39c37e960be7ad2b0c95eae`. The repository remained private. The implementation diff contained no database migration, candidate-profile change, application-submission change, public SEEK client, live job-board request, credential/session artifact, real candidate data, or unignored private artifact.
-- The merge candidate passed `npm run format:check`, `npm run lint`, `npm run typecheck`, 63 unit tests across 13 files, 3 integration tests across 2 files, a 34-page production build, 5 Playwright tests, and `npm audit` with zero vulnerabilities.
-- Phase 2 provides reliable normalization, provenance, checkpoint, persistence, eligibility, and fit patterns, but real-world intake is still programmatic and single-record for user-supplied SEEK content. There is no `/import` workflow, multi-job splitter, upload boundary, source-neutral parser, preview/confirmation stage, or approved live URL retrieval.
-- `apps/web/lib/data.ts` currently imports the committed fictional `data/profile.example.json` and evaluates every fixture-derived dashboard job with it. That behaviour is acceptable only for explicitly labelled demo/fixture jobs. Reusing it for a real imported vacancy would create a fictional eligibility/fit result and is a release-blocking Phase 2.5 design flaw unless the runtime boundary below is implemented first.
-
-### Objective and success boundary
-
-Build a source-neutral, local-first intake path that lets a user bring job advertisements they are entitled to use into ApplyPilot, review exactly what was detected, and explicitly confirm persistence. The phase succeeds when paste and safe file-upload inputs can produce deterministic job previews and confirmed normalized jobs without unauthorized scraping, invented source/job facts, document generation, form filling, or application submission.
-
-### Assumptions, requirements, and dependencies
-
-- The user controls the supplied text/file and is responsible for having the right to use it. ApplyPilot does not republish imported content.
-- Real inputs are untrusted even when supplied by the local user. Byte limits, content-type checks, inert parsing, Zod validation, deterministic classification, and fail-closed review states are mandatory.
-- Candidate data is not an importer, source-detection, splitter, or parser input. Eligibility and fit run only after a confirmed normalized job is persisted and a separate runtime provider resolves an evaluation-eligible candidate profile. A real imported job may use only a validated `PRIVATE_LOCAL_PROFILE`; it must never fall back to the committed demo profile.
-- Existing Phase 2 SEEK parsing rules should be reused or extracted into shared deterministic helpers when their input preconditions are met. Source-neutral code must not copy and then silently diverge from those rules.
-- Runtime remains local Next.js 16, strict TypeScript, Zod, SQLite/Drizzle, Vitest, and Playwright. Before editing `apps/web`, implementation must read the repository's applicable Next.js 16 documentation and `apps/web/AGENTS.md` if present.
-- A small inert HTML parser such as `parse5` is the expected new runtime dependency. It must be pinned, audited, and used only server-side. No browser DOM, script engine, remote asset loader, OCR, PDF parser, or required paid/AI service is planned.
-
-### Non-goals
-
-- Phase 3 Indeed discovery, a Phase 2.6 ATS adapter, any other live job-board adapter, broad web crawling, search-engine discovery, authenticated retrieval, or browser automation.
-- Fetching a URL merely because the user supplied it; a URL is data, not permission.
-- CAPTCHA/MFA/login/access-control/rate-limit/bot-detection bypass, stealth, proxy rotation, fingerprint spoofing, cookie/session import, or hidden endpoint replay.
-- CV or cover-letter generation, application-question answering, form filling, application preparation, status updates, or submission.
-- Fuzzy/semantic duplicate matching, inferred job facts, probabilistic record boundaries, or AI extraction.
-- PDF/OCR, Word/Office documents, archives, images, executable content, or unknown/binary upload formats.
-
-### Architecture, risks, and rollback summary
-
-`@applypilot/job-importer` will own the source-neutral intake contracts and pure deterministic pipeline. `@applypilot/job-sources` will continue to own source-specific adapter/parsing behaviour. `@applypilot/database` will own import staging and confirmed persistence. `@applypilot/candidate-profile` will own the source-neutral runtime resolution contract, while a server-only web implementation will load and validate the fixed local private-profile path. `apps/web` will provide the local `/import` presentation and server actions only. The preview phase creates only local staging/audit metadata; the confirmation phase is the only path that may create/update normalized jobs. Evaluation is a separate post-persistence step gated by job provenance and the resolved candidate-profile state.
-
-Primary risks are executable/untrusted HTML, denial-of-service through large/deep inputs, false multi-job splits, source misclassification, accidental raw-content exposure, false duplicate merges, forged URLs, SSRF if a future URL fetcher is enabled, and schema evolution against local databases. The controls in sections E, H, J, L, O, Q, and T are acceptance requirements, not optional hardening.
-
-Rollback is additive and local: keep implementation isolated on a future feature branch and leave its PR unmerged; disable the `/import` navigation/route and importer registration to restore the Phase 2 UI; revert code normally; never rewrite `main`; preserve imported user data unless the user separately approves deletion. Database rollback and backup requirements are exact in section O.
-
-### Candidate-profile runtime boundary
-
-Introduce an explicit `CandidateProfileProvider` before any real imported job can reach the eligibility or fit engines. The source-neutral contract belongs to `@applypilot/candidate-profile`; the initial filesystem-backed implementation is server-only and is called by post-confirmation evaluation orchestration, never by the importer:
-
-```ts
-type CandidateProfileRuntimeState =
-  | "DEMO_PROFILE"
-  | "PRIVATE_LOCAL_PROFILE"
-  | "NO_ACTIVE_PROFILE"
-  | "INVALID_PRIVATE_PROFILE";
-
-type JobEvaluationContext = "DEMO_FIXTURE_JOB" | "REAL_IMPORTED_JOB";
-
-interface CandidateProfileProvider {
-  resolve(context: JobEvaluationContext): Promise<CandidateProfileResolution>;
-}
-```
-
-`CandidateProfileResolution` is a discriminated union. Only `PRIVATE_LOCAL_PROFILE` for `REAL_IMPORTED_JOB`, or `DEMO_PROFILE` for an explicitly labelled `DEMO_FIXTURE_JOB`, carries a server-internal validated `CandidateProfile`. Missing and invalid states carry only stable, non-sensitive reason codes. The provider must enforce these decisions rather than leaving them to callers:
-
-| Evaluation context | Local private file state | Provider result           | Eligibility/fit behaviour                                                                  |
-| ------------------ | ------------------------ | ------------------------- | ------------------------------------------------------------------------------------------ |
-| Real imported job  | Present and valid        | `PRIVATE_LOCAL_PROFILE`   | Evaluate using that validated private profile and its local profile-version provenance     |
-| Real imported job  | Missing                  | `NO_ACTIVE_PROFILE`       | Persist the job; do not invoke either engine; expose `NOT_EVALUATED`/unavailable           |
-| Real imported job  | Present but invalid      | `INVALID_PRIVATE_PROFILE` | Fail closed; persist the job; do not invoke either engine; expose unavailable with safe UI |
-| Demo/fixture job   | Explicit demo flow       | `DEMO_PROFILE`            | Existing fictional evaluation is allowed only with a visible demo/fixture label            |
-
-The committed example is never a fallback for `REAL_IMPORTED_JOB`. Real/demo context is derived from trusted persisted acquisition/provenance (`FIXTURE` versus confirmed user-supplied import), never from the detected vendor source: a fixture whose source is SEEK remains demo, while a pasted SEEK advert remains real. Real and demo records must carry explicit provenance, and an evaluation service must reject a context/profile mismatch even if a caller attempts to pass the example profile directly. For an unevaluated real job, the existing nullable `jobs.eligibility_status` and `jobs.fit_score` fields remain `null`, reason arrays remain empty, and no `eligibility_results` or `fit_scores` row is created. A typed view state such as `NOT_EVALUATED` is derived without extending `EligibilityStatusSchema` or fabricating a score. The jobs/dashboard UI displays: **Private candidate profile required for eligibility and fit analysis.** An invalid private file may use the more specific safe label **Private candidate profile is invalid; eligibility and fit were not evaluated.**
-
-The minimal private loader reads only `data/profile.private.json` from a fixed application-controlled path on the local server. It uses `CandidateProfileSchema.safeParse`, distinguishes `ENOENT`/missing from invalid JSON/schema content, rejects non-file/path surprises, applies a bounded read, and returns only the discriminated resolution above. It never logs the file body, full validation input, Zod values, candidate fields, or filesystem path. Full candidate data never crosses a server-component/action boundary or enters a client-component import graph/bundle; the UI receives only an allowlisted status DTO such as `{ state, label, evaluationAvailable }`. Referee contact details and all other private fields remain server-side, never enter localStorage/sessionStorage, and are never sent to source detection, splitting, parsing, import records, external services, CI, or cloud systems.
-
-When a valid private profile is used for evaluation, the evaluation service must use the existing local-only `candidate_profiles` and append-only `candidate_profile_versions` tables to store the validated snapshot and content hash before writing `eligibility_results` and `fit_scores`, so every persisted evaluation retains profile-version provenance; this needs no new profile migration. The ignored SQLite database remains local private data. Phase 2.5 adds no profile editor and does not populate any real name, phone, email, address, visa/work-right detail, referee, CV, passport, or identity value in committed source, fixtures, tests, screenshots, or CI. `data/profile.example.json` remains committed, fictional, and demo-only; `data/profile.private.json` remains Git-ignored and is populated later by an explicit local setup step outside Git.
-
-## A. Product goal and planned inputs
-
-All intake modes converge on one `RawImportedJobDocument -> ImportedJobDraft[] -> preview -> confirmed normalization/persistence` pipeline. `detectedSource` describes the record's evidence-based origin; `acquisitionMethod` separately describes how bytes entered ApplyPilot. Neither field may be derived from the other. Planned inputs are:
-
-1. A pasted single job advertisement in plain text, Markdown-like text, JSON, JSON-LD, or HTML.
-2. Pasted search results containing multiple job cards or repeated structured job records.
-3. Pasted HTML copied or saved by the user, parsed inertly and never rendered as supplied markup.
-4. Local upload of a compatible `.txt`, `.md`, `.html`, `.htm`, or `.json` file.
-5. A job URL only when the URL policy registry says automated retrieval is explicitly supported by an approved source-specific plan; otherwise the UI requires user-supplied content.
-6. Future source adapters, email ingestion, browser extensions, CLI commands, and mobile share flows that construct the same validated raw-document contract rather than inventing parallel pipelines.
-
-The immediate Phase 2.5 implementation target is real user-supplied paste and upload. The URL input and registry are planned as a safe decision surface. The production Phase 2.5 registry contains exactly zero `FETCH_ALLOWED` entries and no production network content provider. A future reviewed phase may enable a narrowly allowlisted `FETCH_ALLOWED` entry without changing the downstream pipeline.
-
-## B. `/import` user experience
-
-Add a local `/import` route with four explicit entry choices: **Paste one job**, **Paste multiple/search results**, **Upload a file**, and **Job URL**. Paste modes accept a source hint of `Auto-detect` or one of the supported source labels. Upload shows accepted formats and limits before file selection. URL mode evaluates policy before any retrieval and, for the initial registry, explains how to paste or upload content instead.
-
-Submitting content performs validation, inert extraction, deterministic source detection, splitting, and draft parsing, then displays a preview containing:
-
-- detected job count and overall split result;
-- per-record title, company, location, source guess, source confidence, stable warnings, and duplicate status;
-- whether a source URL/external ID was explicitly found;
-- missing required fields and material ambiguities;
-- a plain-text excerpt only, escaped by React, never supplied HTML;
-- `Import`, `Edit`, and `Skip` actions per record plus a bulk selection control.
-
-The user must explicitly confirm selected records. Confirmation revalidates the staged data and override set, normalizes each record, applies strong duplicate rules, and persists it transactionally. Only after persistence does the evaluation service resolve `CandidateProfileProvider` for `REAL_IMPORTED_JOB`: a valid `PRIVATE_LOCAL_PROFILE` runs eligibility and fit, while `NO_ACTIVE_PROFILE`, `INVALID_PRIVATE_PROFILE`, or any attempted demo-profile fallback leaves both evaluations unavailable. In every case the imported job remains visible and usable in jobs/dashboard views. Confirmation does not shortlist the job, generate documents, prepare an application, change application status beyond the existing initial `NEW` state, or submit anything.
-
-The preview must remain usable by keyboard, associate warnings with their fields, preserve focus after edits, identify destructive/irreversible outcomes before confirmation, and avoid color-only status communication.
-
-## C. Multi-job pasted text and copied search results
-
-Multi-job mode accepts repeated text blocks, JSON arrays/graphs, or HTML job cards. It creates an ordered candidate-record list and never directly imports the entire page as one job when strong repeated structure is present. The preview exposes boundaries as numbered records so the user can inspect each title/company/location and edit, combine, split, or skip uncertain records before confirmation.
-
-Copied search-result cards often omit full descriptions. Such records may still preview, but a missing field required by `JobSchema` remains missing. The UI must request a manual edit or fuller pasted detail; it must not invent a description, company, location, URL, external ID, salary, requirement, or employment type. A structurally sound card without sufficient canonical fields is `REVIEW_REQUIRED`, not silently importable.
-
-Mixed-source input is permitted. Source detection runs per candidate record; the batch-level `detectedSource` becomes `MIXED` only when records have more than one confident source. A batch hint is never applied blindly to every record.
-
-## D. Deterministic source detection
-
-Define `DetectedJobSource` as `SEEK | INDEED | EMPLOYMENT_HERO | GREENHOUSE | LEVER | WORKDAY | GENERIC_COMPANY_SITE | UNKNOWN`, with batch-only `MIXED`. This field means origin/detected source only. Define a separate `AcquisitionMethod` such as `USER_SUPPLIED_CONTENT | FILE_UPLOAD | FIXTURE | APPROVED_SOURCE_FETCH | UNKNOWN`; Phase 2.5 production imports use only the first two, and `UNKNOWN` is reserved for legacy provenance that cannot be established safely. Every source result includes `confidence: HIGH | MEDIUM | LOW`, ordered `ruleIds`, safe evidence paths/tokens, and conflicts. Acquisition method is recorded independently and is never accepted as source evidence: a pasted SEEK advert is `detectedSource: SEEK` plus `acquisitionMethod: USER_SUPPLIED_CONTENT`, while uploaded Greenhouse content is `detectedSource: GREENHOUSE` plus `acquisitionMethod: FILE_UPLOAD`. If origin evidence is insufficient, `UNKNOWN` remains truthful regardless of acquisition method or source hint.
-
-Detection order is deterministic:
-
-1. Explicit structured source values in a validated payload, when consistent with a recognized URL/payload contract.
-2. Exact allowlisted host/path shapes and stable identifiers: reviewed exact SEEK hosts plus `/job/<id>`; reviewed exact Indeed country hosts plus job/view-job shapes and explicit job keys; reviewed exact Employment Hero/Swag vendor hosts; exact Greenhouse hosts `boards.greenhouse.io`, `job-boards.greenhouse.io`, and `boards-api.greenhouse.io`; exact Lever hosts `jobs.lever.co`, `api.lever.co`, and `api.eu.lever.co` plus reviewed paths; and Workday hosts validated by `host === "myworkdayjobs.com" || host.endsWith(".myworkdayjobs.com")` plus reviewed job paths.
-3. Vendor-specific structured JSON/JSON-LD keys or inert HTML markers that have fictional golden fixtures and at least two independent signals.
-4. Generic schema.org `JobPosting` plus an HTTPS employer/careers URL becomes `GENERIC_COMPANY_SITE` only when no vendor rule matches.
-5. Everything else is `UNKNOWN`.
-
-`HIGH` requires corroborated structured identity plus a recognized URL/payload shape. `MEDIUM` requires one strong vendor-owned shape or two independent structured markers. Text logos, CSS class names, and a user source hint alone are `LOW` and force review. A conflicting hint adds `SOURCE_HINT_CONFLICT`; it never overrides observed evidence. Detection performs no DNS lookup, HTTP request, authentication, or browser access.
-
-Hostname input is parsed and normalized with the standard URL implementation, including lowercased ASCII/punycode hostname and removal of one terminal root dot before matching. Vendor recognition must use either exact equality or an explicit dot-boundary suffix check; no `includes`, wildcard text such as `indeed.*`, suffix without a leading dot, substring, logo, or registrable-domain guess is allowed. Providers with country-specific domains use a reviewed enumerated host allowlist. Lookalikes such as `indeed.example-attacker.test`, `boards.greenhouse.io.attacker.test`, `lever.co.attacker.test`, prefix/suffix concatenations, userinfo tricks, Unicode confusables, and trailing-dot/port variants must never classify as trusted vendor infrastructure unless normalization yields an exact reviewed host.
-
-Rules are versioned and return evidence so later changes can be fixture-reviewed. One shared safe-host matcher is used by source detection and URL policy so the two cannot drift, but source detection classifies provenance only; it never authorizes retrieval. That separate decision belongs only to section L.
-
-## E. Untrusted-content validation and sanitization
-
-Validate at both the web/server-action boundary and package boundary with Zod. Initial hard limits are:
-
-- maximum input/upload body: 1 MiB of raw UTF-8 bytes;
-- maximum URL length: 2,048 characters;
-- maximum 100 detected job candidates per batch;
-- maximum 128 KiB extracted text per candidate after normalization;
-- maximum 25,000 text lines, 256 JSON nesting levels, and 256 HTML tree depth; exceeding a limit fails before preview;
-- filename maximum 255 characters after basename extraction; paths, control characters, and NUL bytes are rejected;
-- parsing time and memory must be bounded and exercised with adversarial fixtures.
-
-Allow only UTF-8 `text/plain`, `text/markdown`, `text/html`, and `application/json`, with conservative aliases that match an allowed extension and successful content sniff. Hash original bytes before decoding. Reject invalid UTF-8 rather than silently replacing data. Normalize line endings and Unicode only in a derived parser view; raw bytes/text and the original hash remain unchanged locally.
-
-HTML is parsed server-side as an inert tree. Extract text and validated `application/ld+json` data only. Discard `script`, `style`, `noscript`, `template`, `iframe`, `frame`, `object`, `embed`, `applet`, `form`, `input`, `button`, `textarea`, `select`, `option`, `link`, `meta`, `base`, media, SVG/MathML, comments, processing instructions, inline event handlers, `style`, `srcdoc`, and active/remote resource attributes. Do not execute JavaScript, resolve CSS, submit forms, load fonts/images/media, follow links, or preserve executable DOM. Never use `dangerouslySetInnerHTML`; React must render extracted strings as text.
-
-JSON is parsed as data only. Prototype-polluting keys (`__proto__`, `prototype`, `constructor`) are rejected or removed by an explicitly tested recursive sanitizer, and all objects are copied into plain safe records before schema parsing. Parser failures return stable codes and short safe messages without echoing the body.
-
-Credential/session detection is deliberately narrow and structure-aware. Reject before retention only high-confidence material such as an `Authorization: Bearer <token>` header with a token-shaped value, syntactically valid `Cookie:`/`Set-Cookie:` header blocks, recognized browser local/session-storage or session-export formats containing token/cookie material, PEM private-key blocks, or JSON objects whose credential/session keys contain token-shaped values. Do not reject ordinary recruiter email addresses, public URLs, vacancy/reference IDs, prose mentioning API access, tokens, authentication, password policies, cookies, or security responsibilities, or JSON-LD job fields merely because their names contain words such as `id` or `url`. Rejection records only the input hash, length, and stable detector code; it never retains or echoes the matched value. Positive credential fixtures and negative ordinary-job-ad fixtures are mandatory.
-
-## F. `RawImportedJobDocument`
-
-Define the source-neutral boundary as:
-
-```ts
-interface RawImportedJobDocument {
-  importId: string;
-  inputType: "PASTED_SINGLE" | "PASTED_MULTI" | "PASTED_HTML" | "FILE_UPLOAD" | "URL";
-  acquisitionMethod: "USER_SUPPLIED_CONTENT" | "FILE_UPLOAD";
-  sourceHint: DetectedJobSource | null;
-  detectedSource: DetectedJobSource | "MIXED";
-  originalFilename: string | null;
-  sourceUrl: string | null;
-  contentHash: string;
-  createdAt: string;
-  parserVersion: string;
-  contentLength: number;
-  detectedJobs: number;
-  warnings: ImportWarning[];
-  content: string; // LOCAL_PRIVATE; excluded from logs, audit metadata, and client DTOs
-}
-```
-
-`importId` is a random local UUID. `contentHash` is SHA-256 over the exact accepted bytes. `createdAt` is an injected ISO 8601 clock value. `contentLength` is the pre-decode byte length. `acquisitionMethod` is derived only from the trusted intake route/file boundary, while `detectedSource` is derived only from content/URL evidence. The web preview receives only selected escaped excerpts and typed fields, never the complete `content` field. Raw content remains in the ignored local SQLite database, is never uploaded to CI/cloud/analytics, and never appears in console, error, request-body, or audit logs.
-
-In production Phase 2.5, a URL-policy check that returns anything other than a future approved fetch decision does not create a raw document and does not persist a URL-only pseudo-job. The `URL` input discriminator is reserved for the downstream contract after a later approved provider supplies validated bytes; it cannot be used to treat the URL string itself as job content.
-
-## G. One source-neutral parser contract and expected files
-
-Define one parser contract:
-
-```ts
-interface JobImportParser {
-  parseDocument(document: RawImportedJobDocument): ImportParseResult;
-  parseRecord(record: SplitImportedJobRecord, context: ImportContext): ImportedJobDraft;
-}
-```
-
-`ImportedJobDraft` carries only explicit extracted values for external ID, source URL, title, company, location, category, description, responsibilities, employment/salary/hours/schedule text, requirements, dates, and cover-letter instruction. Every field has `originalValue`, evidence path/range, extraction rule ID, and confidence. Absent facts are `null`/empty plus warnings. Parser output is validated before preview and again before normalization.
-
-SEEK input should reuse `createSeekRawJobRecord`, `parseUserSuppliedSeekContent`, requirement/date rules, and `normalizeSeekJob` where their validated preconditions are satisfied. Implementation may extract generally useful pure helpers into source-neutral modules with regression tests; it must not weaken the current SEEK URL gate or duplicate rules into a second untracked implementation. Other detected sources initially use generic schema.org/visible-text parsing and preserve the detected source as provenance; source-specific enrichments remain later adapter work.
-
-Expected future implementation files are:
-
-- Create `packages/job-importer/package.json`, `tsconfig.json`, and `src/{index,types,schemas,limits,sanitize,source-detector,multi-job-splitter,single-job-parser,url-policy,identity,import-service}.ts` with colocated unit tests.
-- Create `packages/candidate-profile/src/runtime.ts` for the provider/result/context contract and its pure mismatch-policy tests; export it without adding filesystem access to the package root.
-- Create `apps/web/lib/candidate-profile-provider.ts` as the `server-only` fixed-path filesystem implementation and add focused missing/invalid/valid/redaction/client-serialization tests. Use the existing candidate-profile tables through a focused local repository only if profile-version result persistence requires it; no profile schema migration or editor is planned.
-- Create `packages/database/src/job-import-repository.ts` and its migration/integration tests.
-- Conditionally create `packages/database/drizzle/0001_real_world_job_intake.sql` only after this blueprint and its migration recommendation are human-approved.
-- Create `apps/web/app/import/page.tsx`, `apps/web/app/import/actions.ts`, and focused `apps/web/components/job-import/*` components; modify navigation, dashboard/jobs data access, and styles minimally.
-- Create `fixtures/imports/manifest.ts` and the fictional files in section S.
-- Create `tests/integration/real-world-job-intake.test.ts`, `tests/e2e/import.spec.ts`, and `docs/REAL_WORLD_JOB_INTAKE.md`.
-- Modify `packages/job-model/src/index.ts`, `packages/job-sources` exports/helpers, `packages/database/src/{schema,index}.ts`, `apps/web/lib/data.ts`, `/profile` or `/settings` for the safe runtime-state indicator, root/workspace TypeScript configuration as required, `README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `docs/JOB_SOURCE_ADAPTERS.md`, `docs/JOB_NORMALIZATION.md`, and this plan only to reflect verified implementation.
-- Do not create an HTTP content provider, network client, crawler, browser client, application form, document generator, or submission file in Phase 2.5. A future approved `FETCH_ALLOWED` source may add a narrowly scoped content provider.
-
-## H. Deterministic multi-job splitter
-
-`splitImportedJobs` returns ordered records plus one of `CONFIDENT`, `REVIEW_REQUIRED`, or `FAILED`:
-
-- `CONFIDENT`: boundaries come from a JSON array/`@graph` of independently valid `JobPosting` objects, repeated inert HTML job-card structures with explicit per-card title/link/company evidence, or explicit user separators where every segment independently meets the minimum draft shape.
-- `REVIEW_REQUIRED`: there are plausible repeated blocks, inconsistent structural markers, overlapping ranges, mixed full ads/cards, or one/more records missing required preview fields. Candidate boundaries are shown and nothing is persisted until the user confirms/edits them.
-- `FAILED`: no safe record boundary or viable single-record interpretation exists, the input is empty/disallowed/oversized, or all candidates fail minimum validation.
-
-The splitter uses this order: validated JSON/JSON-LD nodes; repeated HTML container/card structure; explicit delimiter/numbered-record grammar; repeated labelled field grammar; conservative single-record fallback. Blank lines, headings, bullet lists, repeated words such as “About us”, or title-looking sentences inside a description are never sufficient boundaries by themselves. A lower-confidence rule cannot override a higher-confidence structure.
-
-Every segment retains its ordinal, exact original byte/character range where possible, raw-fragment hash, boundary rule IDs, confidence, warnings, and extraction evidence. The parser never manufactures a delimiter, merges non-adjacent spans, or silently drops leftover text; unassigned content becomes a preview warning.
-
-## I. Preview, selection, and confirmation
-
-Each preview record shows title, company, location, detected source and confidence, external ID/URL presence, duplicate decision, split confidence, missing fields, warnings, and an escaped excerpt. Available actions are:
-
-- **Import**: select a reviewable record for the confirmation transaction;
-- **Edit**: change extracted fields or approved boundaries while preserving the immutable originals;
-- **Skip**: exclude the record and record a safe local reason/code;
-- **Bulk import selected** / **Bulk skip selected**: act only on explicitly checked records; no default “select all” when any item is `REVIEW_REQUIRED`.
-
-`CONFIDENT` records may be preselected, but the batch confirmation button remains explicit. `REVIEW_REQUIRED` records are never preselected and require an acknowledged warning after any necessary edit. `FAILED` records cannot import. The confirmation screen states counts for create/update/duplicate/skip/fail before commit. There is no CV, cover letter, shortlist, prepare, apply, or submit action on `/import`.
-
-Preview tokens are random, short-lived, local, and bound to `importId + contentHash + parserVersion + overrideHash`. Confirmation rejects stale/mismatched/replayed tokens and revalidates the stored raw document and selected records server-side.
-
-## J. Strong duplication and local identity
-
-Duplicate evaluation is deterministic and ordered:
-
-1. Exact `(detected source, validated externalId)` when both exist.
-2. Exact canonical source URL. Canonicalization requires HTTPS, lowercases only scheme/host, removes fragments/default ports, normalizes dot segments, preserves case-sensitive paths, and removes only an explicit allowlist of tracking parameters such as `utm_*`; unknown/identity query parameters are retained and sorted.
-3. Exact segment content hash for repeated identical supplied records.
-4. When no external ID or canonical URL exists, a versioned local fingerprint: `sha256("job-import-fingerprint-v1\n" + detectedSource + "\n" + normalizedTitle + "\n" + normalizedCompany + "\n" + normalizedLocation + "\n" + normalizedDescriptionHash)`. Normalization is limited to Unicode NFC, trim, whitespace folding, and locale-stable lowercase; no synonym, stemming, geocoding, or semantic similarity is used.
-
-The local fingerprint is used automatically only when title, company, location, and description are all explicit. Missing fields yield `REVIEW_REQUIRED`, not a partial fingerprint. The persisted record separately identifies whether identity came from `EXTERNAL_ID`, `CANONICAL_URL`, `CONTENT_HASH`, or `LOCAL_FINGERPRINT`; a derived fingerprint is never presented as a vendor external ID.
-
-Same identity plus same content hash is `DUPLICATE_UNCHANGED`. Same external ID/URL plus changed content hash is `UPDATE_REVIEW_REQUIRED` and must be visibly confirmed. Conflicting strong signals are `IDENTITY_CONFLICT` and cannot auto-merge. Cross-source and fuzzy matching remain Phase 6 review work.
-
-## K. Upload policy
-
-Allow only `.txt`, `.md`, `.html`, `.htm`, and compatible `.json` files. Extension, declared MIME, sniffed content, UTF-8 validity, and parser result must agree; a mismatch is rejected. The 1 MiB raw-byte limit applies before buffering/parsing, and the 100-record/128-KiB-per-record limits apply after splitting.
-
-Explicitly reject executables, scripts, installers, archives/compressed files, images, audio/video, fonts, PDFs, RTF, Microsoft Office/OpenDocument packages, email containers, SQLite/databases, unknown MIME, multipart files, encrypted/password-protected files, and binary data. Renaming a disallowed file to an allowed extension must still fail content sniffing. There is no PDF parsing or OCR in Phase 2.5.
-
-Uploaded content is read into local server memory within the bound, hashed, validated, and stored in the ignored local database. It is not written to a web-public directory, temp path with a user filename, Git-tracked path, CI artifact, or cloud service. Original filenames are basenames for display/provenance only and are never used as filesystem paths.
-
-## L. URL policy registry
-
-Define a versioned registry whose only decisions are:
-
-- `FETCH_ALLOWED`: an approved source-specific HTTPS host/path contract may be fetched by a separately reviewed bounded content provider.
-- `USER_CONTENT_REQUIRED`: ApplyPilot must not fetch; UI instructs the user to copy/paste or upload content they are entitled to use.
-- `UNSUPPORTED`: invalid protocol/host/path/content model or explicitly disallowed category; no fetch and no workaround.
-- `REVIEW_REQUIRED`: no current evidence-based policy decision; no fetch until a plan and human review change the registry.
-
-The production Phase 2.5 registry is exhaustive and contains **zero `FETCH_ALLOWED` entries**:
-
-| Detected source / URL class                                               | Production decision     |
-| ------------------------------------------------------------------------- | ----------------------- |
-| SEEK                                                                      | `USER_CONTENT_REQUIRED` |
-| Indeed                                                                    | `REVIEW_REQUIRED`       |
-| Greenhouse                                                                | `REVIEW_REQUIRED`       |
-| Lever                                                                     | `REVIEW_REQUIRED`       |
-| Employment Hero                                                           | `REVIEW_REQUIRED`       |
-| Workday                                                                   | `REVIEW_REQUIRED`       |
-| Generic company site                                                      | `REVIEW_REQUIRED`       |
-| Unknown                                                                   | `REVIEW_REQUIRED`       |
-| Invalid, non-HTTPS, credential-bearing, IP-literal, local/private network | `UNSUPPORTED`           |
-
-The registry uses the exact/dot-boundary host matcher from section D; a detected vendor label cannot authorize a URL whose normalized host/path fails its reviewed contract. Phase 2.5 therefore performs no production live URL fetch. The URL UI explains the decision and offers paste/upload; it must not silently fall back to a browser, redirector, alternate endpoint, DNS lookup, or another adapter.
-
-A test-only fictional `FETCH_ALLOWED` provider may exist solely to exercise the future provider interface. It must be isolated from the production registry, accept only an exact reserved host such as `fetch-fixture.example.test`, require an injected in-memory transport, assert that global/network `fetch` and DNS are never called, and reject redirects outside its fictional contract. Its existence must not change the production `FETCH_ALLOWED` count from zero or support a claim of live retrieval.
-
-Any future production `FETCH_ALLOWED` entry requires an evidence-dated source plan, a reviewed exact/dot-boundary hostname and path contract, and human approval in a later phase. Its fetcher must use an exact host/path allowlist, HTTPS only, no userinfo, no credentials/cookies/referrer, an honest fixed user agent, public-IP DNS resolution checked before connection and after every redirect, a maximum three redirects, five-second timeout, 1 MiB streamed response cap, permitted response MIME, conservative source rate limits/`Retry-After`, no JavaScript, and safe terminal errors. DNS rebinding, redirect-to-private-network, authentication, CAPTCHA, bot/access controls, and rate limits fail closed and emit redacted events.
-
-## M. Manual corrections and provenance
-
-Edits occur only in preview. Store immutable `originalExtractedFields`, a separate `editedFields` patch, `editedAt`, `editedBy: LOCAL_USER`, optional reason, acknowledged warning codes, and an `overrideHash`. The effective draft is a deterministic overlay; neither raw document nor original extraction is mutated.
-
-The UI shows original and edited values side-by-side for changed fields and identifies user-supplied corrections in job provenance. Clearing a field produces explicit `null`, not fallback to the original. Edits are revalidated, sanitized as text, and size-limited. Audit metadata records record ID, changed field names, before/after hashes, timestamp, and reason code—not raw field values, descriptions, or the full patch.
-
-Changing a detected source, external ID, URL, title, company, location, or record boundary recalculates identity and duplicate status and requires a fresh confirmation token. The normalized job retains parser version, raw hash, source-detection evidence, extraction evidence, and override provenance.
-
-## N. End-to-end pipeline and exact implementation order
-
-The only approved canonical flow is:
-
-`USER CONTENT -> validate -> inert sanitize -> source detection -> split -> parse -> preview -> edit/review -> explicit confirmation -> normalize -> deduplicate -> persist -> resolve active candidate profile -> if PRIVATE_LOCAL_PROFILE: eligibility -> fit; otherwise: evaluation unavailable -> dashboard`
-
-In expanded implementation terms:
-
-`input -> byte/MIME/credential validation -> raw hash/local staging -> inert sanitize/extract -> evidence-based origin detection + independent acquisition-method assignment -> deterministic split -> per-record parse -> Zod draft validation -> preview + manual edits -> explicit confirmation -> source-specific/generic normalization -> JobSchema validation -> identity/dedup decision -> transactional job/source/import persistence -> CandidateProfileProvider.resolve(REAL_IMPORTED_JOB) -> validated private-profile version + eligibility + fit, or typed NOT_EVALUATED -> dashboard/jobs visibility`
-
-No downstream stage receives executable markup. No persistence of canonical jobs occurs before confirmation. If normalization, identity validation, source-record write, import-record write, or its required audit write fails, the selected persistence transaction rolls back and the preview remains available with a safe error. Candidate-profile resolution occurs only after that transaction. Missing/invalid private profile or an evaluation-engine failure does not roll back or hide a valid imported job; it leaves the job explicitly `NOT_EVALUATED` with nullable eligibility/fit fields and a safe reason. An evaluation-result transaction cannot create only one of eligibility/fit or lose its profile-version link. Batch completion may report per-record results, but canonical job/provenance persistence itself cannot be half-complete.
-
-Exact future implementation steps:
-
-1. Start only after this planning PR is human-approved and merged; create `feat/real-world-job-intake-implementation` from fresh `main`, re-read all instructions/blueprint, and record implementation start in this plan before code.
-2. Read applicable Next.js 16 local documentation, inspect package/database boundaries, and pin/audit the minimum inert-parser dependency.
-3. Add source-neutral types, independent detected-origin/acquisition-method fields, limits, schemas, safe hashing, structure-aware credential detection, sanitization, and no-body logging tests.
-4. Implement and test safe exact/dot-boundary hostname matching, source detection, and the URL policy registry with all production entries fail-closed, a production `FETCH_ALLOWED` count of zero, and no network client.
-5. Implement the deterministic splitter and source-neutral single-record parser; reuse/refactor SEEK pure rules with regression coverage.
-6. Add identity/canonicalization/duplicate decisions and manual-override provenance.
-7. Apply the human-approved `0001` migration with upgrade/foreign-key/backup-restore tests, then add the import repository and transactional confirmation service.
-8. Implement the server-only `CandidateProfileProvider`, fixed-path private-profile loader, safe status DTO, and explicit demo-versus-real evaluation context. Integrate eligibility and fit only after confirmed persistence and only for `PRIVATE_LOCAL_PROFILE`; preserve the imported job as `NOT_EVALUATED` when no valid private profile is available.
-9. Build the accessible `/import` paste/upload/URL-policy preview and edit/skip/confirm UX plus a non-sensitive profile-state indicator under `/profile` or `/settings`; do not add a profile editor, document, or application action.
-10. Add fictional fixtures, unit/property/adversarial/profile-boundary tests, integration tests, E2E tests, regressions, explicit assertions that blocked URLs never call `fetch`, and proof that real imports never reach eligibility/fit with the demo profile.
-11. Update actual architecture/security/normalization/adapter/import docs and this plan with verified behaviour, limitations, commands, results, rollback, and unfinished work.
-12. Run all quality gates and audits, push the implementation branch, open an unmerged PR into `main`, wait for CI, and stop for human review. Do not begin Phase 3.
-
-## O. Database review, recommendation, migration, and rollback
-
-Database recommendation: **YES — add reviewed staging tables and make imported source identity truthful; no migration is created or run by this blueprint.**
-
-The existing tables are not sufficient by themselves. `job_source_records` requires a normalized `job_id`, non-null vendor `external_id`, non-null `source_url`, and fetched timestamp, so it cannot honestly represent a pre-confirmation batch, multiple candidate records, failed/review/skipped records, manual overrides, or pasted jobs without a URL/vendor ID. Generating fake external IDs/URLs would violate the truth-store principle, and putting staging JSON into `settings` would make lifecycle/query/retention unreliable.
-
-Proposed `0001_real_world_job_intake.sql` schema, subject to blueprint approval:
-
-```text
-import_batches
-  id TEXT PRIMARY KEY
-  input_type TEXT NOT NULL CHECK in the RawImportedJobDocument input types
-  acquisition_method TEXT NOT NULL CHECK in USER_SUPPLIED_CONTENT/FILE_UPLOAD
-  source_hint TEXT NULL
-  detected_source TEXT NOT NULL  # origin only; never derived from acquisition_method
-  original_filename TEXT NULL
-  source_url TEXT NULL
-  content_hash TEXT NOT NULL
-  parser_version TEXT NOT NULL
-  content_length INTEGER NOT NULL CHECK 0 <= value <= 1048576
-  detected_jobs INTEGER NOT NULL DEFAULT 0 CHECK 0 <= value <= 100
-  warnings_json TEXT NOT NULL DEFAULT '[]'
-  raw_content_text TEXT NOT NULL
-  status TEXT NOT NULL CHECK in RECEIVED/PREVIEW_READY/CONFIRMED/COMPLETED/PARTIAL/FAILED
-  created_at TEXT NOT NULL
-  confirmed_at TEXT NULL
-  completed_at TEXT NULL
-
-import_records
-  id TEXT PRIMARY KEY
-  batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE CASCADE
-  ordinal INTEGER NOT NULL
-  split_status TEXT NOT NULL CHECK in CONFIDENT/REVIEW_REQUIRED/FAILED
-  record_status TEXT NOT NULL CHECK in PREVIEW_READY/REVIEW_REQUIRED/SELECTED/SKIPPED/IMPORTED/UPDATED/DUPLICATE/FAILED
-  detected_source TEXT NOT NULL  # origin only
-  acquisition_method TEXT NOT NULL CHECK in USER_SUPPLIED_CONTENT/FILE_UPLOAD
-  source_confidence TEXT NOT NULL CHECK in HIGH/MEDIUM/LOW
-  external_id TEXT NULL
-  source_url TEXT NULL
-  segment_content_hash TEXT NOT NULL
-  identity_kind TEXT NULL CHECK in EXTERNAL_ID/CANONICAL_URL/CONTENT_HASH/LOCAL_FINGERPRINT
-  identity_value TEXT NULL
-  boundary_json TEXT NOT NULL
-  original_fields_json TEXT NOT NULL
-  edited_fields_json TEXT NULL
-  override_metadata_json TEXT NULL
-  warnings_json TEXT NOT NULL DEFAULT '[]'
-  normalized_job_id TEXT NULL REFERENCES jobs(id)
-  created_at TEXT NOT NULL
-  updated_at TEXT NOT NULL
-  imported_at TEXT NULL
-  UNIQUE(batch_id, ordinal)
-```
-
-Add indexes on `import_batches(content_hash, created_at)`, `import_batches(status, created_at)`, `import_records(batch_id, record_status)`, `import_records(identity_kind, identity_value)`, and `import_records(normalized_job_id)`. JSON columns are Zod-validated on every read/write. `raw_content_text` and the database are `LOCAL_PRIVATE` and ignored.
-
-Rebuild `job_source_records` in the migration so `external_id`, `source_url`, and `fetched_at` are nullable; add `identity_kind TEXT NOT NULL`, `identity_value TEXT NOT NULL`, and `acquisition_method TEXT NOT NULL`; retain `payload_hash`; and replace the broad required-ID assumption with a unique `(source_id, identity_kind, identity_value)` index plus a partial unique `(source_id, external_id)` index where external ID is non-null. `identity_kind` plus `identity_value` becomes the canonical persistence identity for every source record. Add database checks where SQLite can enforce them and repeat/recompute them in Zod and repository transaction validation:
-
-- `EXTERNAL_ID` requires a non-null validated `external_id` and exact `identity_value === external_id`.
-- `CANONICAL_URL` requires a non-null HTTPS `source_url` that has passed the reviewed canonicalizer and exact `identity_value === canonicalSourceUrl`; the original URL remains only in local raw provenance.
-- `CONTENT_HASH` requires a lowercase SHA-256 value and exact equality to the validated candidate-segment/payload hash used for that record.
-- `LOCAL_FINGERPRINT` requires the lowercase SHA-256 output recomputed from the documented `job-import-fingerprint-v1` inputs; all title/company/location/description inputs must be explicit before this identity is permitted.
-
-The table-level disjunction rejects impossible combinations instead of accepting a non-null pair with unrelated evidence. Application validation recomputes canonical URLs, hashes, and fingerprints because SQLite cannot prove those algorithms. `external_id` and `source_url` remain nullable for legitimate user-supplied records, and no layer may manufacture an ID, URL, placeholder domain, or fetched timestamp to satisfy persistence.
-
-Backfill current Phase 2 rows as `EXTERNAL_ID` only after verifying each existing non-null external ID and equality of the new identity value. Backfill `acquisition_method` only from explicit validated `accessMode`/`retrievalMethod` provenance; use truthful `UNKNOWN` or abort for review when provenance is absent, never infer acquisition from `source_id`. Update `JobSchema.externalId` and `JobSchema.sourceUrl` to nullable, add `UNKNOWN` to `JobSourceSchema`, and persist detected origin separately from acquisition method in import batches, import records, source records, audit metadata, and UI. Existing fixture/SEEK meanings remain unchanged and regression-tested.
-
-Migration procedure: stop the local app; resolve the exact database path; create a timestamped backup beside the ignored database; run `PRAGMA integrity_check`; apply the forward migration in a transaction using a create/copy/verify/rename table-rebuild sequence; restore indexes/foreign keys; run `PRAGMA foreign_key_check` and row-count/hash assertions; start the app only after success. The implementation must not auto-migrate an existing real database at server startup; expose an explicit local migration command and preview/backup confirmation.
-
-Rollback: application code can be reverted normally while leaving additive import tables dormant. Schema reversal is not destructive by default. If no imported rows exist, a reviewed down migration may drop the two new tables and rebuild `job_source_records` to the original constraints after proving all external IDs/URLs are non-null. If any imported data exists, export/backup it and restore the pre-migration database; never silently coerce nulls, manufacture identifiers/URLs, drop imported content, or delete a local database. Any cleanup is a separate explicit user-approved operation.
-
-Privacy implication: this migration stores real supplied ad content locally to preserve provenance and deterministic reprocessing. Phase 2.5 performs no automatic destructive cleanup, including for expired preview tokens or abandoned batches. `/import` and documentation must state clearly that accepted raw content remains in the local ignored database until a future explicit user action exists. Export, per-record/batch delete, and policy-driven purge are required future work with confirmation, dependency handling, backup, and audit design; they are not implemented or simulated automatically in Phase 2.5. Local backups must not be uploaded elsewhere. The schema stores no candidate profile, document, application answer, credential, cookie, or browser session in import tables.
-
-## P. Minimal dashboard changes
-
-- Add `/import` to local navigation and an **Import jobs** entry point on jobs/dashboard.
-- Add a compact import summary: last local batch time, imported/updated/duplicate/review/failed counts, and a clear “user-supplied local content” label.
-- Add an `Imported` badge and separate safe provenance fields for **Detected source** and **Acquisition method**; never label pasted/uploaded content as adapter-fetched. Include URL only when explicit and non-null, otherwise `No source URL supplied`.
-- Link a confirmed job back to a safe import ID/hash prefix and parser version without exposing raw content.
-- Add one safe indicator under `/profile` or `/settings`: `Candidate profile: Demo`, `Private profile loaded`, `Private profile missing`, or `Private profile invalid`. The client sees only this status/label and no candidate field, referee contact, validation payload, profile hash, or private path.
-- For real imported jobs without a valid private profile, replace score/status presentation with `Not evaluated` and **Private candidate profile required for eligibility and fit analysis.** Do not display zero, a demo-derived status, an empty score badge that implies analysis, or a shortlist recommendation.
-- State on `/import` that accepted raw job content is retained in the local ignored database for provenance/reprocessing and that Phase 2.5 has no automatic cleanup/export/delete/purge control.
-- Keep all application/document controls unchanged; no profile editor, dashboard redesign, live-source badge, auto-refresh, or submission action.
-
-## Q. Local privacy and content handling
-
-- Raw inputs, parsed fragments, edits, and database backups remain on the user's computer in ignored paths. There is no cloud sync, analytics payload, telemetry body, remote parser, AI provider, or CI artifact.
-- Never log request bodies, raw HTML/text/JSON, excerpts, descriptions, filenames containing paths, field values, cookies, headers, or candidate facts. Logs/audit events use IDs, hashes, lengths, counts, enumerated codes, and durations.
-- Treat job text as potentially sensitive/copyrighted even if public elsewhere. Display it only to the local user and do not commit real examples, snapshots, or test traces.
-- Reject only high-confidence structured authorization headers, cookie/set-cookie headers, bearer-token containers, credential/session JSON or recognized browser storage/session exports, PEM private keys, and equivalent tested credential structures; do not retain a rejected body. Ordinary job-ad email addresses, URLs, IDs, and prose mentioning API, token, passwords, authentication, or policies remain valid input.
-- Use `Cache-Control: no-store` for import pages/actions and prevent raw content from entering URLs, server-rendered page source beyond bounded escaped preview fields, React error payloads, source maps, or browser storage.
-- `data/profile.private.json` is loaded only by the fixed-path server provider, validated with `CandidateProfileSchema`, and remains covered by `.gitignore`. Its complete contents and validation input never enter logs, audit events, source maps, page source, browser storage, CI/cloud, importer functions, or external services. The UI status DTO never contains referee contacts or other profile fields.
-- Candidate profile information never enters validation/sanitization beyond its own loader, source detection, splitting, parsing, source authorization, identity/deduplication, or import records. After confirmed persistence, only the post-import evaluation service may receive the provider's server-internal validated profile. `DEMO_PROFILE` is rejected for real imports.
-- Phase 2.5 retains accepted raw content locally without automatic deletion so provenance/reprocessing remain possible. A later approved design must add explicit export, delete, and purge controls; until then the user-facing retention notice is mandatory.
-- No actual candidate name, phone, email, address, visa/work-right details, referee, CV, passport, or identity material may be added to Git. Only the fictional example/schema is committed; private setup occurs outside Git.
-- Final application submission still requires explicit human confirmation, and Phase 2.5 contains no path toward submission.
-
-## R. Safe audit and observability events
-
-Permit these local events with only `importId`, record ID/ordinal, enum states/codes, source/confidence, hashes or short hash prefixes, counts, sizes, parser/policy versions, durations, and timestamps:
-
-- `job_import.batch.received`
-- `job_import.validation.rejected`
-- `job_import.source.detected`
-- `job_import.split.completed`
-- `job_import.preview.ready`
-- `job_import.url.policy_blocked`
-- `job_import.record.edited`
-- `job_import.record.selected`
-- `job_import.record.skipped`
-- `job_import.batch.confirmed`
-- `job_import.record.imported`
-- `job_import.record.updated`
-- `job_import.record.duplicate`
-- `job_import.record.failed`
-- `job_import.evaluation.completed`
-- `job_import.evaluation.unavailable`
-- `job_import.batch.completed`
-- `job_import.batch.partial`
-- `job_import.batch.failed`
-
-Evaluation events may contain only job/import IDs, engine/profile schema versions, and enumerated profile state/reason codes; they may not contain a candidate-profile snapshot, content hash exposed to the browser, profile path, validation issues with input values, or referee/contact facts. No event may contain raw/edited job fields, content excerpts, full source URLs/query strings, filename paths, request/response bodies, cookies, tokens, credentials, candidate data, or serialized exception objects. Errors are allowlisted stable codes with bounded safe messages.
-
-## S. Fictional fixture matrix
-
-All committed fixtures use invented companies, roles, IDs, and `.example.test` URLs. The manifest must cover:
-
-- one complete pasted plain-text job and one Markdown job;
-- one valid pasted SEEK JSON/raw record and one SEEK schema.org HTML record reusing Phase 2 rules;
-- copied search results with 2, 10, and exactly 100 distinct cards;
-- JSON array and JSON-LD `@graph` with multiple jobs;
-- repeated HTML cards, nested cards, adjacent unrelated content, and mixed full-ad/card input;
-- deterministic source evidence for SEEK, Indeed, Employment Hero, Greenhouse, Lever, Workday, generic company site, unknown, mixed sources, low-confidence hint, and conflicting hint;
-- exact allowed vendor hosts and adversarial lookalikes including `indeed.example-attacker.test`, `boards.greenhouse.io.attacker.test`, `lever.co.attacker.test`, userinfo tricks, suffix concatenations, Unicode/confusable hosts, trailing dots, explicit ports, and valid dot-boundary Workday tenant hosts;
-- missing title, company, location, description, external ID, and URL cases;
-- same source/external ID with same hash, same ID with changed hash, exact canonical URL duplicate, exact content duplicate, local-fingerprint duplicate, and conflicting strong identities;
-- malformed/invalid/deep JSON, malformed/deep HTML, invalid UTF-8, NUL/control bytes, oversized input, 101-record overflow, overlong field, and unassigned trailing content;
-- scripts, event handlers, `javascript:` links, forms/password inputs, iframes, embeds, SVG, remote images/styles/fonts, prototype-pollution keys, high-confidence authorization/cookie/session/private-key/credential JSON containers, and token-shaped values;
-- negative credential fixtures with recruiter emails, public URLs, vacancy/reference IDs, JSON-LD identifiers, and normal prose about APIs, tokens, authentication, cookies, and password/security policies that must remain accepted;
-- allowed `.txt/.md/.html/.htm/.json` MIME matches plus renamed executable, archive, PDF, Office file, image, database, and unknown MIME rejections;
-- production URL examples for `USER_CONTENT_REQUIRED`, `UNSUPPORTED`, and `REVIEW_REQUIRED`, plus a count assertion that production has zero `FETCH_ALLOWED` entries; any `FETCH_ALLOWED` fixture is isolated to an exact reserved `.example.test` host and injected transport that can never reach the public network;
-- provider fixtures for valid fictional private-profile content created only in temporary ignored test paths, missing and invalid private files, explicit demo context, and client/log/audit serialization checks; no real candidate data appears in fixtures;
-- manual edits, cleared fields, stale/replayed preview token, per-record skip, bulk selection, confirmation rollback, concurrent/repeated confirmation, and partial batch results.
-
-## T. Testing and validation plan
-
-- Unit/schema: every Zod boundary, byte/line/depth/count/field limit, UTF-8 handling, raw hash, stable parser version, and no-body error contract.
-- Sanitizer/adversarial: every active element/attribute/resource vector in section E, entity/encoding tricks, malformed trees, prototype keys, and assertions that no script executes, no remote resource loads, and preview markup contains only escaped text.
-- Source detection: all rule IDs, confidence levels, conflicting hints, mixed batches, ordering, versioning, exact/dot-boundary host matching, reviewed country-host allowlists, adversarial lookalike domains/userinfo/confusables/trailing-dot/port cases, and no network/DNS call.
-- Splitter/parser: all `CONFIDENT`/`REVIEW_REQUIRED`/`FAILED` paths, stable boundaries, leftover content, 1/2/10/100 records, missing fields, deterministic repeated execution, and exact evidence ranges/hashes.
-- Identity/dedup: external ID, canonical URL edge cases, tracking allowlist, content hash, local fingerprint, changed content, identity conflicts, no fuzzy/cross-source merge, and concurrent confirmation.
-- URL policy: every registry state, malformed/private/userinfo/redirect and lookalike-host cases, SEEK fixed to `USER_CONTENT_REQUIRED`, Indeed/Greenhouse/Lever/Employment Hero/Workday/generic/unknown fixed to `REVIEW_REQUIRED`, invalid/private/non-HTTPS/IP/local fixed to `UNSUPPORTED`, production registry count exactly zero `FETCH_ALLOWED`, and the isolated `.example.test` injected future-fetcher contract makes no network/DNS call and stops on size/MIME/timeout/rate/auth/security signals.
-- Credential detection: positive high-confidence structured bearer/header/cookie/session-storage/private-key/credential-JSON fixtures are rejected without body retention, while normal recruiter emails, public URLs, job/reference IDs, JSON-LD identifiers, and ordinary job prose mentioning APIs, tokens, authentication, cookies, or password policies are accepted.
-- Manual edits: immutable originals, overlay/clear semantics, provenance and hashes, sanitization, identity recalculation, stale token rejection, and redacted audit metadata.
-- Database/migration: upgrade a current `0000` database with SEEK rows, empty database, transaction failure, row/index/FK/hash preservation, nullable source identity, every `identity_kind` consistency invariant, invalid combination rejection, canonical URL/hash/fingerprint recomputation, acquisition-method backfill without origin inference, import cascade behaviour, backup/restore instructions, and no automatic startup migration or fabricated ID/URL/timestamp.
-- Candidate-profile provider: valid private file -> `PRIVATE_LOCAL_PROFILE`; missing -> `NO_ACTIVE_PROFILE`; malformed JSON/schema -> `INVALID_PRIVATE_PROFILE`; invalid fails closed without demo fallback; demo is returned only for explicit `DEMO_FIXTURE_JOB`; fixed-path/bounded server-only loading; safe UI DTO; private profile absent from page/source, browser storage, logs, audit metadata, importer/parser/source calls, external-service calls, CI, and Git tracking.
-- Integration: real imported job + valid private profile -> evaluated with its local profile-version provenance; real imported job + missing private profile -> persisted but `NOT_EVALUATED`; real imported job + demo profile only -> persisted but never scored; fixture/demo job + explicit demo profile -> allowed and labelled; invalid private profile -> persisted but evaluation unavailable. Also cover paste/upload -> preview with no canonical job writes -> confirmed transaction -> source record/job -> profile resolution -> conditional evaluation -> dashboard, including duplicate/update/failure/restart/rollback/partial/concurrency cases and candidate truth regressions.
-- Isolation/serialization: spy/assert that candidate profiles are never arguments to validator/sanitizer/source-detector/splitter/parser/URL-policy/dedup functions; no private field or referee contact is serialized beyond approved display values; captured logs and audit events contain no profile data; `git check-ignore data/profile.private.json` succeeds and tracked-file audits reject it and common private variants.
-- UI/E2E: all `/import` modes, accessible labels/errors/focus, preview/edit/skip/bulk/confirm, blocked URL guidance, separate detected-source/acquisition labels, nullable source URL rendering, profile-state indicator, evaluated and unavailable imported-job states, dashboard visibility, local raw-retention notice, no raw/private-profile payload in page source, and no profile editor/CV/application/submission action.
-- Regression: all 63 Phase 2 unit tests, 3 integration tests, 5 E2E tests, existing fixture counts/SEEK capability states, truth rules, document foundations, and human-confirmation gate remain green.
-- Quality/security: `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, `git diff --check`, secret/ignored-artifact audit, migration audit, and GitHub CI. CI must use only fictional fixtures and injected transports.
-
-## U. Acceptance criteria
-
-Phase 2.5 must not be marked `COMPLETE` unless:
-
-- the `/import` workflow accepts pasted single ads, pasted multi-job/search results, pasted HTML, and allowed local files through one source-neutral contract;
-- every untrusted boundary is bounded, inert, Zod-validated, and covered by adversarial tests;
-- source detection for all named sources is deterministic, evidence-bearing, confidence-rated, and separate from URL authorization;
-- the splitter returns only `CONFIDENT`, `REVIEW_REQUIRED`, or `FAILED`, never invents boundaries, and exposes uncertain records for review;
-- preview shows count/title/company/location/source guess/confidence/warnings/duplicate status and requires explicit confirmation before canonical persistence;
-- manual corrections preserve original extraction, raw content, timestamps, user override provenance, and identity recalculation;
-- raw content stays local, never executes, never loads remote assets, and never appears in logs/audit/CI/cloud/browser storage;
-- accepted raw content is explicitly documented/displayed as retained in the local ignored database for provenance/reprocessing; Phase 2.5 performs no automatic destructive cleanup, while export/delete/purge remain separately reviewed future work;
-- uploads enforce the exact allowlist/limits and reject archives, executables, binary Office files, unknown MIME, PDF, and OCR paths;
-- URL policy is default-deny, SEEK is `USER_CONTENT_REQUIRED`, every other named production source is `REVIEW_REQUIRED`, invalid/private/non-HTTPS/IP/local URLs are `UNSUPPORTED`, the production registry contains zero `FETCH_ALLOWED` entries, and blocked decisions never silently fall back;
-- hostname classification uses only reviewed exact hosts or validated dot-boundary suffixes and withstands lookalike-domain, userinfo, confusable, trailing-dot, and port tests;
-- credential/session rejection is limited to high-confidence structured material; ordinary job-ad email addresses, URLs, IDs, and security/API/password prose are accepted;
-- duplicate handling uses only approved strong identities/content hash/local fingerprint, requires review for changed/colliding identities, and performs no fuzzy merge;
-- database migration and backup/rollback tests pass, `identity_kind`/`identity_value` are the canonical consistent persistence identity, required source facts can remain null without fabrication, acquisition method never substitutes for origin, and no existing SEEK/provenance row changes meaning;
-- detected origin and acquisition method remain separately modeled, persisted, audited, and displayed; user-supplied content is never represented as adapter-fetched and genuinely unknown origin remains `UNKNOWN`;
-- selected records normalize and persist transactionally and appear in existing jobs/dashboard views even if evaluation is unavailable;
-- real imported jobs never use the fictional candidate profile for eligibility or fit; only a validated private local profile may evaluate them, while absent/invalid/demo-only states remain `NOT_EVALUATED` with no fabricated score;
-- private profile loading is fixed-path, Zod-validated, server-only, Git-ignored, absent from browser storage/client source/logs/audits/import functions/external services/CI/cloud, and represented in the UI only by an allowlisted explicit state;
-- fixture/demo jobs may use `data/profile.example.json` only through an explicitly labelled demo context, and real/demo evaluation cannot be mixed silently;
-- no real candidate name, phone, email, address, visa/work-right details, referee, CV, passport, identity material, or private profile is committed;
-- no document generation, application preparation, form filling, status mutation beyond initial job state, or submission capability is added;
-- no live job-board access, candidate/private data, credential/session artifact, database, or real advertisement is committed or used in CI;
-- all local quality gates, dependency/security audits, and GitHub CI pass; actual results and limitations are recorded in this plan;
-- the implementation branch is pushed with an unmerged PR into `main` and stops for human review; Phase 3 remains unstarted.
-
-## V. Future extension points
-
-- Source adapters implement a `RawJobDocumentProvider` that emits the same `RawImportedJobDocument`; they do not bypass validation, preview, deduplication, or confirmation.
-- An email forwarder may transform an explicitly selected message/attachment locally, with sender/header/body privacy controls, into the same contract; mailbox-wide scanning is not implied.
-- A browser extension may export only user-selected visible content/URL into a local authenticated handoff, never cookies, storage, credentials, hidden network responses, or automated browsing.
-- A CLI may support `applypilot import <file>` and stdin with the same limits, preview manifest, and an explicit `--confirm` step; non-interactive auto-import is not the default.
-- A mobile share target may send a URL or selected text to the local intake API after pairing/authentication and must receive the same URL-policy result.
-- Future Greenhouse/Lever/Employment Hero/Workday/Indeed adapters plug in behind parser/provider registries with versioned capabilities and policy state. They may enrich source-specific fields but cannot weaken unknown handling or create application/submission paths.
-- Parser/version migrations may reprocess local raw content into a new preview, but never mutate an existing confirmed job silently; differences require review and auditable update confirmation.
-
-## W. Roadmap recommendation: public ATS discovery before Indeed
-
-Recommendation: **YES — after Phase 2.5 is implemented and reviewed, plan a separate Phase 2.6 for read-only Greenhouse and Lever public job-board adapters before Phase 3 Indeed. Do not add or start Phase 2.6 automatically from this recommendation.**
-
-Evidence reviewed on 2026-09-05, without requesting a live job listing:
-
-- The official [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html) states that published job-board data is publicly available and authentication is not required for GET endpoints; it documents list and retrieve job endpoints. Application POST is separately authenticated and remains out of scope.
-- The official [Lever Postings API](https://github.com/lever/postings-api) documents unauthenticated read access to a tenant's published postings, including list/detail JSON, while its application POST uses an API key and remains forbidden here.
-- Current [Indeed job-posting guidance](https://docs.indeed.com/job-postings/) focuses on ATS, agency, employer, and publishing-partner integrations rather than a general candidate discovery API. The [Indeed Developer Agreement](https://docs.indeed.com/legal-terms/developer-agreement) makes API access and integration approval discretionary and subject to written approval.
-
-Greenhouse and Lever therefore offer narrower, documented, tenant-scoped read interfaces that can validate the URL registry/provider extension with lower access ambiguity and real published data before the broader Indeed research gate. A Phase 2.6 blueprint must still perform current terms, host/tenant discovery, rate-limit, field-completeness, pagination, retention, and security review; use GET only; never call application endpoints; remain local-first; and open its own planning PR for human approval. The historical Phase 3/5 numbering remains unchanged until the owner explicitly approves a roadmap amendment.
-
-## Planning human-review checkpoint (completed)
-
-This blueprint was initially `AWAITING_HUMAN_REVIEW`. The owner approved it on 2026-09-05 after the amendment addressed the real-versus-demo candidate-profile gate, server-only private-profile loader, safe hostname boundaries, zero-fetch production URL registry, narrow credential detection, canonical identity invariants, origin/acquisition separation, and raw-content retention. Planning PR #4 was then merged normally as recorded above; implementation is isolated on `feat/real-world-job-intake-implementation` and its future pull request must remain unmerged for a separate human decision.
-
-## Planning checkpoint execution record
-
-- Phase 2 closeout: PR #3 was verified against the approved head, green CI, private repository, implementation diff, tests, safety boundaries, tracked artifacts, and secret patterns, then merged normally as `cd3e13699cef3e41b8e3edd56239435ca647d66b` at `2026-09-05T06:42:34Z`. Fresh local `main` matched `origin/main`, and `feat/seek-discovery-implementation` was deleted locally and remotely.
-- Planning branch: `feat/real-world-job-intake-plan`, created and pushed from the refreshed Phase 2 merge commit at `2026-09-05T16:42:55+10:00`.
-- Planning pull request: #4, `https://github.com/adeel1608/applypilot/pull/4`, from `feat/real-world-job-intake-plan` into `main`. It is intentionally open and unmerged for human review.
-- Plan content: inserted Phase 2.5 before Phase 3 without renumbering historical phases and added the complete A-W blueprint. Only `PROJECT_PLAN.md` changed; no application code, importer/parser, fixture, database schema/migration, URL fetcher, source adapter, application flow, or submission behaviour was created.
-- External research: reviewed only official Greenhouse, Lever, and Indeed interface/legal documentation for section W. No job listing, job-board search page, live adapter endpoint, authenticated resource, browser session, or application endpoint was accessed.
-- First planning-branch `npm run format:check`: failed because the fresh Windows checkout marked 48 Phase 2 files with CRLF working-copy differences. `npm run format` normalized those working copies; Git content comparison and staging confirmed that only `PROJECT_PLAN.md` had a substantive diff.
-- Successful rerun: `npm run format:check`, `npm run lint`, and `npm run typecheck` passed; `npm test` passed 63 tests across 13 files; `npm run test:integration` passed 3 tests across 2 files; `npm run build` generated 34 pages; `npm run test:e2e` passed 5 tests; `npm audit` reported zero vulnerabilities; and `git diff --check` passed.
-- Initial planning PR CI: GitHub Actions run `33951189079` passed every `quality` step in 1m31s, including install, formatting, lint, typecheck, unit/integration tests, production build, Chromium install, and E2E tests. GitHub emitted a non-blocking annotation that `actions/checkout@v4` and `actions/setup-node@v4` currently target a deprecated Node 20 action runtime while the workflow forces Node 24; the run passed and workflow maintenance is deferred to a separately planned change.
-- Security/privacy result: repository visibility remained `PRIVATE`; the planning diff contained no credential, private profile, local database, browser/session/cookie state, real job content, generated document, candidate data, or high-confidence secret pattern. No live job-board access or application action occurred.
-- Rollback: close PR #4 and delete the planning branch, or normally revert its documentation commit. There is no database, runtime, external job-board, candidate, application, or deployment state to undo.
-- Unfinished work: all Phase 2.5 implementation is intentionally unstarted. Required next checkpoint is human review and an explicit decision on PR #4; if approved, merge normally, delete the planning branch, create `feat/real-world-job-intake-implementation` from fresh `main`, and follow section N. Phase 3 and the recommended-but-unapproved Phase 2.6 remain unstarted.
-
-### Human-review amendment checkpoint
-
-- Amendment request: resolve the candidate-profile runtime boundary and the additional hostname, URL-policy, credential-detection, persistence-identity, source/acquisition, retention, testing, and acceptance issues before approval of PR #4.
-- Scope guard: documentation only on `feat/real-world-job-intake-plan`; no Phase 2.5 implementation branch, importer, migration, profile loader/provider, `/import` UI, network client, live job-board access, application action, or PR merge is permitted by this checkpoint.
-- Baseline at amendment start: working tree clean at `0808f512c66622215e6b772db43bc3d5e75e2081`; PR #4 open from `feat/real-world-job-intake-plan` into `main`, `MERGEABLE`/`CLEAN`, with only `PROJECT_PLAN.md` changed and both existing `quality` checks successful.
-- Blueprint result: added the fail-closed `CandidateProfileProvider` design, private-file loading boundary, conditional post-persistence evaluation, source/acquisition separation, safe host matcher, production zero-`FETCH_ALLOWED` policy, structured credential detection, canonical database identity invariants, explicit local raw retention, profile-focused tests, and mandatory acceptance gates. Real candidate content remains forbidden from Git.
-- Local validation on Node `v24.18.0`: `npm run format:check`, `npm run lint`, and strict `npm run typecheck` passed; `npm test` passed 63 tests across 13 files; `npm run test:integration` passed 3 tests across 2 files; `npm run build` generated 34 pages; `npm audit` reported 0 vulnerabilities; and `git diff --check`, `git check-ignore data/profile.private.json`, the tracked-private-artifact check, and the changed-file scope check passed. The first `npm run test:e2e` invocation passed all 5 tests but emitted one non-fatal server `Unexpected end of JSON input` diagnostic during parallel navigation; an immediate full rerun passed all 5 tests without that diagnostic. No application code was changed to mask it.
-- Amendment-content commit `12c0fc77565760c4b5b7826800f264c083b17810` was pushed to PR #4. GitHub Actions push run `33952285498` and pull-request run `33952287171` both passed every `quality` step in 1m33s, including install, format, lint, typecheck, unit/integration tests, production build, Chromium install, and 5 browser tests. Both retained the known non-blocking annotation that `actions/checkout@v4` and `actions/setup-node@v4` target the deprecated Node 20 action runtime while the workflow forces Node 24; no check failed. The final checkpoint-record-only commit is separately required to pass CI before handoff.
-- Unfinished work remains the entire Phase 2.5 implementation. PR #4 remains open and unmerged for renewed human approval; Phase 2.6 and Phase 3 remain unstarted.
-
-## Phase 2.5 implementation execution record
-
-- Implementation branch/base: `feat/real-world-job-intake-implementation`, created and pushed from refreshed `main` at approved planning merge `11185763b1679c35fecfcb45fbd9172a4a3a6de2`. The implementation-start checkpoint was committed before application code as `dfbec61`.
-- Source-neutral intake: added pinned `@applypilot/job-importer` with 1 MiB/line/depth/count/field bounds, fatal UTF-8 decoding, MIME/extension/magic agreement, structure-aware credential rejection, data-only JSON, inert parse5 HTML/JSON-LD and repeated-card extraction, deterministic splitting, generic/SEEK-compatible parsing, source evidence, independent acquisition method, URL policy, canonicalization, hashing, and versioned local fingerprint support.
-- Source and URL safety: named source recognition uses reviewed exact hosts or explicit dot-boundary Workday matching; adversarial lookalikes and credential-bearing URLs do not classify as trusted. SEEK is `USER_CONTENT_REQUIRED`; all other named/generic/unknown production sources are `REVIEW_REQUIRED`; invalid, non-HTTPS, userinfo, IP-literal, single-label, and local/private names are `UNSUPPORTED`. The production registry contains exactly zero `FETCH_ALLOWED` entries and the implementation contains no network/DNS content provider.
-- Persistence/migration: added reviewed `0001_real_world_job_intake.sql`, `import_batches`, and `import_records`; rebuilt `job_source_records` with nullable explicit ID/URL/fetch time, canonical identity kind/value, independent acquisition method, consistency checks, and truthful Phase 2 backfill. Added an explicit preview/`--confirm` migration command with fixed resolved path, existing-database backup, integrity/foreign-key checks, source-row count/hash verification, and no startup migration. Raw accepted content remains only in the ignored local database with no automatic destructive cleanup.
-- Confirmation and duplication: preview staging cannot write canonical jobs; random 30-minute tokens bind local confirmation and are deleted after use. Confirmed selected records are revalidated and transactionally imported, updated only with explicit acknowledgement, deduplicated by strong evidence, or blocked on external-ID/canonical-URL conflicts. Originals, edit patches, timestamps, parser/hash provenance, source, acquisition, and redacted audit events remain distinct.
-- Candidate boundary: added `CandidateProfileProvider`, `DEMO_FIXTURE_JOB`/`REAL_IMPORTED_JOB` contexts, four explicit runtime states, and a fixed-path bounded server-only `data/profile.private.json` loader using `CandidateProfileSchema`. Real imports never receive the committed demo profile. Valid private profiles create/reuse local append-only profile-version provenance before atomic eligibility/fit writes; missing, invalid, demo-only, or failed evaluation leaves the imported job visible with null evaluation fields and no result rows. Browser DTOs contain only the allowlisted profile status.
-- Local UI: added dynamic/no-store `/import` paste-one, paste-multiple, pasted-HTML, allowed-file, and URL-policy modes; escaped bounded preview, origin/acquisition labels, warnings, extracted-versus-edited values, import/skip/bulk-selection controls, update acknowledgement, and explicit confirmation. Dashboard/jobs/detail views include local imports and show `Not evaluated` rather than a fabricated score. `/profile` exposes only the safe runtime state. No document, application, status-advance, form-fill, fetch, or submission action was added.
-- Fictional tests: added reconstructed import fixtures and unit/adversarial coverage for all named sources, lookalike hosts, zero-fetch policy, narrow credential positives/ordinary-ad negatives, JSON/HTML/file limits, 100/101 record bounds, schema.org and repeated HTML cards, SEEK parser reuse, URL canonicalization, identity, demo-profile mismatch, and safe profile DTOs. Added migration/persistence integration coverage for Phase 2 upgrade, profile/no-profile/demo-only evaluation gates, profile-version linkage, deduplication, token replay, identity conflicts, audit redaction, and database constraints. Added browser coverage for URL blocking without external requests, all paste/HTML/upload modes, preview/confirmation, dashboard/job visibility, not-evaluated messaging, and safe profile status.
-- Documentation: updated README, architecture, security, adapter, and normalization guidance and added `docs/REAL_WORLD_JOB_INTAKE.md`, including explicit migration/backup, local retention, private-profile, no-network, and rollback boundaries.
-- Local validation on Node `v24.18.0`: after formatting the final small UI text change, `npm run format:check`, `npm run lint`, and strict `npm run typecheck` passed; `npm test` passed 80 tests across 16 files; `npm run test:integration` passed 9 tests across 3 files; `npm run build` compiled all 8 application routes, with import/jobs/profile dynamic as required; `npm run test:e2e` passed 9 browser tests; `npm audit` reported 0 vulnerabilities; explicit migration preview and confirmed fresh-database migration/integrity verification passed; and `git diff --check` plus ignored/private/tracked-artifact audits are required again immediately before the implementation commit. Playwright emitted only its existing non-fatal `NO_COLOR`/`FORCE_COLOR` process warnings.
-- Rollback: leave the implementation PR unmerged or revert its commits normally. Disable the `/import` route/navigation to restore the Phase 2 UI. Existing real local databases are never down-migrated or deleted automatically; restore the timestamped pre-migration backup if rollback is required. Imported data must not be coerced or discarded without a separate explicit user decision.
-- Historical implementation handoff: complete Phase 2.5 implementation commit `449d3a577ce7f1074452f06cf45e394ef6d6bfe6` was pushed, and PR #5 (`https://github.com/adeel1608/applypilot/pull/5`) was opened from `feat/real-world-job-intake-implementation` into `main`. At that checkpoint the PR was intentionally open/unmerged and `MERGEABLE`; the later merge is recorded in the closeout below.
-- Initial implementation CI: GitHub Actions push run `33955352108` passed every `quality` step in 1m51s, and pull-request run `33955358978` passed every `quality` step in 2m7s. Both covered clean install, formatting, lint, typecheck, 80 unit tests, 9 integration tests, production build, Chromium installation, and 9 browser tests. Both retained only the known non-blocking annotation that `actions/checkout@v4` and `actions/setup-node@v4` target the deprecated Node 20 action runtime while the workflow forces Node 24.
-- Historical handoff checkpoint: this implementation record was committed and pushed as `a688eca26496d386534cd4cc9ee586d73b602ff2`; final push run `33955494472` and pull-request run `33955496392` both passed. PR #5 then remained open for the separate human decision that was supplied before the closeout below. Phase 2.6 and Phase 3 remained unstarted.
-
-## Phase 2.5 closeout
-
-- Final status: `COMPLETE` on 2026-09-05 after explicit owner approval and the merge gate below.
-- Pull request #5 (`feat/real-world-job-intake-implementation` -> `main`) was verified `OPEN`, non-draft, `MERGEABLE`, and `CLEAN` at exact head `a688eca26496d386534cd4cc9ee586d73b602ff2`. Its only commits were the implementation-start checkpoint `dfbec6199bc1872287b61d3f25a459b91ce8ca00`, implementation `449d3a577ce7f1074452f06cf45e394ef6d6bfe6`, and final checkpoint `a688eca26496d386534cd4cc9ee586d73b602ff2`; there were no reviews or comments requiring resolution.
-- Final GitHub Actions `quality` runs `33955494472` (push) and `33955496392` (pull request) both completed successfully. They covered clean install, format, lint, strict typecheck, unit and integration tests, production build, Chromium setup, and browser tests. The known action-runtime deprecation annotation was non-blocking and did not fail either run.
-- Final validated totals were 80 unit tests across 16 files, 9 integration tests across 3 files, all 8 application routes compiled in the production build, and 9 Playwright browser tests. `npm audit` and the production dependency audit reported 0 vulnerabilities. The explicit migration preview and a confirmed fresh test-database migration/integrity check passed during implementation validation.
-- Repository visibility remained `PRIVATE`. The final tracked-artifact audit found no `data/profile.private.json`, SQLite database/journal, raw real advertisement, cookie, browser/auth session, generated personal CV/document, or credential. `git diff --check` passed; `git fsck --no-reflogs --full` reported only the already documented benign dangling blob `644a4ebfd0a77e8c168f71681aba74a404195d8a`.
-- Production URL policy remained default-deny: SEEK is `USER_CONTENT_REQUIRED`; the other known/generic/unknown sources are `REVIEW_REQUIRED`; invalid/non-HTTPS/credential-bearing/IP/local inputs are `UNSUPPORTED`; `productionFetchAllowedCount()` remains zero. The importer has no production HTTP/DNS provider or live job-board client.
-- The private-profile boundary remained fixed-path, bounded, server-only, Git-ignored, and Zod-validated. Real imported jobs require `PRIVATE_LOCAL_PROFILE`; missing/invalid/demo-only resolution leaves eligibility and fit unavailable, with no demo-profile fallback or result rows.
-- PR #5 was merged normally at `2026-09-05T08:59:25Z` as merge commit `873a05a1fc6425ccc2e73fcf06448910172ca304`. Refreshed local `main` and `origin/main` both resolved to that SHA with a clean worktree. The fully merged implementation branch was deleted locally and remotely.
-- No live source access, application preparation, form filling, status advance, final submission, real candidate profile, or real vacancy was used during implementation or closeout. Phase 2.6 and Phase 3 remain unstarted.
-- Rollback remains a normal revert of the Phase 2.5 merge/commits. An existing real local database must not be down-migrated or deleted automatically; restore a separately protected timestamped pre-migration backup only after an explicit reviewed rollback decision. Imported raw content remains local until future reviewed export/delete/purge controls exist.
-- Known limitations: no live URL fetching; no PDF/OCR/Office intake; no automatic raw-content cleanup; no standalone re-evaluation action for an already persisted unchanged job; required `CandidateProfileSchema` fact wrappers still require schema-valid values even when unverified; and custom migration path `APPLYPILOT_DB_PATH` and web filename `APPLYPILOT_DB_FILENAME` must be coordinated if the default path is not used.
-- Newly identified activation blocker: the migration script currently creates an existing-database backup named `*.sqlite.<timestamp>.backup`, while the current `.gitignore` database rules do not match that exact suffix. No such file is tracked or present at closeout. Phase 2.5A must stop before any real migration until a dedicated reviewed bugfix branch adds/tests the exact backup ignore rule; this planning branch does not change runtime or ignore configuration.
-
-# Phase 2.5A - Local Activation and Real-World Smoke Test
-
-- Status: `AWAITING_HUMAN_REVIEW`
-- Objective: prove the complete local real-world workflow using one private candidate profile and one real user-supplied vacancy before adding live public source adapters.
-- Prepared on: 2026-09-05
-- Planning branch: `chore/phase-2-5a-local-activation-plan`
-- Planning base: Phase 2.5 merge commit `873a05a1fc6425ccc2e73fcf06448910172ca304`
-- Scope of this checkpoint: blueprint and fictional documentation only. It does not create/read a real private profile, run a real migration, import a real vacancy, access a job board, add source/application behaviour, or start Phase 2.6/3.
-
-## Current state, assumptions, requirements, and architecture
-
-- Phase 2.5 is merged and provides the local `/import` UI, explicit preview/confirmation, conservative normalization/deduplication, SQLite persistence, fixed-path server-only private-profile resolution, conditional eligibility/fit evaluation, and dashboard/job-detail rendering.
-- The owner will create or supply the real profile locally only after this blueprint is approved. The owner will separately supply exactly one visible vacancy advertisement they are entitled to use. Neither input is placed in Git, fixtures, chat transcripts intended for publication, issue/PR bodies, CI, screenshots, or cloud services.
-- The application remains local-first and network-free for this checkpoint. A pasted SEEK advertisement may be classified as `detectedSource: SEEK` only from evidence in the supplied bytes, while `acquisitionMethod` remains `USER_SUPPLIED_CONTENT`. A URL or source label never authorizes retrieval.
-- The activation uses the actual ignored local SQLite database at the migration preview's resolved path. The app remains stopped during migration, never auto-migrates, never deletes an existing database, and uses only migrations `0000_applypilot_foundation.sql` and `0001_real_world_job_intake.sql`.
-- Real content follows the existing architecture without shortcuts: package-boundary validation and inert parsing; local staging/preview; explicit confirmation; strong identity and persistence; then the server-only provider and deterministic engines. No candidate data enters the importer, and no raw job body enters candidate evaluation or audit metadata.
-- Proposed Phase 2.5A execution changes are limited to a small safe `scripts/validate-private-profile.ts`/`npm run profile:validate` helper and, if needed, a privacy-audit helper that reports only pass/fail sink names. Any such code is written and tested before the real profile exists and is reviewed on the Phase 2.5A execution branch. A defect in existing product behaviour uses the separate bugfix process in section L.
-- Dependencies remain Node 24, npm workspaces, the merged local Next.js application, SQLite/Better SQLite3, `CandidateProfileSchema`, deterministic eligibility/fit packages, and a local browser. No paid API, AI provider, geocoder, mailbox, browser extension, public source client, or external service is added.
-
-## A. Private profile setup plan
-
-The real runtime path is exactly `data/profile.private.json`. It is local-only, fixed-path, server-only, bounded to 1 MiB, parsed as JSON, validated with `CandidateProfileSchema`, and never logged or sent externally. Git ignore and untracked-state checks are hard preconditions. It is never used by CI or captured in screenshots/traces. `docs/PRIVATE_PROFILE_SETUP.md` is the schema-derived fictional setup reference.
-
-The current top-level input requires `schemaVersion`, `profileId`, `identity`, `contact`, `location`, `education`, `employment`, `verifiedAchievements`, `skills`, `languages`, `licences`, `certifications`, `workRights`, `availability`, `transport`, `preferences`, `unsupportedExperience`, `forbiddenClaims`, `referees`, and `candidatePreferences`. `displayNameTemplate` and `documentFileNameTemplate` have defaults.
-
-Nested optional/defaulted fields are: `identity.preferredName`; `contact.linkedInUrl`/`portfolioUrl`; education `startDate`/`endDate`; employment `location`/`endDate` and defaulted `achievementIds`; skill `level`/`evidence`; licence `jurisdiction`/`expiresOn`; certification `issuer`/`expiresOn`; work-right `notes`; preference `earliestStartDate`/`salaryExpectation`; referee `contact` and defaulted `private`; and defaulted `candidatePreferences.includeRefereesOnResume`. Fact-wrapper `source` and `verifiedAt` are optional. Required arrays may be empty.
-
-Verification is exactly `VERIFIED`, `USER_CONFIRMATION_REQUIRED`, or `UNKNOWN`. Only `VERIFIED` facts support claims. `verifiedAchievements[*].verification` must be literal `VERIFIED`, and every employment `achievementId` must resolve to one of those achievements. Required wrappers still require a schema-valid `value`; missing truth must not be replaced with an invented value.
-
-Availability uses a non-empty timezone and arrays of recurring windows/fixed commitments. Days are Monday-Sunday enums, and times are 24-hour `HH:mm`. Work rights use a fact wrapper whose value includes country, `UNRESTRICTED | RESTRICTED | NONE | UNKNOWN`, a positive `maximumHoursPerFortnight` or `null`, and optional notes. Transport separately records a boolean vehicle-access fact, explicit modes, and a non-negative maximum-commute fact. Licences are explicit objects and are never inferred from vehicle access or role history. Job preferences record explicit location/work-type/category arrays, positive maximum weekly/fortnightly-hours facts, and optional earliest-start/salary facts. `unsupportedExperience` and `forbiddenClaims` are required negative constraints; they are not suggestion text and should overlap where a dangerous unsupported claim must be prohibited.
-
-## B. Private profile validation procedure
-
-Before real data exists, add and test `npm run profile:validate`. It must use the same fixed path and `CandidateProfileSchema.safeParse` as runtime and print exactly one primary result:
-
-```text
-Private candidate profile: VALID
-```
-
-or `MISSING` or `INVALID`. `VALID` exits zero; `MISSING` and `INVALID` use documented non-zero exits. Invalid output may include only bounded schema field paths and stable error codes, never candidate values, input fragments, file body, full exception, profile hash, or resolved private path. The command performs no database write, browser start, logging, analytics, or network call.
-
-Before invoking it, `git check-ignore -v data/profile.private.json` must identify the repository ignore rule and `git ls-files --error-unmatch data/profile.private.json` must fail. After the owner creates the file locally from verified facts, run the validator and record only its state and exit code. If it is invalid, do not launch the real import; correct only owner-confirmed local facts or record the schema path as a blocker.
-
-## C. Database activation
-
-1. Resolve the backup-ignore blocker through a dedicated reviewed bugfix PR before touching a real database. The exact migration backup filename `data/applypilot.local.sqlite.<timestamp>.backup` must be ignored and verified with `git check-ignore`.
-2. Stop all ApplyPilot development, production, and E2E processes. Use the default database path unless a custom path is explicitly reviewed; the migration's `APPLYPILOT_DB_PATH` and web runtime's `APPLYPILOT_DB_FILENAME` must resolve to the same intended file.
-3. Run `npm run db:migrate`. This is preview-only. Record the resolved absolute path without listing directory contents or database data, and confirm it is the intended local file.
-4. Confirm whether the file exists. Do not delete, rename, truncate, replace, or down-migrate it. If it exists, confirm the timestamped backup destination will remain ignored and local.
-5. Run `npm run db:migrate -- --confirm`. The command checks pre-migration integrity, creates a backup only when a database already exists, recognizes/applies `0000`, applies `0001` when `user_version < 1`, verifies source-record row count/hash, runs `PRAGMA foreign_key_check`, and finishes with `PRAGMA integrity_check`.
-6. Record only the database path class (`default local` or approved override), whether a backup was created, `user_version`, migration identifiers `0000`/`0001`, integrity result, foreign-key result, and command exit status. Never print job/profile/raw-content rows.
-7. Start the application only after the confirmed migration reports `ApplyPilot local database is migrated and verified.` A failure stops activation; retain the original database and backup and follow the rollback plan.
-
-## D. Real vacancy test input
-
-- Use exactly one real vacancy initially, preferably a normal casual or part-time role relevant to the candidate. The owner explicitly supplies the complete visible advertisement content; ApplyPilot does not search, browse, fetch, follow its URL, or access an authenticated session.
-- Do not place the content in Git, a fixture, a test snapshot, command-line history, issue/PR text, or CI. Paste it directly into the local `/import` workflow over loopback.
-- For a SEEK vacancy, record `acquisitionMethod: USER_SUPPLIED_CONTENT` and record `detectedSource: SEEK` only when the parsed source URL/structured content supplies valid SEEK evidence. A mere user hint is not enough. Source URL, external ID, posting date, and every other field stay absent when the supplied content does not establish them.
-- Keep the original visible advertisement available to the human for side-by-side review, without asking ApplyPilot to retrieve it.
-
-## E. Expected end-to-end flow
-
-`real user content -> bounded validation -> inert parsing -> evidence-based source detection -> deterministic preview -> human field inspection/edit/skip -> explicit confirmation -> strong deduplication -> normalized job/source/import persistence -> resolve REAL_IMPORTED_JOB with PRIVATE_LOCAL_PROFILE -> append/reuse profile version -> eligibility -> fit score -> dashboard/jobs detail`
-
-No canonical job exists before confirmation. No engine runs with `DEMO_PROFILE`. Missing/invalid private state preserves the imported job but writes no eligibility/fit result. Confirmation does not shortlist, generate a document, prepare/form-fill an application, change application status beyond `NEW`, or submit anything.
-
-## F. Manual review checklist
-
-For every item below, compare the original visible advertisement, preview, and persisted job detail. Record `MATCH`, `ABSENT/UNKNOWN`, `USER_CORRECTED`, or `PARSER_DEFECT`, plus a safe field name/reason only; do not copy the real value into the plan or PR:
-
-- job title; company/advertiser; location;
-- employment type; hours/ranges; days, times, shifts, and schedule;
-- salary text, currency, period, minimum, and maximum where explicitly present;
-- required experience separately from preferred experience;
-- qualifications/certifications; licences/checks; vehicle requirement;
-- work-right wording without strengthening `valid` into `unrestricted`;
-- physical requirements without medical inference;
-- original posting-date text and normalized posting date;
-- detected source, evidence/confidence, and acquisition method.
-
-Any unsupported parser inference, strengthened wording, invented placeholder, incorrect required/preferred classification, or source/acquisition conflation is a failure. UI editing may correct an extraction only from the original visible advert and must preserve override provenance; it must not manufacture missing information.
-
-## G. Eligibility review
-
-Inspect the persisted eligibility status and every stable reason under four headings: positive facts, blocking facts, review-required facts, and rule/source references. Compare each result with the private profile and original vacancy manually. Verify hard blockers such as qualifications, licences, vehicle, work rights, availability/hours, commute, and mandatory experience only use explicit candidate/job evidence. Unknown material facts must produce review rather than eligible. Tests passing is supporting evidence, not proof that this one real decision is correct.
-
-The review record contains only status and stable reason/rule codes or generalized field paths. It must not copy candidate values or the real advertisement. Any materially wrong decision stops Phase 2.5A and enters section L.
-
-## H. Fit-score review
-
-Inspect the 0-100 total, every category contribution, positive reasons, and negative reasons. Check for obviously incorrect weighting, missing verified candidate evidence, misparsed job requirements, false-positive signals, and false-negative signals. Confirm the score does not use unverified/unknown/forbidden facts and does not override an ineligible/review-required decision.
-
-This checkpoint does not tune weights. Record non-blocking calibration observations for Phase 7/8 using safe category/rule labels. A defect that prevents truthful basic use follows section L.
-
-## I. Demo-profile isolation
-
-Before the one real import, prove the invariant without sacrificing the final evaluated state:
-
-1. With the valid real profile backed up only to an ignored `data/private/` location, temporarily remove it from the fixed path using a reversible move; never print/copy its body. Run `npm run profile:validate` and require `MISSING`.
-2. Run the focused existing isolated integration case for `REAL_IMPORTED_JOB` with no active profile and the case that rejects `DEMO_PROFILE`; require `NOT_EVALUATED`, null job eligibility/fit, and zero result rows. The test uses fictional data and an isolated in-memory database, not the real vacancy or real profile.
-3. Restore the file atomically to `data/profile.private.json`, validate `VALID`, and only then import the sole real vacancy into the actual database.
-4. Confirm the real import reports/records `PRIVATE_LOCAL_PROFILE` and its eligibility/fit rows link to a private profile version. Confirm fixture jobs remain explicitly demo-labelled.
-
-The current Phase 2.5 implementation has no standalone re-evaluation command and does not evaluate an unchanged duplicate. Therefore do not use the sole actual vacancy as a missing-profile probe and expect it to become evaluated after restoring the file. If human acceptance requires the same persisted real job to demonstrate both live states, record this as a product gap and open a dedicated bugfix plan/PR; do not edit SQLite or distort the advert to force an update.
-
-## J. Privacy audit
-
-After the smoke test, stop the app and run an audit that reports only sink names and `PASS`/`FAIL`:
-
-- `git status --short` is clean after committing only non-sensitive execution evidence;
-- `git ls-files --error-unmatch data/profile.private.json` fails, while `git check-ignore -v` succeeds for the profile, SQLite database, WAL/SHM files, and the exact timestamped migration-backup filename;
-- no real/private candidate value appears in captured logs, Playwright traces, screenshots, HTML source, localStorage, sessionStorage, source maps, CI output/artifacts, Git history/diff, or `audit_events.redacted_metadata_json`;
-- no private profile path, body, validation input, hash exposed to the browser, referee/contact fact, or candidate field entered importer/parser/source calls;
-- no real raw job body exists in Git, fixtures, snapshots, logs, screenshots/traces, CI, or audit bodies; its permitted copies remain only in the ignored local database and the user's original source;
-- SQLite and all migration backups remain local and ignored; no database is attached to an issue/PR or uploaded;
-- no network request reached a job-board/public source and no application/document action occurred.
-
-The audit may compare in-memory candidate strings/hashes against local sinks, but must never print the needles or matching content. Do not generate screenshots or retain traces during the real-data run. A single privacy failure stops the phase, preserves evidence only in non-sensitive form, and invokes section L.
-
-## K. Success criteria
-
-Phase 2.5A succeeds only when:
-
-- the private profile validates locally and remains untracked, ignored, server-only, absent from CI/external services, and undisclosed in all audited sinks;
-- the explicit migration resolves the intended local database, protects an existing database with an ignored backup, applies/verifies `0000` and `0001`, passes integrity/foreign-key checks, and performs no startup auto-migration or deletion;
-- exactly one real user-supplied vacancy can be pasted, previewed truthfully, manually reviewed, explicitly confirmed, strongly deduplicated, and displayed in dashboard/job detail;
-- source and acquisition method remain truthful, including SEEK plus `USER_SUPPLIED_CONTENT` only when source evidence supports SEEK;
-- eligibility uses `PRIVATE_LOCAL_PROFILE`, preserves profile-version provenance, and exposes inspectable correct positive/blocking/review reasons;
-- fit produces an inspectable score, category contributions, and positive/negative reasons without unverified or forbidden facts;
-- real-import/demo-profile mismatch produces `NOT_EVALUATED` in the isolated proof, never demo evaluation;
-- no unsupported parser inference, sensitive-material leak, live source network request, document/application action, form fill, status advance, or submission occurs.
-
-## L. Failure and bug handling
-
-Do not patch `main`, the planning branch, the real database, or a persisted job by hand. For a product defect, create a dedicated branch from fresh `main`. Before code, update `PROJECT_PLAN.md` with the safe symptom, exact reproduction using fictional/redacted data, expected/actual behaviour, root-cause hypothesis, security/privacy impact, test required, migration/data impact, rollback, and acceptance criteria. Add a regression fixture that contains no real profile/job content, implement the smallest fix, run all gates/audits, and open an unmerged PR for human review.
-
-The known timestamped-backup ignore defect is a mandatory pre-activation bugfix. If a candidate schema gap prevents truthful validation, or the same-job live demo-isolation transition is required, those are separate bugfix decisions; never fabricate facts or directly rewrite database state.
-
-## M. Next phase gate
-
-Only after the owner reviews evidence and marks Phase 2.5A `COMPLETE` may ApplyPilot plan Phase 2.6, the read-only Greenhouse + Lever public discovery blueprint. Phase 2.5A approval does not authorize Phase 2.6 implementation, Phase 3 Indeed work, any live job-board request, or application submission.
-
-## Testing, rollback, and exact execution order
-
-Before any real data is created, run the full merged baseline suite. After the smoke test and privacy audit, rerun `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Use `npm.cmd`/`npx.cmd` equivalents where PowerShell blocks script shims. Test data remains fictional and E2E must not capture real-data screenshots/traces.
-
-Operational rollback is non-destructive: stop the app; restore the private profile only from its ignored local backup; keep the database and migration backup intact; revert committed helper/documentation code normally; never delete or down-migrate the real database or imported job without a separate explicit owner decision. If migration fails, do not start the app and retain the original/backup for reviewed recovery. If privacy fails, stop and do not push until the leak is removed from all local/Git artifacts without rewriting shared history unless separately authorized.
-
-Exact steps after blueprint approval are:
-
-1. Merge only the approved planning PR normally, refresh `main`, verify `main == origin/main`, and create a dedicated Phase 2.5A execution branch.
-2. Re-read repository instructions and this entire plan; record the execution start before changing code or operating on real data.
-3. Resolve the timestamped migration-backup ignore defect on a dedicated bugfix branch/PR and obtain human approval; rebase/recreate the execution branch from the fixed fresh `main`.
-4. Before any real input, implement/test the safe profile-state validator and any privacy checker, run the full baseline suite, and commit only those non-sensitive helpers/plan records.
-5. Have the owner create `data/profile.private.json` locally from `docs/PRIVATE_PROFILE_SETUP.md`; verify ignore/tracking state and run the state-only validator. Do not read it into chat or print values.
-6. Perform the reversible missing-profile/provider isolation procedure with fictional in-memory test data, restore the file, and require `VALID` before proceeding.
-7. Stop the app, preview and confirm the explicit migration on the intended actual local database, and record only safe metadata/results.
-8. Start the local app. The owner supplies exactly one visible vacancy body directly to `/import`; do not use its URL to fetch anything.
-9. Inspect every preview field against the original, apply only evidence-backed corrections, then explicitly confirm the selected job once.
-10. Verify persisted provenance, dashboard/detail display, `PRIVATE_LOCAL_PROFILE` evaluation, profile-version linkage, eligibility reasons, fit contributions/reasons, and absence of application actions.
-11. Run the privacy audit and complete regression/quality gates. Record only safe statuses, counts, codes, timestamps, and SHAs in this plan.
-12. Push the execution branch and open an unmerged PR for the final human review. Do not merge it, delete/alter real local data, access a live source, or start Phase 2.6/3.
-
-## Phase 2.5A planning checkpoint execution record
-
-- Phase 2.5 merge: after explicit owner approval, PR #5 was verified at expected head `a688eca26496d386534cd4cc9ee586d73b602ff2` with `OPEN`/`MERGEABLE`/`CLEAN` state, private repository visibility, final successful CI runs `33955494472` and `33955496392`, expected three-commit history, no reviews/comments, and no tracked sensitive/runtime artifact or forbidden network/submission addition. It merged normally as `873a05a1fc6425ccc2e73fcf06448910172ca304` at `2026-09-05T08:59:25Z`.
-- Refreshed local `main` exactly matched `origin/main` at the merge SHA with a clean worktree. The fully merged `feat/real-world-job-intake-implementation` branch was deleted locally/remotely. Planning branch `chore/phase-2-5a-local-activation-plan` was created and pushed from that fresh main.
-- Intended planning changes are this living-plan closeout/Phase 2.5A blueprint, the fictional schema-derived `docs/PRIVATE_PROFILE_SETUP.md`, and the README status/link update. No application/importer/database/schema/migration/source/application code, ignore rule, real profile, real vacancy, local database, generated document, credential, session, or browser state is part of the planning diff.
-- The fictional documentation template was extracted and successfully parsed by the actual `CandidateProfileSchema` without writing a profile file.
-- Local validation on Node `v24.18.0`: `npm run lint` and strict `npm run typecheck` passed; `npm test` passed 80 tests across 16 files; `npm run test:integration` passed 9 tests across 3 files; `npm run build` passed and generated 31 static segments across the eight application routes; `npm run test:e2e` passed all 9 browser tests; and `npm audit` reported 0 vulnerabilities.
-- The first `npm run format:check` found the known Windows CRLF working-copy mismatch across 52 merged Phase 2.5 files. `npm run format` normalized the worktree; content comparison confirmed that only the intended documentation/plan files changed, and the rerun passed. `git diff --check` passed. Playwright emitted only the existing non-fatal `NO_COLOR`/`FORCE_COLOR` process warnings.
-- Security/scope result: the repository remains private; `data/profile.private.json` remains ignored and untracked; no SQLite database/journal, migration backup, raw real advert, private profile, generated personal document, credential, cookie, auth/browser session, or build artifact is present in the planning diff. No job board was accessed and no application action occurred.
-- Blocker: the planned exact migration-backup ignore test currently fails because `*.sqlite.<timestamp>.backup` is not matched by `.gitignore`. Activation and real-data handling are not authorized by this blueprint and must wait for the dedicated bugfix/review described above. No real migration was run during this task.
-- Rollback: close the unmerged planning PR and delete the planning branch, or normally revert its documentation commit after merge. There is no real profile, vacancy, database, job-board, application, or deployment state to undo.
-- Planning commit/pull request: documentation commit `11e4b451c9dabdccee4e71c9975b5a93dbeb85bd` was pushed, and PR #6 (`https://github.com/adeel1608/applypilot/pull/6`) was opened from `chore/phase-2-5a-local-activation-plan` into `main`. At that exact head it was `OPEN`, non-draft, `MERGEABLE`, and `CLEAN`, with no reviews or comments; push run `33957557263` passed in 1m57s and pull-request run `33957578628` passed in 1m52s.
-- Final handoff checkpoint: commit and push this PR/CI record, wait for its new push and pull-request `quality` runs, confirm the branch is clean and PR #6 remains open, then stop for human review. The final run IDs belong in the handoff rather than a recursive checkpoint-commit loop. Phase 2.5A operation, the backup-ignore fix, real profile setup, real vacancy import, Phase 2.6, and Phase 3 are not started.
-
-## Exact recommended Phase 2.5A execution prompt
-
-```text
-PROJECT: ApplyPilot
-PHASE: 2.5A - LOCAL ACTIVATION AND REAL-WORLD SMOKE TEST
-
-The Phase 2.5A blueprint has been approved and merged. Follow AGENTS.md and read PROJECT_PLAN.md, SECURITY.md, docs/REAL_WORLD_JOB_INTAKE.md, docs/PRIVATE_PROFILE_SETUP.md, and the actual CandidateProfileSchema in full. Inspect Git/GitHub state first. Refresh main, require main == origin/main and a clean worktree, then create a dedicated Phase 2.5A execution branch from fresh main. Do not start Phase 2.6 or Phase 3.
-
-Before handling any real data, check whether the known migration-backup ignore defect still exists: the migration creates *.sqlite.<timestamp>.backup. If that exact filename is not ignored, STOP activation, create a dedicated bugfix branch, update PROJECT_PLAN.md first, add a regression check and the narrow ignore fix, run all gates, and open an unmerged bugfix PR for human review. Resume Phase 2.5A only after that PR is explicitly approved/merged and the execution branch is refreshed from fixed main.
-
-Implement only the blueprint's small safe local validation/audit helpers if they are still absent. `npm run profile:validate` must read only data/profile.private.json through CandidateProfileSchema and print `Private candidate profile: VALID`, `MISSING`, or `INVALID`; invalid diagnostics may expose bounded field paths/codes only, never values, body, full exception, hash, or resolved path. Write and test helpers before the real file exists. Run the full baseline gates using fictional data.
-
-Do not create or infer the owner's profile yourself. Ask the owner to create data/profile.private.json locally from docs/PRIVATE_PROFILE_SETUP.md and confirm it is ready. Never paste, echo, log, screenshot, upload, commit, or send its contents externally. Verify `git check-ignore` succeeds, `git ls-files --error-unmatch` fails, and the safe validator returns VALID. If required truthful schema values are unavailable, stop rather than inventing them.
-
-Prove demo isolation before the real import: reversibly move the private file only to an ignored data/private location, require the validator to return MISSING, and run the focused fictional/in-memory integration cases proving REAL_IMPORTED_JOB with missing or DEMO_PROFILE resolution stays NOT_EVALUATED with null eligibility/fit and no result rows. Restore the private file and require VALID. Do not use the sole real job as the missing-profile probe; Phase 2.5 has no standalone re-evaluation for an unchanged duplicate.
-
-Stop the app. Run `npm run db:migrate`, inspect the resolved intended local path, then run `npm run db:migrate -- --confirm`. Do not delete or down-migrate an existing database. Confirm any timestamped backup is ignored/local, migrations 0000 and 0001 are present, user_version is correct, and integrity/foreign-key checks pass. Start the app only after success.
-
-Ask the owner to supply exactly one complete visible casual/part-time vacancy advertisement they are entitled to use and paste it directly into local `/import`. Do not browse, search, fetch, or follow a job-board URL. Do not put the advert in Git, fixtures, test snapshots, logs, screenshots, traces, CI, or PR text. For SEEK, require evidence before `detectedSource: SEEK`; acquisition must remain `USER_SUPPLIED_CONTENT`.
-
-Manually compare preview and persisted detail against the original for title, company, location, employment type, hours, schedule, salary, required/preferred experience, qualifications, licences, vehicle, work rights, physical requirements, posting date, source, and acquisition method. Any unsupported inference is failure. Explicitly confirm only after review. Verify the job appears in dashboard/detail, uses PRIVATE_LOCAL_PROFILE with profile-version provenance, has inspectable and manually correct eligibility status/reasons and fit total/category contributions/positive/negative reasons, and never uses DEMO_PROFILE.
-
-Do not tune scoring during this smoke test. Record non-blocking calibration observations for Phase 7/8. For any defect, do not patch main or edit SQLite: update PROJECT_PLAN.md first with safe reproduction/impact/test/rollback, use fictional regression data on a dedicated bugfix branch, and open an unmerged PR.
-
-Run the blueprint privacy audit without printing candidate/job values: clean Git status; profile/database/WAL/SHM/timestamped backups ignored and untracked; no private profile in logs, traces, screenshots, browser storage, HTML/source maps, Git, CI, or audit bodies; no real raw advert in Git/logs/traces/CI/audits; no job-board request; no document/application/form-fill/status/submission action. Do not retain real-data screenshots or traces.
-
-Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm audit`, and `git diff --check`. Update PROJECT_PLAN.md with safe commands/results, blockers, rollback state, and the next human gate only. Push the execution branch and open an unmerged PR. Do not merge it. Do not start Phase 2.6, Phase 3, live source access, or application submission.
-```
-
-# Phase 2.5A Execution
-
-- Status: `COMPLETE`.
-- Started: 2026-09-06.
-- Execution branch: `feat/phase-2-5a-local-activation`.
-- Approved bugfix merge: PR #7 merged normally as `6f42b8f1edd5813d34c398aad56248555fae044d` at `2026-09-06T07:09:44Z`. Fresh local `main` matched `origin/main` at that SHA with a clean worktree; the merged bugfix branch was deleted locally/remotely before this branch was created and pushed.
-- Current local state: no `data/profile.private.json`, SQLite database, WAL/SHM file, or timestamped backup exists. No real vacancy content has been supplied or retained. Real-data operations have not started.
-
-## Current state, objective, and assumptions
-
-The merged Phase 2.5 application already provides local bounded intake, explicit preview/confirmation, strong identity, SQLite persistence, server-only private-profile resolution, deterministic eligibility/fit evaluation, and dashboard/detail views. The merged blocker fix protects the supported timestamped SQLite backup form. A dedicated safe profile validator is absent and must be implemented/tested before any real profile exists.
-
-The objective is to validate the complete local workflow with one owner-confirmed private profile and exactly one owner-supplied visible vacancy, without accessing a job board or enabling an application action. The default `data/applypilot.local.sqlite` path will be used. The owner has not yet supplied the required profile facts or vacancy body; those gates require interactive owner input after the fictional-only helper and baseline checks are complete. Unknown facts remain unknown, and no required value may be invented merely to satisfy the schema.
-
-## Operations and exact implementation changes
-
-1. Verify the merged ignore contract directly and run its permanent regression.
-2. Add `scripts/validate-private-profile.ts`, using the fixed repository-relative private-profile path, 1 MiB bound, JSON parsing, and the real `CandidateProfileSchema`. It emits only `VALID`, `MISSING`, or `INVALID`; invalid details are bounded paths/stable codes without values, contents, hash, exception, or absolute path.
-3. Add `profile:validate` to `package.json` and fictional/malformed/missing/oversized validator tests under `tests/security/`; align README/private-profile setup wording with the implemented command and current in-progress phase. No package dependency or runtime/provider behavior changes.
-4. Run the full fictional baseline suite before requesting private facts.
-5. Use the schema-derived documentation as a local scaffolding checklist: collect owner-confirmed facts in small groups, assemble the ignored file locally, omit unnecessary/high-risk identity material and referee contacts, validate it, and report only state/codes. Do not require the owner to rewrite the large JSON template.
-6. Prove demo-profile isolation with the real file reversibly moved only to ignored `data/private/`, the validator reporting `MISSING`, and the existing focused fictional/in-memory integration tests. Restore atomically and require `VALID`.
-7. Stop all local app/E2E processes, preview and confirm the default migration, verify the exact backup is ignored if created, and require both migrations, expected user version, integrity, foreign-key, and success checks.
-8. Have the owner supply exactly one complete visible vacancy directly to local `/import`; manually validate every field and explicitly confirm only after the truth review.
-9. Verify truthful persistence, dashboard/detail rendering, `PRIVATE_LOCAL_PROFILE` provenance, eligibility, fit, and absence of document/application/submission behavior.
-10. Stop the app, complete the non-disclosing privacy audit and all quality gates, record safe results, push only source/docs, open an unmerged execution PR, wait for final-head CI, and stop for review.
-
-## Candidate-profile handling
-
-The only real profile path is `data/profile.private.json`, and it must be ignored/untracked before creation. The validator and runtime use `CandidateProfileSchema`; tests use fictional temporary files only. Owner-confirmed facts may be assembled locally, but TFN, bank/payment data, passport or visa grant numbers, passwords, OTPs, security answers, and unnecessary referee contacts are forbidden. The profile body, values, candidate contacts, work-right details, referee facts, hash, absolute path, and full validation input/errors never enter Git, chat output, logs, audits, screenshots/traces, browser storage, CI, source maps, or external services.
-
-The local scaffolding workflow is: review each required schema group with the owner; populate only supplied/confirmed values; preserve empty required arrays when the owner confirms there is nothing to assert; stop with a concise missing-fact path list when a truthful required value is unavailable; validate ignore/untracked state before writing; write only the ignored local file; then run the state-only validator. No fictional template value is carried into the real profile. For the owner-supplied structured natural-language questionnaire, use a one-off assembler only under ignored `data/private/`; it reads the ignored facts file, preserves supplied verification states, derives only non-claim technical IDs where needed, omits records whose required exact dates are unresolved, validates with `CandidateProfileSchema`, writes atomically, and reports only state plus bounded paths/codes. The assembler and source facts remain untracked and never enter the execution PR.
-
-## Database and real-job handling
-
-The default supported database path and its WAL/SHM/backup siblings must remain ignored and untracked. The app is stopped for migration. Preview precedes explicit confirmation; an existing database is never deleted, truncated, down-migrated, or directly edited, and an existing backup is retained. Only safe path classification, existence/backup booleans, migration IDs/version, integrity/foreign-key states, and exit status may be recorded.
-
-The one vacancy is pasted by the owner over loopback and never fetched. Raw content remains only in the owner's original source and ignored local database. SEEK origin requires evidence from supplied bytes, while acquisition remains `USER_SUPPLIED_CONTENT`. No real advert enters commands, Git, fixtures, automated tests, logs, traces, screenshots, CI, or PR text.
-
-## Privacy boundaries and manual validation
-
-Candidate data never enters import parsing/source detection/deduplication. Raw vacancy text never enters candidate-profile code or safe audit metadata. The browser receives only approved profile state plus the normal local job UI. Manual preview review covers title, company, location/postcode, employment type, hours, schedule, salary, required/preferred experience, qualifications/certifications/licences/checks, vehicle, work-right wording, physical requirements, dates, source/confidence/acquisition, external identity/URL, and cover-letter requirement. Unsupported facts remain null/unknown; wording is never strengthened; corrections require visible evidence and preserved override provenance.
-
-Eligibility review compares stable positive/blocking/review codes and field/evidence references with the private profile and original advert. Fit review inspects total, category contributions, positive/negative reasons, missing evidence, and preference/requirement signals without tuning weights. Final application submission, preparation, form filling, status advancement, document generation for the real job, live board access, Phase 2.6, and Phase 3 remain out of scope.
-
-## Testing and security strategy
-
-Before and after real activation, run `npm.cmd run format:check`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run test:integration`, `npm.cmd run build`, `npm.cmd run test:e2e`, `npm.cmd audit`, `npm.cmd run audit:production`, and `git diff --check`. General automated tests remain fictional. Focused checks cover the ignore regression, validator missing/invalid/valid/oversized states and redaction, and real-job demo isolation in memory. Real-data validation is manual/local and creates no screenshot or Playwright trace.
-
-The final privacy audit checks ignore/untracked state, changed/tracked/reachable paths, high-confidence secrets, logs/audit bodies, browser storage/rendered output/source maps, build/test artifacts, PR/CI scope, network absence, and application-action absence without printing candidate/job needles. Repository visibility must remain private.
-
-## Rollback
-
-Helper/source changes can be reverted normally or left in the unmerged execution PR. Before real import, remove or correct only the local private file through an explicit owner decision. Migration failure leaves the original database and ignored backup intact and stops the app. After migration/import, never delete or down-migrate the real database, backup, profile, or job automatically; preserve them for a separately reviewed recovery decision. Close the unmerged execution PR and delete its branch to roll back repository state.
-
-## Acceptance criteria and stop conditions
-
-Phase 2.5A is `COMPLETE` only when profile validation/Git isolation, demo isolation, default migration and backup policy, exactly one manually truth-checked import, private-profile provenance, eligibility, fit, dashboard/detail rendering, privacy audit, full local gates, and final-head CI all pass with no network source access or application action. Only source/documentation changes are committed and the execution PR remains unmerged.
-
-Stop and leave the phase `IN_PROGRESS` or `BLOCKED` for any trackable private path, missing/unconfirmed required profile fact, invalid profile, demo fallback, migration/integrity/foreign-key failure, unsupported parser inference, incorrect eligibility/fit behavior, privacy leak, live-source request, application action, failed local gate, or failed CI. The immediate permitted work ends after fictional helper/baseline validation if owner-confirmed profile facts are still unavailable.
-
-## Pre-profile execution checkpoint
-
-- Ignore boundary: `git check-ignore -v` passed for the private profile, default SQLite database, WAL, SHM, and exact fictional timestamped backup path. TypeScript, Markdown, migration SQL, and generic non-database `.backup` probes remained trackable. The permanent regression passed 7/7 assertions.
-- Validator implementation: added fixed-path `npm.cmd run profile:validate`, bounded to 1 MiB and the real `CandidateProfileSchema`, with exit `0`/`2`/`3` for `VALID`/`MISSING`/`INVALID`. Output is limited to the primary state plus at most 20 bounded paths/stable codes; values, input, hashes, absolute paths, and exception text are never emitted. Missing, malformed JSON, schema-invalid, valid fictional, oversized, and redaction behavior are covered with temporary fictional files.
-- Encountered checks: the first CLI test run exposed unsupported top-level await in the root CommonJS transform; an explicit async entry point fixed the real command. A second combined run exposed Windows process-start contention between five spawned `tsx` validators and the Git regression; the tests were refactored to exercise the exported validation/format/exit contract directly, while the real fixed-path CLI was executed separately. No failed check was skipped.
-- Current command state: with no private file present, `npm.cmd run profile:validate` reports only `Private candidate profile: MISSING` and exits `2`, as designed.
-- Fictional baseline: formatting, lint, strict typecheck, 92 unit/security tests across 18 files, 9 integration tests across 3 files, production build with 31 generated segments, and 9 browser tests passed. `npm.cmd audit` and `npm.cmd run audit:production` each reported 0 vulnerabilities; `git diff --check` passed. The only browser output was the existing non-fatal `NO_COLOR`/`FORCE_COLOR` warning.
-- Test cleanup: Playwright created only ignored fictional `applypilot.e2e.sqlite`, WAL, and SHM artifacts. The repository-owned controlled shutdown removed those files; port 3100 is closed and the local private/runtime-artifact count is zero.
-- Source checkpoint: plan-first commit `7da184eb0a3e11f3ac5ad10235fea366862f2952`; validator/tests/documentation commit `ca4dfdd675b40dc5bd9f46cc4e1d3654eb0c19b1`. No profile, vacancy, database, backup, credential, session, real document, live-source request, or application action is part of either commit.
-- Current stop/input gate: owner-confirmed required profile facts have not been supplied, so `data/profile.private.json` has not been written and migration/import have not started. Continue by collecting the facts in small human-readable groups; do not ask the owner to construct JSON. If a required fact cannot be truthfully confirmed, keep Phase 2.5A `IN_PROGRESS` and stop before profile creation.
-
-## Profile, isolation, and migration checkpoint
-
-- Owner input: the owner completed the ignored/untracked local facts questionnaire. It contained explicit verification states, negative constraints, omitted high-risk identifiers, and no referee contact details. A generic one-off assembler under ignored `data/private/` parsed the local source, derived only technical skill IDs, validated with `CandidateProfileSchema`, and wrote `data/profile.private.json` atomically without printing the body or values.
-- Truth handling: one optional employment record was omitted because its required start/end dates were supplied only at month granularity. No day was inferred. This is a known profile-completeness item, not a schema or activation blocker; it can be added later only after exact dates are owner-confirmed.
-- Profile validation: `npm.cmd run profile:validate` returned `Private candidate profile: VALID` with exit `0`. The profile matched all 22 top-level schema keys and retained 3 education records, 3 exact-date employment records, 6 achievements, 48 skills, 3 languages, 2 licences, 3 certifications, and 2 contact-free private referee records. A non-disclosing structural audit found zero referee contacts and zero prohibited high-risk identity/payment/authentication keys.
-- Git isolation: `git check-ignore -v data/profile.private.json` matched the exact private-profile rule, while `git ls-files --error-unmatch` failed as required. The facts questionnaire, one-off assembler, and final profile are all ignored and untracked.
-- Demo isolation: the valid profile was moved reversibly to an ignored `data/private/` holding path. The validator returned only `MISSING` with exit `2`; the two focused fictional/in-memory integration cases for no private profile and demo-only resolution passed, proving `NOT_EVALUATED`, null eligibility/fit, and no result rows. The profile was atomically restored, the holding path was absent, and validation returned `VALID` with exit `0`.
-- Process/migration gate: ports 3000 and 3100 had no listeners and no ApplyPilot Node/npm process was running. Migration preview resolved the documented default local SQLite path, returned exit `0`, and created no file. The active database and prospective timestamped backup both matched their narrow ignore rules.
-- Confirmed migration: `npm.cmd run db:migrate -- --confirm` returned `ApplyPilot local database is migrated and verified.` Migration `0000` foundation and `0001` intake tables were present, `user_version` was `1`, `PRAGMA integrity_check` passed, and `PRAGMA foreign_key_check` returned no issue. This was a fresh database, so backup created is `NO`; the database exists locally, is ignored, and is untracked.
-- Current stop/input gate: no real vacancy has been supplied or imported. The owner must now place exactly one complete visible advertisement in the local-only handoff and retain the original for side-by-side review. No job-board search/fetch, real import, eligibility/fit evaluation, document/application action, or submission has occurred. Phase 2.5A remains `IN_PROGRESS`.
-
-## Vacancy handoff checkpoint
-
-- Checked: 2026-09-07.
-- Boundary result: the single local handoff was non-empty, within the 1 MiB intake limit, ignored, untracked, and free of the bounded high-confidence credential patterns checked before local use.
-- Truth-review result: `FAIL`. The supplied content was an incomplete search-result excerpt with visibly truncated wording rather than the complete visible advertisement required by the approved activation procedure. Missing advertisement content cannot be fetched, inferred, or strengthened.
-- Import result: `NOT_STARTED`. ApplyPilot was stopped before any preview or confirmation. Ports 3000 and 3100 are closed, and the local database still has zero jobs, source records, import batches, import records, eligibility results, and fit scores.
-- Safety result: no job-board request, link follow, browser automation against a job board, application action, document generation, status advancement, or submission occurred. The private profile and migrated ignored database remain intact.
-- Current stop/input gate: replace the ignored local vacancy handoff with the complete visible advertisement for exactly one vacancy, then rerun the boundary and manual truth-review workflow. Phase 2.5A remains `IN_PROGRESS`.
-
-## Complete handoff and runtime-path blocker
-
-- Checked: 2026-09-07. The replacement handoff contains one complete visible advertisement. It remains ignored/untracked and passes size and credential-boundary checks. Evidence supports source `WORKDAY`; the intended acquisition method remains `USER_SUPPLIED_CONTENT`. Manual preview review and import are `NOT_STARTED`.
-- Confirmed runtime defect: `npm.cmd run profile:validate` reports `VALID`, but the local `/profile` response reports `Private profile missing` when Next starts through the documented npm workspace script. The web provider and database resolver join `process.cwd()` with `data`; npm starts the workspace in `apps/web`, while the validator and migration use repository-root `data`.
-- Activation is blocked before staging or confirming the vacancy. The local app was stopped, and the real profile, vacancy, and migrated database are preserved. The earlier incomplete-content gate is resolved; no additional owner vacancy content is needed.
-- Follow the approved failure procedure on `fix/resolve-local-runtime-data`, created from fresh `origin/main` in an isolated worktree containing no real local data. Reproduce the root/workspace discrepancy with fictional files, share a server-only repository-root data resolver between the provider and database, retain existing validation/filename/no-auto-migration boundaries, run all gates, and open an unmerged bugfix PR.
-- After bugfix review/merge, refresh the activation branch and resume the complete preview truth review. Conservative requirement extraction and document-requirement defaults still require examination at that gate; they have not been accepted as validated real-job behavior.
-
-### Runtime-path fix prepared for review
-
-- Bugfix PR #8: `https://github.com/adeel1608/applypilot/pull/8`, branch `fix/resolve-local-runtime-data`, implementation commit `4b3ad6567de3cfcad16a449b597d79305f7fbee3`. The PR is unmerged and addresses root/workspace data resolution with a shared server-only resolver, five fictional regression cases, workspace-launched E2E, and explicit exclusion of runtime files from build tracing.
-- Local bugfix validation passed 92 unit/security tests, 9 integration tests, 9 fictional E2E tests, formatting, lint, typecheck, production build, both zero-vulnerability audits, and diff checks. All 12 build trace manifests excluded fictional private-data sentinels. A production HTTP check loaded a temporary fictional root profile while withholding its unique values from rendered HTML.
-- The isolated worktree's initial dependency install failed because the Windows native build toolchain was unavailable; the unchanged lockfile installed with lifecycle scripts disabled, and its packaged SQLite binary was verified. The normal CI install remains part of the PR gate. Final PR-head CI is reported in the handoff.
-- Original activation state remains preserved: profile `VALID`; root database integrity `PASS`; zero job/import/evaluation/application/document rows; real vacancy still local and unimported; no application or live-source action. No additional vacancy content is needed. Resume only after this concrete fix is reviewed and normally merged, then complete the outstanding preview, evaluation, privacy, and activation checks.
-
-## Owner-authorized public visibility checkpoint
-
-- Date: 2026-09-07. The owner explicitly authorized changing `adeel1608/applypilot` from `PRIVATE` to `PUBLIC` to permit read-only ChatGPT review through public GitHub access. This supersedes the earlier private-repository requirement only for repository visibility; all candidate-data, credential, local-runtime, and human-review protections remain unchanged.
-- Starting state and objective: personal GitHub CLI account `adeel1608`, default branch `main`, clean existing activation branch, private repository, and open unmerged PR #8. Publish only the already-audited GitHub repository; do not publish ignored local files, modify application code, change remotes, create/delete/switch branches, change other repository settings, or merge PR #8.
-- Approved exception: `.env.example` may remain tracked only as a non-secret local/default configuration template. The owner separately approved this exception after the initial literal `.env.*` path gate paused publication. Real `.env` files, secret environment files, and every other private-data exclusion remain prohibited from Git.
-- Implementation scope and data flow: existing local source/history and a temporary read-only remote mirror are inspected locally; private-profile and vacancy comparison values remain in memory and are never printed or uploaded. GitHub receives only the authorized visibility-setting change and this safe plan-only documentation commit. No application architecture, dependency, provider, runtime, or candidate-data flow changes.
-- Exact execution sequence: verify the CLI owner and repository identity; inspect tracked paths, ignore rules, all local refs/reflogs, and advertised remote branch/PR refs; review secret-shaped findings without exposing values; resolve the template exception; recheck the exact template and unchanged refs; change only visibility; verify authenticated and anonymous repository/PR reads; recheck local privacy boundaries; validate, commit, and push only this plan on the existing activation branch.
-- Pre-publication privacy audit: `PASS` after the explicitly approved template exception. The audit covered 52 local commits including reflogs, 53 remote commits including PR refs, and 243 unique historical file blobs. Private candidate/contact/referee/employment/education prose and real-vacancy comparisons found no matches. Commit metadata comparisons also found no private identity/contact matches. Secret-shaped findings were reviewed and confirmed as synthetic credential-rejection test fixtures, not operational credentials. No remote Actions artifacts or releases were present at the check.
-- Final template gate: `PASS`. The working, tracked, and historical `.env.example` contents matched the exact approved non-secret local/default configuration. They contained no API keys, access tokens, OAuth secrets, passwords, cookies/session values, private candidate values, database credentials, or credential-bearing private URLs. No other prohibited environment/private path was tracked.
-- Private local data: `data/profile.private.json`, `data/private/` including the real vacancy handoff, and the local SQLite database remain ignored, untracked, and absent from audited Git history. Database WAL/SHM/backup and real environment-file ignore protections remain in force. No private file contents, values, or comparison needles were emitted or added to Git.
-- Authorized setting change: `gh repo edit adeel1608/applypilot --visibility public --accept-visibility-change-consequences` succeeded. Repository metadata confirmed `PUBLIC`, `private: false`, unchanged owner/repository, and unchanged default branch `main`. No other repository-setting or authentication change was made.
-- Public access verification: `PASS` for the required authenticated `gh repo view` and `gh api repos/adeel1608/applypilot` checks, and for separate anonymous HTTPS reads of repository metadata, the default-branch README, and PR #8. The anonymous requests supplied no authorization header or authenticated browser session.
-- PR #8 preservation: `OPEN`, unmerged, `MERGEABLE`, and `CLEAN`, with unchanged head `4b3ad6567de3cfcad16a449b597d79305f7fbee3`. Both existing `quality` checks reported `SUCCESS`. This visibility task does not approve or perform a merge or resume local activation.
-- Validation strategy and acceptance: require the identity, privacy, template, unchanged-ref, public-read, and unmerged-PR gates above; run the repository formatting check and `git diff --check`; confirm the commit contains only `PROJECT_PLAN.md`. Application lint/typecheck/unit/integration/build/E2E reruns are not required for this settings-and-documentation-only change; existing PR CI remains separately reported, not claimed as a new application validation run.
-- Documentation validation: `npm.cmd run format:check` passed. The initial `git diff --check` flagged a newly added Markdown hard-line-break as trailing whitespace; the metadata was moved to its own paragraph, and the final formatting and diff checks both passed. The change contains only `PROJECT_PLAN.md`. Direct ChatGPT GitHub connector metadata access to PR #8 also succeeded after publication without reconnecting or changing its existing work-account authorization.
-- Risk and rollback boundary: public Git content and history may be copied. A later owner-authorized return to private visibility cannot recall external copies; no automatic visibility reversal, history rewrite, credential change, or private-data deletion is authorized. This documentation change can be reverted separately through normal review.
-- Completion handoff: public visibility and anonymous read access are verified; private local data remains excluded; the next permitted task is read-only PR review. PR #8 must remain unmerged unless the owner later grants separate explicit merge approval.
-
-# Phase 2.5A runtime data-path bugfix
-
-Status: `AWAITING_HUMAN_REVIEW`. Started 2026-09-07 on `fix/resolve-local-runtime-data`, from fresh `origin/main` at approved PR #7 merge `6f42b8f1edd5813d34c398aad56248555fae044d`. Work occurs in an isolated worktree with no real profile, vacancy, or database. The activation branch and its ignored local data remain preserved.
-
-## Problem, objective, and reproduction
-
-The documented npm workspace start changes the working directory to `apps/web`. The web profile provider and database resolver currently look under `process.cwd()/data`, whereas the root validation and migration commands use repository-root `data`. A valid profile is consequently reported missing and the migrated database is unavailable. A local HTTP check confirmed the profile-state mismatch before any real vacancy was staged or imported.
-
-Use only fictional temporary repositories to reproduce: create the ApplyPilot root manifest, `apps/web`, a valid fictional root profile, and a migrated fictional root database; start resolution with the workspace working directory. Expected: the same root profile/database as from repository root. Actual: missing profile and database. Workspace-local decoys must never override repository-root data.
-
-## Requirements, architecture, and proposed files
-
-- Add a shared server-only `apps/web/lib/local-data-directory.ts` resolver that walks ancestors from the launch directory to the nearest validated ApplyPilot root manifest and returns that root's `data` directory. Validate manifest shape with Zod; return a bounded error code if the repository cannot be identified. Do not search globally, create directories, relocate data, expose paths to client props, or use a public environment variable.
-- Use the resolver in `candidate-profile-provider.ts` and `local-database.ts`. Preserve explicit test profile paths, the 1 MiB/schema validation, demo isolation, database filename validation, schema-readiness gate, and no automatic migration. Resolve the default profile path inside the existing safe error boundary.
-- Add fictional regression coverage in `tests/security/local-runtime-paths.test.ts` for root/workspace launches, decoys, missing data, unknown roots, and invalid database filenames. No new dependency is needed.
-- Launch the existing fictional E2E server with the web workspace working directory, matching the documented npm runtime. Root-owned E2E migration/cleanup paths remain explicit. Update `docs/REAL_WORLD_JOB_INTAKE.md` to document the shared directory contract.
-
-## Data flow, risks, and privacy
-
-Launch directory -> validated repository manifest -> repository `data` -> existing server-only profile/database gates -> existing safe DTOs. This changes path selection only; no job parsing, scoring, candidate schema, SQL schema, migration, application behavior, or data format changes. Missing/unrecognized roots fail closed. The resolver must not select `apps/web/data`, an unrelated ancestor project, or another worktree. Runtime files remain ignored. Profile/vacancy bytes, hashes, contact details, and absolute private paths must not enter logs, Git, CI, or PR text.
-
-## Tests, rollback, acceptance, and exact steps
-
-1. Commit this blueprint before runtime code changes.
-2. Add and run fictional regressions against the old implementation; record the root/workspace failures.
-3. Implement the shared resolver, update its two consumers, align the E2E launch directory, and document behavior.
-4. Run focused tests, formatting, lint, strict typecheck, unit/security tests, integration tests, production build, fictional E2E, both dependency audits, and `git diff --check`.
-5. Verify only intended source/docs enter the diff and that the original activation data is unchanged; push and open an unmerged bugfix PR, wait for final-head CI, and stop for human review.
-
-Acceptance requires consistent root/workspace resolution, safe missing/invalid behavior, no implicit data creation or migration, passing local/CI gates, and no real-data artifact in the worktree/PR. Rollback is a normal revert or closing the unmerged PR; never delete or modify the original local profile/database. Phase 2.5A remains blocked pending bugfix review/merge and the still-unfinished real preview, import, evaluation, privacy audit, and activation gates.
-
-### Build-tracing refinement
-
-The first production build succeeded but warned that dynamic filesystem paths could trace the whole project into deployment output. Private runtime files must never be packaged. Apply the installed Next.js compiler's documented `turbopackIgnore` call annotation to these deliberate runtime-only filesystem/path operations and avoid redundant path resolution of the already-absolute working directory. Rebuild and inspect output trace manifests; use fictional ignored sentinel files to verify that local profile/database/private paths are absent. This is required to preserve the original privacy boundary, not an acceptance of the warning.
-
-## Bugfix execution results
-
-- Blueprint committed before runtime changes as `837a955`. Five fictional path regressions cover both launch locations, workspace decoys, missing root data, filename traversal/override, and an unrecognized root. The old implementation failed the workspace, decoy, override, and unrecognized-root expectations. Cold module-graph imports also initially exceeded test/hook timeouts; imports were moved outside the timed assertions with a bounded startup hook, and all five cases plus the two existing provider tests then passed.
-- The first `npm.cmd ci` attempted a native `node-gyp` rebuild and failed because Visual Studio C++ build tools are unavailable on this Windows host. A test retry while dependencies were incomplete failed to load its configuration. `npm.cmd ci --ignore-scripts` subsequently installed the unchanged lockfile successfully; the packaged SQLite native binary passed an in-memory query, and the final test runner was the locked Vitest `4.1.11`. No dependency/lockfile change or native toolchain installation is included.
-- The fresh worktree's Windows CRLF checkout caused the first formatting check to flag 146 files. `npm.cmd run format` normalized them; Git normalization confirmed that only the seven intended source/documentation files differ. A blueprint whitespace issue was corrected. No unrelated source changes were retained.
-- Final local gates: `npm.cmd run format:check`, `npm.cmd run lint`, and `npm.cmd run typecheck` passed. `npm.cmd test` passed 92 unit/security tests across 18 files; `npm.cmd run test:integration` passed 9 tests across 3 files. `npm.cmd run build` passed with 31 generated segments and no dynamic-filesystem tracing warnings after the refinement. `npm.cmd run test:e2e` passed all 9 fictional browser tests from the workspace launch directory. Both `npm.cmd audit` and `npm.cmd run audit:production` reported 0 vulnerabilities. `git diff --check` passed. E2E emitted only the existing non-fatal color-environment warnings.
-- Build privacy: three ignored fictional profile/private/database sentinels were present for the rebuilt artifact check. All 12 output trace manifests contained zero private runtime entries; the build contained zero sentinel-content matches. The three test files were removed after verification.
-- Production runtime proof: start the built app through the npm web workspace with a temporary valid fictional root profile. `/profile` returned HTTP 200 and `Private profile loaded`, while the unique fictional profile ID/name/email sentinels were absent from rendered HTML. The server was stopped and the temporary fictional profile removed; ports 3000, 3100, and 3200 have no listeners.
-- Real-data isolation: no real profile or vacancy was copied to this worktree. A non-disclosing scan of its 153 tracked files found zero matches for checked private contact/name/vacancy needles. The original runtime paths remain ignored; its database integrity is valid, with zero jobs, source records, import batches/records, eligibility/fit rows, applications, or generated documents. Repository visibility remains `PRIVATE`.
-- Handoff: open an unmerged bugfix PR and report its final-head CI result separately to avoid a recursive checkpoint-commit loop. Only this path-resolution defect is addressed. The complete real vacancy remains locally available, but its manual preview, import, evaluation, and final activation audit are unfinished. Review/merge this fix before refreshing and resuming the activation branch. No real source access, application action, or Phase 2.6 work occurred.
-
-# Personal Live V1 readiness program — execution checkpoint
-
-- Started 2026-09-07 under the owner's explicit master-mission authorization. Scope: merge only the approved PR #8, resume the existing one-vacancy local activation, collect truthful/privacy-safe evidence, then produce the Personal Live V1 gap analysis and master blueprint on the activation branch. Open the activation/master-plan PR and leave it unmerged. Future release trains remain design-only and require their own plan/review/merge/implementation gates.
-- Stage 0 audit: read the repository instructions, full historical project plan, README, architecture, security, and contribution documents. The original activation worktree was clean at `21ea29d4b910ccdf1a18048b4236a5ed9784167a`; personal CLI identity was `adeel1608`; repository visibility was `PUBLIC`; default branch was `main`; and PR #8 was the sole open PR. Inventory includes the domain/workspace packages, eight application routes, two reviewed SQLite migrations, offline/source-content adapters, unit/security/integration/browser tests, local setup/validation scripts, CI workflow, and domain/privacy documentation.
-- Stage 1 merge: PR #8 matched approved head `4b3ad6567de3cfcad16a449b597d79305f7fbee3`, was open/non-draft, `MERGEABLE`/`CLEAN`, had successful final-head quality checks, zero unresolved review threads, and zero new PR conversation comments. Its audited diff contained only the approved resolver, consumer, fictional-test, launcher, and documentation changes. It merged normally as `4920b593aad90cc734570a3aae1d562d09d480e7` at `2026-09-07T02:06:55Z`.
-- Refresh: local `main` was fast-forwarded and verified equal to `origin/main` at that merge. Bringing main into the existing activation branch caused only `PROJECT_PLAN.md` conflicts: the active branch/visibility header and independently appended historical sections. Both historical records were preserved, with the activation branch remaining current. The profile, complete vacancy handoff, and SQLite database were byte-for-byte unchanged across fetch/checkouts/merge, verified with in-memory comparisons and no printed hashes. The clean linked bugfix worktree/branch is retained rather than force-removed.
-- Architecture and privacy boundaries: continue the existing local UI -> bounded staging/preview -> explicit single-record confirmation -> canonical persistence -> `PRIVATE_LOCAL_PROFILE` -> deterministic eligibility/fit -> local dashboard path. No direct SQLite insertion, source URL retrieval, real-ad fixture, private screenshot/trace, candidate-data publication, document generation, application action, or submission is authorized. The owner-supplied real input is reviewed locally; committed reports contain only safe statuses, field/rule codes, counts, and commit identifiers.
-- Planned file scope: safe evidence and blueprint updates in this plan, README, architecture, security, and justified focused release/source/threat-model/runbook/checklist documents. No future adapter, matcher, document, runner, scheduler, notifier, deployment, or release-tool implementation is included. A newly discovered product defect requires a separately reviewable fictional reproduction and plan; stop at any new human gate rather than silently implementing beyond approval.
-- Exact remaining steps: verify merged-main CI; revalidate profile/ignore/database state without disclosing values; run the actual loopback UI from the documented workspace launch; inspect one complete preview and all material semantics before confirming; verify single-job counts, private evaluation provenance, truthful eligibility/fit, integrity, foreign keys, and absence of application/document/session artifacts; audit all privacy sinks and history; run every requested quality/dependency gate; perform current official source/policy research and the complete product/security/UX/release analysis; define the forward R0-R11 trains without deleting history; publish only safe source/docs in an unmerged activation/master-plan PR with final-head CI.
-- Risks, rollback, and acceptance: malformed or strengthened requirements, demo fallback, wrong eligibility, private-data leakage, failed integrity/quality checks, or new review requirements stop activation. Preserve all existing private files and any staged/imported local data; do not down-migrate, overwrite, delete, or repair real rows directly. Normal reviewed code/document reverts are the rollback path. Completion requires the real UI proof, privacy and quality gates, evidence-backed release blueprint, and an unmerged human-review PR; future source access and final submission remain disabled.
-- Merged-main CI: quality run `34075192121` succeeded at `4920b593aad90cc734570a3aae1d562d09d480e7`. Activation refresh is committed as `6b7a42a`; no future application functionality was changed.
-- Real UI evidence: launched the documented npm web workspace on loopback port 3000. The connected browser tool reported no browser available; the installed local Playwright Chromium successfully drove the actual `/import` form and job-detail route. This was not a direct database insertion or a parser-only simulation. External browser requests were denied; none were attempted. No screenshots, video, traces, persistent browser storage, or application actions were created.
-- Preview review: compared the complete owner-supplied input in memory, retaining original raw content and all unlabelled description lines. Used existing UI controls to supply the missing title from the exact source heading and copy the source URL without opening it. Employer/location matched the source and owner specification; employment type was preserved. Work-right wording was not strengthened, and conditional certification wording remained conditional. Structured duties/requirements, schedule/hours, location detail, and dates remain incompletely extracted; no missing fact was fabricated. Detected source remains honestly `UNKNOWN` despite the retained source URL: editing the URL does not rerun source detection.
-- Preview accounting: four local preview batches/records were staged while browser-checkpoint selectors, line-ending comparison, and React's source-form reset were resolved. Three remain unconfirmed `PREVIEW_READY`; exactly one batch completed and exactly one canonical job/source record was created. These local audit records were preserved, not silently deleted to improve the counts. No duplicate canonical job exists.
-- Evaluation: one eligibility row and one fit row reference the same profile version. An in-memory canonical comparison proved the snapshot equals the validated private file and differs from the fictional example: `PRIVATE_LOCAL_PROFILE`. The exact job-specific result and contributions remain private local evaluation metadata and are reported only to the owner in the private handoff, not published in this repository. Safe review codes are `JOB_WORK_RIGHTS_AMBIGUOUS`, `VEHICLE_REQUIREMENT_AMBIGUOUS`, and `AMBIGUOUS_REQUIREMENT`. Schedule, hours, suburb/commute, structured duties and requirements remain unknown/unextracted; the current score is not a calibrated suitability or legal determination.
-- Database and action boundary: `PRAGMA integrity_check` returned `ok`; foreign-key check returned zero rows. Counts: canonical jobs 1, source records 1, preview batches/records 4 each, completed batches 1, eligibility rows 1, fit rows 1, applications 0, generated documents 0. No CV, cover letter, application packet, final submission, or authenticated browser state was generated. The app/browser were stopped after inspection; real files remain local.
-- Analysis scope and proposed architecture: retain the local Next.js/domain/SQLite foundation; add separately reviewed read-only adapters, versioned requirement/dedup/evaluation models, fact-bound documents/packets, isolated local browser execution, and durable lifecycle events in the future trains. Exact interfaces/data flow, file scope, dependencies, privacy boundaries, test/rollback/acceptance gates, external approvals, and complexity are specified in the linked master blueprint, source matrix, threat model, checklist, and runbook. These documents are proposals, not implemented capability or source authorization.
-- Quality and dependency gates: the first `npm.cmd run format:check` exposed ten PR #8/activation files whose Windows checkout still had CRLF working-tree endings while Git stored LF. A scoped Prettier normalization introduced no content diff for those files; the repeated format check passed. `npm.cmd run lint` and `npm.cmd run typecheck` passed. `npm.cmd test` passed 97 tests across 19 files; `npm.cmd run test:integration` passed 9 across 3 files. `npm.cmd run build` passed with 31 route segments, and `npm.cmd run test:e2e` passed all 9 fictional browser tests. The browser run emitted only the known non-fatal `NO_COLOR`/`FORCE_COLOR` warnings. `npm.cmd audit` and `npm.cmd run audit:production` each found zero vulnerabilities; `git diff --check` passed. Formatting was rechecked after the normalization and final documentation edits.
-- Test isolation: the real server was stopped and ports 3000/3100 were free. The private profile was moved to an exact ignored hold path only for the synthetic quality run and restored in a `finally` path; in-memory file comparisons confirmed it was restored byte-for-byte. The real vacancy and database were unchanged during the test run. The profile validator passed again after restoration. No hashes or values were printed.
-- Repository/history audit: scanned 55 local all-ref/reflog commits, 54 remote-advertised commits and 245 unique blobs with 56 private-value needles held only in process memory. No private path or private-value finding occurred. Five scanner alerts are the existing intentional fictional credential-rejection fixtures in `fixtures/imports/manifest.ts`, `packages/job-importer/src/job-importer.test.ts`, and `packages/job-sources/src/seek/schemas.test.ts`; their placeholder content was already manually classified and remains necessary negative-test data. `.env.example` remains the owner-approved non-secret template exception. The real profile, vacancy, DB/WAL/SHM and all inspected `data/private` files are ignored, untracked and absent from history.
-- Build/runtime/CI audit: a separate working-tree and output scan used 59 in-memory private needles across 160 repository/document files and 777 artifact files (327,103,180 bytes), including all 12 Next output trace manifests. It found zero private-value or private-runtime trace entries. No package publication guard changed. The real browser created no screenshot, video, trace or storage-state artifact; its 16 server-log entries were only local route/timing metadata, with no credential header or profile JSON. The repository has zero GitHub Actions artifacts and zero releases. Current Actions history therefore exposes no uploaded artifact, and PR #8 remains merged at the exact approved merge SHA.
-- Phase 2.5A result: `PASS` for supervised local intake/evaluation, with the documented extraction/calibration limitations. Exactly one real canonical job and one source record were created through one completed UI import; three additional batches are unconfirmed preview audit records and are not jobs/imported duplicates. Current local-live classification is `SUPERVISED LOCAL INTAKE ALPHA`. Local Live Alpha is ready within that narrow boundary; Personal Live Beta, Personal Live V1 and hosted production are not ready.
-- Publication handoff: commit and push only the safe activation/master-plan scope, audit the resulting local/remote commit and PR surfaces, confirm final-head CI, and leave the new PR unmerged. The final PR number, head, and CI result are reported directly to the owner after publication rather than committed, avoiding a recursive checkpoint-commit loop. Human review of that PR is the next gate; no R1-R11 implementation is authorised by this checkpoint.
-
-# Personal Live Beta Core implementation blueprint
-
-- Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`.
-- Approved scope: the owner's combined Beta Core implementation task, stages 0-64, without automatic merge of the final implementation pull request.
-- Implementation branch: `feat/personal-live-beta-core`.
-- Fresh base: PR #9 was reverified at its approved head with a clean merge state, successful required checks, no review threads, and a private-data-safe diff. It merged normally on 2026-09-07 as `471ab1055743249ff51a46d7187e541d0b5008af`. Local `main` then matched `origin/main`; this branch was created from that exact merge.
-- Baseline result: Phase 2.5A is `COMPLETE`; supervised Local Live Alpha is available with the recorded extraction and calibration limitations. The Personal Live V1 blueprint is the approved baseline. Personal Live Beta is in development. Personal Live V1 and hosted production remain not ready.
-
-## Current implementation state
-
-The repository has a local Next.js 16 UI, candidate truth store, bounded paste/upload importer, two explicit SQLite migrations, profile-versioned eligibility/fit results, an HTML/PDF resume foundation, a basic cover-letter generator, runner/tracker contracts, fictional source fixtures, validation/migration helpers, and read-only CI. One owner-supplied job is preserved in the ignored local database with one source record, one eligibility result, one fit result, and three unconfirmed preview audit records. No application or generated-document rows exist.
-
-Code inspection confirms the Beta gaps:
-
-- generic text parsing is label/section-oriented, searches the whole body for employment type, and does not produce typed requirement spans, field evidence, schedule/hours/geography, or tri-state document requirements;
-- canonical identity is source-scoped and current records are mutable snapshots; there are no immutable source observations, reviewable cross-source clusters, canonical versions, or correction records;
-- eligibility does not classify legal limits, preferences, and employer requirements separately; hours handling conflates weekly preferences and work-right ceilings;
-- fit scoring reads some unverified preferences and all employment evidence, provides no coverage/confidence model, and has no local calibration harness;
-- ten resume enum values share one general data model/renderer, semantic claim entailment is not enforced, page limits are not measured, output paths are not fully confined, and DOCX does not exist;
-- application preparation returns an empty answer list and missing-document names; durable packets, question disclosure decisions, readiness, real lifecycle events, runnable checkpoints, and one-use final consent do not exist;
-- all production URL fetching is disabled, operational doctor/privacy/status/backup/restore/start-stop commands do not exist, Actions use mutable major tags, and the loopback mutation boundary is not yet explicitly origin/session hardened.
-
-## Objective and product boundary
-
-Deliver one coherent, local-first Personal Live Beta Core that improves real-job extraction and matching, provides truthful private documents and application-packet preparation, durable tracking, repeatable local operations/privacy controls, default-disabled Greenhouse and Lever readers, and an executable synthetic-only browser runner with a frozen final-review gate.
-
-The completed Beta may prepare a real application locally, but it may not operate an external employer form without a separately approved target-specific plan. Real submission remains disabled. Every irreversible real submission continues to require a fresh deliberate owner action for one frozen packet; no background, batch, scheduled, timed, implicit-Enter, or reusable consent is permitted.
-
-## Permanent requirements and non-goals
-
-- Candidate-facing content uses only facts validated by the candidate truth store. A fact being true and the owner approving disclosure of that fact are separate states.
-- Unknown, unparsed, conditional, conflicting, expired, stale, unverified, or forbidden information never becomes true, supported, required, satisfied, or recommended by default.
-- Candidate profile data never enters discovery, source identity, deduplication, importer parsing, or external source requests. Real/demo evaluation contexts remain non-interchangeable.
-- No CAPTCHA, MFA, authentication, access-control, bot-detection, rate-limit, robots, site-restriction, or destination-control bypass; no stealth, proxy rotation, hidden endpoint replay, credential capture, or automated login.
-- No real background discovery or application. Greenhouse/Lever readers are GET-only, owner-started, tenant-allowlisted, strictly bounded, default-disabled, and independently stoppable.
-- No real browser runner or external form interaction in this implementation. The executable runner operates only against the repository's synthetic loopback application site. Real-runner capability reports `TARGET_APPROVAL_REQUIRED`.
-- No private profile, real vacancy, SQLite/WAL/SHM/backup, personal document, answer, browser state, cookie, credential, allowlist, or calibration label enters Git, CI, build traces, test recordings, pull-request text, or public documentation.
-- Existing local rows and files are preserved. No automatic migration, destructive cleanup, direct real-SQL repair, silent replacement, or output overwrite.
-- npm `private: true` remains unchanged. No hosted deployment, tunnel, public bind, paid required API, primary AI matcher/writer, scheduling, notifications, or broad job-board crawling is included.
-
-## Architecture and data flow
-
-The Beta retains domain ownership outside the web layer and adds versioned contracts at each material boundary:
-
-`owner content or approved tenant GET -> bounded immutable SourceObservation -> inert extraction -> RequirementEvidence + field provenance -> CanonicalJobVersion -> duplicate review -> profile-versioned EvaluationVersion with coverage -> durable shortlist -> verified ClaimSelection -> private DocumentArtifact -> tri-state ApplicationPacket -> synthetic runner checkpoint -> frozen review -> one-use consent -> synthetic result -> append-only application event`
-
-Real local data follows the same contracts but stops at packet preparation. Source readers receive source capability/tenant configuration only; candidate facts are joined after local persistence. All boundary inputs and persisted JSON are Zod-validated. Audit events use typed event-specific allowlists rather than substring key filtering, retaining safe enums such as `PRIVATE_LOCAL_PROFILE` while rejecting nested values/bodies.
-
-### Additive persistence plan
-
-Add the next migration, `0002_personal_live_beta_core.sql`, without rewriting migrations 0000/0001. It will add only versioned/additive structures needed by the approved Beta:
-
-- immutable `source_observations`, canonical `job_versions`, typed `job_field_evidence`, `requirement_evidence`, and audited `job_corrections`;
-- `duplicate_clusters` and `duplicate_cluster_members` with explicit suggested/linked/rejected/split states and retained observations;
-- `evaluation_versions` containing job/profile/rule/weight versions, eligibility class/reasons, fit contributions, coverage/confidence, provenance enum, and stale state;
-- local `calibration_labels` and `calibration_pairs`, never exported by privacy tooling;
-- `job_queue_entries` for durable shortlist/review/preparation state separate from eligibility;
-- immutable `document_artifacts` and `document_approvals`, including type/template/format/path/digest/job/profile/rule versions, claim evidence, layout result, and approval invalidation;
-- `application_packets`, `application_packet_documents`, `application_questions`, `application_answer_versions`, and disclosure decisions;
-- append-only Beta lifecycle `application_events_v2`, plus projections that preserve legacy NEW/REVIEWED/APPLIED evidence while mapping to DISCOVERED/REVIEWING/SUBMITTED;
-- synthetic `application_runs`, `runner_checkpoints`, and expiring single-use `final_action_consents`; no credential or browser-state columns;
-- source `capability_configs` and `discovery_runs` containing only tenant IDs, allowlisted hosts/paths, policy versions, budgets, cursors, counts, and safe errors.
-
-The migration copies/maps existing real job/source/evaluation evidence into new version rows only after an explicit preview, consistent backup, row-count/hash/FK assertions, and owner-authorized `--confirm`. It retains the legacy tables for compatibility and historical evidence. The application never auto-migrates. Rollback uses the protected pre-migration backup or a normal code revert; no down migration drops real rows.
-
-## Staged implementation contract
-
-### Stages 3-9: truthful intake, evidence, observations, and identity
-
-- Close Phase 2.5A as complete in current status wording and clearly distinguish available Local Live Alpha, Beta in development, V1 not ready, and hosted production not ready.
-- Replace ad-wide employment-type searching with precedence-aware, field-local parsing. Add Australian state normalization, location/postcode evidence, exact/relative dates, salary period/range, weekly and fortnightly hours, roster/day/time parsing, typed responsibilities, qualification/licence/check/work-right/vehicle/physical/experience/skills evidence, and tri-state document requirements.
-- Add `RequirementEvidence` with exact bounded span/path, source observation ID, modality `REQUIRED | PREFERRED | CONDITIONAL | UNKNOWN | NEGATED`, condition, certainty, extractor version, and stable rule ID. Empty extraction means incomplete coverage, never no requirements.
-- Preserve complete local source text for side-by-side review while browser DTOs use bounded escaped views. Show original source versus normalized value, evidence/modality/confidence, user correction, missing/unparsed fields, and stale/version state.
-- Create immutable observations on each accepted source version. Corrections overlay, never mutate, original evidence and record actor/reason/timestamp/hash without raw values in public audit output.
-- Treat `(source, tenant, externalId)` as observation identity. Cross-source canonical linking requires exact application target/requisition plus consistent corroboration; uncertain pairs enter a reversible review cluster. Similar title alone never auto-merges; changed reposts preserve history.
-
-### Stages 10-17: eligibility, fit, coverage, calibration, and queue
-
-- Classify each decision input as `LEGAL_LIMIT`, `CANDIDATE_PREFERENCE`, or `EMPLOYER_REQUIREMENT`; retain evidence version/effective dates/units. Preferences rank or require an explicit owner rule but never waive law or employer requirements.
-- Keep weekly and fortnightly units separate. Model current work-right ceiling independently from preferred hours and already-worked/period context. No implicit weekly conversion establishes legal compliance. Unknown legal evidence is review-required.
-- Add overnight and week-boundary schedule handling, timezone, dated exceptions, verified fixed commitments, unknown roster review, and date/start/expiry checks.
-- Cover work rights, legal hours, candidate hours, qualifications, licences and jurisdiction/expiry, own vehicle versus commute, availability, location/commute, experience, certifications, physical demands, age, contradictions, negation, and conditional statements with stable reason codes and synthetic matrix tests.
-- Replace broad audit-key filtering with per-event schemas so safe `PRIVATE_LOCAL_PROFILE`/engine/profile-version enums survive and any candidate values, paths, snapshots, hashes exposed to the browser, or raw job content fail validation.
-- Fit uses only verified facts and verified preferences. Unverified employment is excluded. Score and ranking report input coverage/confidence and missing/ambiguous dimensions. Ineligible jobs cannot be recommended irrespective of score.
-- Add a local-only calibration harness for golden labels and pairwise rankings, rule/weight version comparison, sensitivity and monotonicity. Private labels stay ignored; committed tests are fictional. Do not claim calibration targets from the existing single real job.
-- Add a durable real-job queue with review/shortlist/skip/preparing states, stale evaluation visibility, filters, and audited owner actions. Job detail shows source/evidence comparison, duplicate review, evaluation version/provenance, reasons, contributions, coverage, missing inputs, and preparation entry points.
-
-### Stages 18-25: truthful private documents
-
-- Implement genuinely differentiated strategies for all ten named templates, with category-specific evidence priorities/section ordering while sharing a safe renderer. All substantive summary, skill, experience, project, education, achievement, availability, and work-right text is created by allowlisted transformations from verified facts and retains fact IDs.
-- The claim validator proves both reference validity and transformation/entailment; arbitrary prose paired with a valid fact ID fails. Forbidden/unsupported claims are checked across every field and heading.
-- Enforce Australian English, selectable ATS text, black Times-compatible typography, minimum 10 pt, real bullets, no images/graphics/sidebar/skill bars/photo, one-page casual target, and two-page engineering maximum. Deterministically trim lower-priority evidence before overflow and never shrink below the floor.
-- Confine output beneath an ignored private document root using resolved/real paths; reject traversal, UNC, ADS, junction/symlink escape, Windows reserved names, unsafe characters and collisions. Create new versioned files without overwriting.
-- Keep PDF and add an audited, maintained DOCX dependency with explicit style/paragraph structure. Validate page/text/font/reading order for PDF and structure/text parity for DOCX. No real artifact appears in CI.
-- Add private document preview/generation/approval/invalidation UI. Cover letters use exact reviewed employer/role, at most three verified evidence links, tri-state requirement, owner tone, concise output, shared claim safety, PDF/DOCX only when required/requested, and immutable approval versions.
-- Perform one real private CV smoke for the preserved job only after code, migration, and privacy gates pass; do not publish content, names, hashes, screenshots, or path. Owner approval is local and does not authorize upload.
-
-### Stages 26-32: packets and durable tracking
-
-- Build immutable application packets from current canonical job/evaluation/profile, approved CV, optional/required letter, document checklist, target URL/domain, question versions, answer versions, and disclosure decisions.
-- Answer states remain `VERIFIED_ANSWER`, `USER_CONFIRMATION_REQUIRED`, and `UNKNOWN`. Truth and permission to disclose are separate. Sensitive, demographic, health, background, work-right, salary, availability, and start-date questions never default to affirmative or disclosed.
-- `READY_TO_APPLY` requires current versions, approved CV, required approved letter/documents, no blocking unknown answer, valid destination, unexpired requirements, no duplicate danger, and eligibility other than `INELIGIBLE`. Any dependency change invalidates readiness.
-- Prepare a private packet for the preserved real job locally. Unanswered questions remain unknown; `PREPARING` or `REVIEW_REQUIRED` is acceptable and must not be coerced to ready.
-- Implement lifecycle `DISCOVERED -> REVIEWING -> SHORTLISTED -> PREPARING -> READY_TO_APPLY -> APPLICATION_IN_PROGRESS -> READY_FOR_FINAL_REVIEW -> SUBMITTED -> ASSESSMENT/INTERVIEW -> OFFER/REJECTED`, with WITHDRAWN/EXPIRED branches and PAUSED/OUTCOME_UNKNOWN run states. Events are append-only, transactional, actor/timestamp/versioned, idempotent, and retain legacy evidence.
-- Replace fixture-only applications UI with real local packet/status timelines, filters, missing-input/recovery views, owner-entered outcome attribution, and explicit empty/loading/error states.
-
-### Stages 33-41: security and local operations
-
-- Enforce loopback binding plus explicit Host/Origin validation, foreign-origin mutation denial, forwarded-host distrust unless explicitly configured, local session/CSRF nonce binding, replay protection, safe no-store responses, and tests for DNS-rebinding/cross-port/foreign-origin cases. Loopback is not treated as authentication.
-- Centralize confined path creation/read/write with root allowlists, `realpath`/parent checks, no-follow/create-new semantics, safe permissions where supported, and platform-focused traversal/junction/ADS/reserved-name/collision tests.
-- Implement `privacy:audit` with safe paths/commit IDs/categories only, scanning index, tracked tree, all refs/history, PR diff, ignored-boundary probes, build/traces/maps/test artifacts, output roots, and configured CI artifacts. Never print matching values.
-- Implement read-only `doctor`, `db:status`, `migration:status`, `preflight`, and `release:check`; a complete `quality` command; consistent SQLite `backup` and preview/confirm `restore`; and owned loopback `local:start`/`local:stop` with PID ownership, collision/root/bind checks, no auto-migration, no unrelated process termination, and no data deletion.
-- Backup uses stopped writers or SQLite's consistent snapshot API, a confined ignored destination, create-new behavior, integrity/FK/schema/count manifest, and no overwrite. Restore verifies into a new location first and requires a separate exact-target owner confirmation.
-- Pin GitHub Actions dependencies to immutable commit SHAs with represented tags documented in comments, preserve read-only permissions and no artifact upload, and test/update lockfile/dependency policy without weakening npm publication guards.
-
-### Stages 42-46: default-disabled Greenhouse and Lever readers
-
-- Add source-specific official GET-only clients behind the existing adapter contract. Greenhouse supports owner-configured board token and list/detail only; Lever supports owner-configured region/site and list/detail pagination only. Application POST endpoints are absent and method guards reject every non-GET.
-- Configuration is accepted only from ignored `data/private/source-allowlist.json`, validated with exact source/tenant/host/path/policy version/expiry/budget and explicit owner approval. Missing, invalid, expired, or unapproved configuration reports `SOURCE_READY_AWAITING_TENANT`/disabled without network.
-- Use HTTPS, exact host/path, no userinfo/cookies/auth/referrer/candidate data, public-address resolution before connection and redirects, redirect revalidation, byte/time/page/record/request budgets, one in-flight request per tenant, honest user agent, bounded retries, `Retry-After`, 401/403/429/security stops, cursor-loop termination, and immutable local observations.
-- If the private allowlist exists and explicitly approves a tenant, perform at most one owner-started bounded read-only smoke for that configured source. Otherwise perform no live call and report waiting for an approved tenant. Never enumerate tenants or substitute a public company opportunistically.
-- Discovery UI shows effective capabilities, disabled/waiting reason, policy expiry, owner-started controls and safe counts/errors; it never exposes the allowlist path/body or implies continuous discovery. There is no scheduler.
-
-### Stages 47-51: executable synthetic runner and final gate
-
-- Implement a local runner state machine and synthetic loopback application site only: prepared, opened, mapped, filled, paused/review, final review, synthetic submitted, or outcome unknown. Checkpoints are durable and resumable without storing credentials/session state.
-- Map only approved packet values; unknown/sensitive questions pause. Validate target/form action at every navigation. Upload only the approved synthetic document digest. Stop on CAPTCHA, MFA, auth, bot detection, 401/403, rate limit, site restriction, page/form/version/destination changes, and any unsupported field. No bypass or automatic resume.
-- Freeze the exact packet, host/form version, documents/digests, answers, disclosures, and unresolved state for final review. Generate an expiring, single-use consent only when no blockers remain. Changed/expired/replayed consent causes zero clicks; a valid fixture causes exactly one synthetic irreversible click.
-- A lost response writes `OUTCOME_UNKNOWN` and never retries automatically. Real target capability remains `TARGET_APPROVAL_REQUIRED`; no external site/browser profile/authentication/upload/submit smoke is authorized.
-
-### Stages 52-58: UX, migration, preserved real workflow, and security suite
-
-- Update all eight routes with truthful mode separation, real queue/packets/timelines, clear missing/stale/error states, and effective source/runner/operation status. Keep demo content explicitly isolated and off the real-job default view.
-- Meet keyboard/focus/error-summary/status-announcement/label/contrast/200%-zoom/narrow-viewport/long-content requirements with fictional browser tests. Do not create real-data screenshots or traces.
-- Apply migration 0002 to a synthetic upgrade first. For the real database: stop owned processes, preview, verify backup confinement/ignore, explicitly confirm, assert legacy counts/relationships/content digests, apply, run FKs/integrity, and preserve the original backup. Never edit real rows by hand.
-- Re-evaluate the preserved real job through the public domain/repository service, creating a new evaluation version while retaining its historical Phase 2.5A evaluation. Verify private provenance and truthful evidence/coverage without printing job/profile values.
-- Run the real local Beta path only through supported UI/services: review/shortlist, generate one private CV, optional cover letter only if locally appropriate, prepare one packet, leave unknowns unresolved, and stop before any employer form. No external upload, source fetch except separately approved read-only tenant smoke, browser application, or submission.
-- Add executable security fixtures for every listed content, host/origin, SSRF/DNS, path, token/session, audit, claim, stale-version, duplicate, migration/backup, runner-stop, consent replay, lost-response, and build/publication boundary. Automated data remains fictional.
-
-### Stages 59-64: validation, audit, documentation, and handoff
-
-- Run formatting, lint, strict typecheck, unit, integration, security, migration, document-layout/DOCX, synthetic-runner/browser, production build, full/production dependency audits, privacy audit, doctor/status/preflight, backup/restore rehearsal, local start/stop, diff/fsck/history checks, and final-head CI. Record every failure and fix; no skipped gate is called pass.
-- Repeat the public-repository privacy audit against private profile, vacancy, database/backups, generated documents, answer/calibration/allowlist/browser state, build artifacts, refs/history, PR body/diff, logs and CI artifacts without emitting values.
-- Update README, architecture, security, Personal Live V1, go-live checklist, source matrix, threat model, runbook, and this plan to distinguish implemented, disabled/waiting, synthetic-only, and still-blocked behavior.
-- Classify manual-intake Beta separately from source-enabled Beta and V1. The likely safe terminal states are manual-intake Beta ready after all local gates, source-enabled Beta waiting unless a tenant is privately approved, and V1 not ready because the real runner remains target-approval-required.
-- Commit by concern, push one branch, open one large implementation PR into `main`, verify its exact head and required checks, and leave it unmerged for direct ChatGPT/human review. Do not merge, deploy, enable a real target, or delete private/runtime data.
-
-## Expected source and file changes
-
-- Domain: extend `job-model`, `job-importer`, `job-normalizer`, `candidate-profile`, `eligibility-engine`, `fit-scorer`, `resume-engine`, `cover-letter-engine`, `application-runner`, and `application-tracker` with versioned schemas/services and focused tests.
-- Persistence: migration 0002, schema exports, Beta repositories for observations/evidence/evaluations/queue/artifacts/packets/events/runs/capabilities, explicit migration/status/backup/restore support, and synthetic upgrade/recovery tests.
-- Sources: `job-sources` Greenhouse/Lever readers, common safe HTTP transport, allowlist/capability schemas, fixtures/contract/security tests; no application client.
-- Web: server-only Beta service boundary; loopback/origin/session guards; all eight route views/actions/components; local synthetic application route accessible only in the synthetic test mode; Next.js code follows the installed version's documentation.
-- Operations: root scripts for doctor, status, privacy, quality, backup/restore, preflight/release, and owned start/stop; package scripts and hardened workflow pins.
-- Documents/tests/docs: ten fictional CV golden cases, DOCX/PDF/layout checks, application/synthetic-runner fixtures, security fixtures, and reality/status documentation. Private artifacts and source configuration use only already-ignored or newly narrow ignored local paths.
-
-## Dependency policy
-
-Before adding a DOCX library, inspect current official package metadata, licence, maintenance activity, dependency tree, Node 24 support, and advisories. Pin the selected exact version and audit both full and production graphs. Prefer no other new runtime dependency. Source HTTP uses Node's built-in facilities with dependency injection; SQLite and Playwright remain existing dependencies. Any unavoidable package or Action change is documented with represented version/tag and rollback.
-
-## Testing strategy and acceptance criteria
-
-Acceptance requires all stage-specific checks above plus:
-
-- deterministic, evidence-preserving extraction across fictional plain text, HTML, JSON-LD, Workday-like, Greenhouse-like, Lever-like, casual/part-time/full-time/contract/internship, negated, conditional, contradictory, long, malformed, and missing-field cases;
-- immutable observation and evaluation history, reversible human duplicate decisions, same-source/cross-source idempotency, and no loss of the existing real row relationships;
-- zero unverified/unknown/forbidden evidence used for positive eligibility, score, claim, answer, readiness, or synthetic form mapping;
-- all ten templates materially differ in ordering/priorities and pass semantic-claim, ATS, page, text, DOCX parity, path, version/approval and private-output gates;
-- packets correctly block stale/missing/unapproved documents, expired job evidence, duplicate danger, invalid destinations, ineligibility, unknown required answers, and undisclosed facts;
-- application event projections are reproducible and cannot erase or reverse a real submission; synthetic lost outcomes never retry;
-- source clients cannot issue write requests, use unapproved tenants, send candidate data, escape hosts/addresses/budgets, or continue after auth/rate/security stops;
-- foreign-origin/host/replay mutations fail; path/junction/traversal/collision escapes fail; audit/log/build/CI serialization cannot contain private canaries;
-- the existing private profile, vacancy, database, one canonical job/source/evaluation chain, and unconfirmed preview evidence remain preserved; the new real evaluation/document/packet smoke stays local and no employer form is touched;
-- final local gates and exact-head CI pass, the public PR contains source/fictional tests/safe documentation only, and the implementation PR remains open and unmerged.
-
-## Risks and mitigations
-
-- Large combined scope can create incompatible partial states. Work in concern commits and stop only at a compiling/test-safe checkpoint; record completed/remaining stages and continue on this same branch rather than claiming completion.
-- Extraction false positives can change legal or application meaning. Preserve exact spans/modalities, expose coverage, require review, and keep legacy/raw evidence.
-- Migration can corrupt the single real local history. Exercise synthetic upgrades first, stop writers, create/verify a consistent ignored backup, compare counts/hashes/FKs, and retain the original.
-- Document generation can overclaim or leak identity. Use controlled transformations, all-field validation, private path confinement, no real test recordings, and local approval/version invalidation.
-- Source reads can violate scope or expose local networks. Remain default-disabled, require private allowlist approval, GET-only exact routes, address/redirect checks and conservative stop budgets.
-- Loopback/browser actions can be induced cross-origin or repeated. Bind local session/origin/form versions, use one-use tokens, and deny any changed context.
-- Public-source history cannot be recalled. Run repeatable privacy audits before every push and stop publication on any unexplained finding.
-
-## Rollback and continuation strategy
-
-Repository changes remain isolated on the feature branch and can be reverted by concern or closed unmerged. New capabilities default disabled; disable the individual source, document, packet, runner, or mutation surface without deleting observations/events. Keep existing and migrated private databases/backups intact. Restore only after a separate preview and exact owner confirmation. Never auto-retry an unknown submission, rewrite shared history, or delete private artifacts to simplify rollback.
-
-If a turn/runtime limit prevents completion, update this section with exact completed stages, commands, failures, private-smoke status, and remaining work; commit and push a coherent compiling/test-safe checkpoint; and continue on `feat/personal-live-beta-core`. Do not open a misleading complete PR.
-
-## Exact implementation order
-
-1. Commit this blueprint/status checkpoint before application code.
-2. Read the applicable installed Next.js 16 documentation; research/pin the DOCX dependency and current official Greenhouse/Lever contracts; resolve immutable Action SHAs.
-3. Implement extraction/evidence/observation/dedup contracts and migration/repositories with synthetic upgrade tests.
-4. Implement eligibility/fit/coverage/calibration/queue semantics and UI with regressions.
-5. Implement claims, ten templates, private PDF/DOCX artifacts, cover letters, approval UI and fictional layout verification.
-6. Implement packets, disclosure-aware tri-state answers, readiness, lifecycle/event projection and applications UI.
-7. Implement loopback/session/path hardening and operational commands, backup/restore rehearsal, privacy tooling and workflow pinning.
-8. Implement default-disabled Greenhouse/Lever GET readers and perform no tenant call unless the ignored approved allowlist permits one bounded smoke.
-9. Implement the synthetic site/runner, stop conditions, frozen review and one-use final gate; retain real target disabled.
-10. Apply the additive migration to the preserved real database only after synthetic gates and explicit backup/confirmation; re-evaluate and run the approved local private document/packet smoke without employer interaction.
-11. Complete all-route UX/accessibility/security/browser tests and the full validation/privacy/publication matrix.
-12. Update reality documentation, create focused commits, push, open one implementation PR, verify exact-head CI, and stop without merging.
-
-## Beta Core implementation continuation checkpoint — 2026-09-07
-
-Status remains `IN_PROGRESS`; this is a coherent, compiling checkpoint rather than Beta completion. PR #9 was merged at `471ab1055743249ff51a46d7187e541d0b5008af`; the active branch remains `feat/personal-live-beta-core`. Concern commits are `5059985` (approved blueprint), `aa62164` (domain, migration, documents, packets, runner safety), and `09fe761` (governed readers and initial operations).
-
-Completed or materially implemented at this checkpoint:
-
-- Stages 0-3: approved merge/base/branch/blueprint and Phase 2.5A closure are complete.
-- Stages 4-6 and 8-14: typed extraction, exact source spans, modality/kind/certainty, Australian location/salary/week/fortnight/document tri-state fields, immutable source/job/evaluation persistence, cross-source human-review dedup, legal-vs-preference reason classes, verified-preference fit inputs, and coverage reporting are implemented. Extraction provenance UI and the larger adversarial/golden matrix remain.
-- Stages 18-24: all ten CV categories now carry category-specific section ordering, evidence priorities, summary strategy, skills/experience/project selection policy, and Times-family ATS rendering. Candidate projects are an optional verified fact type. Arbitrary prose attached to a valid fact ID fails semantic validation. DOCX `9.7.1` is exact-pinned after licence/maintenance/dependency review; a real DOCX is generated in tests. New DOCX paths reject absolute/traversal/ADS/reserved names, symlink escape, and overwrite. PDF confinement, page-overflow/layout extraction, full PDF/DOCX content parity, approval versions/UI, and private real-document smoke remain. Cover letters support DIRECT/WARM/FORMAL style with shared semantic claim checks and preserve `UNKNOWN` rather than treating it as false.
-- Stages 26-31 and 47/49-51 domain layer: packet truth/disclosure states, readiness blockers, Beta lifecycle transitions, persistent packets/questions/answers/runs/checkpoints, target/form/document digest binding, ordered synthetic runner states, stop reasons, expiring single-use consent, terminal lost-response behavior, and plaintext-token non-persistence are implemented and unit-tested. Real targets remain permanently paused as `TARGET_APPROVAL_REQUIRED`. Event projection/UI, executable browser integration, synthetic fixture site, resume support, and full stop-condition E2E remain.
-- Stage 54 synthetic migration foundation: additive migration `0002_personal_live_beta_core.sql`, Drizzle exports, empty/foundation/intake upgrade tests, legacy source-observation/job-version backfill verification, and a Beta repository are implemented. The preserved real database is healthy at schema v1 with one pending migration and has not been migrated.
-- Stages 35-37 and 39/41 initial operations: repeatable current-tree/history-path privacy audit, doctor, DB/migration status, a composite quality command, data-root confinement for migration, and immutable `actions/checkout`/`actions/setup-node` v4 pins are implemented. Backup/restore, preflight/release checks, owned local start/stop, build/CI artifact scanning, and all-ref historical content scanning remain.
-- Stages 42-45 reader core: official-shape Greenhouse Job Board and Lever Postings GET readers are implemented without any POST/auth/cookie surface. Capabilities are default-disabled, owner/tenant/host/path/expiry/budget/cap bound, with HTTPS/userinfo/port/DNS/IP/redirect/timeout/byte/concurrency/retry/401/403/429 stops. Fictional tests only were used. No private tenant was selected, loaded, printed, or contacted; effective status is `SOURCE_READY_AWAITING_TENANT`. Private allowlist loading/persistence, pagination/detail support, discovery UI, and any separately approved one-call smoke remain.
-
-Verification at this checkpoint:
-
-- `npm.cmd run lint`: PASS.
-- `npm.cmd run typecheck`: PASS.
-- `npm.cmd test`: PASS, 121 tests across 23 files.
-- Synthetic migration tests: PASS for fresh and existing intake databases; foreign-key checks are clean.
-- `npm.cmd run privacy:audit`: PASS, 171 tracked files and 292 historical path entries checked; known synthetic credential sentinel fixtures are explicitly normalized only for value-pattern scanning while their paths remain audited.
-- `npm.cmd run doctor`: PASS; private profile/directory, SQLite, and real environment boundaries are ignored as required.
-- `npm.cmd run db:status`: healthy preserved local database, schema v1, one pending migration, integrity PASS, zero foreign-key issues. No values or hashes were printed.
-- `git diff --check`: PASS before both implementation commits.
-- `npm.cmd run format:check`: not yet a final pass. It exposed existing formatting drift in repository documentation plus several then-unformatted new files; every changed source file reported at that point was normalized. A whole-repository final formatting pass and verification remain required before PR publication.
-
-No real profile, vacancy, database row, CV, cover letter, packet, source tenant, browser session, employer form, or submission was read into Git or published. No live source request or external application action occurred. The preserved real migration/re-evaluation/private smoke is deliberately deferred until backup/restore, full synthetic document/runner/privacy gates, and UI/service integration are complete.
-
-Next continuation order: finish backup/restore and owned loopback operations; add allowlist loading and source pagination/detail persistence; complete event projection and packet/document approvals; read the remaining installed Next.js mutation/cookie/header guidance before web edits; implement loopback request guards, queue/job/document/application/source UI, and the synthetic fixture site; then run full fictional integration/E2E/layout/security gates before any explicitly previewed and backed-up real migration.
-
-## Beta Core 50-minute continuation checkpoint — 2026-09-07
-
-Status remains `IN_PROGRESS`. This run started from `778755b10ffd0f834d62cc892cb7b7b21b6e25a4` on `feat/personal-live-beta-core`. No final implementation pull request was opened and no pull request was merged.
-
-Completed in this bounded run:
-
-- Added verified, create-new-only SQLite backup and exact-confirmation restore tooling. Backup uses SQLite's consistent backup operation and records a private manifest with digest, byte count, schema version, integrity/FK result, and table counts. Restore re-verifies the backup, asserts writer quiescence, creates and verifies a recovery backup, verifies a staged copy before replacement, rejects collisions, and rolls back the displaced original if final verification fails. The executable test uses only a synthetic temporary database; the preserved real database was not read, backed up, migrated, restored, or otherwise touched.
-- Added strict append-only Beta application-event validation, deterministic event projection, transactional event persistence, transition/from-state validation, idempotency conflict rejection, digest-bound document approval, packet derivation from current persisted job/profile/evaluation/document truth, and transactional stale-dependency invalidation.
-- Added the private source-allowlist reader for the single ignored path `data/private/source-allowlist.json`. Missing configuration remains `SOURCE_READY_AWAITING_TENANT`; file/symlink/size/realpath/schema checks fail closed, while readiness exposes a non-secret alias rather than a tenant token. Added explicit Greenhouse/Lever `LIST_JOBS` and `GET_JOB` operation guards and detail readers. Tests used fictional temporary configuration and injected transports only; real source calls remained zero.
-- Extended the privacy audit from tracked-tree and history-path checks to bounded all-ref historical blob-content checks. The first per-object implementation was interrupted after proving too slow and was replaced by one bounded `git cat-file --batch` process. The final audit passed without printing candidate values.
-- Added composite `preflight`, `quality`, and `release:check` commands, while leaving owned process start/stop for a later continuation.
-- Added a shared loopback mutation guard and applied it to import actions. It requires an exact loopback Host and matching Origin/port, rejects DNS-rebinding-style hosts, foreign/cross-port origins, missing origins, and mismatched forwarded hosts. Installed Next.js 16 mutation, Server Action, and header documentation was read before the web change.
-- Added a synthetic-mode-only loopback application site and POST route with fictional simple, unknown-required, conditional, upload, changed-page, redirect, CAPTCHA, MFA, access-denied, rate-limit, different-action, and lost-response cases. Browser integration proves mapping, synthetic upload digest verification, frozen review, one-use consent, exactly one local POST, replay rejection, and terminal `OUTCOME_UNKNOWN`; it performs no external application action.
-- Corrected E2E profile isolation by adding a validated filename-only override and configuring the E2E server to use a nonexistent ignored test profile. An initial failed browser run had loaded and rendered the owner's local profile into a local ignored failure artifact. No value was printed, committed, uploaded, or sent externally. The exact artifact directory was moved without inspection into ignored, recoverable `data/private/quarantine/e2e-failure-2026-09-07T1445`; the repeated full suite passed with the real profile excluded.
-- Corrected the production-build private-profile path annotation after Turbopack warned that the dynamic path could trace the whole project. The repeat build passed without that warning.
-
-Validation results:
-
-- `npm.cmd run format:check`: PASS after the repository formatting pass.
-- `npm.cmd run lint`: PASS after removing one unused import.
-- `npm.cmd run typecheck`: PASS.
-- `npm.cmd test`: PASS, 133 tests across 25 files. One concurrent run timed out in an existing Git-ignore subprocess test while four gates competed for resources; the isolated full rerun passed.
-- `npm.cmd run test:integration`: PASS, 9 tests across 3 files.
-- `npm.cmd run test:e2e`: PASS, 12 fictional/local browser tests. The focused synthetic application suite also passed 4 tests after its runner integration was added.
-- `npm.cmd run build`: PASS after the path-tracing correction; 32 route segments including the disabled-by-default synthetic routes were generated.
-- `npm.cmd run privacy:audit`: PASS, 179 tracked files, 305 historical path entries, and 306 historical blobs checked.
-- `npm.cmd audit`: PASS, zero vulnerabilities.
-- `npm.cmd run audit:production`: PASS, zero vulnerabilities.
-- `git diff --check`: PASS.
-
-Remaining highest-priority work:
-
-1. Implement owned loopback start/stop and finish the preflight/release-command rehearsal without touching the real database.
-2. Complete PDF output confinement, measured layout/overflow checks, full PDF/DOCX text parity, document approval UI, and remaining ten-template fictional golden coverage.
-3. Add session/nonce/replay protection beyond the Host/Origin boundary and complete queue, job, document, packet, application, and source-capability UI/service integration.
-4. Persist bounded source observations/detail pagination through the approved repository boundary; keep all real source calls disabled unless a private tenant is explicitly approved.
-5. Complete runner checkpoint/event persistence, all stop-condition browser coverage, accessibility/long-content/narrow-viewport checks, and the broader security suite.
-6. Only in a later time-bounded run with adequate recovery time: preview and verify a real backup, apply migration 0002 to the preserved private database, run integrity/FK/isolation checks, and perform the approved local re-evaluation/document/packet smoke. No employer form or real submission is authorized.
-7. Finish reality documentation, full release/privacy/history/CI checks, then open one implementation pull request only when the Beta Core is coherent; leave it unmerged.
-
-## Beta Core 50-minute continuation checkpoint — 2026-09-08
-
-Status remains `IN_PROGRESS`. This run started clean at `87da7a2a86d0adc0288e40fbc5fd68098126b94d` on `feat/personal-live-beta-core`. The GitHub CLI identity was `adeel1608`. The comparison repository and ApplyPilot both inherited `Adeel <adeel@qltyss.com>` from the same global Git configuration, so no verified personal author value existed to copy; repository-local/global identity, historical commits, and authentication were left unchanged.
-
-Implemented and synthetically verified in this run:
-
-- Operations: `preflight` now reports safe profile/database/migration/loopback/output/source/runner/backup/blocker states without private values. `release:check` runs preflight, quality, both audits, and an exact head/worktree/schema/source/runner/release summary; it deliberately classifies the current product `NOT_READY` despite passing tests. `local:start` binds only `127.0.0.1`, forces normal synthetic-disabled mode, performs no migration/discovery/runner action, stores owned PID metadata and logs only under ignored `data/private/runtime`, and refuses occupied ports, unsafe hosts, unsafe metadata, or a currently owned process. `local:stop` checks PID, random marker, entrypoint, repository, and creation time before termination and clears only proven-dead stale metadata. Unit tests cover stale PID reuse and unrelated-process refusal.
-- Operational rehearsal: the first start attempt exposed Windows CIM date serialization and exceeded the original startup wait. It failed closed but left the exact spawned process listening after its identity could not be established and removed metadata prematurely. The process command line/marker/creation were then independently verified and only that PID was stopped; port 3000 closed. CIM output was changed to ISO time, startup allowance increased, and an identity-uncertain timeout now retains metadata and refuses termination. The repeated start returned PASS on `127.0.0.1:3000`, `/` returned 200, the synthetic route returned 404 in normal mode, verified stop passed, and the port closed.
-- Backup/restore: the existing design was retained and its TypeScript CLI runtime defect was corrected by replacing unsupported top-level await with explicit async entrypoints. Backup manifests are now schema-validated, a backup root must exactly belong to the selected database's adjacent `data/private/backups`, and any failed/incomplete create removes only its newly allocated exact files. The expanded fictional rehearsal proves preview, restore into a separate destination, restore over a mutated original with verified recovery backup, schema 2, integrity PASS, zero FK issues, expected counts/data, confirmation refusal, destination collision, malformed manifest, corrupt backup, wrong schema, incomplete material, path escape, and lookalike-root rejection. No real backup or restore ran.
-- PDF hardening: PDF generation now accepts only a private-relative `.pdf` path, rejects absolute/traversal/UNC/ADS/reserved/trailing/wrong-extension paths, resolves the output parent beneath the real private root to reject symlink/junction escape, returns the PDF in memory, and writes create-new with no overwrite. The example script now targets ignored `data/private/generated/examples`. Fictional tests prove a real A4 PDF, collision refusal, one-page casual layout, at-most-two-page engineering layout, selectable DOM text, body text at least 10 pt, no clipping/horizontal overflow, and no image/sidebar/table/canvas/SVG content. Full artifact-level PDF/DOCX text extraction parity remains incomplete.
-- Synthetic runner/site: added changed-field, authentication-required, HTTP 401/403/429, unsupported-control, bounded slow-response, and success-receipt fixtures. They remain available only when explicit E2E synthetic mode is enabled and normal local start returns 404. Browser and domain tests prove CAPTCHA, MFA, authentication/access/rate-limit and unsupported-control stops, unknown-required pause, expired consent, packet/profile/document/domain/form change zero-click behavior, one valid fixture submission, replay rejection, and one-click terminal `OUTCOME_UNKNOWN` with no retry. No external request or real application action occurred.
-
-Validation and current classification:
-
-- `npm.cmd run preflight`: PASS_WITH_RELEASE_BLOCKERS; private profile VALID; real database PRESENT at schema v1 with one pending migration, integrity PASS and zero FK issues; source `SOURCE_READY_AWAITING_TENANT` with zero capabilities; real runner `TARGET_APPROVAL_REQUIRED`; backup readiness READY.
-- `npm.cmd run release:check`: PASS as a command, with `RELEASE_CLASSIFICATION=NOT_READY`; formatting, lint, typecheck, 166 unit tests across 26 files, 9 integration tests across 3 files, production build, privacy audit, full audit, and production audit passed. Both dependency audits found zero vulnerabilities.
-- `npm.cmd run test:e2e`: PASS, 14 fictional/local browser tests. Focused PDF and synthetic application suites also passed after their final changes.
-- `npm.cmd run local:start` / `npm.cmd run local:stop`: PASS on the corrected implementation; loopback-only bind and closed port verified.
-- `git diff --check`: PASS. The final staged and post-commit privacy/history checks are performed before push and recorded in the external checkpoint.
-- Real database state: `PRIVATELY_VERIFIED` read-only for profile/schema/integrity/FK status; migration/backup/private Beta smoke remain `NOT_IMPLEMENTED` in this run. Real source activation is `WAITING_FOR_APPROVAL`; real runner is `READY_DISABLED`/`TARGET_APPROVAL_REQUIRED`; no source calls occurred.
-
-Remaining highest-priority work:
-
-1. Complete artifact-level PDF/DOCX essential-content parity and the document approval/generate/regenerate/cover-letter UI without exposing a profile dump.
-2. Complete real/default job queue/detail, owner correction, applications/packet/timeline, and source-capability UI/service integration with version invalidation.
-3. Add the local mutation nonce/session/request binding and executable stale/replay/cross-port security tests beyond the existing Host/Origin protections.
-4. Persist bounded source run/observation/paging metadata while keeping Greenhouse/Lever real calls disabled until a pre-existing private approved tenant exists.
-5. Complete runner checkpoint/event persistence, final-review disclosure display, remaining control mapping/reconciliation, accessibility/responsive/empty/error-state coverage, and the remaining high-risk golden cases.
-6. Only after every remaining synthetic/document/security gate passes and a fresh adequate recovery window exists: stop the owned app, preview and create a verified real backup, migrate the preserved database additively to schema 2, run integrity/FK/mapping/isolation checks, and perform the approved local-only re-evaluation/document/packet/tracking smoke. Never visit or submit an employer form.
-7. Finish reality/privacy/history documentation and exact-head CI, then open one final implementation PR only when the manual-intake Beta Core is coherent; leave it unmerged.
-
-## Personal Live Beta Core completion record — 2026-09-08
-
-Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`. This continuation started from `9953f2872be544921b76f38c7a3831ac6efc9b50` on `feat/personal-live-beta-core`. It completes the remaining approved Beta Core scope without enabling a live source, real runner target, deployment, or submission. The final implementation pull request is the human/ChatGPT review boundary and must remain unmerged.
-
-Completed implementation:
-
-- Connected the default private-local job queue, job evidence/coverage/evaluation detail, owner correction overlays, version invalidation, shortlist/review/skip/preparing controls, private document generation/approval, packet preparation, application timeline, dashboard, and source-capability status. Fictional demonstrations remain explicitly collapsed/isolated and never use the private profile.
-- Added immutable source observations, job/evaluation versions, requirement evidence, corrections, artifacts/approvals, packets, discovery metadata, runner checkpoints, consents, and append-only application events across the repository/service boundary. New and re-evaluated real imports use the Beta version model while historical records remain retained.
-- Enforced process-local HttpOnly SameSite=Strict sessions and expiring, one-use, action/session-bound nonces on local mutations in addition to exact loopback Host/Origin/port and forwarded-host rejection. Responses that create the session are private/no-store. Replay, expiry, action mismatch, session mismatch, foreign origin, cross-port, and rebinding-style host cases fail closed.
-- Completed bounded Greenhouse/Lever GET readers, including Lever paging/cursor termination and safe capability/run persistence. No ignored allowlist was present, no tenant was guessed, and the effective state remains `SOURCE_READY_AWAITING_TENANT` with zero real source requests.
-- Completed private PDF/DOCX CV and cover-letter rendering, essential-content extraction/parity fixtures, create-new path confinement, measured page limits, and deterministic whole-evidence trimming without reducing the 10 pt floor. `pdfjs-dist@6.3.289` is exact-pinned as a development-only Apache-2.0 text/page inspection dependency; the lockfile, full graph, and production graph report zero known vulnerabilities.
-- Completed the synthetic-only runner disclosure and browser matrix for mapping, supported/unsupported controls, unknown required answers, approved document digests, CAPTCHA, MFA, authentication, access denial, rate limits, changed pages/actions/destinations/packets/profiles/documents, expiring/replayed consent, one valid fixture click, and terminal lost-response `OUTCOME_UNKNOWN` with no retry. The real runner remains `TARGET_APPROVAL_REQUIRED`.
-- Completed repeatable database-safe migration, private smoke, privacy, and publication tooling. Migration uses the verified consistent backup path; privacy auditing covers staged/tracked content, ignored-boundary probes, all refs/history blobs, build/test artifacts, selected private canaries, and CI artifact-upload policy without printing matching values.
-
-Real database and private acceptance:
-
-- The owned application was stopped before database work. The preserved schema-v1 database had integrity `PASS`, zero foreign-key issues, one canonical real job, and no Beta material. A consistent schema-v1 backup was created and verified, and its restore preview passed before migration.
-- Two initial private smoke attempts stopped safely: the first exposed an overly literal DOCX parity comparator, and the second exposed an over-page resume. Generated files from those attempts were moved without inspection into ignored private quarantine. The verified original backup was restored; restore collision guards also retained every recovery/staging file rather than overwriting it. The parity comparator and deterministic PDF fitter were corrected and passed fictional regressions.
-- The database was then restored to the verified pre-migration baseline, backed up again, and migrated additively to schema v2. Final state is 573440 bytes, schema v2, zero pending migrations, integrity `PASS`, and zero foreign-key issues. Original, recovery, and migration backups remain ignored/private and retained.
-- The single authoritative private smoke re-evaluated exactly one preserved job with `PRIVATE_LOCAL_PROFILE`, advanced its queue locally to `PREPARING`, generated and approved one PDF plus one DOCX CV with essential-content parity, left cover-letter requirement `UNKNOWN` without generating one, created one `REVIEW_REQUIRED` packet with unresolved destination/questions intact, and recorded four lifecycle events. The final default UI read-only smoke passed four private routes without screenshots/traces or printed values. Real source calls: `0`. Real application actions: `0`. Employer forms visited/uploads/submissions: `0`.
-- A post-browser privacy scan found selected private canary bytes in an ignored Next development compiler cache originating from the approved private UI process. The exact generated cache was moved without inspection into ignored private quarantine. The repeated audit passed. No private value, document, database, backup, vacancy, allowlist, browser state, credential, or quarantine material is tracked or included in the public diff.
-
-Local validation completed before publication:
-
-- `npm.cmd run format:check`: `PASS`.
-- `npm.cmd run lint`: `PASS`, zero warnings.
-- `npm.cmd run typecheck`: `PASS`.
-- `npm.cmd test`: an initial complete run exposed two Chromium PDF tests using Vitest's 5-second default; explicit 20-second browser-render budgets were added. A later composite release run likewise exposed one synchronous `git check-ignore` case exceeding that default under full-suite contention; its subprocess matrix received the same explicit bounded budget. Focused behavior never failed, and the complete suite is rerun at the final head. Latest completed result before the release rerun: `PASS`, 172 tests across 27 files.
-- `npm.cmd run test:integration`: `PASS`, 9 tests across 3 files.
-- `npm.cmd run build`: `PASS`, Next.js production build compiled/typechecked and generated 31 page units; private routes remain dynamic.
-- `npm.cmd run test:e2e`: the first 10-worker run reproduced an intermittent Next development JSON/compilation failure against the suite's one shared fictional SQLite/server. The suite was correctly serialized to match that shared-state contract. Final result: `PASS`, 16 tests with one worker.
-- `npm.cmd run preflight`: `PASS`; profile `VALID`, database schema v2/integrity `PASS`/zero FK issues, private output and loopback boundaries `PASS`, backup ready, manual-intake Beta `READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, real runner `TARGET_APPROVAL_REQUIRED`.
-- `npm.cmd run privacy:audit`: pre-staging result `PASS`, 196 tracked files, 354 historical paths, 355 historical blobs, 944 build/test artifacts, and 11 selected private canaries checked. After staging every new public file, the repeated result was `PASS` across 204 tracked/index files with the same history/artifact/canary coverage.
-- `npm.cmd audit` and `npm.cmd run audit:production`: `PASS`, zero vulnerabilities in both full and production graphs.
-- `npm.cmd run local:start` / `npm.cmd run local:stop`: `PASS`; the owned server bound only `127.0.0.1:3000`, and the verified owned process stopped normally.
-- `git diff --check` and staged `git diff --cached --check`: `PASS`. `git fsck --full` completed successfully; it reported only benign unreachable objects and no corruption.
-- Concern commit `843a293` contains the Beta Core implementation/tests/tooling; `5bd0fd4` closes reality documentation; `0ac7b8d` stabilizes the subprocess-backed policy matrix. `npm.cmd run release:check` passed on clean published head `0ac7b8d54a469365fc98a29f2521bdc6cf63c34b`, including 172 unit tests, 9 integration tests, production build, privacy and dependency audits, and `MANUAL_INTAKE_BETA_READY` classification. Its exact-head E2E repeat passed 16 tests and the post-browser privacy audit passed across 204 files, 410 history paths, 411 history blobs, 954 artifacts, and 11 selected private canaries.
-- PR #10 was opened unmerged from the exact branch. Its first push CI run failed before assertions because the newly browser-backed PDF unit tests ran before the workflow's later Chromium installation. The existing immutable, read-only workflow is corrected by moving that same Chromium installation ahead of unit tests; no permission, artifact, dependency, or test requirement is weakened. The corrected exact-head CI result remains the external final gate to avoid a recursive result-only commit. No further real database or private smoke mutation is required.
-
-Release classification and continuation:
-
-- Manual-intake Beta: `READY` after the staged/final local gates and exact-head CI pass. It remains owner-controlled and every artifact/application decision requires review.
-- Source-enabled Beta: `WAITING_FOR_APPROVED_TENANT`. A separately approved private capability and one scoped read-only smoke are required; no current tenant is enabled.
-- Personal Live V1: `NOT_READY`. A legitimate approved source and separately planned/reviewed real application target/runner remain mandatory. Synthetic runner evidence is not real-operation authority.
-- Hosted production: `NOT_READY` and unnecessary for this local Beta.
-- Next action after exact-head CI: direct ChatGPT/human review of the single final implementation PR. Do not merge, deploy, activate a source/target, run another private smoke, or submit an application under this task.
-
-## Post-publication Beta UI completeness audit — 2026-09-08
-
-The first exact-head PR #10 CI passed, but a requirement-by-requirement audit against the full continuation prompt found UI acceptance gaps that green domain/runner tests alone did not close. The branch and PR remain open and unmerged while these are completed; the earlier private migration/smoke remains authoritative and will not be repeated because this closure is code/fictional-test only.
-
-Objective and exact changes:
-
-- Add server-rendered real-queue filters for eligibility, fit, coverage, category, employment type, source, location, state, expiry evidence, unknown requirements, and queue state. Expose owner labels for `SHORTLIST`, `REVIEW_LATER`, `SKIP`, and `ARCHIVE`; archive maps to the existing durable `SKIPPED` state with a distinct audited reason rather than changing the already-applied schema.
-- Expose recommended/current CV template, a validated ten-category override, evidence and unsupported-gap preview, and a validated cover-letter tone override. Generation continues to use verified facts only, produces create-new PDF/DOCX artifacts, and binds approvals to the immutable artifact's job/profile/template/rule/renderer versions and digest.
-- Enrich `/applications` with selected current documents, cover-letter state, unknown-answer and approved-disclosure counts, runner state, blocker-driven next action, and explicit recovery guidance. Add nonce-protected, state-valid manual owner outcome recording: assessment/interview/offer/rejection require the submitted lifecycle, while withdrawal/expiry remain available only where the domain transition graph permits them. Never infer an employer response or provide a path that marks an unsubmitted packet submitted.
-- Add fictional browser/unit coverage for filtering, archive/review labels, template/tone controls, packet-blocked summaries, keyboard focus/200% zoom/long content, and manual-outcome transition authorization. Keep real/demo isolation, no-store session behavior, zero real source calls, and zero real application actions.
-
-Security/privacy/rollback: use existing Zod/domain enums, prepared statements, loopback session/nonces, append-only event validation, and safe display-only metadata. No migration, raw source rewrite, private value logging, document content route, external target, or browser state is added. A code revert removes these views/actions without touching private observations/artifacts/events. After implementation, rerun the full local release/browser/privacy gates, push the same branch, and require new exact-head PR CI green before returning the final review handoff.
-
-### UI completeness closure result — 2026-09-08
-
-Status: `COMPLETE_AWAITING_EXACT_HEAD_CI`. The existing PR #10 remains open and unmerged; this pass changes no migration, private record, source capability, or real runner authority.
-
-- `/jobs` now filters the real local queue by eligibility, fit, coverage, category, employment type, source, location, state, expiry evidence, unknown requirements, and owner queue state. `SHORTLIST`, `REVIEW_LATER`, `SKIP`, and `ARCHIVE` are distinct owner-facing choices; review-later/archive are retained as audited reason codes over the existing schema rather than a database change.
-- The job workspace now exposes current/recommended templates, all ten validated overrides, template strategy/priorities, a bounded verified-fact evidence preview, unsupported/unknown gaps, document lifecycle/version/evidence metadata, and a validated cover-letter tone. Regeneration is create-new: prior same-format artifacts become superseded, their digest approval is invalidated, and any packet that selected one becomes review-required/invalidated without overwriting history.
-- `/applications` now summarizes lifecycle and packet readiness, selected CV/letter artifacts and approval/staleness, unknown required answers, separate disclosure approvals, runner stop/recovery state, next action, and append-only timeline. Nonce-protected owner-observed outcomes use the existing domain transition graph and explicit confirmation; the UI offers no `SUBMITTED` transition and performs no employer action.
-- Focused filter/outcome/template/tone/repository tests passed. The composite `release:check` passed formatting, lint, typecheck, 178 unit tests across 29 files, 9 integration tests across 3 files, the 31-unit Next production build, privacy checks, and zero-vulnerability full/production dependency audits. It classified manual-intake Beta `READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, the real runner `TARGET_APPROVAL_REQUIRED`, and Personal Live V1 `NOT_READY` as intended.
-- The complete serialized browser suite passed 17 fictional/local tests, including exact queue controls, template/tone/evidence UI, narrow layout, keyboard focus, 200% zoom, full synthetic stop coverage, one fictional consent-bound click, and no retry after an unknown outcome. One prior run exposed only a flaky fixture-link navigation assertion; the locator now verifies the exact route before deterministic navigation, and the full rerun passed.
-- The privacy scanner detected selected private canary bytes in ignored E2E development compiler cache files. Each exact generated cache directory was moved without inspection into ignored private quarantine; the final post-browser audit passed across tracked/history/build/test surfaces and 11 private canaries. No private profile, database, vacancy, document, cache, credential, or quarantine material is tracked or staged.
-- The authoritative private database remains schema v2, 573440 bytes, with zero pending migrations, integrity `PASS`, and zero foreign-key issues. The prior single private smoke remains authoritative and was not repeated. Real source calls remain `0`; real application actions remain `0`; employer forms visited/uploads/submissions remain `0`.
-- Remaining publication step: commit and push this coherent closure on `feat/personal-live-beta-core`, verify PR #10 points to the exact new head with successful GitHub Actions, and stop for ChatGPT review without merging.
-
-## PR #10 human-review remediation blueprint — 2026-09-08
-
-Status: `IN_PROGRESS_REVIEW_FIXES`. Direct ChatGPT review requested changes at reviewed head `7af56299117d70f8c7a7b37602aa260b6b52cea3`. The clean working branch is still `feat/personal-live-beta-core`; GitHub CLI is authenticated as `adeel1608`; PR #10 is open, unmerged, and points to the reviewed head. This is a bounded correction pass on the same branch and PR, not a new feature train.
-
-### Current state and objective
-
-The approved Beta architecture, additive schema v2, private migration, private local smoke, source-disablement, and real-runner boundary remain intact. Review identified correctness gaps in legacy vacancy reprocessing, profile snapshot activation/binding, stale generation, correction evidence/location versioning, packet expiry/duplicate safety, v2 import integration coverage, Lever path confinement, the document-type contract, local document inspection, and the local release script. The objective is to fix only those findings, prove them with fictional/synthetic regressions, then take one fresh verified backup and perform one offline reprocess/document/packet refresh of the existing private vacancy. No migration file will change.
-
-### Assumptions and requirements
-
-- The one canonical private legacy workflow can be reconstructed only through its stored import/source IDs and confirmed stored material. If source batch/record identity or segment boundaries are absent, inconsistent, or ambiguous, reprocessing stops with `LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT`; title/company matching is forbidden.
-- Original import material, source observations, job versions, evaluations, documents, approvals, packets, and events are immutable history. Reprocessing/correction creates new versions and invalidates dependants; it does not rewrite or delete history.
-- One canonical stable profile serialization/hash helper is shared by persistence and generation binding. Reusing an existing A snapshot after A -> B -> A must reactivate A's exact stored version.
-- Document generation is an explicit consumer of the current job/profile/evaluation tuple. It fails with stable re-evaluation-required codes on any hash, active-version, job-version, or staleness mismatch and never re-evaluates implicitly.
-- Correction copies unchanged source field/requirement evidence with original provenance, adds owner evidence only for corrected fields, and reuses the deterministic conservative Australian location parser. No distance is derived.
-- Packet readiness derives expiry and duplicate-review safety from persisted current evidence. Expired and unresolved duplicate states block; unknown expiry remains explicitly unknown/review-required rather than active.
-- Runtime document types align to schema v2 (`CV | COVER_LETTER`); `OTHER` has no current use and is removed without migration.
-- The document route accepts only an artifact ID plus an allowlisted disposition mode. It verifies exact loopback Host/request boundary and the current HttpOnly session, performs the database lookup, confines the recorded private-relative path through realpath, verifies bytes against the stored digest, returns draft PDFs for inline review and PDF/DOCX downloads with no-store/nosniff/sanitized headers, and rejects stale/missing/unsafe artifacts. No public/static copy or arbitrary browser path exists.
-- Greenhouse semantics remain unchanged. Lever tenant URLs and every redirect require an exact path-segment boundary. No tenant is enabled, enumerated, or contacted.
-- The real application runner remains `TARGET_APPROVAL_REQUIRED`; external form visits, uploads, and submissions remain disabled.
-
-### Architecture, data flow, and proposed file scope
-
-- Candidate profile: add a stable canonical content-hash helper in `@applypilot/candidate-profile`; make `JobImportRepository.persistProfileVersion` reactivate an existing identical version and expose/read the exact binding needed by services. Add A -> B -> A and stale-dependency regressions.
-- Import/reprocess: extend the existing importer/repository boundary with a GENERAL offline legacy reprocess method. Resolve canonical job -> exact `job_source_records`/import record/batch -> stored confirmed content and recorded segment identity; run the current parser/extractor; persist a new immutable observation/version/evidence/evaluation through the same v2 path. Add a schema-v2 integration suite using the actual `JobImportRepository` for new/repeat/changed imports and profile modes.
-- Beta repository/workspace: carry field and requirement evidence forward during owner correction, add corrected-field evidence, normalize changed location structure, centralize current evaluation/profile checks for generation, invalidate profile-dependent documents/approvals/packets on version changes, and derive packet expiry/duplicate state.
-- Runner contract: change the in-memory packet expiry representation to `ACTIVE | EXPIRED | UNKNOWN` and add `JOB_EXPIRY_UNKNOWN` readiness handling if this remains migration-free; remove `OTHER` from packet/document runtime schemas.
-- Sources: replace prefix string matching in the shared public-posting boundary with exact segment-boundary validation used for initial and redirect URLs; add sibling-prefix tests.
-- Web: add `apps/web/app/documents/[artifactId]/route.ts` and a server-only artifact resolver/response helper, extend the current document list with safe preview/download links, and add fictional route/browser tests. Applicable local Next.js 16 route-handler, dynamic-route, cookies, and headers guidance must be read before implementation.
-- Operations: flatten `release:check` so E2E executes before the post-browser privacy audit and release summary. Keep individual scripts and CI checks. Update the existing private smoke to use the new reprocess path and current generation binding; it remains offline and outputs safe counts/status only.
-- Documentation: record implementation/results here and update the existing PR #10 body with exact final counts after all checks.
-
-No new production dependency or migration is planned. Expected files are confined to the packages/services/routes/scripts/tests directly implicated above. A genuine need for schema 0003, `OTHER`, ambiguous real source reconstruction, or additional source/runner authority is a stop condition requiring a new reviewed design rather than scope expansion.
-
-### Security, privacy, and failure risks
-
-Primary risks are reconstructing the wrong stored segment, strengthening an unknown expiry/duplicate state, mixing profile file bytes with the wrong database version, serving a path outside private storage, digest/time-of-check drift, redirect prefix collision, accidentally rewriting applied migration 0002, or compiling private values into test/build artifacts. Controls are exact stored identifiers and hashes, Zod boundaries, SQLite transactions/prepared statements, immutable version rows, fail-closed stable codes, create-new files, realpath confinement, post-open digest verification, loopback/session enforcement, no-store/nosniff headers, fictional browser data, and post-browser canary scanning. Tests and tooling must never print private values. No real screenshot, video, trace, source request, or employer interaction is permitted.
-
-### Testing and acceptance strategy
-
-- Unit/repository: stable profile hashing/reactivation A -> B -> A; stale profile/evaluation generation refusal; approval/packet invalidation; evidence carry-forward and owner evidence; Melbourne VIC -> Sydney NSW structure; packet ACTIVE/EXPIRED/UNKNOWN and duplicate resolved/unresolved/unknown; runtime type alignment; Lever exact/sibling/redirect path boundaries; document route ID/path/session/digest/content-type/disposition safety.
-- Integration: actual migrations 0000/0001/0002 plus actual import repository flow for new user content, unchanged repeat, explicitly changed update, observation/version/evidence/evaluation linkage, private profile provenance, demo non-evaluation, missing-profile no-fallback, and offline legacy reprocess history preservation.
-- Browser: fictional draft PDF inline/open/download and PDF/DOCX downloads through the local artifact-ID route; no arbitrary path; current UI controls remain responsive and submission-disabled. No real artifact is captured.
-- Full gates: format, lint, typecheck, unit, integration, build, E2E, audits, post-browser privacy, doctor, database status, quality, preflight, flattened release check, diff check, strict fsck, owned local start/stop/closed port, and exact-head GitHub CI.
-- Private closure only after synthetic gates: stop owned app, create/verify a fresh consistent backup without deleting older backups, perform exactly one stored-ID offline legacy reprocess, verify old/new versions/evidence/current extractor/current profile binding/integrity/FKs with safe counts, generate/verify/approve new PDF+DOCX, preserve actual cover-letter state, prepare one new review-required packet without fake submission, and repeat the full private publication audit.
-
-Acceptance requires every enumerated human-review finding to pass, schema v2 with zero pending migrations/integrity PASS/zero FK issues, real source calls and employer/application actions all zero, no private material in Git/build/test/CI inputs, PR #10 updated to and green at the new exact head, and PR #10 left open/unmerged. Rollback is by focused commit revert plus restoration from the newly verified backup if the private reprocess fails; never delete history or down-migrate.
-
-### Exact implementation order
-
-1. Commit this remediation blueprint before application changes.
-2. Implement stable profile hashing/reactivation and current tuple validation with fictional repository tests.
-3. Implement offline stored-ID legacy reprocessing and the full schema-v2 import/reprocess integration matrix.
-4. Fix correction evidence/location carry-forward and packet expiry/duplicate truth, with regressions.
-5. Align document types and harden Lever path-segment validation/redirect tests.
-6. Implement the local artifact-ID serving route and fictional unit/browser tests after reading bundled Next.js guidance.
-7. Make `release:check` include E2E followed by privacy, and update operational tests/scripts without weakening CI.
-8. Run every synthetic/full local gate. Stop and fix all failures before private work.
-9. Create and verify a fresh private backup; perform one offline real vacancy reprocess and one current document/packet refresh; verify safe counts/integrity/FKs and zero external actions.
-10. Run the final privacy/publication matrix, commit by concern, push the same branch, update PR #10's body to actual results, wait for exact-head CI, and stop unmerged for ChatGPT re-review.
-
-### PR #10 human-review remediation result â€” 2026-09-08
-
-Status: `COMPLETE_AWAITING_EXACT_HEAD_CI`. The correction remains on `feat/personal-live-beta-core` and the existing PR #10 remains open and unmerged. No migration, source capability, external runner authority, application destination, or repository setting changed.
-
-Completed review fixes:
-
-- Added a general offline legacy reprocess path that resolves the exact stored source record, import record, one-job batch, and immutable source observation by stored identifiers. It re-runs the current parser/extractor, creates a new job version and typed evidence tied to the original observation, then creates a current private-profile evaluation. Multi-job or ambiguous provenance stops with `LEGACY_REPROCESS_REQUIRES_OWNER_REIMPORT`. Fictional schema-v2 integration proves historical preservation and the safe refusal.
-- Centralized the candidate-profile content hash, reactivates an existing identical snapshot, and verifies the profile file hash, active version, evaluation profile/job versions, evaluation staleness, and safe output root before document content is generated. The UI exposes stable re-evaluation-required states. A -> B -> A, changed-file, stale evaluation, approval invalidation, packet invalidation, and permanently stale old-artifact regressions pass.
-- Owner corrections copy unchanged source field evidence and typed requirement evidence with their original observation references, add `OWNER_CORRECTED` evidence only for changed/derived fields, and use the shared conservative Australian location helper. The Melbourne/VIC -> Sydney/NSW regression retains no old VIC structure and derives no distance.
-- Packet runtime truth now uses `ACTIVE | EXPIRED | UNKNOWN` and `CLEAR | UNRESOLVED | UNKNOWN`; expired/unknown expiry and unresolved/unknown duplicate states block readiness. Document runtime types now match applied schema v2 exactly (`CV | COVER_LETTER`) without changing migration 0002.
-- Schema-v2 actual-import coverage applies 0000/0001/0002 and proves new, unchanged repeat, explicit changed update, immutable observations/versions, current typed evidence, private fit/coverage evaluation, demo exclusion, missing-profile exclusion, current evaluation linkage, and ambiguous legacy refusal.
-- Lever endpoint and every redirect now require exact tenant path-segment boundaries; exact tenant/base and job paths pass while sibling-prefix initial/redirect paths stop. Greenhouse behavior remains green. No capability exists and no source request ran.
-- Added a loopback/session-protected artifact-ID route. It performs the SQLite lookup, rejects absolute/traversal/realpath escape and stale artifacts, opens only a regular confined file, verifies its digest/signature, and returns no-store/nosniff responses with exact PDF/DOCX types and sanitized disposition. Draft PDF inline preview and PDF/DOCX download are exposed without public/static copies; unit/browser tests use fictional bytes only.
-- Flattened `release:check` so format, lint, typecheck, unit, integration, build, E2E, post-browser privacy, full/production dependency audits, and an explicitly gated release summary run in order. The production build uses nonexistent build-only private-profile/database filenames so private runtime state is never an input to build-time rendering. The privacy scanner now treats four-to-six-byte compiler-database matches as canaries only in readable artifact text, avoiding demonstrated isolated binary collisions while retaining exact detection for readable short values and all longer canaries.
-
-Private closure and safety results:
-
-- Fresh verified backup: `backup-2026-09-08T08-34-53.537Z-a36f16c8`, schema v2, integrity PASS. Older backups were not deleted.
-- Exactly one existing private vacancy was reprocessed from stored local material. Result: one canonical job, historical versions preserved, current extractor `2.0.0` evidence present, evaluation context `PRIVATE_LOCAL_PROFILE`, exact current profile/version binding, integrity PASS, and zero foreign-key issues. Real source calls remained 0.
-- Prior documents/approvals/packet were invalidated by the new job version. A new private CV PDF/DOCX pair was generated from the exact current job/profile/evaluation tuple, content parity passed, and only those current artifacts were approved. The actual cover-letter state remained `UNKNOWN`, so no cover letter was generated. A new packet is `REVIEW_REQUIRED`; the existing four historical lifecycle events were preserved and no second application/submission was created.
-- A pre-smoke audit found a prior build cache containing selected canary bytes; the exact disposable `.next` directory was moved intact to a private local temp location because direct deletion was policy-blocked. A fresh isolated build initially produced only isolated four-byte surname collisions in opaque SST records (5-7 printable-byte runs, no readable profile context and no other private canary). The tested scanner correction and build isolation produce a post-build/post-browser privacy PASS. No private profile, vacancy, database, backup, PDF, DOCX, packet, cache, session, trace, screenshot, or report is tracked, staged, or present in the PR diff.
-
-Validation on clean implementation head `41dd3e1ef8b044f876efa3a0628ba0ddaeb092eb`:
-
-- `npm.cmd run release:check`: PASS. This includes `format:check`, lint, typecheck, 189 unit tests across 31 files, 13 integration tests across 3 files, the 31-route Next production build, 18 serialized fictional/local E2E tests, post-browser privacy audit across 217 tracked/index files, 462 history paths, 463 history blobs, 663 build/test artifacts and 11 selected private canaries, plus zero-vulnerability full and production dependency audits.
-- Release classification: `MANUAL_INTAKE_BETA_READY`; source-enabled Beta remains `WAITING_FOR_APPROVED_TENANT`; the real runner remains `TARGET_APPROVAL_REQUIRED`; Personal Live V1 remains `NOT_READY` pending separately approved real source/runner scope.
-- `npm.cmd run db:status`: schema v2, pending migrations 0, integrity PASS, foreign-key issues 0.
-- `npm.cmd run doctor`: PASS. `npm.cmd run preflight`: PASS with manual-intake Beta READY and capability count 0.
-- `npm.cmd run local:start` / `npm.cmd run local:stop`: PASS on `127.0.0.1:3000`; port 3000 closed afterward. An earlier start immediately after intentional `.next` removal failed closed because no production build existed; after the isolated release build the required start/stop rehearsal passed.
-- `git diff --check`: PASS. `git fsck --strict`: PASS with benign dangling objects only and no corruption.
-- Real employer form visits, uploads, submissions, application actions, and source calls: all 0.
-
-Remaining publication steps only: commit this result note, rerun final checks on the exact documentation head, push the same branch without force, update the existing PR #10 body with the actual 189/13/18 counts and new regressions, require exact-head GitHub Actions green, and stop for ChatGPT re-review without merging.
-
-## R2 matching quality + R1 source-enabled Beta plan gate — 2026-09-08
-
-Status: `PLAN_ONLY_AWAITING_HUMAN_REVIEW`. The historical sentence immediately above belongs to the pre-merge PR #10 result record; it is preserved as evidence and is no longer the current next action.
-
-### Current state and objective
-
-Baseline verification found clean `main` equal to `origin/main` at merge commit `4a0462d24b9a8db79ec49ff64242405d8f96f40d`; PR #10 is merged and its reviewed head remains `b7872fe5791f1baa88d9e95e2b7096926ea44813`. GitHub CLI is authenticated as `adeel1608`. The local doctor, database status, preflight, and privacy audit pass; schema is v2 with zero pending migrations, integrity PASS, zero foreign-key issues, no source capability, Manual-intake Personal Beta READY, source-enabled Beta WAITING_FOR_APPROVED_TENANT, and runner TARGET_APPROVAL_REQUIRED. The planning branch was created directly from that baseline. No private smoke, source call, application action, or repository setting change is part of this gate.
-
-The objective is to replace broad roadmap prose with implementation-ready designs for two deliberately separate trains:
-
-1. [R2 matching quality](docs/R2_MATCHING_QUALITY_PLAN.md): typed field/evidence states and modalities; Australian geography, employment/hours/schedule, salary unknown-period, document tri-state, typed requirement/work-right structure; legal/employer/preference semantics; verified-only scoring; calibration; durable cross-source duplicate review; queue freshness; corrections; typed audit; additive persistence; and evidence-first UI.
-2. [R1 source-enabled Beta](docs/R1_SOURCE_ENABLED_BETA_PLAN.md): exact owner-approved capability records; current Greenhouse/Lever evidence; candidate-blind source boundaries; SSRF/DNS/redirect/budget/retry/cancel/crash/log/tenant controls; one selected family; and a future separately authorised one-tenant smoke.
-
-### Assumptions, requirements, and non-goals
-
-- The merged Manual-intake Personal Beta remains the release baseline. R2 improves confidence/structure but does not retroactively revoke the narrow owner-reviewed manual release.
-- Unknown remains unknown; source-stated is not automatically verified truth; owner correction does not erase source history; a derived value cannot increase certainty or modality.
-- Only current verified candidate facts may add fit points. A score never clears blocker/review/stale/conflict/coverage state and is never a hiring probability.
-- Source and candidate pipelines remain separated: candidate data, preferences, documents, answers, sessions, and credentials are absent from discovery requests.
-- No tenant is guessed or enumerated. Public vendor documentation is not blanket employer/use authority. One exact private capability requires separate owner/policy approval and expires/revokes fail closed.
-- All schema evolution is additive after reviewed SQL and a verified ignored backup. Applied migration 0002 is immutable; private database migration is not authorised by this planning task.
-- This task does not implement R1/R2 code, activate any tenant, make a live source request, visit an employer form, upload, submit, deploy, rewrite history, or merge its PR.
-
-### Architecture and data flow
-
-R2 preserves domain purity and immutable versioning:
-
-`local/source observation -> Zod boundary -> field + requirement evidence state/modality -> canonical job version -> classed eligibility + coverage -> verified-only score -> duplicate review/current queue decision -> owner correction/re-evaluation -> later document/packet consumer`
-
-R1 remains a candidate-blind upstream producer:
-
-`ignored exact owner capability -> expiry/revocation/operation preflight -> pinned bounded HTTPS GET -> Zod source DTO -> transactional run/page/observation -> R2 normalization -> owner review queue`
-
-Every downstream material decision binds job/profile/rule/weight/evidence/duplicate versions. Changes mark evaluations, queue decisions, artifacts, and packets stale rather than overwriting history. Audit accepts only event-specific opaque IDs/enums/versions/codes/counts/timestamps; free-form source/profile/document/network values are rejected.
-
-### Proposed implementation file scope
-
-- R2A: `packages/job-model`, `packages/job-importer`, source mappers, database schema/repositories and the next unused additive migration, normalization fixtures/docs, evidence UI.
-- R2B: `packages/eligibility-engine`, `packages/fit-scorer`, evaluation repository/service, fixtures, eligibility/fit UI/docs.
-- R2C: `packages/job-normalizer`, duplicate/queue/correction/audit repositories and actions, `/jobs` UI, integration/browser tests.
-- R2D: fictional golden fixtures, private aggregate calibration harness, dashboard/detail uncertainty UX, accessibility/browser/release docs.
-- R1A: `packages/job-sources` shared boundary/private allowlist, capability/run persistence, source status UI, synthetic network/security tests.
-- R1B: one selected reader (recommended Lever), structured source schema/mapping, observation persistence, fictional contracts.
-- R1C: normally safe evidence documentation after one separately authorised private smoke; capability/raw data remains ignored and uncommitted.
-
-The [R2 defect table](docs/R2_MATCHING_QUALITY_PLAN.md#current-defect-disposition) records `FIX_IN_R2 | ALREADY_FIXED | DEFER` with file/function evidence. The two non-blocking PR #10 carryovers remain assigned outside R2: before packet preparation, re-resolve the current private profile/apply the document-style current tuple gate under R4/R11; replace the cosmetic `Â·` separator under R8 UI hardening.
-
-### Dependencies, risks, security, and privacy
-
-R2A depends only on the merged manual Beta and reviewed backup/migration design. R2B depends on R2A. R2C depends on R2A/R2B version bindings. R2D depends on R2A–R2C. R1A is reviewed independently but R1B normalization depends on R2A; R1C depends on reviewed/merged R1A/R1B, R2A, a new exact owner capability approval, policy review, and adequate recovery time.
-
-Principal risks are false certainty, requirement-modality loss, class conflation, ranking bias, false duplicate merge, stale queue/preparation state, correction/audit provenance loss, private calibration leakage, arbitrary network destinations, DNS rebinding, unbounded responses/retries, cursor/crash duplication, tenant crossover, and accidental write/application behavior. The exact asset/threat/impact/control/test/residual-risk/stop-condition matrix is in [THREAT_MODEL_V1](docs/THREAT_MODEL_V1.md#r1r2-next-gate-threat-register--2026-09-08). Any private-data finding, unpinned destination, unclear source authority, unsafe migration mapping, automatic ambiguous merge, positive unverified score, or real action path is a stop condition.
-
-### Testing strategy and acceptance
-
-Each implementation slice has its own dependencies, files, schema/data changes, tests, privacy/rollback, human gate, and acceptance criteria in the focused plans. Across the trains, required gates include:
-
-- field/modality/span and sparse-coverage fixtures; full AU location, salary/doc tri-state, structured requirements/work-right, employment/schedule regressions;
-- complete legal/employer/preference outcomes, current verified-only score ablation, determinism/bounds/monotonicity, blocker/no-recommendation, and fictional golden rankings;
-- cross-tenant/repost/conflict/link/split, queue staleness, typed correction, audit allowlist, crash/idempotency integration cases;
-- additive migration preview/backfill/count/FK/integrity/backup/restore tests with legacy ambiguity mapped to UNKNOWN;
-- R1 exact URL/host/path/query/operation/expiry/revocation, IPv4/IPv6/rebinding/pinning, redirects, content type/size/body timeout/cancel, retry/rate/cursor/concurrency/crash/log/private-canary tests using injected transports only;
-- browser evidence/uncertainty/dedup/queue/accessibility/responsive/error states; and
-- format, lint, strict typecheck, unit, integration, production build, E2E, full/production dependency audit, diff/privacy/history/build audit, and exact-head CI.
-
-Acceptance requires the focused plans to be internally consistent, current status docs to distinguish READY/WAITING/NOT_READY correctly, all named defects/carryovers to have ownership, and this documentation-only PR to be green and left unmerged for review. It does not require or permit application-code behavior to change.
-
-### Rollback and exact implementation sequence
-
-Planning rollback is a normal revert of this documentation commit; it changes no runtime/private data. Future code rollback disables the affected parser/rule/scorer/source capability and pins retained prior versions. Migrations never delete legacy rows; restore occurs only from an owner-approved verified backup. Source rollback revokes/disables one capability while retaining safe observations. A submitted application history is never rewritten.
-
-Exact forward sequence after this plan is separately reviewed and merged:
-
-1. Authorise and implement **R2A evidence model and normalization only** on a new feature branch.
-2. Review the additive schema/migration and fictional evidence fixtures; run complete gates; leave its implementation PR unmerged.
-3. After R2A human review/merge, separately plan/authorise R2B, then R2C, then R2D.
-4. R1A may proceed only under separate implementation authority and with zero real calls. R1B recommends Lever and consumes R2A evidence.
-5. R1C begins only after a fresh explicit one-tenant approval. Its first smoke is one Lever LIST request, `skip=0`, `limit=25`, at most 2 MB, zero redirects/retries/details, followed by local integrity/privacy/idempotency checks and default disablement.
-6. A separate post-smoke human decision is required to declare source-enabled Personal Beta ready. No R1 result authorises a real runner or application action.
-
-Historical plan decision: **R2A — evidence model and normalization** was selected as the next implementation slice. Its implementation result and current unmerged-review gate are recorded below.
-
-### Planning implementation and local validation record
-
-- Changed scope is documentation only: `PROJECT_PLAN.md`, `README.md`, and files under `docs/`. No application code, dependency, workflow, migration, private runtime record, repository setting, or source capability changed.
-- Current-status documentation now records PR #10 merged, merge `4a0462d24b9a8db79ec49ff64242405d8f96f40d`, Manual-intake Personal Beta READY, source-enabled Personal Beta WAITING_FOR_APPROVED_TENANT, Personal Live V1 NOT_READY, and runner TARGET_APPROVAL_REQUIRED. Historical checkpoint sections remain historical.
-- R2 audit records 21 matching defects: 16 `FIX_IN_R2`, 5 `ALREADY_FIXED`, plus two separate PR #10 carryovers deferred to R4/R11 and R8 UI hardening. The corrected audit separates already-gated location/work-type/category preferences from the R2B-owned unverified commute-negative branch and records that `REVIEW_REQUIRED` can currently reach `recommended=true`. R2A–R2D are independently reviewable slices; R2A is the only recommended next implementation choice.
-- R1 compares current official Greenhouse and Lever documentation without a listing request. Lever is recommended for a future first family because one `skip`/`limit` page and plaintext/structured fields permit tighter bounds; no tenant is selected. R1A–R1C remain separately gated.
-- `npm.cmd run release:check`: PASS on the complete staged planning content before this result-only note. Doctor/database/preflight passed; formatting, lint, typecheck, 189 unit tests across 31 files, 13 integration tests across 3 files, production build with 31 page units, and 18 serialized fictional E2E tests passed. Privacy audit passed across 219 tracked/index files, 463 history paths, 464 history blobs, 687 build/test artifacts, and 11 selected private canaries. Full and production dependency audits reported zero vulnerabilities. Release classification remained `MANUAL_INTAKE_BETA_READY`; capability count remained 0.
-- The result-only note is followed by formatting, lint/typecheck, staged diff/privacy/history checks, commit/push, and exact-head GitHub Actions. CI is the final complete rerun on the committed head.
-- Real source calls, employer form visits, external uploads, submissions, real application actions, private document regeneration, private packet creation, and destructive/private smoke operations during this planning gate: all `0`.
-
-# R2A evidence model and normalization implementation — 2026-09-09
-
-Status: `IMPLEMENTATION_COMPLETE_AWAITING_FINAL_PR_REVIEW`. Human-approved plan PR #11 was corrected only for the reviewed commute-preference and `REVIEW_REQUIRED` recommendation audit findings, passed local and exact-head CI, and merged normally as `78dc90e133f9ce39e8a651e4f975e698543b891c`. This implementation branch, `feat/r2a-evidence-normalization`, was created from that clean merged main. R2B, R2C, R2D, R1 activation, real source requests, real browser targets, external uploads, and submissions remain unauthorised and unimplemented.
-
-## Current state and objective
-
-Schema v2 already retains immutable source observations, job versions, basic field/requirement evidence, owner corrections, evaluation versions, documents, packets, and application history. The current parser is still narrow: ordinary unpunctuated headings are weak, employment type can fall back to whole-ad keywords, schedule is normally empty, location is a single optimistic projection, salary disappears when its period is unknown, document requirements are partly projected to booleans, typed capabilities are incomplete, and empty recognized arrays can overstate coverage.
-
-R2A will add a complete versioned truth/evidence layer from an immutable source observation through typed field/requirement evidence and field-family coverage to a new normalized job version. It must preserve source wording and bounded provenance without making R2B eligibility or scoring decisions. Existing schema-v2 data and every historical evaluation/artifact/packet/application row remain readable and retained.
-
-## Requirements and architecture
-
-- Add independent evidence state `SOURCE_STATED | OWNER_CORRECTED | DERIVED | UNKNOWN | CONDITIONAL | CONFLICTING` and requirement modality `REQUIRED | PREFERRED | CONDITIONAL | NEGATED | UNKNOWN`; parser confidence never changes either axis.
-- Every material record carries stable evidence ID, observation/version linkage, canonical field/kind, bounded source path/span, normalized typed value, extractor/rule version, derivation/correction/conflict linkage, and a bounded local excerpt/digest. Text spans must satisfy `0 <= start <= end <= immutable source length` and never cross source versions.
-- Add field-family coverage `COMPLETE | PARTIAL | UNKNOWN` for identity, geography, employment, hours, schedule, compensation, dates, skills, experience, education, licences, certifications, work rights, vehicle, physical requirements, training, and documents. Empty arrays do not imply complete; material unparsed spans remain explicit.
-- Add deterministic ordinary-heading grammar and structured-first parsing. Structured and prose conflicts retain both values in a linked conflict set. No source-specific rule is tailored to the existing private vacancy.
-- Add typed Australian location alternatives, scoped employment evidence, unit-preserving hours, schedule/roster, typed salary including unknown period, tri-state document requirements, structured experience/education/licence/certification/work-right/vehicle/physical/training evidence, and negation/conditional grammar. Commute minutes and kilometres remain separate; no legal or candidate rule runs in R2A.
-- Owner correction remains an immutable overlay: source observations never change, unaffected evidence carries forward, corrected evidence is `OWNER_CORRECTED`, and downstream data is invalidated by the existing version contract.
-- All job content remains inert data. R2A performs no URL dereference, tool/AI invocation, policy change, network call, or candidate-data logging.
-
-The implementation uses a new `@applypilot/job-model` R2A evidence contract and a pure `@applypilot/job-importer` normalization/extraction pipeline. Existing `Job` remains the compatibility projection consumed by the current R2B-era engines. A schema-v3 repository persists R2A evidence against immutable `source_observations` and `job_versions`, while the current evaluation/documents/packet become stale through the existing dependency invalidation service when a new job version is created.
-
-Data flow:
-
-`stored/user source bytes -> immutable source observation -> structured-first section/span parser -> typed field evidence + requirement evidence + coverage -> compatibility Job projection -> immutable job version -> additive R2A evidence persistence -> existing downstream rows stale`
-
-## Proposed files, schema, and dependencies
-
-- Create `packages/job-model/src/r2a.ts` for all closed R2A schemas/types and export it from the package.
-- Create `packages/job-importer/src/r2a-normalization.ts` plus fictional golden tests/fixtures; update the existing parser/extractor only to call this shared pipeline and preserve legacy DTO compatibility.
-- Add migration `packages/database/drizzle/0003_r2a_evidence_normalization.sql`; never modify 0000/0001/0002.
-- Add `job_field_evidence_v2`, `requirement_evidence_v2`, `evidence_derivations`, and `job_normalization_coverage` with explicit FKs, CHECK constraints, indexes, immutable row identities, conservative `UNKNOWN` legacy backfill, and no destructive down migration. Do not create R2B/R2C tables.
-- Extend database schema exports/repositories with a transactional R2A version writer/reader and synthetic schema-v2 upgrade/restore/idempotency tests.
-- Update job detail server UI to show safe bounded state/modality/coverage/conflict/parser/version information without candidate values or R2B conclusions. Read the installed Next.js 16 route/server guidance before editing.
-- Update normalization, threat, checklist, and project reality documentation after results are known.
-- Add no runtime dependency. Continue using Zod, SQLite, Vitest, Playwright, and existing backup/restore tooling.
-
-## Risks, privacy, and rollback
-
-Primary risks are span/version mismatch, structured/prose certainty inflation, false conflict resolution, legacy guessing, destructive migration, accidental private excerpt publication, and stale downstream material appearing current. Controls are strict Zod refinement, immutable observation/version FKs, closed enums/CHECKs, stable deterministic IDs, conservative `UNKNOWN` backfill, synthetic upgrade/restore rehearsal, safe aggregate-only logs, and post-reprocess privacy scanning.
-
-Rollback is a normal unmerged-branch/code revert while schema-v3 tables remain dormant, or restoration of the verified pre-migration private backup after an accepted recovery decision. No down migration deletes R2A or legacy rows. The real database is touched only after every synthetic quality/migration gate passes, owned writers are stopped, a fresh verified ignored backup and preview succeed, and enough recovery time remains. Any mapping, integrity, FK, isolation, or privacy failure stops work without direct SQL repair.
-
-## Testing strategy and acceptance criteria
-
-Fictional golden coverage must include hospitality, retail, admin/reception, warehouse, engineering, robotics, automation, embedded, internship, health/licensed, remote, and multi-location roles. It must exercise required/preferred/conditional/negated/unknown/conflicting language; no experience; vehicle versus licence; Australian versus foreign licence; valid versus unrestricted rights; sponsorship; hourly/annual/unknown-period salary; weekly/fortnightly hours; overnight/fixed/flexible roster; tri-state documents; selection criteria; and multi-state locations.
-
-Synthetic acceptance requires schema-v2 population, backup, migration preview/apply, conservative backfill, row/link/FK/integrity preservation, R2A reprocess, idempotency, and restore rehearsal. Complete gates before private work are format, lint, typecheck, unit, integration, build, E2E, privacy, both dependency audits, migration/backup/restore, diff check, and strict fsck.
-
-Private acceptance then requires a fresh verified backup, additive schema-v3 migration with zero pending migrations/integrity/FK issues, and one offline reprocess of the existing stored vacancy from its current immutable local source. The old observation, job version, evaluation, documents, packet, and application history remain; one new R2A version/evidence set is current; affected downstream rows are visibly stale; no real document regeneration is required. Only aggregate evidence/coverage/conflict/unknown counts may be recorded. Final privacy checks cover Git/index/history, `.next`, maps/static output, Playwright artifacts, logs, CI, database/backups/documents/packet/quarantine/session material.
-
-R2A is complete only when all material field families have explicit state/provenance and truthful coverage, all required grammar/typing/conflict/owner-correction/legacy regressions pass, synthetic and private migration/reprocess gates pass, documentation reflects reality, and one implementation PR has exact-head green CI and remains unmerged for ChatGPT review.
-
-## Exact implementation steps
-
-1. Implement/export the R2A schemas, bounded span/refinement, typed material-field contracts, coverage, conflicts, derivations, and tests.
-2. Implement deterministic sections, structured priority, typed normalizers, compatibility projection, and the fictional golden corpus.
-3. Add reviewed additive migration 0003 and repository write/read/backfill behavior with transaction, FK, integrity, idempotency, and restore tests.
-4. Integrate imports/offline reprocessing and owner-correction carry-forward without running R2B rules; invalidate downstream consumers on the new version.
-5. Read installed Next.js guidance, expose bounded R2A evidence/coverage UI, and add fictional unit/browser tests.
-6. Run the complete synthetic quality/migration/privacy/recovery gates. Fix every failure before private work.
-7. Stop writers, verify the real schema-v2 DB and private profile, create and verify a fresh ignored backup, preview/apply migration 0003, and verify mapping/integrity/FKs.
-8. Offline-reprocess the existing stored vacancy through the general supported service, preserve history, and verify aggregate R2A state/coverage/conflict/unknown counts plus downstream staleness. Make zero network/application/document actions.
-9. Run final exact-head release/privacy/database/diff/fsck gates, update reality docs/results, commit by concern, push this branch, open one R2A PR, wait for exact-head CI, and stop with the PR unmerged.
-
-## R2A implementation and verification result
-
-R2A is `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED` on this branch. The implementation adds parser, evidence-contract, and normalization version `3.0.0`; migration `0003_r2a_evidence_normalization.sql`; the additive `job_field_evidence_v2`, `requirement_evidence_v2`, `evidence_derivations`, and `job_normalization_coverage` tables; immutable/idempotent repository persistence; owner-correction carry-forward; structured-first and ordinary-heading normalization; safe job-detail evidence UI; and a 12-role-family fictional corpus.
-
-Pre-private synthetic verification passed formatting, lint, typecheck, 215 unit tests across 33 files, 14 integration tests across 3 files, the Next.js production build, 19 serialized fictional E2E tests, the schema-v2 backup/migration/backfill/idempotency/restore rehearsal, privacy audit, full and production dependency audits, `git diff --check`, and `git fsck --strict`. Migration 0003 preserved legacy rows and conservatively mapped unmapped historical meaning to `UNKNOWN`.
-
-The real ignored local database was verified at schema v2 with exactly one pending migration, integrity `PASS`, zero FK issues, and a valid ignored private profile. ApplyPilot writers were already stopped. Fresh verified schema-v2 backups were created before the preview and confirmed migration; migration 0003 completed at schema v3 with zero pending migrations, integrity `PASS`, and zero FK issues. The database retained 1 job and 2 historical job versions before reprocess; conservative backfill produced 6 requirement evidence rows and 34 coverage rows across those versions.
-
-The existing single stored vacancy was then reprocessed offline from its immutable stored source with the general R2A parser. It retained the source observation and all historical evaluation/document/packet/application rows, created job version 3 with 5 field evidence rows, 7 requirement evidence rows, all 17 coverage rows, 7 unknown coverage families, and 0 conflicts. The prior evaluation, 2 documents, and 1 packet were made stale/invalidated. No R2B rule ran, no private document was regenerated, and real source calls, employer-form visits, uploads, submissions, and other real application actions remained `0`.
-
-The first post-migration `npm.cmd run preflight` correctly exposed release-tool version drift: `preflight-summary.ts` still rejected every schema above v2 even though migration/status/release tooling had moved to v3. The implementation now centralizes current schema version/readiness in `scripts/lib/database-schema.ts`, applies it consistently across migration, status, preflight, release, private-smoke, and R2A reprocess entry points, and includes regression cases for current, older, and future schemas. The repaired preflight reports schema v3, zero pending migrations, `MANUAL_INTAKE_BETA state=READY`, source-enabled Beta `WAITING_FOR_APPROVED_TENANT`, and `PASS` with no blockers.
-
-Final branch validation uses 217 passing unit tests across 34 files, 14 passing integration tests across 3 files, 19 passing serialized fictional E2E tests, and a production build with 31 page units. Formatting, lint, strict typecheck, composite quality/preflight/release checks, full and production dependency audits, privacy audit, database status, diff check, and Git object validation are the required final exact-head gates; their final committed-head and GitHub Actions results are recorded in the implementation PR handoff.
-
-Current train status:
-
-- R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; implementation PR must remain open and unmerged for human review.
-- R2B: `NOT_IMPLEMENTED`.
-- R2C: `NOT_IMPLEMENTED`.
-- R2D: `NOT_IMPLEMENTED`.
-- R1 source-enabled Beta: `WAITING_FOR_APPROVED_TENANT`; capability count remains 0 and no real source was activated.
-
-Non-blocking future hardening retained from the PR #10 review:
-
-- Before local packet preparation, optionally re-resolve the current private profile file and apply the same current-profile/evaluation consistency gate used for document generation.
-- Replace the cosmetic document-link separator with an encoding-safe separator and add a rendered-text regression.
-
-# PR #12 consolidated R2A hardening pass — 2026-09-09
-
-Status: `HARDENING_COMPLETE_AWAITING_EXACT_HEAD_CI_AND_HUMAN_REVIEW`. Starting branch/head are `feat/r2a-evidence-normalization` at `c4046238196f0b9a2d4580e3e3c3804c230d8268`; PR #12 remains open and unmerged. Migration `0003_r2a_evidence_normalization.sql` is immutable applied history and retains reviewed Git object hash `bc71996fb2d84e7c890b8d6d5c5ba9174cdf9e2d`. No additive 0004 was required.
-
-## Current state, objective, and assumptions
-
-The current 3.0.0 parser couples conditional requirement modality to `CONDITIONAL` evidence state, permits domain-valid requirement links the database cannot store, verifies pointer bounds/excerpts but not SHA-256 hashes, detects only a small set of field conflicts and no proposition-scoped requirement conflicts, and may overstate coverage. Structured parsing expects display strings to be contiguous in serialized input, does not fully traverse nested/multi-location JobPosting data or inert structured descriptions, and has location/salary/document/schedule/date/work-right edge cases. The read path can throw on synthetic legacy 0003 pointers and the UI collapses invalid R2A into ordinary absence. Offline reprocess writes a job/version before downstream invalidation in a separate transaction, requires a new version even when semantics are unchanged, and its real-data command lacks explicit confirmation/bound backup creation. The migration command does not stop future schemas before backup/application work.
-
-The objective is the smallest truthful R2A 3.1.0 contract: evidence state and modality are independent; requirements are never `DERIVED` in this release; derived fields reference field evidence only; conflicts contain at least two same-proposition records; every current-domain-valid object persists/reloads; every exact excerpt/hash/source length is verified at server boundaries; structured components retain exact source provenance; date precision/timezone truth is explicit and backward-readable; coverage is conservative; reprocess plus staleness is atomic and semantically idempotent; legacy 0003 placeholders are readable without fabricated spans; and invalid current evidence is visible as a safe owner warning.
-
-Assumptions are: the immutable stored source observation remains the authority; JSON/JSON-LD is inert text and no URL is dereferenced; the real database remains schema v3 unless a proven shape blocker requires reviewed additive 0004; historical 3.0.0 rows retain their recorded versions; the corrected 3.1.0 parser may legitimately create one new immutable version; a repeated 3.1.0 run on identical stored source/owner state must not churn versions; R2B/R2C/R2D and all source/runner capabilities remain out of scope.
-
-## Requirements and architecture
-
-- Narrow `R2RequirementEvidence` states to persistable non-derived semantics, require owner/conflict links, require a retained condition for conditional modality, and forbid positive normalized requirements under negated modality. Keep `R2JobFieldEvidence` derivations field-only and validate input existence/kind/state at the top-level boundary.
-- Add stable requirement proposition identity derived conservatively from normalized subject/kind/class/jurisdiction/document kind/work-right proposition. Detect only same-proposition contradictory modality/value pairs; unrelated requirements sharing a broad kind never conflict. Expand field conflict grouping across all material same-field values while preserving explicit location alternatives as alternatives rather than conflicts.
-- Verify SHA-256 excerpts alongside exact slice and source length in Node extraction/persistence. Domain schemas continue validating shape without importing Node crypto into client bundles; import/repository boundaries perform cryptographic verification.
-- Replace reconstructed structured spans with a JSON token/path locator that points to exact component string tokens. Traverse JobPosting `jobLocation.address` objects/arrays and common identity/employment/salary/date/skills/qualification/requirements fields. Extract structured HTML descriptions through the existing inert sanitization/text boundary while mapping each extracted text span back to exact source bytes or a conservative component evidence/derived field graph.
-- Make coverage bounded and conservative: `COMPLETE` requires a recognized family-owned section/structured property whose material spans were all treated; otherwise evidence yields `PARTIAL`, no evidence yields `UNKNOWN`, and unknown headings/unclassified material spans remain reviewable across relevant families.
-- Harden AU locality/state/postcode parsing, location alternatives, salary shorthand/ranges/period uncertainty, document-local clauses, credible clock grammar, explicit date precision/timezone, and multi-proposition work-right extraction without candidate inference.
-- Add an explicit R2A read result `AVAILABLE | LEGACY_NOT_AVAILABLE | INVALID`; tolerate only recognized 0003 legacy UNKNOWN placeholders as unavailable compatibility data, never as exact provenance. The current UI shows `R2A_EVIDENCE_INVALID_REVIEW_REQUIRED` for invalid current rows without exception/private content.
-- Wrap canonical update, job-version/R2A persistence, and downstream stale/invalidation updates in one SQLite transaction. Treat unchanged 3.1.0 semantic content as an idempotent no-op. Use SQLite abort triggers in tests to inject evidence/evaluation/document/packet failures and prove total rollback.
-- Require an exact confirmation token for `r2a:reprocess-private`; before mutation verify schema/integrity/FKs, ignored/untracked path, one supported stored provenance, and create/verify a fresh ignored backup. Migration confirmation refuses schema newer than the supported version before backup or mutation.
-
-Data flow:
-
-`immutable source bytes -> inert structured/text token spans -> 3.1.0 field + requirement evidence -> hash/slice/length verification -> conservative conflict + coverage graph -> one atomic canonical/version/evidence/staleness transaction -> explicit AVAILABLE/LEGACY_NOT_AVAILABLE/INVALID read state -> safe owner UI`
-
-## Proposed files and dependencies
-
-- Update `packages/job-model/src/r2a.ts` and focused schema tests for the narrowed state/modality/derivation/conflict/date contracts and 3.1.0 constants.
-- Refactor `packages/job-importer/src/r2a-normalization.ts`, its tests, and `fixtures/r2a/manifest.ts` for structured token provenance, inert description parsing, conservative coverage/conflicts, and the complete adversarial grammar corpus.
-- Update `packages/database/src/r2a-repository.ts`, `beta-repository.ts`, `job-import-repository.ts`, and database/integration tests for exact hash/source verification, legacy compatibility results, atomic reprocess, rollback injection, and semantic idempotency.
-- Harden `scripts/r2a-reprocess-private.ts`, `scripts/migrate-local-database.ts`, shared safe database helpers, and tests for confirmation/bound backup and future-schema refusal.
-- Update `apps/web/lib/beta-workspace.ts`, the job detail page, and fictional E2E tests for explicit availability/legacy/invalid display states.
-- Update `PROJECT_PLAN.md`, `docs/R2_MATCHING_QUALITY_PLAN.md`, `docs/JOB_NORMALIZATION.md`, `docs/THREAT_MODEL_V1.md`, and `docs/GO_LIVE_CHECKLIST.md` with final verified reality only.
-- Add no network, AI, browser-target, scoring, or runtime dependency. Prefer existing Node crypto, Zod, SQLite transactions/savepoints, HTML sanitization, backup helpers, Vitest, and Playwright.
-
-## Risks, security/privacy, and rollback
-
-Primary risks are strengthening conditional/negated text, false same-kind conflicts, fabricated structured spans, accidental COMPLETE coverage, corrupt legacy-row crashes, partial current-version activation, future-schema mutation, private-data leakage during revalidation, and repeat-version churn. Controls are closed refinements, exact proposition keys, token-level source locations, conservative UNKNOWN/PARTIAL fallback, cryptographic boundary checks, explicit read states, one outer transaction, failure-trigger tests, pre-mutation confirmation/backup/schema checks, aggregate-only logs, and full tracked/history/build/test privacy scans.
-
-All job/HTML/JSON content remains inert. There will be zero source calls, employer-form visits, uploads, submissions, or real runner actions. No exception/private excerpt is rendered in invalid UI. Real profile/vacancy/database/backups/artifacts remain ignored/untracked and their content is never printed. Migration 0003 is protected by pre/post Git hash checks. Rollback before private work is normal code/test revert on the unmerged branch; after private reprocess, recovery uses only the newly verified ignored backup under explicit owner recovery authority. No down migration or direct row repair is allowed.
-
-## Testing, acceptance, and exact sequence
-
-Synthetic acceptance covers every requested independence combination; requirement link/negation/conflict refinements; field-only derivation persistence/round-trip and cross-kind rejection; tampered hash; same-subject requirement conflicts versus unrelated kinds; broad field conflicts versus alternatives; unknown/generic heading coverage; nested/multi-location JSON-LD and inert HTML description; AU location, salary, document, clock, date precision/timezone, and multi-work-right regressions; legacy multi-row 0003 read; atomic evidence/evaluation/document/packet rollback; same-version idempotency; confirmation/backup; future-schema refusal; and AVAILABLE/LEGACY_NOT_AVAILABLE/INVALID UI. Existing fictional corpus remains and no automated fixture uses the private vacancy.
-
-Before private mutation run format, lint, typecheck, unit, integration, build, E2E, privacy, full/production dependency audits, migration/legacy/backup/restore/atomic tests, diff check, and strict fsck. Then stop owned writers, verify profile/schema/integrity/FKs/ignore state and exact supported provenance, create/verify a fresh backup, run one explicitly confirmed offline 3.1.0 reprocess, verify the historical 3.0.0 version remains, the new version/current evidence is correct, dependent rows are stale/invalidated atomically, repeated semantic execution is a no-op, and calls/visits/uploads/submissions remain zero. Finish with the entire named exact-head local gate, privacy audit, immutable-0003 check, coherent commits, same-branch push, PR #12 exact-head push/PR CI, and an unmerged handoff.
-
-Exact implementation order:
-
-1. Lock migration 0003 hash and implement/test the narrowed 3.1.0 domain invariants and date compatibility.
-2. Implement exact pointer hashing, structured token/description extraction, conservative coverage, conflict proposition keys, and all grammar/location/salary/document/schedule/work-right fixtures.
-3. Implement repository legacy/read-state compatibility, domain/persistence parity, atomic reprocess, idempotency, and failure injection.
-4. Harden real reprocess confirmation/backup and future-schema migration refusal; add synthetic command/helper coverage.
-5. Implement explicit safe UI states and E2E regressions.
-6. Run all synthetic gates and fix every failure before any real DB touch.
-7. Perform exactly one backed-up/confirmed offline private 3.1.0 reprocess and safe aggregate verification; do not regenerate documents or repeat mutation when already current.
-8. Update reality docs, run every final gate on the committed head, push only `feat/r2a-evidence-normalization`, wait for both exact-head CI contexts on PR #12, and stop unmerged.
-
-## Consolidated hardening implementation and verification result
-
-R2A parser, evidence-contract, and normalization version `3.1.0` now enforce independent evidence state/modality, persistable requirement invariants, field-only derivations, proposition-scoped requirement conflicts, broad conservative field conflicts, SHA-256 excerpt validation, bounded conservative coverage, nested/array JSON-LD component provenance, inert structured-description extraction, explicit date precision/timezone state, and hardened location/salary/document/schedule/work-right parsing. Historical 3.0.0 DATE JSON remains readable. Recognized 0003 UNKNOWN placeholders return `LEGACY_NOT_AVAILABLE`; corrupt current rows return `INVALID` and the owner UI shows only `R2A_EVIDENCE_INVALID_REVIEW_REQUIRED`.
-
-R2A reprocess now records the canonical job, immutable version/evidence, and all downstream invalidation in one outer SQLite transaction. Synthetic abort triggers at evidence insert, evaluation staleness, document invalidation, and packet invalidation each proved total rollback with unchanged prior job/version/evaluation/document/approval/packet state plus clean integrity/FKs. Identical 3.1.0 reprocess is a semantic no-op. The private command requires exact token `REPROCESS_R2A_PRIVATE`, confirms ignored/untracked schema-v3 one-job supported provenance with clean integrity/FKs, and creates/verifies a fresh backup before mutation. Confirmed migration refuses a future schema before backup or application writes.
-
-Pre-private synthetic verification passed formatting, lint, typecheck, 244 unit tests across 35 files, 19 integration tests across 3 files, a 31-page-unit production build, 20 serialized fictional E2E tests, migration/legacy/backup/restore/idempotency/atomic rollback cases, privacy audit, full and production dependency audits with zero vulnerabilities, `git diff --check`, and `git fsck --strict`. The E2E suite includes an intentionally corrupt fictional normalization and proves the explicit safe invalid-data warning.
-
-ApplyPilot writers were already stopped. The ignored private profile validated generically and the real database was schema v3 with zero pending migrations, integrity `PASS`, and zero FK issues. Confirmed offline reprocess created and verified ignored backup `backup-2026-09-09T08-05-00.355Z-b9be68b7`, then created exactly one immutable current version: versions 1–3 retain 3.0.0 and version 4 records 3.1.0 with 5 field evidence rows, 7 requirement evidence rows, 17 coverage rows, 5 UNKNOWN families, and 0 conflicts. Historical observations and downstream rows were preserved; affected rows were already stale/invalidated, so additional stale evaluation/document/packet counts were all 0. Real source calls, employer-form visits, uploads, submissions, document generation, packet preparation, and all other real application actions were 0.
-
-Current release state remains deliberately bounded:
-
-- R2A: `IMPLEMENTED / SYNTHETICALLY VERIFIED / PRIVATELY VERIFIED`; PR #12 exact-head CI and final human delta review remain required before merge.
-- R2B: `NOT_IMPLEMENTED`.
-- R2C: `NOT_IMPLEMENTED`.
-- R2D: `NOT_IMPLEMENTED`.
-- Source-enabled Personal Beta: `WAITING_FOR_APPROVED_TENANT`; capability count 0.
-- Personal Live V1: `NOT_READY`; real runner `TARGET_APPROVAL_REQUIRED`.
-
-# R2B + R2C + R2D matching quality implementation - 2026-09-09
-
-Status: `IN_PROGRESS`. PR #12 was reverified open, unmerged, mergeable, and clean at the human-approved exact head `e565b068e818bf93dbdb825f70b5a89c0db10ffa`; both exact-head GitHub Actions quality checks were successful. Its body was updated with the final 3.1.0 metadata without changing the Git head. PR #12 then merged normally as `3789b7001ae95a14965a70e630b9085910e159e8`. Local `main` was fast-forwarded and verified equal to `origin/main`; `feat/r2-matching-quality` was created from that exact merge.
-
-## Current state, objective, and assumptions
-
-R2A 3.1.0 and immutable migration 0003 are merged and privately verified. The compatibility eligibility and fit engines remain version 1.0.0 and consume optimistic legacy `Job` projections rather than current R2A evidence. The current scorer can subtract commute points when the candidate maximum is unverified and can recommend `REVIEW_REQUIRED` work. Existing duplicate comparison is pure and conservative but is not durably connected to owner decisions. The Beta repository has mutable queue projection plus basic duplicate/correction/version tables, but lacks immutable R2 decision snapshots, current evidence/evaluation bindings, durable candidate-pair decisions, calibration metadata, and correction-aware parser replay.
-
-The objective is to complete R2B eligibility and verified-only scoring, R2C duplicate/correction/queue/audit lifecycle, and R2D fictional calibration framework plus evidence-first UX in one reviewable train. The implementation must remain deterministic, local-first, candidate-truth-bound, and source-neutral. It must preserve every source observation and historical evaluation, keep ambiguous evidence reviewable, label ranking `UNCALIBRATED` until the private threshold is genuinely met, and leave the final implementation PR open and unmerged.
-
-Assumptions: migration 0003 and all earlier migrations are immutable; the next schema version is 4 and any required change is additive migration 0004; the existing private database is schema v3 and will not be touched until all synthetic gates pass; the current private source material and owner corrections remain local/ignored; no source tenant is approved; no employer target or real runner is approved; and no network, external upload, form visit, or submission is permitted. A parser upgrade after an owner correction must reconstruct from immutable source and replay only provenance-valid current correction operations.
-
-## Requirements, architecture, and data flow
-
-- Add closed R2 evaluation schemas with explicit `LEGAL_LIMIT | EMPLOYER_REQUIREMENT | CANDIDATE_PREFERENCE` reason classes, evidence state/modality/coverage inputs, candidate verification state, and job/profile/evaluation/scorer/weight versions. Material unknown, unresolved conditional, conflict, stale binding, or insufficient coverage yields `REVIEW_REQUIRED`; only a verified deterministic mandatory mismatch can yield employer/legal `INELIGIBLE`.
-- Preserve valid versus unrestricted Australian work rights, weekly versus fortnightly hours, time versus distance commute, licence versus vehicle versus commute, explicit schedule/availability semantics, jurisdiction/expiry uncertainty, and conditional certification state. These dimensions never substitute for one another and the UI states this is not legal advice.
-- Replace score inputs with allowlisted current evidence references. Only current `VERIFIED` candidate facts and current usable `SOURCE_STATED | OWNER_CORRECTED | DERIVED` job evidence may add points. Every contribution stores code, signed points, candidate reference, job evidence reference, evidence class, scorer/weight versions, and safe explanation. Unverified maximum commute contributes zero positive and zero negative points.
-- Recommendation is a separate gate requiring current `ELIGIBLE` evaluation, exact current job/R2/profile/evaluation bindings, no material conflict/conditional/unknown blocker, approved extraction coverage, and score threshold. `REVIEW_REQUIRED` and `INELIGIBLE` are never recommended.
-- Add durable ordered observation-pair candidates and immutable owner decisions for `SUGGESTED | LINKED | REJECTED | SPLIT`, with `DISTINCT` as the no-active-cluster projection. Strong source/tenant/external identity remains idempotent; cross-source link suggestions require canonical application target or requisition identity plus corroboration. Similar prose/title/company alone never links.
-- Add immutable queue decision versions for `REVIEWING | SHORTLISTED | SKIPPED | PREPARING`, each bound to current job, R2 evidence, profile, eligibility, fit, duplicate, and coverage versions plus actor/reason/time. Any changed binding marks the current projection stale and prevents preparation.
-- Complete owner-correction replay as an ordered typed overlay. Correction operations retain actor/reason/changed fields/source-version applicability. Parser reprocess performs `immutable source + applicable current correction chain + current parser`, carries unaffected current source evidence, emits `OWNER_CORRECTED` evidence, retains history, and is a semantic no-op when source/parser/correction state is unchanged. A materially changed source with an unproven correction target stops for applicability review rather than copying a stale value.
-- Replace remaining R2 audit metadata filtering with closed event-specific Zod schemas. Only opaque IDs, enums, versions, reason codes, counts, booleans, and timestamps are allowed; unknown/nested/free-form/private values are rejected.
-- Add a versioned fictional golden corpus across hospitality, retail, administration/reception, warehouse, engineering, robotics, automation, embedded, internship, regulated/licensed, remote, and multi-location cases. Add deterministic ranking, ablation, monotonicity, bounds, and top-k framework metrics. Private row-level labels/results remain ignored and local; public metadata contains only safe aggregate counts.
-- Update `/jobs`, `/jobs/[id]`, and `/dashboard` to expose eligibility class, current/stale bindings, evidence class, blockers/unknowns/conditions/conflicts, coverage, contribution breakdown, calibration, duplicate state, queue freshness, and correction provenance without raw dumps or unnecessary candidate values. Owner link/reject/split, queue, and correction actions remain nonce/session/origin protected.
-
-Data flow:
-
-`immutable observation + current valid correction overlay -> current R2A normalization/version -> R2 evidence eligibility gate -> verified-only versioned fit contributions -> recommendation gate -> duplicate resolution + queue freshness snapshots -> evidence-first owner UI -> downstream document/packet invalidation when any binding changes`
-
-## Proposed files, schema, and dependencies
-
-- Add domain contracts/tests under `packages/eligibility-engine` and `packages/fit-scorer`; retain backward-compatible wrappers only where existing fixture/demo callers require them.
-- Extend `packages/job-normalizer/src/cross-source-dedup.ts` with versioned persistence-ready signals and conservative pair ordering.
-- Add immutable migration `packages/database/drizzle/0004_r2_matching_quality.sql`; extend `packages/database/src/schema.ts`, `beta-repository.ts`, `r2a-repository.ts`, `job-import-repository.ts`, `job-discovery-repository.ts`, and focused tests with evaluation bindings, duplicate candidates/decisions, queue snapshots, calibration aggregates, typed audit, and correction replay.
-- Add fictional `fixtures/r2/manifest.ts` and matching unit/integration tests. Private calibration storage, if present, stays under ignored `data/private/` and never enters Git.
-- Extend `apps/web/lib/beta-workspace.ts`, job/dashboard actions/pages, and shared styles/components after reading the applicable installed Next.js 16 instructions and `apps/web/AGENTS.md` in full.
-- Update database status/migration/preflight/release/private-smoke scripts to schema v4 only if migration 0004 is added; add an explicit R2 private re-evaluation command with exact confirmation and backup, or extend the existing supported private command without creating a second unsafe path.
-- Update R2, eligibility, fit, normalization, threat-model, checklist, README/architecture/security, and this living plan with verified behavior only.
-- Add no AI, network, geocoder, analytics, source, browser-target, or runtime dependency. Use existing Zod, SQLite/Drizzle, Vitest, Next.js, and Playwright facilities.
-
-## Risks, privacy/security, and rollback
-
-Primary risks are false legal/employer certainty, positive points from unverified data, recommendation bypass, unit conflation, false duplicate links, stale queue preparation, stale correction replay, partial transactions, private calibration leakage, broad audit serialization, migration corruption, and misleading UI. Controls are closed schemas, exact current-version bindings, deterministic reason codes, evidence allowlists, atomic append-only writes, conservative review states, pair/applicability provenance, fail-closed typed audit, fictional corpus tests, private-canary audits, and a synthetic-first migration/restore gate.
-
-Candidate/job source values, source excerpts, private labels, documents, paths, answers, cookies, sessions, credentials, URLs with userinfo/query values, and free-form correction reasons never enter Git/CI/audit metadata. Real profile, vacancy, database, backups, artifacts, packet, calibration labels, and quarantine remain ignored/untracked and are not printed. Network request count, employer-form visit count, external upload count, and submission count remain zero.
-
-Rollback before private work is normal commit revert or closing the unmerged branch/PR. New behavior can be disabled by selecting the retained prior engine/weight versions while preserving all observations, evaluations, duplicate decisions, queue decisions, corrections, and audit history. After private migration, recovery uses only the newly verified ignored backup under an explicit reviewed restore confirmation. Never edit migrations 0000-0003, down-migrate destructively, delete local history, or rewrite shared Git history.
-
-## Testing, acceptance criteria, and exact implementation sequence
-
-Synthetic acceptance includes the full class/status/evidence-state/modality matrix; work-right and hour-unit cases; licence/vehicle/commute separation; fixed/flexible/rotating/overnight/weekday/weekend/time/unknown schedules; verified/unverified/stale/conflicting candidate ablation; commute neutrality; recommendation gates; contribution reproducibility; duplicate identity/ambiguity/link/reject/split/replay/history cases; queue binding/staleness/preparation refusal; correction/source/parser applicability and idempotency; audit extra-key/private-canary rejection; schema fresh/v3-upgrade/rollback/restore/history tests; the full fictional golden corpus; ranking/ablation/monotonicity/determinism/bounds/top-k checks; and accessible narrow/zoom/keyboard/long/empty/error/conflict/stale browser states.
-
-R2B/C/D are complete only when all named behavior is implemented, migration 0004 (if needed) preserves history and passes integrity/FKs, the ignored real database is freshly backed up and safely upgraded, one local current private R2 evaluation is appended without tuning, historical evaluations remain queryable, downstream stale state is truthful, every final command passes, one PR named `feat: complete R2 matching quality` has exact-head green CI, and that PR remains open and unmerged. Calibration remains `UNCALIBRATED` unless 30 independently owner-reviewed private jobs across at least four role families and all relevant statuses actually exist.
-
-Exact sequence:
-
-1. Commit this implementation-start blueprint before application code.
-2. Define and test R2B eligibility/scoring contracts and compatibility adapters; implement verified-only scoring and the recommendation gate.
-3. Add migration 0004 plus synthetic fresh/v3-upgrade/history/backup/restore tests, then implement atomic R2 evaluation persistence.
-4. Implement durable duplicate candidates/owner decisions, queue snapshots/staleness, typed correction replay, and closed audit schemas with repository/integration tests.
-5. Build the fictional golden corpus and calibration framework; pass ranking, ablation, monotonicity, determinism, bounds, and top-k tests while reporting `UNCALIBRATED`.
-6. Read the applicable web instructions, implement R2 UI/actions/accessibility, and add fictional browser coverage.
-7. Run the entire synthetic gate: format, lint, typecheck, unit, integration, build, E2E, privacy, full/production audits, migration/restore, golden/ablation/determinism/staleness/duplicate/correction tests, diff check, and strict fsck. Fix every failure before private work.
-8. Stop owned writers; verify private profile/database ignore state, schema/integrity/FKs, and zero network/action authority; create and verify a fresh ignored backup; preview/confirm only migration 0004; append one current local R2 evaluation using current R2A evidence; verify historical preservation and downstream staleness without printing private values.
-9. Update reality documentation and exact safe aggregates; run the complete final command matrix on the committed head; inspect status/diff/privacy/migration hashes; push `feat/r2-matching-quality`; open one unmerged implementation PR; wait for both exact-head CI contexts and fix any failure on the same branch.
-
-## R2 matching-quality implementation and private acceptance result
-
-Status: `IMPLEMENTED / SYNTHETICALLY_VERIFIED / PRIVATELY_VERIFIED / FINAL_PR_PENDING`. R2A 3.1.0 is `READY`; R2B eligibility and verified-only scoring are `READY`; R2C duplicate, queue, correction, and audit persistence are `READY`; R2D software is `READY`; calibration remains truthfully `UNCALIBRATED` because 0 independently owner-reviewed private labels span 0 role families and 0 eligibility statuses, below the 30-job / four-family / all-status threshold.
-
-Implementation completed the class-separated R2 eligibility engine, current verified-only evidence-linked scoring, strict recommendation gate, unit-safe work-right/commute/schedule/licence/vehicle semantics, 12-family fictional golden corpus, versioned calibration metrics, durable owner-reviewed duplicate decisions, immutable queue snapshots and staleness, typed correction overlays with provenance applicability, event-specific closed audit schemas, and evidence-first `/jobs`, `/jobs/[id]`, and `/dashboard` UI. Packet preparation now re-resolves the current private profile and refuses persistence before the R2 recommendation/currentness/duplicate gates. Production local imports retain distinct listing URLs and use only an explicit application target or requisition identity plus corroboration for a cross-source suggestion; fictional integration proved `SUGGESTED` with zero automatic link decisions.
-
-Additive migration `0004_r2_matching_quality.sql` was added; migrations 0000-0003 remain byte-for-byte unchanged from merged main. Synthetic fresh and v3-upgrade coverage preserves historical jobs, versions, R2A evidence, integrity, and foreign keys and verifies backup/restore. R2 repository tests prove idempotent immutable evaluation, strict audit canary rejection, duplicate link/reject/split history without observation deletion, PREPARING refusal, stale PREPARING downgrade, changed-evaluation document/approval/packet invalidation, correction replay/idempotency/applicability review, and calibration persistence.
-
-Pre-private gates passed: Prettier formatting; ESLint with zero warnings; TypeScript; 274 unit tests in 41 files; 21 integration tests in 3 files; 31-route-unit production build; 22 serialized fictional E2E tests; privacy audit (`tracked_files=232`, `history_paths_checked=547`, `history_blobs_checked=548`, `build_test_artifacts_checked=870`, 11 private canaries); full and production npm audits with zero vulnerabilities; `git diff --check`; and `git fsck --strict`. Browser coverage includes R2 evidence health, recommendation/calibration/duplicate/queue state, error/empty/conflict/stale presentation, long safe wrapping, labelled controls, keyboard focus, effective 320px/200% zoom, and no horizontal clipping.
-
-ApplyPilot-owned writers were already stopped. The private profile validated without printing values; profile, database, vacancy, backup, artifact, and packet paths remained ignored/untracked. The real database preflight was schema v3 with one pending migration, integrity `PASS`, and zero FK issues. Confirmed migration created verified ignored backup `backup-2026-09-09T10-34-07.300Z-811958ac`, applied only additive migration 0004, and verified schema v4, zero pending migrations, one job, four job versions, 10 R2A field rows, 20 R2A requirement rows, 68 coverage rows, integrity `PASS`, and zero FK issues. Before evaluation, the explicit R2 command created a second verified ignored backup `backup-2026-09-09T10-34-18.979Z-d7c0dff8`.
-
-One current R2 evaluation was appended locally without parser/weight tuning: `REVIEW_REQUIRED`, recommended `NO`, 71% coverage, 3 material unknowns, 3 material conditions, 0 conflicts, ordinal band `LOW_PRIORITY`, calibration `UNCALIBRATED`. Two legacy evaluations and all four job versions remain historical; one current R2 evaluation and one calibration aggregate exist. Four historical documents are stale and two packets invalidated rather than silently current. Post-acceptance integrity is `PASS`, foreign-key issues 0. Real source calls, employer-form visits, external uploads, submissions, document generation, packet preparation, and all other real application actions during this R2 run are 0.
-
-The coherent implementation and reality documentation were committed as `e3ab01ec33ab52448e4d3186a272265a75ec6468`. The complete named local final matrix passed on that clean committed head: format, lint, typecheck, 274 unit tests in 41 files, 21 integration tests in 3 files, production build with 31 route units, 22 serialized E2E tests, full and production dependency audits with zero vulnerabilities, privacy audit with 11 private canaries, doctor, schema-v4 database status, quality, preflight, release check, `git diff --check`, and `git fsck --strict`. The final release check classified Manual-intake Personal Beta `READY`, Source-enabled Personal Beta `WAITING_FOR_APPROVED_TENANT`, Personal Live V1 `NOT_READY`, and the real runner `TARGET_APPROVAL_REQUIRED`.
-
-Branch `feat/r2-matching-quality` was pushed without history rewriting and implementation PR #13, `feat: complete R2 matching quality`, was opened against `main`. This documentation-only release record will become the PR's final reviewed head; the complete local matrix will be repeated on it and exact-head GitHub Actions must pass before handoff. PR #13 must remain open and unmerged for ChatGPT review. No live source call, employer-form visit, external upload, submission, document generation, packet preparation, or other real application action was performed.
-
-# PR #13 final hardening pass - 2026-09-10
-
-Status: `IN_PROGRESS / REQUEST_CHANGES`. The branch is clean at the reviewed exact head `f33f634eedda9835e88c50b98a81e886ff2de14e`; PR #13 is open, unmerged, mergeable, and clean. The prior two exact-head quality runs are successful. R2A remains approved. R2B/R2C/R2D require the consolidated hardening below before another merge decision. This pass stays on `feat/r2-matching-quality`, updates PR #13 only, and does not authorize a source tenant, network request, employer-form visit, upload, submission, real runner, deployment, or merge.
-
-## Current defects, objective, and assumptions
-
-The present golden manifest stores expected labels and scores but no executable engine inputs; its calibration test passes those expected values directly into the metrics helper. The scorer hardcodes `UNCALIBRATED` even though the calibration gate can produce `CALIBRATED`. Schema v4 stores an eligibility-engine version but omits it and calibration context from the evaluation uniqueness contract. Production cross-source comparison can describe a historical observation using the mutable current `jobs.normalized_json` projection. Packet preparation validates recommendation/staleness/duplicates but does not require a current R2 `PREPARING` decision. Commute scoring looks for requirement evidence although R2A emits `commute.distance` and `commute.duration` field evidence. Period-dependent legal hours can become a blocker without a resolved current time basis. Owner corrections preserve a family's pre-correction `UNKNOWN` coverage even when the corrected value is now explicit. Finally, persistence trusts a caller-supplied `recommended` bit after only current-binding checks.
-
-The objective is to repair all findings as one coherent, reviewable delta. Applied migrations 0000-0004 are immutable; the private database is already schema v4. The next migration is additive/transactional `0005_r2_matching_quality_hardening.sql`. Existing v4 rows, R2A evidence, duplicate/queue/correction/audit/calibration history, documents, approvals, and packets must be preserved. Current private calibration remains `UNCALIBRATED`; no private labels are fabricated and scorer/parser/rule weights are not tuned to influence the private result.
-
-## Architecture, data flow, and proposed changes
-
-- Replace metadata-only golden execution with fictional scenario descriptors that resolve to complete candidate profiles, current/stale R2 bindings, R2A field/requirement evidence, commute measurements, expectations for eligibility/contribution direction and code/recommendation/band, and immutable duplicate identities. A shared executor calls the production `evaluateR2Eligibility` and `scoreR2JobFit`; database integration calls production duplicate comparison and `R2Repository.suggestDuplicate` for the duplicate case. Metrics consume only actual outputs. Mutation tests alter a real scorer weight/output or actual eligibility result and must produce a golden mismatch. Determinism executes identical inputs independently; monotonicity, ablation, and bounds compare actual scorer runs.
-- Introduce a closed, versioned calibration context passed into every R2 scorer call. It binds context version, state, scorer/weight/corpus versions, and optional durable calibration-run ID. A safe explicit unreviewed context remains `UNCALIBRATED`; a threshold-qualified context can represent `CALIBRATED` without rewriting history. Persist the context version/run binding with each evaluation and validate version compatibility at the boundary.
-- Add migration 0005 using a transactional create/copy/count-verify/drop/rename rebuild of `r2_evaluation_versions`. Preserve all columns/IDs and add non-null `calibration_context_version` plus nullable `calibration_run_id`. Backfill v4 rows with an explicit legacy context derived only from their stored state. The immutable identity tuple becomes job version, profile version, evidence contract, normalization/coverage versions, eligibility-engine version, fit-scorer version, weight version, and calibration-context version. A calibration-run foreign key, unique identity, indexes, integrity/FK checks, and schema version 5 complete the migration. Update Drizzle metadata, migration tooling/status, fresh/v3/v4/v5/restore/future-schema tests, and E2E schema setup without modifying 0000-0004.
-- At `recordEvaluation`, validate the complete identity and reject impossible readiness independently: a non-`ELIGIBLE`, stale, unresolved-material, or under-coverage evaluation cannot persist `recommended=true`; fit/eligibility coverage and calibration bindings must agree. Version changes create a new immutable row and stale prior current state; an identical complete tuple is idempotent.
-- Build duplicate identities from `source_observations` plus the exact `job_versions.source_observation_id` snapshot. Never read the mutable canonical job row to represent a historical observation. Re-evaluating an old pair remains byte/evidence stable after correction; a new observation creates a new candidate/version, and LINK/REJECT/SPLIT history remains bound to the old evidence digest.
-- Choose explicit workflow A for packet preparation: the owner must first record a `CURRENT PREPARING` R2 queue decision. Packet preparation re-resolves and compares the exact job/profile/evaluation/evidence/coverage/duplicate bindings and refuses absent, reviewing, shortlisted, stale, or mismatched PREPARING state. It no longer creates PREPARING after packet persistence. Evaluation or duplicate changes stale/invalidate queue and packet state.
-- Consume actual current usable R2A `commute.distance`/`commute.duration` field evidence in the scorer while keeping the supplied route measurement and verified candidate preference separate. Minutes and kilometres never convert. Unverified preferences contribute neither positive nor negative points.
-- Make legal-hours blocking require an explicit current time-basis resolution. Unconditional current weekly/fortnightly limits retain exact-unit checks. Teaching/break/expiry/visa/date-window conditions without a deterministically resolved applicable period yield `REVIEW_REQUIRED`; week and fortnight never substitute and the output remains `NOT_LEGAL_ADVICE`.
-- When an owner explicitly corrects evidence in an `UNKNOWN` family, move only that family's coverage to `PARTIAL`, attach the corrected evidence IDs, and retain every unparsed span; never claim `COMPLETE` or improve unrelated families. This lets the corrected value resolve while remaining honest about other unparsed material.
-- Update `PROJECT_PLAN.md`, focused R2/scorer/eligibility/go-live documentation, and PR #13 body only with verified outcomes. `ARCHITECTURE.md`/`SECURITY.md` change only if the implemented trust boundary differs from their current text.
-
-Data flow after hardening:
-
-`immutable observation + bound job-version snapshot -> current R2A evidence/correction overlay -> temporally resolved eligibility -> verified-only scorer + explicit calibration context -> persistence invariant + complete immutable evaluation identity -> duplicate/queue-currentness gate -> explicit CURRENT PREPARING -> local packet persistence`
-
-Golden validation flow:
-
-`fictional scenario -> independently built profile/evidence/bindings -> real eligibility -> real scorer -> actual contribution/recommendation/band -> expectation comparison; duplicate scenario -> real comparison + schema-v5 repository persistence -> expectation comparison`
-
-## Dependencies, risks, privacy, and rollback
-
-No production dependency, AI provider, network client, source capability, browser target, or telemetry is added. Existing Zod, SQLite/Drizzle, Vitest, Next.js, and Playwright facilities are sufficient. The main risks are v4 row loss or foreign-key drift during table replacement, accidental idempotency collisions, mutable duplicate evidence, false legal certainty, unit conversion, a packet bypass, synthetic expectations coupled to outputs, and private calibration leakage. Controls are immutable migration checks, exact identity columns, closed schemas, fail-closed currentness, fictional-only engine inputs, private canaries, ignored local backups, and complete pre-private synthetic validation.
-
-Before private mutation, verify profile/database/vacancy/backups remain ignored and untracked; never print candidate/job values, document contents, source bodies, paths, labels, tokens, cookies, or sessions. Rollback before migration is a normal focused commit revert. After private v5 migration, retain the new verified ignored v4 backup and restore only through the existing explicit confirmation workflow if any migration/integrity/FK/history check fails. Never edit or down-migrate 0000-0004, delete historical evaluations, rewrite Git history, or merge PR #13.
-
-## Testing, acceptance, and exact implementation sequence
-
-Acceptance requires: all 12 role families and all required evidence/status/band states execute production eligibility/scoring; the duplicate golden case executes production comparison/persistence; mutation, recommendation, stale/current, zero-contribution, determinism, monotonicity, ablation, and bounds regressions pass; calibration context can truthfully be uncalibrated or calibrated and is version-bound; evaluation versions change independently for eligibility/scorer/weight/calibration inputs; migration fresh/v3/v4/v5/backup/restore/future-schema/history/integrity/FK gates pass; immutable duplicate history, explicit PREPARING, commute field integration, temporal legal hours, correction coverage, and persistence invariants pass. The full format/lint/typecheck/unit/integration/build/E2E/audit/privacy/doctor/status/quality/preflight/release/diff/fsck matrix and both exact-head GitHub CI events must pass. Private schema must end at v5 with zero pending migrations, integrity `PASS`, zero FK issues, and preserved historical evaluations. PR #13 remains open and unmerged.
-
-Exact sequence:
-
-1. Commit this hardening blueprint before application changes.
-2. Implement explicit calibration context and executable golden scenarios/tests using real R2 engines.
-3. Add immutable migration 0005 and complete evaluation identity/persistence invariants with migration and repository regressions.
-4. Repair immutable-observation duplicate input and prove old/new candidate evidence history.
-5. Enforce explicit current PREPARING before packet creation and invalidate it on evaluation/duplicate changes.
-6. Connect commute field evidence, temporal legal-hours safety, and correction coverage; add direct regressions.
-7. Run the complete synthetic gate, including migration/restore and every review-specific regression. Fix every failure before private work.
-8. Stop owned writers; verify ignored/untracked private state, schema v4, integrity/FKs; create and verify a fresh backup; apply only 0005; verify schema v5/history/integrity/FKs; run at most one local R2 re-evaluation if needed without tuning.
-9. Update truthful docs and PR #13, commit coherent changes, run the exact final matrix on the final head, push the same branch, require exact-head push and pull-request CI green, and stop with PR #13 unmerged.
-
-## PR #13 hardening implementation and private v5 acceptance - 2026-09-10
-
-Status: `IMPLEMENTED / SYNTHETIC GATE PASS / PRIVATE V5 PASS / LOCAL FINAL MATRIX PASS`. The work remained on `feat/r2-matching-quality`; PR #13 remains the only implementation PR and has not been merged. Migrations 0000-0004 are unchanged from reviewed starting head `f33f634eedda9835e88c50b98a81e886ff2de14e`.
-
-Completed implementation:
-
-- replaced self-referential score metadata with 12 executable fictional scenarios that build profiles, R2A evidence, bindings, commute inputs, and duplicate identities, then execute production R2 eligibility/scoring/comparison plus database duplicate persistence;
-- added real weight/eligibility mutation detection, independent determinism, actual-scorer monotonicity/ablation/bounds, stale/current, zero-contribution, and review/ineligible recommendation regressions;
-- introduced a closed versioned calibration context and durable run binding; current state remains `UNCALIBRATED`, while a threshold-qualified stored run can represent `CALIBRATED` without rewriting history;
-- added transactional `0005_r2_matching_quality_hardening.sql`, preserving v4 rows and adding calibration context/run columns plus a complete algorithm identity tuple and SQL recommendation checks;
-- updated repository identity/idempotency so independent eligibility-engine, scorer, weight, or calibration-context changes append a new immutable evaluation and stale the older current row;
-- rebuilt duplicate inputs from each source observation's earliest bound immutable job version, added deterministic duplicate-resolution digests, and made new evidence or decisions stale queue/packet readiness without rewriting owner decision history;
-- chose explicit packet workflow A: the owner first records CURRENT PREPARING, and packet preparation requires its exact current job/profile/R2 evaluation/evidence/coverage/duplicate binding;
-- connected R2A commute distance/time field evidence to the scorer without unit conversion, added verified time-basis modelling for legal fortnight limits, and made unresolved temporal applicability review-required;
-- changed only a corrected UNKNOWN family to PARTIAL while preserving all unparsed spans and unrelated UNKNOWN families; and
-- independently enforced fit/eligibility coverage, calibration-run, and recommendation invariants at the repository and SQLite boundaries.
-
-Pre-private synthetic validation passed: `npm.cmd run format:check`; `npm.cmd run lint` with zero warnings; `npm.cmd run typecheck`; 285 unit tests in 41 files; 21 integration tests in 3 files; production build with 31/31 static-page generation; 22 serialized fictional E2E tests; full and production npm audits with zero vulnerabilities; privacy audit (`tracked_files=248`, `history_paths_checked=605`, `history_blobs_checked=606`, `build_test_artifacts_checked=1100`, 11 canaries); `git diff --check`; and `git fsck --strict`. Focused hardening coverage was 45 tests across six files before the full run. The first E2E run passed 21/22 and truthfully displayed queue freshness `STALE` after an earlier shared-database import created new duplicate evidence; the old assertion required `CURRENT`. The seed was bound to the production duplicate-resolution digest and the UI assertion now accepts the truthful current-or-stale state; the complete rerun passed 22/22. No product failure was waived.
-
-Private acceptance: ApplyPilot-owned writers were already stopped. The private profile validated, and profile/database/private/vacancy paths remained ignored and untracked. Preflight reported schema v4, one pending migration, integrity `PASS`, zero FK issues, one job, four job versions, two legacy evaluations, one R2 evaluation, four document artifacts, two packets, one calibration run, and two R2 audit events. Verified ignored v4 backups `backup-2026-09-09T23-37-56.962Z-061ba74d` and `backup-2026-09-09T23-37-58.339Z-e47f7bd3` preceded migration. Migration 0005 completed at schema v5 with zero pending migrations, integrity `PASS`, zero FK issues, and exact preservation of every pre-migration count and historical R2 evaluation projection.
-
-One approved local-only R2 reevaluation then created verified ignored v5 backup `backup-2026-09-09T23-38-33.239Z-296f279f` and appended one new current evaluation plus calibration aggregate. Safe result: `REVIEW_REQUIRED`, recommended `NO`, 71% coverage, 3 material unknowns, 3 material conditions, 0 conflicts, `LOW_PRIORITY`, `UNCALIBRATED`, 0 private reviewed labels, 0 role families, and 0 represented statuses. Post-run totals are two legacy evaluations, two R2 evaluations, two calibration runs, four R2 audit events, four preserved job versions, four stale historical documents, and two invalidated historical packets; integrity remains `PASS` with zero FK issues. No parser, rule, weight, or threshold was tuned. Real source calls, employer-form visits, uploads, submissions, document generation, and packet preparation were all 0.
-
-Final-tree local verification passed all required commands: `npm.cmd run format:check`; `npm.cmd run lint` with zero warnings; `npm.cmd run typecheck`; `npm.cmd test` with 288 tests in 41 files; `npm.cmd run test:integration` with 21 tests in three files; `npm.cmd run build` with successful compilation and 31/31 static-page generation; `npm.cmd run test:e2e` with 22 tests; `npm.cmd audit` and `npm.cmd run audit:production` with zero vulnerabilities; `npm.cmd run privacy:audit` with 11 private canaries; `npm.cmd run doctor`; `npm.cmd run db:status`; `npm.cmd run quality`; `npm.cmd run preflight`; `npm.cmd run release:check`; `git diff --check`; and `git fsck --strict`. Release status remains schema v5, zero pending migrations, integrity `PASS`, zero FK issues, Manual-intake Personal Beta `READY`, Source-enabled Personal Beta `WAITING_FOR_APPROVED_TENANT`, Personal Live V1 `NOT_READY`, and real runner `TARGET_APPROVAL_REQUIRED`.
-
-The remaining release mechanics are to commit this coherent delta, repeat the exact matrix on that unchanged committed tree, push only the same branch, update the existing PR #13 body, require exact-head push and pull-request CI success, and stop with PR #13 open/unmerged for ChatGPT review. Real source calls, employer-form visits, external uploads, submissions, document generation, packet preparation, and all other real application actions remain 0.
-
-# PR #13 final three-blocker correction - 2026-09-10
-
-Status: `IN_PROGRESS / DO_NOT_MERGE`. The worktree was clean on `feat/r2-matching-quality` at the newly reviewed exact head `24c942df2e2e1991e6102ff41b36639162d79533`. PR #13 was reverified open, unmerged, mergeable, and clean with both prior exact-head quality checks successful. Migrations 0000-0005 are now applied and immutable. This correction stays on the same branch and PR and authorizes no source tenant, network request, employer-form visit, upload, submission, real runner, deployment, or merge.
-
-## Current state, objective, and assumptions
-
-The repository already enforces an exact current R2 `PREPARING` decision at the packet boundary, and the server action accepts a PREPARING queue transition, but the owner-facing job page exposes only skip/review/shortlist controls. Consequently a valid recommended job cannot enter PREPARING through the UI. Calibration can currently become `CALIBRATED` from sample counts and status coverage plus a durable run ID; it does not inspect private label/pair outcomes, require versioned performance criteria, require all safety gates, or require explicit owner approval. Legal-hours applicability currently treats verified `CURRENT` and a boolean period `appliesNow` as indefinitely current, so a stale assertion can create a legal blocker.
-
-The objective is to close those three paths without weakening existing recommendation, duplicate, currentness, private-data, or submission boundaries. Assumptions: explicit PREPARING remains a separate owner decision (workflow A); packet preparation itself continues to require and re-resolve that decision; private calibration evidence is evaluated only in the local process and only safe aggregates/digests are persisted; no performance threshold or calibration owner approval is presently approved, so the real state remains `UNCALIBRATED` and a future count-qualified but unapproved sample is `CALIBRATION_PENDING`; and a legal-hours blocker requires a verified basis whose temporal validity includes the evaluation date.
-
-## Requirements, architecture, and data flow
-
-- Add an owner-visible `Enter PREPARING` form to the packet workflow. It uses the existing nonce-protected queue server action and production `R2Repository.recordQueueDecision`, and is enabled only for a current `ELIGIBLE`/recommended evaluation with no unresolved duplicate. The separate packet button is enabled only when the latest decision is exact `CURRENT PREPARING`; the repository and packet service remain authoritative and fail closed for forged requests, absent/stale/nonrecommended/duplicate-blocked states.
-- Add fictional E2E scenarios that independently prove: an eligible/recommended job starts without PREPARING, enters PREPARING through the visible owner action, then persists a local packet; absent PREPARING cannot prepare; stale PREPARING cannot prepare; nonrecommended work cannot enter or use PREPARING; and an unresolved duplicate prevents the transition and packet. No E2E target URL, employer form, upload, or real submission is introduced.
-- Replace count-only calibration with a closed content-derived assessment. Local private label outcomes bind owner label, current eligibility, ordinal band, recommendation, and role family; local pair outcomes bind the owner-preferred and comparison scores. The assessment checks source-versus-comparable row consistency, unique identities, label semantics, pair ordering, sample/status/family coverage, versioned performance thresholds, all named versioned safety gates, and a threshold/safety-bound owner approval. Missing, inconsistent, or failing qualification after the sample-count threshold yields `CALIBRATION_PENDING`; a below-threshold sample remains `UNCALIBRATED`; only complete passing evidence can yield `CALIBRATED`.
-- Persist no private label or pair content in public artifacts. Add additive migration `0006_r2_calibration_qualification.sql` with a one-to-one local qualification record for each new calibration run containing only counts, agreement basis points, an opaque content digest, version identifiers, owner-approval metadata, and stable blocker codes. Existing v5 runs/evaluations remain untouched and readable; an old/count-only `CALIBRATED` run has no v6 qualification and cannot authorize a new calibrated evaluation. Repository persistence derives the run state from the assessment and independently requires a complete blocker-free qualification before accepting `CALIBRATED`.
-- Extend the work-right hours-limit time basis so `CURRENT` and period `appliesNow` assertions may carry `asOf` and `validThrough` dates. Missing bounds, partially bounded assertions, not-yet-valid assertions, and expired assertions return `REVIEW_REQUIRED`; they never emit the legal-hours mismatch blocker. `DATE_WINDOW` remains an explicit ordered bounded rule. Teaching-period and break-period transitions are re-evaluated against the supplied evaluation timestamp; week and fortnight remain non-interchangeable and all results retain `NOT_LEGAL_ADVICE`.
-
-Data flow:
-
-`owner-visible Enter PREPARING -> nonce/origin/session validation -> current R2 evaluation + duplicate digest validation -> immutable CURRENT PREPARING decision -> separate packet action -> exact PREPARING re-resolution -> local packet only`
-
-`private label/pair rows + current immutable evaluations -> in-memory content comparison -> versioned performance/safety/approval assessment -> UNCALIBRATED | CALIBRATION_PENDING | CALIBRATED -> safe aggregate/digest-only v6 qualification -> version-bound calibration context`
-
-`verified legal-hours value + bounded time-basis assertion + evaluation date -> current applicability | stale/unbounded review -> blocker only for an exact current fortnight conflict`
-
-## Proposed files and dependencies
-
-- Update `apps/web/app/jobs/[id]/page.tsx` and its existing server-action wiring; extend `scripts/start-e2e-server.ts` and `tests/e2e/r2-matching-quality.spec.ts` with fictional, isolated readiness scenarios.
-- Update `packages/fit-scorer/src/calibration.ts` and focused tests with strict private outcome, threshold, safety-gate, approval, assessment, and inconsistency contracts; update `scripts/r2-evaluate-private.ts` to derive evidence from local label/pair contents without printing them.
-- Add only `packages/database/drizzle/0006_r2_calibration_qualification.sql`; update Drizzle metadata, migration/status/E2E setup, calibration persistence, and fresh/v5/v6/future/backup-restore/history tests. Migrations 0000-0005 must have an empty diff from the reviewed head.
-- Update `packages/candidate-profile/src/index.ts`, `packages/eligibility-engine/src/r2.ts`, and focused tests for bounded legal-hours applicability.
-- Update `PROJECT_PLAN.md`, `docs/R2_MATCHING_QUALITY_PLAN.md`, `docs/FIT_SCORER.md`, `docs/ELIGIBILITY_ENGINE.md`, `docs/GO_LIVE_CHECKLIST.md`, and the existing PR #13 body with verified results only. No new runtime, AI, network, browser-target, analytics, or paid dependency is added.
-
-## Risks, security/privacy, and rollback
-
-Risks are a UI-only guard mistaken for authorization, nonce reuse, partial PREPARING/packet state, a fabricated calibration aggregate, private-label leakage, old count-only calibrated rows authorizing new work, SQLite migration drift, and stale temporal assertions producing legal certainty. Controls are the unchanged repository packet gate, separate nonce-protected mutations, production-path E2E, content-derived strict schemas, explicit inconsistency blockers, digest/aggregate-only persistence, calibrated-run qualification joins, additive 0006 with integrity/FK/history tests, evaluation-date comparisons, and fail-closed review states.
-
-Private profile, vacancy, database, backups, documents, packets, label/pair rows, and evidence digests stay ignored/local and are never printed or placed in Git/CI/PR text. Synthetic tests use only fictional values. Before any real v6 migration, stop owned writers; verify profile/database paths remain ignored/untracked and the v5 database has clean integrity/FKs; create and verify a fresh ignored backup; apply only 0006; then verify v6, zero pending migrations, clean integrity/FKs, and preservation of all historical counts. No private re-evaluation, label creation, packet creation, document generation, or real application action is required or authorized for this correction.
-
-Rollback before private migration is a normal revert of unmerged commits. After v6 migration, retain the verified v5 backup and restore only through the explicit reviewed recovery workflow if migration/integrity/FK/history verification fails. Never edit/down-migrate 0000-0005, delete historical calibration/evaluation rows, rewrite Git history, or merge PR #13.
-
-## Testing, acceptance criteria, and exact implementation steps
-
-Acceptance requires the visible PREPARING transition and all five E2E readiness paths; repository fail-closed tests; below-threshold uncalibrated, count-qualified pending, inconsistent/premature pending, failed label/pair performance pending, missing/failed safety pending, missing/mismatched owner approval pending, and complete fictional qualified calibrated tests; v6 qualification persistence and refusal of legacy/count-only calibrated runs; fresh/v5/v6/future/backup-restore/history/integrity/FK migration coverage; bounded current/teaching/break/stale/unbounded legal-hour regressions; complete format/lint/typecheck/unit/integration/build/E2E/privacy/audit/doctor/status/quality/preflight/release/diff/fsck gates; clean same-branch push; and both exact-head GitHub CI events green while PR #13 remains open and unmerged.
-
-Exact sequence:
-
-1. Commit this plan-first blueprint before application/schema code.
-2. Implement the content-derived calibration assessment and fictional failure/promotion tests.
-3. Add immutable migration 0006, persist safe qualifications, reject count-only calibrated runs, and extend migration/restore/future-schema tests.
-4. Add bounded legal-hours schema/engine behavior and teaching-to-break/stale regressions.
-5. Add the explicit PREPARING UI transition, preserve backend authorization, seed fictional E2E readiness states, and prove the complete successful and fail-closed workflows.
-6. Run all synthetic and privacy gates; fix every failure before touching the ignored real database.
-7. Stop owned writers, verify/backup v5, apply only 0006, and verify v6/history/integrity/FKs without private reevaluation or packet mutation.
-8. Update truthful docs and PR #13, commit coherently, run the full exact-head matrix, push the same branch, require exact-head push and pull-request CI success, and stop unmerged for human review.
-
-## PR #13 final three-blocker implementation and private v6 acceptance - 2026-09-10
-
-Status: `IMPLEMENTED / SYNTHETIC PASS / PRIVATE V6 PASS / FINAL EXACT-HEAD GATE PENDING`. The work remains on `feat/r2-matching-quality` and PR #13 remains open and unmerged. The plan-first commit was created at `675d844`; migrations 0000-0005 retain an empty diff from reviewed start `24c942df2e2e1991e6102ff41b36639162d79533`, and the only database addition is 0006.
-
-Completed implementation:
-
-- added an owner-visible, nonce-protected `Enter PREPARING` transition and kept local packet creation as a separately gated action requiring exact `CURRENT PREPARING`;
-- added isolated fictional E2E states proving eligible/recommended -> PREPARING -> review-required local packet success, plus absent, stale, nonrecommended, and unresolved-duplicate fail-closed behavior;
-- replaced count-only calibration promotion with content-derived private label/pair comparison, minimum family/status/sample consistency, versioned performance thresholds, all named safety gates, and threshold/safety-bound owner approval;
-- made count-qualified but unapproved/inconsistent/failing evidence `CALIBRATION_PENDING`, retained below-threshold evidence as `UNCALIBRATED`, and required a blocker-free qualified durable run before any new `CALIBRATED` evaluation can persist;
-- added only additive migration `0006_r2_calibration_qualification.sql`, storing safe aggregate counts/agreement, an opaque local evidence digest, versions, approval metadata, and blocker codes while leaving private labels/pairs and legacy count-only runs untouched; and
-- bounded `CURRENT` and teaching/break/visa `appliesNow` assertions with `asOf`/`validThrough`; missing, partial, future, or stale bounds now review and never create a legal-hours blocker.
-
-Pre-private synthetic validation passed: focused calibration/eligibility/repository/migration/security coverage passed 47 tests across six files; `npm.cmd run quality` passed formatting, zero-warning lint, TypeScript, 293 unit tests in 41 files, 21 integration tests in three files, and a production build with 31/31 static-page generation; full serialized Playwright passed 24 tests; full and production npm audits reported zero vulnerabilities; privacy audit passed 11 private canaries; `git diff --check` and `git fsck --strict` passed. The first combined E2E run exposed two fictional-fixture assumptions: the intentionally available fictional profile invalidated an older missing-profile assertion, and shared location/employment/description fields triggered conservative duplicate review for the success fixture. The profile assertion was updated to verify safe loaded state, fixture identities were isolated, and both the focused nine-test sequence and full 24-test suite passed. No product failure was waived.
-
-Private acceptance used no source or application action. ApplyPilot-owned writers were already stopped; the private profile validated; profile, private directory, SQLite, and vacancy paths remained ignored/untracked; and preflight showed schema v5, one pending migration, integrity `PASS`, and zero FK issues. Verified ignored v5 backups `backup-2026-09-10T01-49-24.369Z-db2f8301` and `backup-2026-09-10T01-49-27.527Z-c7471892` preceded migration. Migration applied only 0006 and finished at schema v6 with zero pending migrations, integrity `PASS`, zero FK issues, one job, four preserved job versions, 10 R2A field rows, 20 R2A requirement rows, and 68 coverage rows. Two legacy evaluations, two R2 evaluations, and two `UNCALIBRATED` calibration runs remain; qualification rows are zero. Post-migration privacy, doctor, and preflight checks pass. No private reevaluation, label/pair creation, document generation, packet creation, source call, employer-form visit, upload, submission, or other real application action occurred.
-
-Remaining release mechanics: commit this coherent application/schema/docs delta, run the complete release matrix on that unchanged exact head, push only the same branch, update the existing PR #13 body with safe results, require both push and pull-request GitHub Actions to succeed for the exact head, and stop with PR #13 unmerged.
-
-# Final offline Personal Live V1 enablement train - 2026-09-10
-
-Status: `IN_PROGRESS / OFFLINE_ONLY`. Human approval merged PR #13 at reviewed head `22798673e785723840d88e66a0dce6f8ff1d4d8f`; merge commit and fresh branch base are `d5a613ce156a6c719b9d9e1caec381e7e616ca4c`. The implementation branch is `feat/personal-live-v1-enablement`. The future implementation PR must remain open and unmerged for review.
-
-## Current state and objective
-
-The merged repository is schema v6 and already contains R2 evidence/evaluation/queue controls, default-disabled Greenhouse and Lever read helpers, an ignored private allowlist loader, immutable observations, application packets, durable runner/checkpoint/consent tables, a synthetic loopback application surface, and an in-memory consent-bound synthetic runner. The existing source capability is the older mutable v1 record: it lacks immutable approval versions, independent policy/capability expiry, explicit revocation/supersession, complete request/page/body/time budgets, crash-safe page checkpoints, strict audit schemas, and a DNS-pinned production transport. The current reader has fictional unit coverage but no complete source-to-R2 transactional orchestration or owner-started source action. The runner proves important safety behavior synthetically, but its target rule is hard-coded to loopback instead of a closed target-capability/adapter contract, and its durable run does not bind the complete packet/document/answer/disclosure/target snapshot or expose recovery decisions to the owner.
-
-The objective is to finish every remaining implementation task that can be proven offline: R1A source authority and transport enforcement, R1B Lever fixture pagination, the source-to-observation-to-R2 queue pipeline, a target-independent runner contract exercised only by fictional loopback targets, durable binding/recovery/audit semantics, and truthful owner-facing status/approval UI. No real tenant or employer target is selected or activated. The end state is an offline-reviewed Personal Live V1 enablement candidate, not authority for a live operation.
-
-## Assumptions, requirements, and hard boundaries
-
-- Real source GETs, employer-form visits, external uploads, and submissions are each exactly zero in this train. No tenant enumeration, opportunistic public-company selection, external browser navigation, candidate-data transmission, or real application action is permitted.
-- Candidate profiles, preferences, documents, answers, packets, sessions, and credentials are absent from source request construction. Returned hosted/application URLs are inert data and never become runner authority.
-- Source execution requires one exact current immutable `APPROVED` capability, a fresh owner-start action, exact operation approval, independent policy/capability validity, remaining budgets, and no revocation/supersession/security stop. Family-level approval never supplies a tenant.
-- Final runner execution always requires a current packet, approved disclosure for every mapped value, an exact approved target capability, a fresh frozen final-review snapshot, and one expiring single-use final-submit consent. This implementation creates no real target capability and cannot visit a real target.
-- CAPTCHA, MFA, authentication, access control, bot detection, rate limiting, website restriction, drift, unsupported controls, destination/form/version/document/packet/profile/answer/disclosure changes, lost responses, or ambiguous outcomes stop. Protections are never bypassed. `OUTCOME_UNKNOWN` is terminal and never retried automatically.
-- Migrations `0000` through `0006` are applied history and must remain byte-for-byte unchanged. Any persistence needed here is additive migration `0007_personal_live_v1_enablement.sql` only. Existing private rows/files are preserved.
-- No new runtime dependency is expected. The source transport uses Node HTTPS with a validated pinned address and original-host TLS verification; tests inject fictional transports and make no network or DNS request.
-
-## Architecture and data flow
-
-R1 uses a closed `SourceCapabilityV2` schema with immutable local configuration digest and version. The ignored file remains the owner authority; the database retains only its safe operational projection and history. A source run snapshots that exact capability version, enters `RUNNING` before a request, records each request/page budget and checkpoint transactionally with immutable observations, and never auto-resumes after interruption. Revocation and every request boundary revalidate the current capability digest.
-
-The production source transport constructs URLs only from typed source/tenant/operation inputs, permits HTTPS and port 443 only, enforces exact host, tenant path-segment, and operation-specific query keys, resolves all addresses, rejects any non-public address, pins one validated address for the TLS connection while retaining the original hostname for SNI/certificate validation, and revalidates every permitted redirect. Limits cover attempts, redirects, retries, pages, records, decoded bytes, request/run time, one in-flight request per tenant, cursor progress, cancellation, content type, UTF-8, JSON structure, and schema. First-use settings can still choose zero redirects/retries; no policy value silently increases a cap.
-
-The source pipeline is:
-
-`exact ignored capability -> owner start + preflight -> bounded GET abstraction -> typed Lever page -> immutable source run/page/observation -> R2A normalization/evidence -> conservative duplicate candidate -> local private-profile R2 evaluation only after source IO ends -> durable REVIEWING queue snapshot`
-
-Production code and tests share the pipeline, but this train supplies only a fictional in-memory Lever transport. The pipeline accepts a candidate resolver only at its post-discovery evaluation stage; transport and raw observation interfaces cannot receive candidate-shaped data. Repeated pages, records, or crash replay are idempotent by exact capability/source/region/tenant/external ID/content digest and immutable page digest.
-
-The runner uses a closed `RunnerTargetCapability` plus an injected target adapter. A frozen run binding contains packet/job/profile/evaluation versions, packet digest, approved document IDs/digests, answer truth/disclosure versions and digest, exact target origin/path/form version, adapter version, unresolved count, and capability version. Synthetic loopback capability is test-only and environment-gated. Real capabilities remain absent and report `TARGET_APPROVAL_REQUIRED`.
-
-The runner flow is:
-
-`current PREPARING packet -> target capability preflight -> durable frozen binding -> adapter inspect/map -> disclosure-approved fill -> checkpoint/pause or final review -> fresh one-use consent -> exactly one adapter final action -> SYNTHETIC_SUBMITTED or terminal OUTCOME_UNKNOWN`
-
-Every checkpoint is append-only and recovery shows the last safe state, stop reason, frozen versions, and permitted next owner action. Resume revalidates every binding and capability; a changed or ambiguous state refuses resume instead of rebuilding authority.
-
-## Additive persistence plan
-
-Add migration `0007_personal_live_v1_enablement.sql`; do not edit or rebuild prior migrations. Add only:
-
-- `source_capability_versions`: immutable closed v2 projections, configuration digest, version/predecessor, source/region/tenant/alias, exact host/path/operations, approval/policy references and timestamps, independent expiries, all budgets/caps, parser version, state/revocation/supersession reason, and created timestamp. Only one non-revoked current version per capability ID is projected by repository logic.
-- `source_run_checkpoints`: one durable run snapshot bound to the capability version/digest, operation, status, current/next cursor, seen-page digest list, request/page/record/byte/retry/redirect counts, safe error/retry-after, owner start/cancel times, and completion timestamp.
-- `source_run_pages`: immutable page identities/cursors/digests/counts linked to a run. No response body or candidate data is stored here; raw local content remains in the existing immutable observation boundary.
-- `runner_target_capability_versions`: immutable synthetic-or-real target approval projections with exact origin/path/form/adapter/policy/expiry/state/configuration digest. The migration creates no real approved row.
-- `runner_run_bindings`: one immutable complete packet/target/answer/disclosure/document/version digest snapshot linked to the existing `application_runs` row and optional target capability version.
-- `runner_recovery_events`: append-only closed safe recovery decisions/stops linked to the run; metadata is IDs, versions, enums, counts, booleans, and timestamps only.
-
-Every table has strict CHECK/FK/unique constraints and indexes. Fresh/v6/v7/future-schema, failed-transaction, backup/restore, idempotency, history, integrity, and FK tests are mandatory. The real database is migrated only after every synthetic gate passes, owned writers are stopped, a fresh ignored consistent v6 backup is verified, migration preview succeeds, and recovery time is available. No real source/runner row is created by migration.
-
-## Proposed file scope
-
-- Source domain: replace the v1-only contract in `packages/job-sources/src/public-postings.ts` and `private-allowlist.ts` with backward-readable but v2-executable capability/approval/budget schemas; add a pinned transport, closed error/audit contracts, run engine, and complete fictional security tests. Extend `lever/reader.ts` mapping for categories, all locations, country, workplace type, salary and page checkpoints; keep Greenhouse behavior default-disabled and regression-tested.
-- Source persistence/pipeline: add focused repository/service files under `packages/database/src/` for immutable capabilities, run/page checkpoints, observation ingestion, R2 normalization/evaluation/queue handoff, crash recovery, revocation, and typed audit. Update schema exports and add migration 0007.
-- Runner domain/persistence: extend `packages/application-runner` with target capability, adapter/inspection/mapping/frozen-review/recovery schemas and a target-independent runner. Keep the existing synthetic API compatibility where useful. Extend database repositories to bind runs/consents/checkpoints atomically and consume consent exactly once before the irreversible adapter call.
-- Web: after reading the installed Next.js 16 route/action/header/cookie guidance, add nonce/session/origin-protected owner actions and status views to `/sources` and `/applications`. Show exact safe capability/limits/expiry/revocation/start state, source run recovery, target approval requirements, frozen disclosure/document/answer state, terminal unknown-outcome guidance, and no live-ready label without an approved capability. Synthetic controls exist only in E2E mode.
-- Fixtures/tests: add fictional Lever list/detail/page/changed/repeat/malformed/security fixtures, source pipeline integration tests, target-adapter fixtures, durable runner/recovery tests, and browser accessibility/error/empty/revoked/stale/unknown-outcome tests. Automated and browser tests remain entirely fictional.
-- Operations/docs: update schema version/status/preflight/release/private-smoke tooling, source matrix, runner guide, Personal Live V1, threat model, go-live checklist, release runbook, README/architecture/security, and this plan with verified reality. Do not change npm publication guards or CI permissions/artifact policy.
-
-## Security, privacy, and failure risks
-
-Principal risks are arbitrary destination construction, DNS time-of-check/time-of-use, private/mapped IPv6 destinations, redirect escape, budget reset across pages/retries, cursor loops, tenant crossover, schema drift, source content leaking to audit/UI, candidate data crossing the source boundary, partial observation/evaluation writes, real-target activation by a synthetic flag, stale packet/disclosure reuse, duplicate final action after lost response, and misleading readiness UI. Controls are strict closed schemas, exact source-built URLs, pinned validated connections, transactionally monotonic counters/checkpoints, tenant-scoped identities, event-specific audit schemas, package/interface separation, frozen version/digest bindings, capability absence for real targets, single-use consent, terminal unknown outcomes, and fictional canary tests.
-
-No capability file body, tenant value considered secret-like, private profile/job source body, document, answer, packet content, token, cookie, session, DNS address, response body, path, or free-form exception may enter public logs, audit metadata, screenshots, traces, Git, CI, PR text, or build artifacts. Private/runtime/quarantine/database/backup/output paths remain ignored and untracked. The privacy audit must pass after build and E2E.
-
-## Testing strategy and acceptance criteria
-
-Required source tests cover schema closure; draft/approved/revoked/expired/superseded states; independent policy/capability expiry; approval binding; operation and parser versions; exact HTTPS/host/port/path/query rules; IPv4, IPv6, mapped IPv6, mixed-answer and rebinding cases; pinned connection contract; redirects; content type/encoding/body/depth/size/time/cancel; 400/401/403/404/409/429/security interstitial stops; retry/attempt/page/record/byte/run/concurrency budgets; cursor repeat/reversal/gap; crash/owner-resume; cross-tenant identity; raw observation idempotency; strict audit redaction; and candidate-data canaries. Lever fixture integration must exercise empty, partial and full pages, multiple pages, list/detail schema, changed and repeated observations, malformed data, inert apply URLs, and zero global network calls.
-
-Required pipeline tests exercise the real production service boundary from fictional Lever pages through immutable observations, R2A evidence, conservative duplicate suggestions, R2 evaluation, and a fresh REVIEWING queue decision. They prove source IO ends before private-profile resolution, missing/invalid/demo profile never substitutes, no auto-link occurs, stale dependencies invalidate safely, crash replay does not duplicate, and revocation blocks the next page.
-
-Required runner tests cover target-independent adapter selection, no real capability, exact origin/path/form/action, packet/job/profile/evaluation/document/answer/disclosure bindings, unknown/sensitive answer pause, approved digest-only upload mapping, every auth/CAPTCHA/MFA/bot/rate/access/restriction/drift/unsupported stop, durable recovery, consent expiry/replay/change, exactly one fictional final click, persistence failure before action causing zero clicks, terminal lost/ambiguous response with one click and no retry, and accessibility of owner-facing recovery instructions.
-
-The complete gate is format, lint, strict typecheck, unit, integration, production build, serialized E2E, migration fresh/v6/v7/future/backup/restore/history/integrity/FK, security/privacy/audit, doctor/status/quality/preflight/release, diff check, and strict fsck. Full and production dependency audits must report no known vulnerability. Exact-head push and pull-request GitHub Actions must pass.
-
-Acceptance requires R1A `READY` offline, Lever fixture integration `READY`, the full fictional source pipeline `READY`, and the target-independent runner framework `READY`; all real operation counts remain zero; no real capability is active; owner UI truthfully reports `WAITING_FOR_APPROVED_TENANT` and `TARGET_APPROVAL_REQUIRED`; the real private database, if migrated to v7, has zero pending migrations, integrity PASS, zero FK issues, and preserved historical counts; one PR titled `feat: prepare Personal Live V1 enablement` is open with exact-head green CI and remains unmerged.
-
-Personal Live V1 is not operationally released by this offline train. After merge, the exact next owner gates are: (A) a new approval of one exact immutable Lever capability/tenant/policy/budgets followed by a separately authorised first GET; and (B) a new target-specific plan/review plus one exact immutable employer target capability, disclosure/frozen packet review, and separate final-submit confirmation. Neither can be inferred from this train.
-
-## Rollback and exact implementation sequence
-
-Repository rollback is normal focused commit revert or closing the unmerged PR. Source and runner capabilities default disabled; disabling/revoking a capability retains immutable observations/runs/checkpoints/events. Migration 0007 is additive and has no destructive down path; if the private migration fails, stop and restore only through the existing verified explicit restore workflow and exact owner confirmation. Never delete or rewrite historical source, evaluation, packet, runner, or submission evidence.
-
-Exact sequence:
-
-1. Commit this consolidated plan-first blueprint before application/schema code.
-2. Implement and test SourceCapabilityV2, immutable approval/revocation/budgets, pinned HTTPS transport, strict errors/audits, and the private v2 loader with zero real calls.
-3. Implement Lever fixture pagination/detail mapping and the transactional source run/page/observation pipeline into R2 normalization, duplicate review, evaluation, and queue.
-4. Add migration 0007 and repository fresh/v6/v7/failure/history/backup/restore tests; update schema-version tooling.
-5. Implement the target capability/adapter/frozen-binding/recovery model and durable generic runner, retaining the synthetic loopback fixture as the only executable target.
-6. Read installed Next.js guidance, implement protected owner source/runner approval/start/recovery views/actions, and add fictional browser/accessibility/security coverage.
-7. Run the complete synthetic gate and fix every failure before any private database operation.
-8. Stop owned writers, verify private ignore/untracked state and schema-v6 health, create/verify a fresh backup, preview/confirm only migration 0007, and verify history/counts/integrity/FKs. Do not create a source capability, run a source request, visit a target, upload, or submit.
-9. Update verified documentation and safe counts; run the complete final matrix on the committed tree, audit migration 0000-0006 hashes/diff, push this branch, open the one implementation PR, update its body, and require exact-head push/PR CI green.
-10. Stop with the new PR unmerged for ChatGPT/human review.
-
-## Final offline Personal Live V1 enablement results - 2026-09-10
-
-Status: `IMPLEMENTED / LOCAL_GATES_PASS / PR_OPEN_FOR_REVIEW`. The consolidated offline scope is complete on `feat/personal-live-v1-enablement`. PR #13 was merged only after its reviewed head `22798673e785723840d88e66a0dce6f8ff1d4d8f` remained open, mergeable, unchanged, and exact-head CI green; merge commit `d5a613ce156a6c719b9d9e1caec381e7e616ca4c` is the base of this branch. No real source tenant or employer target was selected or activated.
-
-R1A is `READY` for offline review. The implementation adds a strict immutable v2 source capability and ignored private allowlist, independent policy/capability expiry, approval/revocation/supersession, exact host/path/operation authority, parser/version binding, request/page/record/byte/time/retry/redirect caps, single concurrency, strict audit metadata, owner cancellation, and fail-closed run recovery. The production transport permits HTTPS GET only, rejects credentials/fragments/non-443 destinations, validates every DNS result against private/reserved/mapped ranges, pins a validated address while preserving hostname TLS verification, validates the connected address, revalidates redirects, bounds decoded response handling, and stops on access/authentication/rate/interstitial/timeout/cancellation/unknown network outcomes. No candidate object or request body can cross its interface.
-
-The R1B Lever fixture integration is `READY`. Fictional list/detail readers map categories, all locations, country, workplace type and salary data, preserve hosted/application URLs as inert observations, and enforce monotonic pagination/checkpoints and the shared run budget. Tests use injected transports only; no DNS lookup or global network call is made.
-
-The offline source pipeline is `READY`. One owner-started run persists `RUNNING` before I/O, snapshots the exact capability version/digest, persists immutable page checkpoints and raw observation payloads, scopes identities by source/region/tenant/external ID, makes exact replays idempotent, supersedes changed observations without rewriting history, normalizes through the production R2A boundary, creates cross-source review suggestions without automatic linking, evaluates only after source I/O has ended through the production eligibility and fit engines, and creates a fresh `REVIEWING` queue decision. Protection stops perform no evaluation or queue transition, only one exact run may be active, and an interrupted run never auto-resumes.
-
-The target-independent runner framework is `READY` for offline review. A strict target capability and ignored private target allowlist bind an exact origin/path/form/adapter/version/policy/expiry. A frozen run binds the packet, job/profile/evaluation, target digest/version, document IDs/digests, answer truth/disclosure versions/digests, and unresolved count. Each open/map/fill/review/submit boundary revalidates the complete binding and current capability. CAPTCHA, MFA, authentication, access control, bot detection, rate limiting, website restrictions, drift and unsupported state stop without bypass. Final action requires an explicit owner-confirmed, expiring, exact one-use consent whose durable representation is hash-only. A lost, thrown, or ambiguous final response is terminal `OUTCOME_UNKNOWN`; the runner cannot blindly retry. Synthetic loopback and a real-shaped no-network fixture prove adapter independence; no real target capability or adapter invocation exists in this run.
-
-Owner-facing `/sources` and `/applications` surfaces now report the exact safe authority state, bounds, expiry, recovery state and allowed owner action. Source start, cancellation and revocation mutations and target approval/revocation mutations require the existing local session, same-origin request, nonce, explicit checkbox, and exact typed confirmation. With no private capability they expose no execution control and truthfully show `WAITING_FOR_APPROVED_TENANT` and `TARGET_APPROVAL_REQUIRED`. Narrow-width E2E coverage passed, and no automatic source resume, target visit, upload, or submission was added.
-
-Migration `0007_personal_live_v1_enablement.sql` is additive; migrations 0000-0006 have no content diff. Synthetic fresh/v6/v7/future-schema/history/integrity/FK and actual temporary restore coverage passed before private mutation. The real local database started at schema v6 with integrity `PASS` and zero foreign-key issues. Verified ignored pre-migration backup `backup-2026-09-10T03-42-08.718Z-a8d12c94` restores in preview. Only migration 0007 was applied. The database now reports schema v7, zero pending migrations, integrity `PASS`, zero foreign-key issues, one preserved job, four job versions, 10 R2A field rows, 20 R2A requirement rows and 68 coverage rows. Verified ignored post-migration backup `backup-2026-09-10T03-42-27.281Z-028906bb` also restores in preview. All new real source capability/run/page/payload and target capability/run-binding/recovery tables contain zero rows. No down-migration or historical rewrite occurred.
-
-The complete local release matrix passed on the final implementation tree: formatting, lint with zero warnings, strict typecheck, 334 unit tests in 45 files, 21 integration tests in 3 files, production build with 31 route units, 27 serialized Playwright tests, doctor, database status, preflight, privacy audit, full dependency audit and production dependency audit. Privacy checked 252 tracked files, 669 history paths, 670 history blobs, 1,215 build/test artifacts and 11 private canaries; no leak or known dependency vulnerability was found. `git diff --check`, immutable-migration diff inspection, staged-scope inspection and strict Git fsck remain the final pre-push mechanics.
-
-Hard-boundary counters for this train are final: real source GETs `0`; real employer-form visits `0`; real external uploads `0`; real submissions `0`. No candidate data was sent externally. Manual-intake Personal Beta remains `READY`; source-enabled Personal Beta remains `WAITING_FOR_APPROVED_TENANT`; operational Personal Live V1 remains `NOT_READY` until separately approved live operations.
-
-Exact owner approvals required after this PR is reviewed and merged are:
-
-- **A - first real Lever tenant GET:** approve one exact immutable `SourceCapabilityV2` for one named Lever tenant/region/host/path/operation set, policy reference and validity window, parser version, request/page/record/byte/time/redirect/retry budgets, then separately authorize one owner-started first GET against that exact current capability. Tenant-family approval, this offline implementation, or fixture success is not sufficient.
-- **B - first real employer target interaction:** approve a new target-specific plan and review, one exact immutable real `RunnerTargetCapability` for the named origin/path/form/adapter/policy/validity window, the current frozen packet/document/answer/disclosure binding, and the specific first target interaction. Any future final application submission still requires a separate fresh one-use final-submit confirmation immediately before the irreversible action.
-
-PR #14, `feat: prepare Personal Live V1 enablement`, is the single implementation PR and remains open and unmerged for ChatGPT/human review. It contains the coherent implementation and release record on `feat/personal-live-v1-enablement`. Exact-head push and pull-request GitHub Actions are mandatory for final handoff; no merge or live-operation authority is granted by this offline train. The next work is only the requested review or one of the two separately authorized activation plans above.
-
-# PR #14 final source hardening - 2026-09-10
-
-Status: `IN_PROGRESS / OFFLINE_ONLY`. This focused pass starts from exact PR #14 head `5cd9ce4589cee5f4be01917936158342e42a8afc` on `feat/personal-live-v1-enablement`. The PR is open, unmerged, cleanly mergeable, and both exact-head GitHub Actions checks are successful. This pass changes only the Lever contract/evidence mapping, source restart reconciliation, and Lever query validation requested by final review. It does not authorize or perform a real source GET, employer-form visit, upload, submission, tenant choice, target choice, or merge.
-
-## Current state, objective, and requirements
-
-The v2 Lever boundary currently accepts an internal `onsite` spelling instead of the official `on-site` wire value, does not retain official `lists[]` sections in the mapped source evidence, and relies on `descriptionPlain`/`additionalPlain`. Query validation allowlists key names and checks only the first `mode` value; duplicate or malformed `mode`, `skip`, and `limit` parameters can pass. The source page transaction safely persists an observation and job version, but the post-discovery R2 handoff considers only observations first created by the just-completed run. Consequently, page-one records in a stopped run are not linked to a restarted run when their identical observations replay, and they can remain unevaluated after the restart completes.
-
-The objective is to accept the official Lever posting shape while keeping all mapped content inert, preserve every list section as R2 source evidence without mutating the raw observation, require canonical exact query semantics, and make a completed restart reconcile every current job previously persisted for the same immutable capability identity. The required scenario is `page 1 persisted -> page 2 fails -> owner restarts -> complete`; after completion, both pages are represented and every record lacking a current R2 evaluation/queue tuple is processed exactly once, while already-current tuples no-op.
-
-Migrations `0000` through `0007` are immutable. Existing durable linkage through `source_observations.run_id -> source_run_checkpoints.capability_version_id -> source_capability_versions.capability_id` is sufficient for reconciliation, so no migration is planned. If that assumption proves false, the only permitted persistence change is additive migration 0008; prior SQL must not change.
-
-## Architecture, data flow, and proposed files
-
-- Extend `LeverPostingV2Schema` with the official `workplaceType` enum `on-site|remote|hybrid|unspecified` and bounded official `lists[]` objects. The mapped domain retains the existing internal `onsite` spelling and converts only official `on-site` to it.
-- Add a Lever-local inert-text helper based on the already-installed HTML parser. It discards active/non-content elements, emits normalized text and line boundaries only, and never renders, evaluates, injects, or follows source HTML/links. Apply it to all mapped text fields. Keep the Zod-parsed raw posting, including original list HTML, only in immutable observation payload storage and content hashing.
-- Map list sections into an immutable `sections` collection. Include every section heading/body in the normalized source text and structured R2 input. Route recognizable qualification/requirement sections to `requirementTexts`, responsibility/duty sections to `responsibilities`, and benefits/other sections to named inert source sections so they remain available to R2A without falsely classifying benefits as mandatory requirements.
-- Strengthen `validateSecureSourceUrl` for Lever. `LIST_JOBS` requires exactly one each of `mode`, `skip`, and `limit`; `mode` must equal lowercase `json`; `skip` and `limit` must be canonical decimal integers with no sign, whitespace, exponent, decimal, leading zero, empty value, or overflow; skip must be below the approved record cap; limit must be positive, at most the page-size cap, and must not make `skip + limit` exceed the record cap. `GET_JOB` requires exactly one `mode=json` and forbids pagination parameters. Lever capabilities require `maxRedirects=0`, making approved request semantics non-mutable across redirects.
-- Replace run-local `jobIdsForRun` handoff with a durable capability-scoped reconciliation query. Starting from the successfully completed run, resolve its exact `capability_id`, enumerate the latest current job versions of all observations persisted under that identity across earlier stopped and current runs, and inspect current R2 evaluation and queue state. Return only work needing evaluation or queueing: no current evaluation means evaluate then queue; a current evaluation with missing/stale queue reuses that evaluation ID without reevaluation; an exact current evaluation/queue tuple no-ops. Existing observation/job-version/content-digest identities continue to make page replay immutable and idempotent.
-- Update focused files only: `packages/job-sources/src/lever/v2-reader.ts`, a small inert-text helper if useful, `secure-source-transport.ts`, `source-capability.ts`, their focused tests, `packages/database/src/source-enablement-repository.ts` and test, package metadata only if the parser dependency must be declared directly, and safe source/security/runbook documentation plus this plan. No runner, candidate, document, target, or submission behavior changes.
-
-Reconciled data flow:
-
-`fictional official Lever JSON -> strict wire schema -> inert mapped text + immutable raw payload -> transactional page/observation/job-version/R2A persistence -> later page failure and safe STOPPED checkpoint -> explicit restart -> idempotent page-one replay + new page-two persistence -> completed-run capability reconciliation -> evaluate only missing current tuples -> queue using new or reusable current evaluation -> exact replay no-op`
-
-## Dependencies, risks, security, privacy, and rollback
-
-No network, tenant, browser, target, AI, paid API, credential, or candidate-data dependency is added. The existing workspace already installs `parse5` for inert import parsing; if the Lever package imports it directly, its package manifest and lockfile will declare that direct relationship without changing the installed version. Risks are HTML-derived evidence influencing R2, list headings being mistaken for mandatory claims, duplicate query-key ambiguity, numeric overflow/alternate encodings, cross-tenant reconciliation, reevaluation duplication, and queue failure between evaluation and queue persistence. Controls are parser-based text extraction with active-element discard, explicit section classification, exact parameter multiplicity/canonicality/bounds, capability-ID-scoped joins, latest-version/currentness checks, and reuse of an already-current R2 evaluation before queue retry.
-
-Raw payloads remain immutable source evidence and may contain source-supplied HTML only inside non-rendered local JSON storage; mapped fields, UI, R2 source text, audits, logs, screenshots, and PR documentation contain inert text only. Candidate profiles are resolved only after source discovery has fully completed and never enter source transport. Private profile, database, backups, vacancy, documents, packets, session and capability files remain ignored/untracked. No private values or real source body may enter tests, Git, CI, logs, screenshots, or PR text.
-
-Rollback before merge is a focused revert of this pass on the same PR branch. There is no database rollback because no migration or private mutation is planned. If migration 0008 unexpectedly becomes necessary, it must be additive, must pass synthetic fresh/v7/v8/future/backup/restore/history/integrity/FK gates before any private change, and requires a new verified ignored v7 backup before application. Never edit 0000-0007 or delete/rewrite observations, versions, evaluations, queues, run history, or raw payloads.
-
-## Testing strategy, acceptance criteria, and exact steps
-
-Focused contract tests must prove all four official workplace values, internal `on-site -> onsite` normalization, list ordering/content preservation, active-element discard, entity/text normalization, inert structured/description evidence, and unchanged immutable raw payload HTML/digest. Pipeline tests must explicitly run `page 1 success -> page 2 failure -> restart -> complete`, prove page-one and page-two observations/job versions/R2A exist, process all pending evaluations/queues, reuse current evaluation when only queueing remains, and prove a later exact replay adds no observation, job version, legacy/R2 evaluation, or queue version.
-
-Adversarial query tests cover missing, duplicate, reordered, empty, signed, leading-zero, decimal, exponent, whitespace/encoded-whitespace, oversized, cap-crossing and unexpected parameters; exact valid boundary values pass; `mode` is exactly once and exactly `json`; detail requests reject pagination; and every Lever redirect is refused before request semantics can change. Existing DNS pinning, address denial, path/host/HTTPS, protection-stop, budget, immutable observation, cross-tenant, audit-redaction, and zero-network tests must remain green.
-
-Acceptance requires Lever contract `PASS`, list evidence `PASS`, restart/replay `PASS`, and query security `PASS`; migration is `NONE`; schema remains v7 with zero pending migrations, integrity `PASS`, and zero FK issues; all real action counters remain `0/0/0/0`; PR #14 remains open and unmerged; and exact-head push plus pull-request CI are successful.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before application code.
-2. Implement official Lever wire values, inert list/text mapping, section classification, immutable raw-payload handling, and focused tests.
-3. Implement exact Lever query multiplicity/canonicality/bounds and zero-redirect enforcement with adversarial tests.
-4. Implement capability-scoped completed-run reconciliation and the explicit failure/restart/replay integration test without a migration.
-5. Run focused source/database tests and typecheck; fix every failure within this scope.
-6. Update safe documentation and this plan with actual results. Verify migrations 0000-0007 have no diff and private artifacts remain ignored/untracked.
-7. Run format, lint, typecheck, unit, integration, build, serialized E2E, migration/backup/restore tests, security/privacy audits, dependency audits, doctor, database status, preflight, release check, `git diff --check`, and `git fsck --strict`.
-8. Commit and push only the same branch, update PR #14 safely, require exact-head push and PR CI green, and stop with PR #14 unmerged.
-
-## PR #14 final source hardening implementation results - 2026-09-10
-
-Status: `IMPLEMENTED / LOCAL_GATES_PASS / PR_OPEN_FOR_REVIEW`. The focused delta is complete on `feat/personal-live-v1-enablement`; PR #14 remains open and unmerged. No migration was required. Migrations 0000-0007 have no diff and remain immutable.
-
-Lever contract is `PASS`. The wire schema accepts only the official `on-site|remote|hybrid|unspecified` workplace values and maps `on-site` to the existing internal `onsite` value. It explicitly accepts official HTML `description`/`additional` fallbacks and bounded `lists[]`. Every mapped title, description, additional field, list heading/body, category/location/country/commitment/team/department, and salary text value is converted through `parse5` to normalized inert text; script/style/form/embed/media and other active/non-content elements and attributes are discarded. The mapped sections and parsed raw posting are deeply frozen. The original raw JSON and content digest remain unchanged in the first canonical source record, and every changed raw payload is stored under its new immutable observation rather than overwriting history.
-
-Lists evidence is `PASS`. Ordered sections are typed as requirements, responsibilities, benefits, or other. All section heading/body text is retained in the normalized description and structured `sourceSections`; recognized requirements and responsibilities also populate the bounded parsed fields consumed by R2A, while benefits remain evidence without being falsely made mandatory. Tests prove entity decoding, active-element discard, no HTML in normalized job/R2 inputs, original HTML retained only in immutable raw observation storage, a requirements-list statement represented in R2 requirement evidence, and runtime/type-level raw-payload immutability.
-
-Restart/replay is `PASS`. A completed run now resolves its exact durable `capability_id`, reconciles current jobs from observations linked to all earlier runs under that identity, and inspects each latest job version's current active-profile R2 evaluation and current queue tuple. Missing evaluations are created; an existing current evaluation is reused when only queueing is missing/stale; an exact current evaluation/queue tuple no-ops. The explicit fictional test persists two page-one records, fails page two, confirms zero evaluation/queue work on the stopped run, restarts to replay page one and add page two, then evaluates/queues all three. A third exact replay leaves observation `3`, job-version `3`, legacy-evaluation `0`, R2-evaluation `3`, and queue-version `3` counts unchanged with zero extra callbacks. Foreign-key check remains empty.
-
-Lever query security is `PASS`. List requests require exactly one each of `mode`, `skip`, and `limit`; `mode` is exactly lowercase `json`; numeric values use canonical unsigned decimal spelling, safe integers, skip below the record cap, positive limit at or below page size, and `skip + limit` at or below the record cap. Detail requests require exactly one `mode=json` and one safe external-ID path segment with no pagination keys. Missing, duplicate, empty, signed, leading-zero, decimal, exponent, whitespace/encoded-whitespace, overflow, over-cap, cap-crossing, uppercase-mode and unexpected values fail before DNS. Lever capability validation requires `maxRedirects=0`, so a redirect cannot mutate approved semantics. Valid query ordering and boundary values still pass.
-
-Focused validation passed: 26 tests across the source contract/security and source-pipeline persistence files, followed by strict typecheck and lint. The complete local release check passed formatting, lint, typecheck, 341 unit tests in 45 files, 21 integration tests in 3 files, production build with 31 route units, 27 serialized E2E tests, doctor, schema/status, preflight, privacy audit, full dependency audit and production dependency audit with zero known vulnerabilities. Migration preview reports current/target schema v7 and pending `0`, with no change made. A fresh ignored schema-v7 backup `backup-2026-09-10T04-57-34.566Z-0ff0b1c0` has integrity `PASS` and restore preview `PASS`; 17 focused migration/schema/real-temporary-backup/restore tests in 3 files pass.
-
-The real local database remains schema v7 with zero pending migrations, integrity `PASS`, and zero foreign-key issues. No real source capability or target is configured. Real source GETs, employer-form visits, external uploads, and submissions in this hardening pass are exactly `0/0/0/0`. No private candidate value or real source body entered Git, logs, tests, screenshots, build output, or documentation.
-
-Final handoff requires the clean committed head to repeat the complete release check, immutable-migration diff, staged privacy/scope checks, `git diff --check`, and `git fsck --strict`; then only this same branch is pushed and PR #14's push and pull-request workflows must succeed on the identical SHA. PR #14 remains unmerged for review regardless of CI success. The next task is human/ChatGPT review of this exact focused delta, not live activation.
-
-# First live source preflight compatibility fix - 2026-09-11
-
-Status: `IN_PROGRESS / LIVE_ACTION_BLOCKED / OFFLINE_FIX_ONLY`. PR #14 merged as
-`4bf6b18e75312a59fc1d85a47bc7d8580e556c38`. The owner supplied one exact real Lever capability,
-but the mandatory preflight rejected its schema-v2 private allowlist before any
-network call because `scripts/preflight-summary.ts` still loads the legacy schema-v1 format from
-the same filename. Real source GETs, employer-form visits, external uploads and submissions remain
-`0/0/0/0`. This run must not attempt the live request after fixing the preflight; a new exact owner
-gate is required after review and merge.
-
-## Objective, assumptions, and requirements
-
-Make operational preflight and release reporting use the same strict `SourceAllowlistV2` authority
-contract as the merged `/sources` owner UI. Preserve the legacy loader for its older isolated public
-posting tests and make no source-transport, parser, pipeline, profile, target, runner, document,
-application or migration change. The private v2 capability remains ignored and must never be
-committed. The real database and approved capability may be read for local verification only; no
-real URL may be resolved or requested during this fix.
-
-## Architecture, files, and data flow
-
-Change only `scripts/preflight-summary.ts`, `scripts/release-summary.ts`, focused synthetic tests,
-and safe documentation/plan records. Both operational scripts will load
-`loadPrivateSourceAllowlistV2`, derive readiness with `sourceCapabilityReadiness`, report active
-approved capability count separately from configured versions, and fail closed when an allowlist
-is malformed or contains no currently enabled capability. Data flow becomes:
-
-`ignored source-allowlist.json -> strict v2 parser -> current approval/policy/capability expiry gate -> preflight/release status -> owner UI`.
-
-No transport or DNS function is imported or invoked by these checks.
-
-## Dependencies, risks, security/privacy, and rollback
-
-No dependency or schema change is required. Risks are treating an expired/revoked v2 record as live,
-silently accepting malformed authority, exposing tenant/private values in logs, breaking the safe
-zero-capability baseline, or accidentally invoking transport in a test. Controls are strict parsing,
-current-readiness filtering, aggregate-only output, fictional temporary allowlists, transport-free
-tests, ignored-path verification, and full privacy/release checks. Rollback is a focused revert of
-this branch; migrations `0000`-`0007` remain byte-for-byte immutable and migration `0008` is not
-needed.
-
-## Testing strategy, acceptance criteria, and steps
-
-Add synthetic process-level coverage for absent, valid approved, expired/revoked, and malformed v2
-allowlists, proving the operational scripts agree with the owner UI contract and make zero network
-calls. Acceptance requires the original real v2 file to pass locally without printing its contents,
-all full release gates to pass, schema v7/pending 0/integrity PASS/FKs 0, clean privacy and dependency
-audits, exact-head push and PR CI green, and all real-action counters still `0/0/0/0`.
-
-Implementation steps: commit this blueprint; add the focused synthetic regression first; switch both
-operational scripts to v2 readiness; run focused tests and local preflight; record actual results;
-run format, lint, strict typecheck, unit, integration, production build, serialized E2E,
-migration/backup/restore, security/privacy/dependency audits, doctor, preflight, release check,
-`git diff --check`, immutable-migration diff, and `git fsck --strict`; commit/push the same branch;
-open `fix: harden first live source smoke`; require exact-head push and PR CI green; stop unmerged.
-
-## First live source preflight compatibility implementation results - 2026-09-11
-
-Status: `IMPLEMENTED / OFFLINE_GATES_PASS / LIVE_REQUEST_NOT_ATTEMPTED`. Mandatory preflight
-blocked the authorized real capability before transport because the operational preflight and
-release scripts parsed the shared private filename with the legacy v1 loader while the merged owner
-UI required v2. The live authority was not consumed: real source GETs, employer-form visits,
-external uploads and submissions remain exactly `0/0/0/0`.
-
-The fix adds one transport-free operational readiness helper shared by preflight and release
-reporting. It strictly loads `SourceAllowlistV2`, counts only capabilities whose approval, policy
-window and capability window are currently enabled, and reports configured and active counts
-without tenant, URL, posting or candidate values. The legacy loader remains unchanged for its
-isolated older contract. Synthetic regressions prove absent, approved-current, expired,
-policy-expired, revoked and malformed cases; no DNS or HTTP dependency is present.
-
-Focused validation passed 25 tests across two files plus strict typecheck and lint. The complete
-offline release check passed formatting, lint, typecheck, 347 unit tests in 46 files, 21 integration
-tests in three files, a production build with 31 route units, 27 serialized E2E tests, privacy audit
-over 271 tracked files/731 history paths/732 history blobs/1,242 build artifacts/11 private canaries,
-and full plus production dependency audits with zero known vulnerabilities. Seventeen focused
-migration/schema/backup/restore tests passed. Migration preview remains schema v7 to v7 with zero
-pending changes; migrations `0000`-`0007` have no diff and no `0008` exists. Verified ignored
-backups `backup-2026-09-11T01-58-24.309Z-7d0070b2` and
-`backup-2026-09-11T02-03-58.579Z-600c4d8e` report schema v7/integrity PASS, and restore preview of
-the pre-action backup passed. The real database remains schema v7, pending zero, integrity PASS and
-foreign-key issues zero. Strict Git fsck completed with only pre-existing unreachable objects.
-
-The exact private capability file is ignored and not part of Git. Local preflight now reports one
-configured/current v2 capability without invoking transport, but this run remains offline after the
-initial preflight blocker. The implementation branch must be pushed and one PR titled
-`fix: harden first live source smoke` left unmerged with exact-head CI green. After that PR is
-reviewed and merged, the owner must issue a fresh exact first-GET authorization with a new execution
-window before any real source request; the expired or current private record alone is insufficient.
-
-# First live source attempt and post-smoke validation - 2026-09-12
-
-Status: `COMPLETE / NETWORK_OUTCOME_UNKNOWN / OFFLINE_VALIDATION_PASS`. PR #15 was verified at its
-approved exact head and merged normally as `4e041c97dc8c692859b03332c39099628e0def13` before any
-source action. Local `main` matched `origin/main`, schema v7 was current, integrity and foreign keys
-passed, migrations `0000`-`0007` were unchanged, the prior private authority was preserved, and a
-fresh exact owner-approved capability was materialised only in the ignored private allowlist.
-
-Operational preflight passed with one current approved capability. Exactly one owner-started,
-GET-only request was attempted with request budget one, page/record cap 25, two-megabyte response
-limit, 30-second request timeout, 60-second run timeout, concurrency one, redirects zero and retries
-zero. The transport did not establish a safely reportable HTTP response and the durable checkpoint
-terminated as `STOPPED / NETWORK_OUTCOME_UNKNOWN`: request count one, page count zero, record count
-zero. No retry, second page, detail request, alternate tenant, employer page, upload or submission
-occurred. Candidate/profile/document/answer data outbound remained zero fields.
-
-Because no usable response crossed the boundary, no raw body or HTML was received or persisted and
-the normalizer, deduper, R2 evaluator and queue had no real records to process. Counts are source
-capability versions one, source runs one, persisted pages zero and observation payloads zero. There
-were no real normalized jobs, evaluations, queue results or Melbourne matches, so no employer target
-candidate or application URL was selected, inspected or visited. A private ignored smoke report
-records only the safe counters and terminal classification.
-
-No parser, normalization, dedupe, evaluation, queue or runner defect is established by the ambiguous
-network outcome. Offline validation passed 55 focused source/restart/replay/authority/runner tests,
-347 unit tests in 46 files, 21 integration tests in three files, a production build with 31 route
-units, and 27 serialized E2E tests. Source query/host/path/DNS/SSRF/redirect/timeout/size/security-stop
-fixtures, immutable persistence/replay, capability expiry/revocation/version sequencing, frozen
-packet/document/answer/disclosure/target bindings, stale-version rejection, one-use consent,
-duplicate-submit prevention, CAPTCHA/MFA/auth/bot/rate/drift stops, lost-submit
-`OUTCOME_UNKNOWN`, owner recovery UI, and no-blind-retry behavior remain green. Privacy audit and
-full plus production dependency audits passed with zero known vulnerabilities.
-
-Migration preview remains v7 to v7 with zero pending changes and no migration was applied. Verified
-ignored pre-attempt backup `backup-2026-09-11T23-53-56.054Z-9916f2de` and post-attempt backup
-`backup-2026-09-12T00-11-30.430Z-9ecea11c` report schema v7 and integrity PASS; restore preview is
-valid. Database integrity remains PASS with zero foreign-key issues. Strict diff and Git fsck checks
-passed; unreachable historical objects are not corruption.
-
-Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`: the bounded source smoke did
-not produce a known successful response or any evaluable job, and the real runner still has no
-owner-approved target. Remaining software blockers are none established by this train. Remaining
-external gates are a fresh exact owner approval for any new source request, followed only after a
-successful source result by separate approval for one exact employer-target interaction. Final
-application submission continues to require a separate fresh one-use confirmation immediately
-before the irreversible action.
-
-# Live source transport diagnosis and one bounded retry - 2026-09-12
-
-Status: `IN_PROGRESS / OFFLINE_FIX_BEFORE_FRESH_AUTHORITY`. The exact starting `main` and
-`origin/main` are `a61b9d97ce10c566e0065dbc2eaf95f87a76bf5c`; GitHub is authenticated as
-`adeel1608`; the worktree was clean; and schema v7 reports zero pending migrations, integrity
-`PASS`, and zero foreign-key issues. The earlier Shield AI run remains durably `STOPPED` with one
-request attempt, zero pages, zero records, and `NETWORK_OUTCOME_UNKNOWN`. No response observation,
-runner target, employer-form visit, upload, or submission exists from that attempt.
-
-## Current state, objective, assumptions, and requirements
-
-Offline forensics found that the owner UI awaited the backend run and its browser automation timeout
-did not cancel the server-side source request; the backend subsequently committed a terminal run
-checkpoint. Page persistence is transactional and was never entered because no response page crossed
-the transport boundary. The secure transport validates HTTPS, exact host/path/query semantics and all
-resolved addresses, preserves SNI/certificate verification, pins one address, uses an abort timeout,
-and permits no Lever redirects or retries. However, resolver failures are not converted to a safe
-source error and generic Node socket/TLS failures are collapsed to `NETWORK_OUTCOME_UNKNOWN`. The
-actual socket's remote address is also not verified independently of the requested pin.
-
-The objective is to add deterministic, redacted transport classifications for DNS resolution,
-unavailable routes, refused/reset connections, TLS handshakes, request timeouts, and residual unknown
-outcomes while remaining fail closed. Classification may inspect only trusted lifecycle state and a
-bounded Node error code; it must never persist arbitrary messages, host secrets, certificates,
-response content, candidate data, or credentials. A classification never means a request is safe to
-retry: request budget, redirect and retry behavior remain unchanged, and failures after request
-creation/transmission remain terminal under this one-attempt authority.
-
-One owner-authorized non-HTTP diagnostic used one DNS resolution and three distinct-address TCP/TLS
-attempts, each below ten seconds. DNS returned three IPv4 and zero IPv6 answers; the first family was
-IPv4. Every TCP connection, TLS 1.2 handshake, and certificate hostname check passed. No HTTP method,
-path, query, header, body, candidate field, credential, raw address, raw certificate, or arbitrary
-exception string was sent or retained. Therefore an avoidable IPv6-first failure was not demonstrated
-and address selection will not be changed speculatively.
-
-## Architecture, proposed files, and data flow
-
-- `packages/job-sources/src/secure-source-transport.ts`: add a closed lifecycle-stage model, pure
-  Node-code classifier, DNS exception handling, actual connected-address verification, and safe
-  default-transport errors. Preserve exact URL validation, all-address SSRF denial, the single pinned
-  address, SNI, certificate verification, response caps, zero redirects, and zero retries.
-- `packages/job-sources/src/source-capability.ts`: extend the closed stop-code schema only with the
-  approved diagnostic codes. No capability field, operation, host, path, query, budget, or authority
-  changes.
-- Focused synthetic tests under `packages/job-sources/src/`: cover every new classification, unknown
-  fallback, DNS failure, timeout/owner-cancel precedence, connected-address mismatch, and proof that
-  transport errors consume only the existing attempt without retry.
-- Safe documentation and this plan: record aggregate diagnostics, gates, and the later bounded source
-  result without private capability contents or live response data.
-
-Data flow remains:
-
-`strict private capability -> exact URL validation -> bounded DNS -> reject if any address blocked ->
-single pinned HTTPS request with SNI/certificate validation -> safe lifecycle/code classification ->
-terminal checkpoint OR bounded JSON -> immutable page/observation -> R2 evaluation -> queue`.
-
-No migration or dependency is planned. Migrations `0000`-`0007` remain immutable and migration `0008`
-must not be created for this observability-only change.
-
-## Risks, security/privacy, rollback, and testing
-
-Risks are leaking raw exceptions/addresses, mislabelling an ambiguous post-transmission outcome as
-retryable, weakening SSRF pinning, trusting a mocked connected address, expanding authority, consuming
-the fresh request before exact-head code is reviewed, or persisting live/private content in Git.
-Controls are closed safe codes, lifecycle-aware tests, actual socket remote-address capture, strict
-all-address rejection, zero automatic retries/redirects, fictional fixtures, ignored private runtime
-files, exact-head local/CI gates, and capability materialisation only after the fix is merged back to a
-clean main. Candidate/profile/document/answer data remains completely outside source requests.
-
-Rollback is a normal focused revert of this branch/merge. It changes no schema and does not rewrite or
-delete the earlier terminal run. The private allowlist and local database are backed up and remain
-ignored. A failed or unknown second GET is terminal; no third GET is authorized.
-
-Acceptance requires all new codes to be synthetically proven, generic messages to remain redacted,
-DNS/SSRF/pinning/SNI/timeout/redirect/retry protections to remain equal or stronger, no migration or
-private tracked artifact, complete local release gates, exact-head GitHub CI green, and an exact-scope
-self-review before the pre-approved merge. Only then may a new deterministic capability be
-materialised for one exact `GET` to
-`https://api.lever.co/v0/postings/shieldai?mode=json&skip=0&limit=25` with the owner-specified bounds.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before application code.
-2. Add closed diagnostic codes and lifecycle-aware classification with focused synthetic tests.
-3. Run focused tests, format, lint, and strict typecheck; self-review security semantics.
-4. Run unit, integration, production build, serialized E2E, migration/status, backup/restore,
-   doctor/preflight/release, privacy/security/dependency audits, diff-check, immutable-migration diff,
-   and strict Git fsck.
-5. Record actual results, commit/push the same branch, open the named PR, require exact-head push and
-   pull-request CI green, self-review and merge only if every pre-approved condition holds, then refresh
-   clean `main`.
-6. Create a verified ignored backup, materialise one new short-lived bounded capability, run preflight,
-   and make exactly one owner-authorized GET. Do not retry or request a second page/detail.
-7. If successful, complete persistence/R2/queue and all useful offline validation; if the result is
-   again unknown, make no third GET and report the deepest safe lifecycle evidence and blocker.
-
-## Transport hardening implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / LOCAL_GATES_PASS / AWAITING_EXACT_HEAD_CI`. The implementation adds only the
-approved closed diagnostics and supporting tests/docs. `DNS_RESOLUTION_FAILED`,
-`NETWORK_ROUTE_UNAVAILABLE`, `CONNECTION_REFUSED`, `CONNECTION_RESET`, and
-`TLS_HANDSHAKE_FAILED` join the existing timeout, forbidden-address, pin-mismatch, and unknown codes.
-Resolver exceptions and empty answers now terminate as DNS failure; generic Node failures are mapped
-only from a closed code allowlist and trusted socket lifecycle state; arbitrary exception text is
-discarded. TLS-like errors after a secure connection remain unknown instead of being mislabelled.
-Network exceptions are terminal even if a broader capability retry ceiling exists, so a diagnostic
-label never creates blind-retry authority.
-
-The default HTTPS transport records socket assignment, TCP connection, TLS establishment, request
-flush, response headers, and body locally for classification; no lifecycle detail is logged. It reads
-the actual response socket address and compares a canonical IP representation to the validated pin,
-while retaining the original hostname for SNI/certificate verification. All resolved addresses still
-must be public; the first validated address remains deterministic because diagnostics did not
-demonstrate an IPv6-first defect. Host, path, query, method, redirects, credentials, candidate-blind
-request data, response byte cap, and time budgets are unchanged or stricter.
-
-Focused validation passed 42 tests across the source capability/transport and durable source
-repository files. It covers resolver throw/empty results, every new code, residual unknown outcome,
-TLS lifecycle qualification, safe message redaction, canonical IPv6 pin comparison, actual pin
-mismatch, timeout/cancellation precedence, no network retry despite a synthetic retry ceiling, and
-durable safe-code persistence with no evaluation/queue execution. Strict typecheck and lint pass.
-
-The complete local release check passed doctor, database/preflight, formatting, lint, strict
-typecheck, 363 unit tests in 46 files, 21 integration tests in three files, the 31-route production
-build, 27 serialized fictional/local E2E tests, privacy audit over 273 tracked files, 738 history paths,
-739 history blobs, 1,287 build/test artifacts and 11 private canaries, and both dependency audits with
-zero known vulnerabilities. Fifteen focused schema/migration/backup/restore tests pass. The verified
-ignored backup `backup-2026-09-12T01-35-17.826Z-04e67f6e` is schema v7/integrity `PASS`, and its restore
-preview passes. The real database remains schema v7 with zero pending migrations, integrity `PASS`,
-and zero foreign-key issues.
-
-Migration is `NONE`; migrations `0000`-`0007` remain unchanged and no `0008` exists. No source
-capability has been created during the fix: the private allowlist contains two configured historical
-versions and zero current capabilities. New real source GETs, employer-form visits, uploads, and
-submissions during diagnostics/fix remain `0/0/0/0`; lifetime application source attempts remain one.
-The three owner-authorized TCP/TLS diagnostic connections carried no HTTP or candidate data. No raw
-DNS address, certificate, exception, private capability, candidate value, or live payload entered
-Git, logs, tests, screenshots, documentation, or CI.
-
-Remaining exact-scope publication steps are staged privacy/diff checks, strict Git fsck, commit/push,
-one PR titled `fix: harden live source transport diagnostics`, and exact-head push/PR CI. The owner's
-pre-approved merge applies only if those checks pass and the diff remains this scope. After the merge,
-refresh clean `main`, create an additional verified ignored backup, materialise the new short-lived
-capability, run clean preflight, and use its single request budget exactly once.
-
-# Post-second live source lifecycle hardening - 2026-09-12
-
-Status: `IN_PROGRESS / OFFLINE_ONLY / NO_FURTHER_REAL_REQUEST_AUTHORITY`. PR #17 passed both
-exact-head quality workflows and merged normally as `15264f324f797f80975ffce776da1ed0a3443c90`.
-Refreshed local `main` exactly matched `origin/main`, was clean, and passed aggregate preflight.
-A fresh deterministic owner-approved capability was created only in the ignored private allowlist
-after a verified ignored schema-v7 backup and restore preview. Exactly one GET was attempted. It
-terminated durably as `STOPPED / NETWORK_OUTCOME_UNKNOWN` with request count one, page count zero,
-record count zero, and queue count zero. No retry, redirect, second page, detail request, alternate
-tenant, employer-form visit, upload, submission, or candidate-data transmission occurred.
-
-## Forensic comparison, objective, and requirements
-
-Both real source attempts ended with one consumed request and no response page/observation. Attempt
-one used the legacy generic classifier, so its deepest durable stage is unknown. Attempt two used the
-closed classifier: a resolver exception or empty result would be `DNS_RESOLUTION_FAILED`, and a
-blocked answer would be `DESTINATION_ADDRESS_FORBIDDEN`. Its residual unknown code therefore proves
-that DNS completed, every resolved address passed public-address validation, and the default request
-path was entered. The request object was created; no durable evidence proves socket assignment, TCP
-connection, TLS establishment, request flush, response headers, response body, or persistence.
-Earlier separately authorized diagnostics proved direct TCP/TLS reachability for three resolved IPv4
-addresses at that time, but they cannot prove the later HTTPS request lifecycle.
-
-The deterministic remaining defect is that the hardened default transport tracks lifecycle state only
-in memory. `SecureSourceError` and the terminal audit/checkpoint interface retain the safe error code
-but discard the deepest safe stage. This branch will persist only a closed lifecycle enum in the
-existing redacted `source.run.stopped` audit metadata and expose it through recovery/UI as needed. It
-must not persist IP addresses, ports, DNS answers, certificates, URLs/queries, headers, raw error
-codes/messages, response content, tenant values, or candidate data. No real request, connectivity
-probe, source activation, runner action, employer interaction, migration, or private-data mutation is
-authorized on this branch.
-
-Node 24 contract inspection also established a pinned-lookup defect consistent with the observed
-boundary: the socket layer may call a custom `lookup` with `options.all=true` during family
-autoselection, while the current callback always returns the single-address `(address, family)` shape.
-That can reject a valid pin before socket assignment even when separate DNS/TCP/TLS diagnostics pass.
-The fix must set the already validated pinned address family explicitly and honor both Node callback
-shapes, returning the same single pin as a one-element array only when `options.all` requests it. This
-does not add address fallback, a second connection, or another HTTP attempt.
-
-## Architecture, files, data flow, and dependencies
-
-- Move the closed lifecycle-stage schema/type into `source-capability.ts`, including `DNS`, request
-  creation, socket assignment, TCP connection, TLS establishment, request flush, response headers,
-  response body, and persistence.
-- Extend `SecureSourceError` with an optional closed stage. Default transport classification attaches
-  the deepest stage; DNS and timeout/cancellation preserve the known stage; pre-existing typed errors
-  receive the current stage without exposing their raw cause.
-- Replace the inline pinned lookup with a pure tested helper that validates the pin once, sets the
-  explicit request family, honors Node's `options.all` callback contract, and can return only that
-  exact validated address. It must not re-resolve, race, or fall back.
-- Extend `SourceRunSink.stop` and the strict `source.run.stopped` audit metadata with nullable
-  `transportStage`. The repository writes it to the existing JSON audit field. No table column or
-  migration is needed. Recovery derives the latest allowlisted stage from that same-run typed audit
-  event and treats absent historical metadata as `null`.
-- Expose the safe stage on the owner source-run recovery UI without host/address/error details.
-- Add synthetic default-transport lifecycle fixtures with a local TLS server or an injected
-  event-equivalent harness only if they make no external connection. Extend source-runner/repository/UI
-  tests for stage preservation, historical null compatibility, invalid-metadata rejection, timeout,
-  response-body reset, and persistence failure.
-
-Data flow becomes:
-
-`validated capability -> DNS/public-address validation -> one pinned HTTPS lifecycle -> closed error
-code + deepest closed stage -> terminal checkpoint + strict redacted audit -> owner recovery UI`.
-
-No dependency change is planned. Migration is `NONE`; migrations `0000`-`0007` stay byte-for-byte
-immutable and no `0008` is required because `audit_events.redacted_metadata_json` already stores
-strict typed event metadata.
-
-## Risks, security/privacy, testing, rollback, and acceptance
-
-Risks are overstating the stage, making stage labels retry authority, leaking network details through
-metadata/UI, breaking historical audit readers, changing transport semantics, or accidentally using
-the still-short-lived private capability. Controls are monotonic local stage tracking, a closed enum,
-strict metadata validation, null compatibility, no raw strings, no transport-policy change, injected
-or loopback synthetic tests, explicit zero-network assertions where practical, and no source-run UI
-action. A stage is diagnostic only and never changes retry, redirect, authority, or recovery rules.
-
-Rollback is a normal focused revert. Existing audit rows without the new optional field remain valid;
-no row, observation, capability, job, evaluation, queue, or private file is rewritten or deleted.
-
-Acceptance requires a future synthetic failure at each lifecycle boundary to persist/display only its
-deepest safe stage, historical attempt metadata to remain readable as null, arbitrary details to be
-rejected, all source/SSRF/pinning/retry tests to stay green, complete release gates and privacy audits
-to pass, migration/status/backup/restore/integrity/FKs to pass, the same branch PR to have exact-head
-CI green, and all post-second real action counters to remain `0/0/0/0`. Under the existing owner
-pre-approval, this offline-only PR may be self-reviewed and merged only when those conditions hold.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before application code.
-2. Thread the closed stage through transport error, run sink, strict audit metadata, repository
-   recovery, and safe owner UI without changing request construction or authority.
-3. Add synthetic stage/redaction/historical-compatibility/persistence tests; run focused tests,
-   formatting, lint, and strict typecheck.
-4. Run complete unit, integration, production build, serialized E2E, migration/status,
-   backup/restore, doctor/preflight/release, privacy/security/dependency audits, immutable-migration
-   diff, `git diff --check`, and `git fsck --strict`.
-5. Record exact results, commit/push only `fix/post-second-live-source-hardening`, open one consolidated
-   PR, require exact-head push and PR CI green, self-review/merge only within the owner-approved
-   offline scope, refresh clean `main`, and stop with no further source request.
-
-## Post-second lifecycle hardening implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / LOCAL_GATES_PASS / AWAITING_EXACT_HEAD_CI`. The second and final authorized
-request remains durably stopped with one request, zero pages, zero records, zero observations, and
-zero queue work. Across both attempts the database contains two capability versions, two stopped
-runs, zero source pages, and zero Lever observations. The deepest provable second-attempt stage is
-`REQUEST_CREATED`: the hardened DNS branches did not fire, every resolved address passed validation,
-and the default request path was entered; historical code did not retain evidence for socket
-assignment or any later stage. No third GET or post-second connectivity probe occurred.
-
-Offline contract inspection established that Node 24 may ask a custom lookup for `all=true` during
-family autoselection while the old pinned callback always used the single-address shape. The corrected
-helper sets the validated pin's explicit IPv4/IPv6 family and returns exactly the same pin either as a
-single address or a one-element array according to Node's callback contract. It never re-resolves,
-races addresses, falls back, or creates another connection/HTTP attempt. This is the strongest
-deterministic explanation available for the two otherwise ambiguous failures; the discarded historical
-raw errors prevent claiming it as proven runtime causation.
-
-The transport now carries a closed deepest lifecycle enum on `SecureSourceError`; DNS, request/socket,
-TCP, TLS, flush, response-header/body, timeout/cancellation, and persistence paths preserve only that
-enum. `source.run.stopped` strict audit metadata accepts an optional nullable stage for backward
-compatibility, rejects arbitrary values, and stores no network values. Repository recovery derives the
-stage from the existing same-run audit JSON, so no schema column/migration is needed. The owner source
-recovery UI displays the safe stage when present; old real attempts correctly display no invented
-stage. Persistence exceptions become `PERSISTENCE_FAILED / PERSISTENCE` and discard raw details.
-
-Focused validation passed 44 tests across the source transport/capability and source repository files.
-It covers every safe class/stage, DNS throw/empty/forbidden answers, Node single/`all=true` pinned lookup
-shapes, canonical IPv6 pin equality, actual-address mismatch, TLS-before/after-secure distinction,
-timeout/cancellation, response reset, no blind retry, audit-stage rejection, historical null, durable
-transport stage, persistence stage, and raw-message absence. Strict typecheck and lint pass. A local
-production `/sources` read returned HTTP 200 and rendered the durable unknown outcome without invoking
-a source action.
-
-The complete local release check passed doctor/database/preflight, formatting, lint, strict typecheck,
-365 unit tests in 46 files, 21 integration tests in three files, a 31-route production build, 27
-serialized fictional/local E2E tests, privacy audit over 273 tracked files, 747 history paths, 748
-history blobs, 1,288 build/test artifacts and 11 private canaries, plus full and production dependency
-audits with zero known vulnerabilities. Fifteen focused schema/migration/backup/restore tests pass.
-Verified ignored post-attempt backup `backup-2026-09-12T02-06-29.303Z-4cfb0016` is schema v7/integrity
-`PASS` and its restore preview passes. The real database remains schema v7, pending zero, integrity
-`PASS`, and foreign keys zero.
-
-Migration is `NONE`; migrations `0000`-`0007` are unchanged and no `0008` exists. Post-second real
-source GETs, employer-form visits, uploads, and submissions are exactly `0/0/0/0`. Total lifetime real
-actions are source/form/upload/submission `2/0/0/0`. Candidate data outbound remains zero fields. No
-private capability content, candidate/profile/document/answer data, live response body, DNS address,
-certificate, raw network error, or runtime artifact entered Git, tests, logs, build output, docs, PR
-content, or CI.
-
-Remaining steps are final scope/privacy/diff/fsck checks, commit/push on this same branch, one
-consolidated offline PR, exact-head push and pull-request CI, owner-pre-approved self-review/merge if
-unchanged and green, and clean main refresh. Source-enabled Personal Beta remains `NOT_READY`; runner
-framework remains offline `READY` but real operation is `TARGET_APPROVAL_REQUIRED`; Personal Live V1
-remains `NOT_READY`. Remaining external blocker is that no known HTTP response or usable source job
-exists. Any future source request requires a completely new exact owner authorization after review of
-this fix; any later employer interaction separately requires one exact target capability and approval.
-
-# Post-fix live response diagnostic hardening - 2026-09-12
-
-Status: `IN_PROGRESS / OFFLINE_ONLY / NO_FURTHER_SOURCE_REQUEST_AUTHORITY`. The run started from clean
-`main` at `30ce9c30926545bed451e178bd2c6bd794d3c57e`, schema v7 with zero pending migrations, integrity
-`PASS`, zero foreign-key issues, no active source or real target capability, and passing privacy and
-preflight checks. A verified ignored database backup and restore preview passed before activation. One
-fresh short-lived capability was materialised in the ignored private allowlist with exactly the
-owner-approved Lever tenant, list operation, host/path/query, parser, expiry, one-request/25-record/
-2-MB limits, zero redirects/retries, and concurrency one. Candidate data outbound was zero fields.
-
-The first automated browser harness did not reach the server action because its browser-only route
-filter rejected local Next.js form traffic. The database contained no run for the capability, proving
-that no source request was issued. The corrected harness permitted only loopback aliases and observed
-exactly one local `/sources` action POST. The normal production owner action then consumed exactly one
-source request and no more. The terminal checkpoint is `STOPPED / PERSISTENCE_FAILED`, with one request,
-zero committed pages, zero records, zero observations, zero normalized jobs, zero R2 evaluations, and
-zero queue results. No employer page, upload, application submission, retry, second page, or detail GET
-occurred. Lifetime real source/form/upload/submission counts are now `3/0/0/0`.
-
-## Deterministic diagnosis and objective
-
-This is not an actual persistence-stage failure. A sink persistence exception is already caught and
-converted to `PERSISTENCE_FAILED` with lifecycle stage `PERSISTENCE`, and page consumption precedes the
-sink call. The real checkpoint instead has page count zero and no lifecycle stage. Network failures,
-timeouts, JSON decoding failures, HTTP/content-type failures, and policy failures are already typed as
-`SecureSourceError`. Therefore the only reachable boundary matching the durable evidence is an untyped
-exception while validating or mapping the accepted JSON response before `consumePage` and before
-`persistPage`. The transport accepted a pinned, identity-encoded, JSON, 2xx response; the exact status
-and response schema were intentionally not retained, so no more specific historical claim is safe.
-
-The deterministic software defect is that `readLeverPageV2` lets Zod response-contract failures and
-unexpected mapping exceptions escape untyped, while `safeStopCode` misleadingly maps any untyped
-exception to `PERSISTENCE_FAILED`. The objective is to make all response validation/mapping failures
-terminate as the closed `SCHEMA_CHANGED / RESPONSE_BODY` diagnostic without exposing Zod paths, raw
-values, response content, arbitrary messages, or transport details. Genuine sink/transaction failures
-must remain `PERSISTENCE_FAILED / PERSISTENCE`. The failed live payload is not available and must not be
-reconstructed, inferred, or fetched again; this branch does not broaden the accepted Lever schema.
-
-## Requirements, architecture, files, and data flow
-
-- Add a narrow response-boundary helper in `packages/job-sources/src/lever/v2-reader.ts` that executes
-  Zod page validation and record mapping, preserves an existing `SecureSourceError` while attaching
-  `RESPONSE_BODY` when needed, and maps all other exceptions to `SCHEMA_CHANGED / RESPONSE_BODY`.
-- Use that boundary for list pages and the detail parser. It must not change HTTP construction,
-  capability checks, DNS/address pinning, SNI/TLS verification, budgets, pagination, redirect/retry
-  behavior, raw-payload immutability, inert HTML conversion, or accepted response fields.
-- Extend fictional tests in `packages/job-sources/src/source-capability.test.ts` and the durable source
-  runner/repository tests to prove malformed-but-valid JSON, Zod contract drift, and mapper exceptions
-  preserve only `SCHEMA_CHANGED / RESPONSE_BODY`, while a synthetic sink failure remains
-  `PERSISTENCE_FAILED / PERSISTENCE` and no raw issue/message reaches audit data.
-- Update `SECURITY.md`, `docs/RELEASE_RUNBOOK.md`, and this plan only if needed to describe the verified
-  diagnostic boundary. No dependency, database, migration, UI, candidate profile, scoring, document,
-  runner, target, or application change is planned.
-
-The corrected failure flow is:
-
-`one approved GET -> pinned 2xx JSON response -> strict Lever validation/inert mapping -> closed
-SCHEMA_CHANGED + RESPONSE_BODY on any untrusted response-contract exception -> terminal checkpoint`.
-
-Only a successfully parsed page may proceed to page accounting and transactional persistence. Sink
-exceptions retain the distinct `PERSISTENCE_FAILED + PERSISTENCE` state.
-
-## Risks, privacy/security, testing, rollback, and acceptance
-
-Risks are masking a programming error as source drift, losing a pre-existing typed stop code, leaking
-validation paths or values, accidentally widening the source schema, or treating better diagnostics as
-retry authority. Controls are one closed error/stage pair, preservation of existing typed errors,
-fictional malformed fixtures, no arbitrary cause serialization, an unchanged schema and request path,
-and zero further network activity. Candidate/profile/document/answer data remains absent from source
-requests and tests; private allowlist, database, backup, response, and runtime files remain ignored.
-
-Rollback is a normal revert of this offline branch/PR. It changes no database row or migration and does
-not rewrite/delete the terminal run. The fresh capability expires independently and cannot authorize a
-new run under this task. No restoration or private-data deletion is part of rollback.
-
-Acceptance requires focused tests for both the corrected response boundary and genuine persistence
-failure, format/lint/typecheck/unit/integration/build/E2E, schema/status and backup/restore checks,
-security/privacy/dependency audits, doctor/preflight/release, immutable migration diff, `git diff
---check`, and `git fsck --strict` to pass. The consolidated PR must contain fictional code/tests and safe
-documentation only. It remains unmerged unless separately authorized; no further real source request,
-form visit, upload, or submission may occur.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before application code.
-2. Add the closed response validation/mapping boundary and focused fictional regressions.
-3. Run focused checks, inspect the diff for authority/privacy drift, then run the complete release gate.
-4. Record exact results, commit/push this branch, open one consolidated offline PR, verify exact-head CI,
-   and stop without another source request.
-
-## Post-fix live response diagnostic implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / LOCAL_GATES_PASS / PR_19_OPEN / EXACT_HEAD_CI_PASS`. The run began from exact clean
-`main` at `30ce9c30926545bed451e178bd2c6bd794d3c57e`. Initial database state was schema v7, zero pending
-migrations, integrity `PASS`, and zero foreign-key issues; migrations `0000`-`0007` were unchanged.
-Initial preflight and privacy checks passed with zero active source capabilities and no approved real
-runner target. A verified ignored schema-v7 backup and restore preview passed before capability
-activation.
-
-One fresh immutable private capability used the established deterministic identifier method and the
-exact owner-authorized Shield AI Lever list scope, query, parser, validity window, and one-request/
-25-record/2-MB/30-second limits. The normal production owner action consumed exactly one request.
-It performed no retry, redirect, second page, detail request, employer-form visit, upload, or
-submission and sent no candidate data. The terminal durable result is `STOPPED /
-PERSISTENCE_FAILED`, request count one, page and record counts zero, and no observation, normalized
-job, R2 evaluation, recommendation, or queue result. Lifetime real source/form/upload/submission
-counts are `3/0/0/0`.
-
-The durable error is an historical misclassification, not evidence of a database write failure. A
-genuine sink exception can occur only after page accounting and is already converted to
-`PERSISTENCE_FAILED / PERSISTENCE`; this run instead retained page count zero and no lifecycle stage.
-All transport, policy, HTTP/content-type, timeout, and JSON-decoding failures are already typed. The
-deepest safely provable boundary is therefore an untyped strict-response validation or mapper
-exception after the transport accepted a pinned, identity-encoded JSON 2xx response and before page
-accounting. The exact HTTP status and response body were intentionally not retained. No fourth GET
-was made, and the unavailable payload was not inferred or reconstructed.
-
-The Lever reader now wraps only strict page validation and record mapping in a response-body
-boundary. Existing `SecureSourceError` values are preserved and gain `RESPONSE_BODY` only when their
-stage was absent; all other exceptions become the closed `SCHEMA_CHANGED / RESPONSE_BODY` result.
-Both list and detail parsing use this boundary. The accepted schema, inert-text mapping, raw-payload
-handling, request semantics, DNS/address pinning, budgets, pagination, redirects, retries, authority,
-and persistence behavior are unchanged. Synthetic regressions cover Zod URL drift and a mapper Date
-exception without retaining fixture values or arbitrary messages. A durable malformed-response test
-proves `STOPPED / SCHEMA_CHANGED`, one request, zero pages/records, `RESPONSE_BODY` recovery, no raw
-fixture in audit metadata, and no persisted source page. The existing sink-failure regression still
-proves the distinct `PERSISTENCE_FAILED / PERSISTENCE` behavior.
-
-Focused validation passed 47 tests across two source/repository files. The complete release check
-passed doctor/database/preflight, formatting, lint, strict typecheck, 368 unit tests in 46 files, 21
-integration tests in three files, a 31-route production build, 27 serialized fictional/local E2E
-tests, privacy audit over 273 tracked files, 765 history paths, 766 history blobs, 1,302 build/test
-artifacts, and 11 private canaries, plus full and production dependency audits with zero known
-vulnerabilities. Seventeen focused database schema/migration/backup/restore tests in three files pass.
-
-The post-run ignored backup `backup-2026-09-12T02-52-46.424Z-9fd3351c` is schema v7 with integrity
-`PASS`, and its exact restore preview passes. An initial command-wrapper preview supplied a truncated
-timestamp because its local output-extraction expression stopped at the colon; validation rejected
-that invalid backup identifier before any restore or database mutation. The immediate exact-ID rerun
-passed. Final database status and preflight pass at schema v7, pending zero, integrity `PASS`, and
-foreign keys zero. The private capability remains bounded by its original expiry and exhausted task
-authority; it does not authorize another request in this run. No real target capability is active.
-
-Migration is `NONE`; migrations `0000`-`0007` remain byte-for-byte unchanged and no `0008` exists.
-The base-to-head migration diff and `git diff --check` are clean. `git fsck --strict` exits zero; it
-reports only unreachable local objects and no repository corruption. The ignored diagnostic helper
-was removed. No private allowlist, database, backup, source response, candidate data, vacancy,
-document, packet, credential, runtime, or session material is tracked by this branch.
-
-The safe result record was committed, the exact-head release check passed, and the same branch was
-pushed as consolidated offline corrective PR #19. Both the push and pull-request `Quality checks`
-workflows passed against its exact head. The PR remains open and unmerged pending separate human
-review. Source-enabled Personal Beta remains `NOT_READY` because no usable source record exists and
-the observed response contract cannot safely be broadened without approved evidence. Personal Live
-V1 remains `NOT_READY`. Any further live source verification requires a new immutable capability and
-new exact owner authorization after this fix is reviewed and merged; any employer interaction
-separately requires an exact approved target.
-
-# Public showcase and repository presentation - 2026-09-12
-
-Status: `IN_PROGRESS / PUBLIC_FICTIONAL_DATA_ONLY`. PR #19 was reverified at the owner-approved exact
-head `e3ccfda40c99c3253faa2913c5d5dbf52f7bfaf6`: it was open, non-draft, cleanly mergeable, and both
-exact-head quality checks were successful. Its diff remained limited to response-diagnostic handling,
-fictional regressions, and safe plan evidence; migrations `0000`-`0007` were unchanged, no private/live
-payload was present, and no source authority was broadened. It merged normally as
-`56aa96691d6aa52cd8c78a3f770d4e5fc66cf16d`. Refreshed local `main` exactly matched `origin/main`, and
-this branch, `feat/public-showcase`, was created from that clean merge. No additional source request,
-employer-form visit, upload, or submission is authorized or planned.
-
-## Current state, objective, and assumptions
-
-`apps/web` is the local/private product surface. Its dynamic routes deliberately read the ignored
-SQLite database, resolve the server-only private profile, expose local import/document/packet flows,
-and render source/runner approval controls. Reusing or deploying that app would create an unnecessary
-private-runtime boundary and could misrepresent operational readiness. The repository currently has
-an engineering-heavy README, no showcase screenshots, no architecture asset, no repository topics or
-homepage, no hosting configuration, and no installed/authenticated Vercel CLI. The repository itself
-is public by prior explicit owner authorization; npm publication remains disabled and no open-source
-licence has been selected.
-
-The objective is a premium public explanation and safe interactive demonstration of ApplyPilot using
-only committed fictional data. It must communicate: local-first candidate control, evidence-backed
-matching, explainable ranking, unknown-as-review, immutable application packets, bounded source and
-target authority, and human control of every external action. It must accurately label Manual-intake
-Personal Beta as locally available, source-enabled Beta as under validation, Personal Live V1 as not
-ready, and the public experience as a fictional demonstration.
-
-Assumptions are that a fully static export is sufficient; no authentication, server state, database,
-upload, source reader, runner, API, paid dependency, remote font, analytics, or form is needed. Client
-state is presentation-only and may support filters, sorting, job selection, evidence inspection,
-packet inspection, and pipeline-stage views. Core content remains useful in prerendered HTML without
-hydration. Deployment may proceed only for this isolated export after its source and built output pass
-the dedicated privacy boundary. Vercel is not currently configured; the implementation will remain
-platform-neutral and may use the available Sites static-hosting path if it requires no account,
-billing, secret, or private-data access. No custom domain will be purchased.
-
-## Architecture, routes, visual system, and data flow
-
-Choose a separate `apps/showcase` Next.js App Router workspace with `output: "export"`. It imports only
-files beneath `apps/showcase` plus `next`, `react`, and `react-dom`; it has no server action, route
-handler, dynamic server API, workspace-domain package, environment access, filesystem access, or
-network fetch. The generated `out/` directory is the sole deployable root. `apps/web` and every local
-runtime route remain unchanged and excluded from the public artifact.
-
-Public routes:
-
-- `/`: narrative product home with the exact public-demo label, hero, workflow, differentiators,
-  truthful status, demo preview, safety model, real inspected tech stack, and architecture diagram.
-- `/demo`: prerendered fictional dashboard with 8 roles, four requested metrics, filters, fit sorting,
-  role selection, evidence/eligibility/recommendation/queue inspection, and pipeline-stage controls.
-- `/demo/evidence`: focused evidence ledger showing `C++ experience -> verified robotics project ->
-MATCH` beside `Australian citizenship required -> UNKNOWN -> REVIEW REQUIRED`, emphasizing
-  `Unknown never means yes`.
-- `/demo/application-packet`: fictional frozen packet with CV version, cover-letter state, typed
-  answers, disclosure decisions, target binding, stale/version checks, and human approval state; no
-  file or action exists.
-
-The visual thesis is a restrained graphite engineering console: near-black layered surfaces, crisp
-off-white type, thin steel borders, a single electric-lime signal colour, monospaced evidence labels,
-large editorial product typography, and a subtle technical grid. Motion is limited to short hover/
-focus transitions and honors reduced-motion preference. Main body text remains at least 16px, labels
-at least 14px where routinely used, focus rings are conspicuous, contrast is accessible, layouts
-remain usable at 200% zoom, and every interaction has a semantic control and non-colour label.
-
-All public data lives in an immutable local TypeScript fixture module owned by the showcase. The flow
-is `fictional fixture -> static HTML dashboard -> optional client-only view state`; it never reaches a
-server, browser storage, or external destination. The explanatory architecture flow is `approved job
-source -> secure bounded transport -> immutable observation -> normalization/deduplication -> evidence
-and fit evaluation -> review queue -> frozen packet -> controlled runner -> fresh human approval`.
-
-## Proposed files, documentation, assets, and repository metadata
-
-- Create `apps/showcase/{package.json,tsconfig.json,next.config.ts}` and App Router source for the four
-  routes, shared layout/navigation/footer, fictional fixtures, static architecture component, and one
-  client-only demo workspace. Use CSS and semantic HTML; add no UI/runtime dependency.
-- Create `scripts/audit-public-showcase.ts` to fail on forbidden imports, runtime capabilities,
-  private-path names, SQLite/database markers, source/target allowlists, candidate canaries, network
-  calls, server actions/routes, and unexpected built artifacts. Add root commands that build both the
-  local app and static showcase and audit the export.
-- Create `tests/security/public-showcase-boundary.test.ts` for the source graph/package/config and
-  fictional-only contract. Extend Playwright with an isolated loopback showcase server and browser
-  coverage for desktop/mobile, keyboard navigation, filtering/sorting/selection, evidence, packet,
-  broken internal links, console/page errors, and horizontal overflow.
-- Create public-safe `docs/assets/landing.png`, `dashboard.png`, `evidence.png`, and
-  `application-packet.png` from the built fictional showcase, plus a requested branded social preview
-  if it can be generated and visually verified without personal data. Create
-  `docs/assets/applypilot-architecture.svg` as a functional static diagram and
-  `docs/PUBLIC_SHOWCASE.md` as the boundary/deployment record.
-- Rebuild `README.md` into a concise public landing page with truthful badges, screenshots, workflow,
-  features, demo status, architecture, safety/privacy, inspected stack, quick start, testing, current
-  status, roadmap, contribution link, and accurate all-rights-reserved licence wording. Add a Live
-  Demo link only after a deployment succeeds.
-- Add a focused pull-request template and issue forms only when they reinforce privacy/reproduction
-  boundaries. Update `ARCHITECTURE.md`, `SECURITY.md`, and `CONTRIBUTING.md` navigation as required.
-- Update the GitHub description and topics only after code/docs pass publication audit. Set the GitHub
-  homepage only after a verified public deployment. Do not change repository visibility, workflow
-  permissions, npm publication guards, branch policy, or licence.
-- Add `.openai/hosting.json` only if the selected Sites deployment path is used, with static output
-  metadata and no secrets, capabilities, D1/R2 binding, or runtime values. Do not add Vercel secrets or
-  fabricate a Vercel project.
-
-## Dependencies, risks, security/privacy, and rollback
-
-No package is added. The existing exact versions of Next.js 16.3.4, React 19.2.8, TypeScript 5.9.3,
-Vitest 4.1.11, and Playwright 1.63.0 are sufficient. The static export uses no paid API and no build-
-time fetch. The actual stack may mention SQLite, Drizzle, Zod, DOCX/PDF tooling, Vitest, Playwright,
-and GitHub Actions only as repository capabilities verified from manifests and code; the hosted demo
-must distinguish these from its own zero-backend artifact.
-
-Principal risks are accidentally bundling the private app, candidate fixture, source/runner controls,
-or local path; publishing a real screenshot; presenting fictional metrics as personal results;
-overstating live readiness; broken static navigation; inaccessible dark styling; a deployment archive
-that includes the repository rather than `out/`; and changing legal/licence terms. Controls are a
-separate workspace/import graph, literal fictional banner, invented company/role/contact-free data,
-static export, source plus built-output denylist/canary audit, local-only screenshot capture from the
-showcase port, no traces containing private routes, no external images/fonts/scripts, truthful status
-copy, exact deploy-root packaging, and no licence change.
-
-The public application must not contain or reference `profile.private.json`, `data/private`, SQLite,
-source/target allowlists, generated private documents, source activation, imports/uploads, local
-sessions, runner authority, real vacancy/application data, credentials, tokens, cookies, or candidate
-values. It must make zero source/employer/upload/submission calls. The four screenshots and social card
-must be visually inspected before Git staging; only fictional public content may appear. Build output,
-Git diff, tracked tree, reachable history, screenshots, deployment archive, and served routes are all
-audited without printing private needles.
-
-Rollback is closing the showcase PR or normally reverting its commits. The separate static app can be
-removed without changing `apps/web`, migrations, local data, capabilities, or runner state. A deployed
-version can be left undeployed/disabled through the hosting provider without deleting local/private
-data. Repository metadata can be restored to its previous safe values. No database migration or data
-rollback exists.
-
-## Testing strategy and acceptance criteria
-
-Required gates are formatting, lint, strict typecheck, all unit/integration tests, both production
-builds, serialized E2E, full privacy audit, public-showcase source/export audit, full/production
-dependency audit, database/schema/backup/restore checks, preflight/release, immutable migration diff,
-`git diff --check`, and `git fsck --strict`. Browser validation must cover 1440px desktop, 390px mobile,
-keyboard access, visible focus, filters/sort/role selection, evidence and packet routes, internal links,
-hydration-disabled core content, no console/page error, and no horizontal overflow.
-
-Acceptance requires the four routes and 8 fictional roles; exact four dashboard metrics; requested
-workflow/difference/evidence/packet/safety/stack/architecture content; public-demo labels; accurate
-readiness claims; four optimized screenshots; architecture asset; a visually valid social preview when
-practical; a concise repository-quality README; safe metadata/topics; no migration/dependency/licence/
-private-runtime change; source/export/deployment privacy checks passing; exact-head local and GitHub CI
-green; one PR titled `feat: launch ApplyPilot public showcase`; owner-pre-approved self-review/merge
-only if every listed condition remains true; and clean refreshed `main` after merge. A deployment is
-successful only when the merged static export is served publicly, its home/demo/routes and metadata
-are verified, no private/local route or marker is exposed, and the GitHub homepage/README link point to
-that URL.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before application code.
-2. Build the isolated static workspace, fictional fixture model, shared shell, landing page, and the
-   smallest recognizable demo dashboard slice; verify it compiles before expanding.
-3. Complete evidence, packet, safety, stack, architecture, responsive, keyboard, and client-only demo
-   interactions without a network/runtime boundary.
-4. Add the source/export boundary audit and its security tests; integrate both application builds into
-   root quality without weakening the existing local product gate.
-5. Run the built showcase locally, complete browser/accessibility/link/overflow/error checks, capture
-   and visually inspect the four requested public screenshots, generate/verify the requested social
-   card, and wire only safe assets/metadata.
-6. Rebuild README and safe supporting docs/templates; run the publication privacy audit. Only then
-   update repository description/topics.
-7. Run the full exact-head release matrix, update this section with actual results, commit by concern,
-   push only `feat/public-showcase`, and open the one showcase PR.
-8. Require both exact-head push and pull-request CI. Self-review the entire public artifact/diff. Merge
-   only under the owner's pre-approved conditions, refresh clean `main`, and record the merge SHA.
-9. If a no-login/no-billing static host is available, package and deploy only the merged showcase
-   export, verify public routes/metadata/privacy against the merged commit, then add the verified Live
-   Demo/homepage URL through a safe documentation/metadata update if possible. If hosting requires
-   account interaction, stop only deployment and report the exact minimum owner action.
-
-## Public showcase implementation and validation results - 2026-09-12
-
-Status: `IMPLEMENTED / LOCAL_RELEASE_PASS / PUBLIC_STATIC_DEPLOYMENT_VERIFIED / PR_PENDING`. The work
-remained on `feat/public-showcase` from PR #19 merge
-`56aa96691d6aa52cd8c78a3f770d4e5fc66cf16d`. It added the independent `apps/showcase` static-export
-workspace and no application migration, domain capability, source/runner authority, local-data path,
-or application-code change under `apps/web`. Migrations `0000`-`0007` are unchanged. Lifetime real
-source/form/upload/submission counts remain `3/0/0/0`; this run made no source request, employer-form
-visit, upload, or submission.
-
-The public app contains `/`, `/demo`, `/demo/evidence`, and `/demo/application-packet` with eight
-explicitly fictional roles, the requested `24/7/5/3` fictional metrics, safe client-only filtering,
-sorting, role selection, evidence inspection, pipeline-stage explanation, and a non-actionable frozen
-packet. Core narrative/evidence/packet content is prerendered and remains available without client
-JavaScript. It uses only Next.js and React dependencies, makes no browser request, and has no route
-handler, server action, environment/filesystem/database import, candidate loader, source transport,
-capability materializer, document generator, or application runner.
-
-The source/export audit verifies static-export configuration; the closed dependency and import graph;
-the four expected HTML routes; absence of local/private routes; absence of network/runtime entry
-points; and absence of `profile.private`, `data/private`, source/runner allowlist filenames, SQLite
-markers, the real Lever host, and selected private-profile canaries in emitted assets. The final audit
-passed across 19 showcase source/config files and the complete export. The repository privacy audit
-passed across 305 tracked files, 811 historical paths, 809 history blobs, 1,326 build/test artifacts,
-and 11 private canaries. No secret, private candidate value, capability, database, backup, vacancy,
-generated personal document, packet, browser/session material, or real application state is tracked
-or hosted.
-
-The public design uses a graphite engineering-console system with off-white typography, steel rules,
-one lime signal colour, monospaced evidence labels, visible focus, reduced-motion handling, and
-responsive layouts. Four Playwright-captured fictional assets were visually inspected at 1440px:
-`landing.png`, `dashboard.png`, `evidence.png`, and `application-packet.png`. A functional
-`applypilot-architecture.svg` documents the authority-narrowing flow. Image generation produced the
-brand-safe `applypilot-social-preview.png` from a fresh text-led product-card prompt in generation
-mode; it contains only the ApplyPilot name, public tagline, abstract workflow, and no person or private
-data. The same safe card is the showcase Open Graph/Twitter asset.
-
-The README is now a public product landing page with factual CI/TypeScript/Next.js/local-first/human-
-control badges, positioning, public/private boundary, product tour, screenshots, workflow,
-differentiators, architecture, readiness, repository map, showcase/local setup, gates, safety,
-contributing, and accurate no-licence wording. `docs/PUBLIC_SHOWCASE.md`, architecture/security/
-contribution updates, a PR checklist, and privacy-forward issue forms complete the repository
-presentation. GitHub metadata now uses the exact product description; topics are `ai`, `ai-agents`,
-`automation`, `career-tools`, `human-in-the-loop`, `job-search`, `local-first`, `nextjs`, and
-`typescript`. Visibility remains `PUBLIC`, npm remains private, no licence changed, and the homepage
-points to the verified showcase URL.
-
-Sites was available without a new account, billing, custom domain, or repository secret. The checked-
-in manifest contains only the opaque project ID and `static.directory = out`. A clean standalone Site
-checkout committed the exact validated showcase source/export, pushed with an ephemeral per-command
-credential that was neither printed nor persisted, and packaged only the normalized static `dist`
-artifact. Saved version 1 deployed successfully with public access at
-`https://applypilot.qss-ai-robot-7121.chatgpt.site`. Direct post-deploy verification returned 200 for
-the home, demo, evidence, packet, and robots routes; `/profile`, `/sources`, `/applications`,
-`/documents`, and `/local-session` returned 404. Served HTML retained the fictional-data markers and
-none of the checked forbidden references. The in-app handoff browser surface was unavailable, so the
-deployment was verified with direct unauthenticated HTTPS reads instead.
-
-The staging path had two non-product setup corrections before the successful Site push. The first
-Windows package-helper invocation passed native paths to Git Bash and failed before writing an
-archive; POSIX paths then produced and validated the archive. A separate clean-checkout command was
-initially issued from its parent temporary directory and created Git metadata there; no commit or push
-succeeded, the exact metadata directory was immediately moved to a named temporary recovery folder,
-and the corrected command used explicit `git -C` scoping. Neither event touched the ApplyPilot
-workspace, user files, private data, deployment content, or GitHub history.
-
-Implementation validation exposed and resolved only test/configuration issues: typed Next routes
-needed canonical non-trailing-slash values; the root showcase launcher needed to invoke Next directly;
-one source-boundary assertion referenced the wrong fixture fields; and early E2E assertions used
-ambiguous text, an incorrect filtered count, and the wrong lowest-fit/stage copy. The corrected
-focused public test passed 2/2 unit cases and the showcase browser suite passed 4/4 cases. Visual
-inspection passed all four screenshots with no clipping, broken hierarchy, private content, or
-unlabelled demo state.
-
-The complete release check passed doctor, database status, preflight, formatting, lint, strict
-typecheck, 370 unit tests in 47 files, 21 integration tests in three files, both production builds,
-the public export audit, 31 serialized E2E tests, repository privacy audit, and full/production npm
-audits with zero known vulnerabilities. E2E includes desktop/mobile, keyboard focus, no horizontal
-overflow, filter/sort/selection, all internal routes, browser console/page errors, and core content
-without hydration. Database status remains schema v7, pending zero, integrity `PASS`, and foreign keys
-zero; the unit suite includes the isolated schema/migration/backup/restore safety tests and the real
-database was not mutated. `git diff --check`, immutable migration diff, and `git fsck --strict` remain
-the final pre-PR repository checks. The final task is to commit this result record, rerun exact-head
-checks, push the same branch, open the one requested PR, require exact-head GitHub CI, self-review the
-complete public diff, merge only under the owner's listed conditions, refresh `main`, and verify the
-deployed showcase content still matches the merged `apps/showcase` tree.
-
-# Official Lever public v0 contract alignment - 2026-09-12
-
-Status: `IN_PROGRESS / OFFLINE_ONLY / NO_SOURCE_REQUEST_AUTHORITY`. The exact starting `main` and
-`origin/main` are `1c9d781278407130bca0c46502cc292ec53c59e4`; the worktree was clean and GitHub
-authentication was `adeel1608`. Initial release preflight passed with schema v7, zero pending
-migrations, integrity `PASS`, zero foreign-key issues, four historical source capability versions,
-zero active source capabilities, Manual-intake Personal Beta `READY`, Source-enabled Personal Beta
-`WAITING_FOR_APPROVED_TENANT`, and the real runner `TARGET_APPROVAL_REQUIRED`. This branch is
-`fix/lever-public-contract-alignment`. No real source request, employer interaction, upload, or
-submission is authorized.
-
-## Current state, official evidence, objective, and assumptions
-
-`LeverPostingV2Schema` validates the public v0 JSON list/detail boundary before inert mapping. It
-currently accepts a bounded string or absence for `country`, while the official Lever Postings API
-documentation says `country` is an ISO 3166-1 alpha-2 string or `null` when unknown. The mapper already
-normalizes an absent value to internal `null`, but Zod rejects the documented wire-level `null` before
-mapping. This is a deterministic public-contract mismatch and is the only compatibility change
-required by the present evidence.
-
-The official field table was reviewed on 2026-09-12 from Lever's public documentation repository at
-`https://github.com/lever/postings-api`. It also documents the existing workplace values
-`unspecified|on-site|remote|hybrid`, `lists[]` entries shaped as `text` plus HTML `content`, optional
-`salaryRange`, optional salary descriptions, and optional closing `additional`/`additionalPlain`
-strings that may be empty. Current ApplyPilot already accepts and safely maps the four workplace
-values, bounds and inertly converts list content, permits empty optional description/additional text,
-and accepts optional salary data. Other documented description/opening/salary-description fields are
-forward-compatible passthrough data and are not used to create stronger internal evidence. The docs
-do not state another nullable public-v0 field requiring a schema relaxation. Country absence is kept
-for backward compatibility because the current parser deliberately supports it; no behavior is
-inferred from the unavailable private response body.
-
-The objective is a narrow documentation-derived parser correction: accept `country: null`, retain
-string and absent behavior, normalize both null and absence to internal `null`, and lock the public
-contract with synthetic regression coverage. No network authority, URL construction, host/path/query
-validation, DNS/address pinning, TLS behavior, request/page/body/time budget, retry, redirect,
-pagination, capability, raw-payload, persistence, R2, queue, runner, document, target, or submission
-behavior changes.
-
-## Architecture, files, data flow, and dependencies
-
-- Update only `packages/job-sources/src/lever/v2-reader.ts` at the country wire boundary. Preserve the
-  bounded string contract and add `nullable()` before the existing optional behavior; do not broadly
-  loosen the object or any unrelated field.
-- Extend `packages/job-sources/src/source-capability.test.ts` with fictional synthetic variants for
-  country string/null/absence, all documented workplace values, `lists[]`, empty optional textual
-  fields, and malformed unsupported values producing the existing closed
-  `SCHEMA_CHANGED / RESPONSE_BODY` failure without raw Zod details.
-- Update `README.md` readiness wording to distinguish the first two attempts, which stopped before a
-  usable response, from the latest bounded attempt, which reached an accepted 2xx JSON response and
-  failed closed during strict response-contract parsing. State that no real job was persisted and
-  Source-enabled Personal Beta remains `NOT_READY`.
-- Update this plan before and after implementation with the exact contract decision and validation
-  evidence. No dependency or migration is expected; migrations `0000`-`0007` remain immutable and no
-  `0008` is permitted for this parser-only change.
-
-Data flow remains:
-
-`bounded public-v0 JSON -> strict LeverPostingV2Schema -> null/absent country -> internal null -> inert
-mapped source record`, with every malformed unsupported value still terminating as
-`SCHEMA_CHANGED / RESPONSE_BODY` before persistence.
-
-## Risks, security/privacy, rollback, testing, and acceptance
-
-Risks are over-loosening the response boundary, changing request authority while correcting a response
-contract, treating optional as nullable without documentation, leaking or encoding assumptions from
-the unavailable live body, weakening inert HTML handling, or overstating source readiness. Controls
-are a one-field documentation-backed schema delta, synthetic-only fixtures, exact failure-code tests,
-an authority/security diff review, immutable-migration verification, full privacy scans, and accurate
-readiness copy. Candidate/private profile, vacancy, database, backups, allowlist, response body,
-documents, packets, credentials, and runtime/session material remain local and ignored; none may be
-printed, committed, or sent externally.
-
-Rollback is a normal revert of the focused branch or pull request. No database row, capability,
-source run, observation, job, evaluation, queue, migration, deployment, or external state is changed.
-
-Acceptance requires: documented string, null, and supported absence variants parse and map correctly;
-all four workplace values and `lists[]` inert evidence remain green; empty documented optional text is
-accepted; malformed unsupported values still produce only `SCHEMA_CHANGED / RESPONSE_BODY`; README
-history/readiness is accurate; migrations remain unchanged; schema/status/integrity/FKs and privacy/
-dependency/security gates pass; full format, lint, typecheck, unit, integration, production build,
-serialized E2E, database/backup/restore, preflight/release, diff, and strict-fsck checks pass; one PR
-titled `fix: align Lever public posting contract` has exact-head push and pull-request CI green; and
-the final diff remains narrow enough for the owner's conditional merge approval. Only then may the PR
-be self-reviewed, normally merged, and local `main` refreshed. No live request follows in this task.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before changing application code.
-2. Add the one-field nullable country boundary and the complete fictional contract regression matrix.
-3. Update README readiness wording without claiming successful ingestion.
-4. Run focused parser tests, strict typecheck, lint, and an authority/migration/privacy diff review.
-5. Run the complete release matrix, migration/backup/restore checks, dependency audits,
-   `git diff --check`, and `git fsck --strict`; record exact results here.
-6. Commit and push only this branch, open the named PR, require exact-head push and PR CI, self-review
-   the full delta, and merge only if every pre-approved condition remains satisfied.
-7. Refresh clean `main`, report the merge and final SHA, and provide the next bounded live-verification
-   proposal as a proposal only. Stop before any network request.
-
-## Official contract alignment implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / LOCAL RELEASE PASS / PR AND EXACT-HEAD CI PENDING`. The only parser change is
-`country: z.string().max(100).nullable().optional()`. Documented country strings remain unchanged;
-documented `null` and the deliberately supported absent field both map to internal `null`. No other
-field was relaxed. The official audit found no additional documented nullable-versus-optional
-incompatibility: current handling already accepts the four workplace values, bounded `lists[]`, empty
-optional additional/description text, optional salary data, and inertly ignores unused forward-
-compatible fields. No unavailable private response body was inspected or inferred.
-
-Synthetic coverage now explicitly passes country string/null/absence, every workplace value, inert
-ordered lists, empty optional description/additional/salary-description strings, and malformed country,
-workplace, and list values. Unsupported values terminate only as `SCHEMA_CHANGED / RESPONSE_BODY`,
-without raw Zod paths or fixture values. The focused source contract file passes 44 tests. README now
-truthfully says the first two attempts stopped before a usable response, the latest bounded attempt
-reached an accepted 2xx JSON response and failed closed during strict response-contract parsing, no
-real job was persisted, and Source-enabled Personal Beta is not ready.
-
-Changed files are `PROJECT_PLAN.md`, `README.md`,
-`packages/job-sources/src/lever/v2-reader.ts`, and
-`packages/job-sources/src/source-capability.test.ts`. No capability, transport, URL/query, DNS, TLS,
-budget, pagination, persistence, evaluation, queue, runner, target, application, dependency, lockfile,
-or migration file changed. Migrations `0000`-`0007` have an empty start-to-head diff and no `0008`
-exists.
-
-Validation results:
-
-- Focused contract: 44/44 tests passed.
-- Formatting, zero-warning lint, and strict typecheck passed. The first formatting check reported 33
-  freshly merged showcase files with Windows line-ending-only working-copy differences; repository
-  formatting normalized them and Git content comparison retained only the intended three implementation
-  files. The first lint run reported one unused destructured test binding; the test was rewritten without
-  an unused binding, and the complete lint rerun passed. No failure was skipped.
-- `npm.cmd run release:check` passed doctor, schema/status, aggregate preflight, formatting, lint,
-  typecheck, 377 unit tests across 47 files, 21 integration tests across three files, the local
-  production build with 31 route units, the separate static showcase build with six generated pages,
-  the public showcase audit across 19 source/config files and the full export, and 31 serialized
-  Playwright tests.
-- Privacy audit passed across 305 tracked files, 816 history paths, 814 history blobs, 1,338 build/test
-  artifacts, and 11 private canaries. Full and production dependency audits each reported zero known
-  vulnerabilities.
-- Fifteen focused database schema/migration/backup/restore/runtime-path tests across three files passed.
-  The real database was read only and remains schema v7, pending migrations 0, integrity `PASS`, and
-  foreign-key issues 0. No backup or migration was applied to it.
-- Release reporting remains Manual-intake Personal Beta `READY`, Source-enabled Personal Beta
-  `WAITING_FOR_APPROVED_TENANT`, Personal Live V1 `NOT_READY`, and real runner
-  `TARGET_APPROVAL_REQUIRED`; four historical source capability versions exist and zero are active.
-- Real source requests, employer-form interactions, uploads, and submissions in this task remain
-  `0/0/0/0`; lifetime real action counts remain `3/0/0/0`.
-
-The remaining release mechanics are to commit this result record, rerun the complete release check on
-that exact unchanged head, verify the migration diff plus `git diff --check` and `git fsck --strict`,
-push only this branch, open the named PR, and require both exact-head push and pull-request quality
-workflows to pass. Then self-review the complete base-to-head diff and merge only under the owner's
-pre-approved narrow-scope conditions. No source request follows the merge in this task.
-
-# Post-contract live source verification and offline hardening - 2026-09-12
-
-Status: `LIVE_REQUEST_SPENT / FAILED_CLOSED / OFFLINE_FIX_IN_PROGRESS / NO_FURTHER_SOURCE_AUTHORITY`.
-The exact starting `main` and `origin/main` were
-`e25171aa32db5e8b12f6501b968b5ecbb17403e2`, the worktree was clean, and GitHub authentication was
-`adeel1608`. Preflight passed with schema v7, zero pending migrations, integrity `PASS`, zero foreign-
-key issues, a valid private profile, four expired historical capabilities, no active source
-capability, no approved real runner target, and a clean privacy audit. Migrations `0000`-`0007` are
-unchanged from the Personal Live V1 foundation. Ignored backup
-`backup-2026-09-12T05-26-53.954Z-0496ae96` and its exact restore preview passed before activation.
-
-Fresh ignored/private capability `lever_b2195ee303962aac722b420d` was generated deterministically from
-the approved source, tenant, region, exact URL, purpose, and T0. Its complete `SourceCapabilityV2`
-authority matched the prompt: Shield AI global Lever list only, exact host/path/query, one request,
-25 records/page, 2 MB response, 30-second request and 60-second run limits, zero redirects/retries,
-concurrency one, 24-hour policy expiry, 30-minute capability expiry, and parser version bound to the
-starting merge. Candidate data outbound was zero. The computer-use inventory and in-app browser were
-unavailable; a direct import probe then failed at the framework's `server-only` module boundary before
-capability persistence, run creation, or transport. Durable counters proved that probe consumed no
-authority. The actual owner action used the merged local `/sources` UI through a one-use headless local
-browser harness and the production nonce, confirmation phrase, server action, capability checks,
-transport, repository, and pipeline. The harness was removed immediately afterward.
-
-Exactly one real GET was attempted. The durable terminal state is `STOPPED / SCHEMA_CHANGED` at
-`RESPONSE_BODY`, request count 1, page count 0, record count 0, retries 0, redirects 0, and no persisted
-observation, normalized job, R2 evaluation, queue decision, target packet, employer-form visit,
-upload, or submission. Reaching response-body contract validation establishes an accepted JSON
-response after transport/status/content controls, but the exact HTTP status is deliberately not
-retained. No retry, second page, detail request, fifth source request, or private response-body
-inspection is permitted. Lifetime source/form/upload/submission counts are now `4/0/0/0`.
-
-## Current state, official evidence, objective, and assumptions
-
-The private response and raw validation paths remain unavailable by design, so this work does not
-guess which member caused the live stop. The official Lever v0 public-postings field table was audited
-again from `https://github.com/lever/postings-api`. Its documented posting members include `id`,
-`text`, `categories`, nullable `country`, opening/description variants, `lists`, optional additional
-text, `hostedUrl`, `applyUrl`, the four `workplaceType` values, optional `salaryRange`, and optional
-salary descriptions. It does not document `createdAt`. ApplyPilot nevertheless names, type-validates,
-and converts `createdAt` into `postedAt`; an otherwise documented posting can therefore fail because
-of an undocumented extension, and an undocumented timestamp can become first-class evidence. This is
-a deterministic contract-boundary defect proven from public documentation, independent of the private
-body. It is not claimed to be the observed body's specific mismatch.
-
-The objective is one narrow offline hardening change: stop assigning validation/evidence semantics to
-the undocumented `createdAt` extension. Unknown response members remain response-size-bounded,
-immutable passthrough data, while `postedAt` remains conservatively `null`. All officially documented
-fields retain their existing types, bounds, inert HTML conversion, and closed malformed-value
-behavior. No network authority, URL, query, DNS, TLS, destination, pagination, budget, retry,
-redirect, capability, persistence, R2, queue, runner, document, packet, target, upload, submission, or
-migration behavior may change.
-
-## Architecture, proposed files, data flow, and dependencies
-
-- In `packages/job-sources/src/lever/v2-reader.ts`, remove the undocumented typed `createdAt` member
-  and its `Date` conversion. Leave the posting object in bounded passthrough mode and map `postedAt`
-  to `null` because the official contract supplies no trustworthy posting timestamp.
-- In `packages/job-sources/src/source-capability.test.ts`, replace the timestamp-conversion/failure
-  assumption with fictional regression variants proving undocumented extension values are retained
-  only in the deeply frozen raw payload, never promoted to `postedAt`, and never relax documented
-  malformed values. Keep country, workplace, lists, inert-text, and closed response-body coverage.
-- Update `README.md` with the fourth bounded attempt: the country-compatible parser still failed
-  closed at response-body validation, no real job was persisted, and source-enabled Beta remains not
-  ready. Do not speculate about the private body or imply successful ingestion.
-- Record actual offline validation and PR state in this plan. No new dependency or database migration
-  is expected; migrations `0000`-`0007` remain immutable and `0008` is not needed.
-
-Data flow after the fix remains:
-
-`bounded public JSON -> documented Lever field validation -> inert mapping -> undocumented extensions
-kept only in immutable raw payload -> postedAt unknown/null -> persistence/R2 only after a wholly valid
-page`.
-
-## Risks, privacy/security, testing, rollback, and acceptance criteria
-
-Risks are using an undocumented field as evidence, over-loosening a documented field, pretending this
-offline fix proves the private live mismatch, leaking response/profile values, or accidentally spending
-another request. Controls are removal of semantics from only the undocumented member, synthetic-only
-tests, no raw response access, authority/migration diff review, privacy audits, and a permanent zero-
-request boundary for the rest of this task. Candidate/profile, response, vacancy, database, backup,
-allowlist, document, packet, credential, and session material remain ignored and uncommitted. Final
-application submission remains owner-confirmed and no real target is approved.
-
-Rollback is a normal revert or closing the offline PR. No migration or data rollback is required. The
-spent source request and durable failed-closed audit remain immutable local evidence; the private
-database can be recovered from the verified pre-run backup if an unrelated integrity problem appears.
-
-Acceptance requires focused tests proving documented fields retain strict behavior and undocumented
-`createdAt` variants cannot become evidence; all format, lint, typecheck, unit, integration, production
-build, serialized E2E, database/schema/backup/restore, privacy/security, full and production dependency
-audits, preflight/release, immutable-migration diff, `git diff --check`, and `git fsck --strict` gates
-pass. Only the reader, fictional regression tests, accurate README status, and this plan may change.
-One PR from `fix/post-contract-live-hardening` must receive exact-head push and PR CI. It stays unmerged
-because this prompt grants no merge authority. Real action counts for this task must end at exactly
-`1/0/0/0`, lifetime `4/0/0/0`, with no further source call.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before application code.
-2. Remove typed/evidentiary use of the undocumented extension and add the fictional regression matrix.
-3. Update README with the exact failed-closed fourth attempt and conservative readiness.
-4. Run focused source tests plus lint/typecheck and inspect the authority/privacy/migration diff.
-5. Run the complete release matrix, focused database backup/restore tests, exact real DB status and
-   restore preview, dependency/security/privacy audits, diff check, and strict fsck.
-6. Record exact results here, commit and push only this branch, open one offline hardening PR, and
-   require exact-head push plus PR GitHub Actions green. Do not merge it and do not make another request.
-
-## Post-contract offline hardening implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD RELEASE AND PR CI PENDING`. The code delta
-removes `createdAt` from the named Lever response schema and maps `postedAt` to `null`. The documented
-v0 fields and every existing host/path/query/transport/budget/pagination control are unchanged.
-Undocumented extension values remain accepted only through the existing response-size-bounded
-passthrough, are retained in the deeply frozen raw payload, and cannot become posting-date evidence.
-The synthetic matrix covers number, null, string, and object extension forms; country,
-`workplaceType`, lists, inert HTML, URLs, and malformed documented values retain their existing tests.
-
-Focused source and durable-repository validation passed 57 tests across two files. The first focused
-run found one test-only assumption that Zod would freeze the caller's original nested fixture object;
-the assertion now correctly checks the stored cloned raw extension, and the rerun passed. Formatting,
-zero-warning lint, and strict typecheck pass. The implementation diff is limited to
-`packages/job-sources/src/lever/v2-reader.ts`,
-`packages/job-sources/src/source-capability.test.ts`, `README.md`, and this plan. There is no network,
-authority, dependency, schema, or migration delta.
-
-The complete pre-commit `npm.cmd run release:check` passed doctor, schema/status, aggregate preflight,
-formatting, lint, typecheck, 380 unit tests across 47 files, 21 integration tests across three files,
-the 31-route local production build, the six-page showcase build, the showcase source/export audit,
-31 serialized Playwright tests, repository privacy audit, and full plus production dependency audits
-with zero known vulnerabilities. The privacy scan covered all 305 tracked files and 11 private
-canaries without exposing private values. Seventeen focused database schema/migration/backup/restore
-tests across three files also pass.
-
-The post-run ignored backup `backup-2026-09-12T05-44-39.678Z-cfb2b824` is schema v7 with integrity
-`PASS`; its exact restore preview passes. The real database remains schema v7, pending migrations 0,
-integrity `PASS`, and foreign-key issues 0. Migrations `0000`-`0007` are unchanged and no migration was
-added. The single live run remains terminal `STOPPED / SCHEMA_CHANGED / RESPONSE_BODY` with one
-request and zero pages/records. This task made `1/0/0/0` source/form/upload/submission actions and the
-lifetime totals are `4/0/0/0`; candidate data outbound remained zero. No target packet exists because
-no source record was accepted. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`;
-the runner remains `TARGET_APPROVAL_REQUIRED`.
-
-Before push, the completed tree must be committed, the complete release gate rerun on that exact
-unchanged commit, and migration/diff/fsck checks must pass. Then one PR from
-`fix/post-contract-live-hardening` may be opened and must receive exact-head push plus PR CI green. It
-must remain unmerged. A future live verification is not authorized by this task and requires a new
-owner-approved, short-lived, immutable capability and one exact bounded request after human review of
-the offline PR.
-
-# Lever documented-contract boundary hardening and redacted diagnostics - 2026-09-12
-
-Status: `BLUEPRINT APPROVED BY OWNER / IMPLEMENTATION PENDING`. The exact clean starting `main` and
-`origin/main` are `b8ca101ab411d95d8ad91947dc0fdbf013a0d0d6`; implementation branch is
-`fix/lever-contract-boundary-hardening`. The real local database is schema v7 with zero pending
-migrations, integrity `PASS`, and zero foreign-key issues. Lifetime real source requests are exactly
-five and this task authorizes none; employer-form visits, uploads, and submissions remain zero. No
-active source or employer-target capability may be used by this offline task.
-
-## Current state, objective, official basis, and assumptions
-
-The existing `LeverPostingV2Schema` validates the documented JSON posting boundary but also rejects
-values using limits Lever's current public Postings API documentation does not state: a restricted
-job-ID regex and length, a non-empty and 1,000-character title rule, 500,000-character description
-and list-content limits, 5,000-character list headings, 100-element list and all-location limits, a
-100-character country limit, non-negative salary values, and currency/interval length limits. The
-page schema also has an arbitrary 100-record bound even though the approved capability and requested
-page size already impose the actual record budget. These rules are contract assumptions, not evidence
-about any private response and are not claimed to have caused the fifth failed-closed run.
-
-The sole contract authority for this work is Lever's current public Postings API documentation at
-`https://github.com/lever/postings-api`. It documents JSON posting strings for `id` and `text`; a
-`categories` object with location, commitment, team, department, and all-locations strings; nullable
-ISO alpha-2 `country`; styled/plain opening and description variants; `lists[]` objects containing
-string `text` and `content`; optional additional text; URL-valued `hostedUrl` and `applyUrl`; the exact
-four-value workplace enum; an optional salary-range object with string currency/interval and numeric
-minimum/maximum; and optional styled/plain salary descriptions. The documentation also exposes a
-`level` category filter; this run explicitly models `categories.level` as a string passthrough member
-without turning it into matching or eligibility evidence. Unknown extensions remain accepted only as
-immutable raw provenance and cannot become evidence.
-
-The objective is to align the parser with those documented types and shapes, preserve the existing
-global two-megabyte transport limit as the resource/security bound, separate provider structure from
-ApplyPilot record usability, and persist one privacy-safe diagnostic for response-contract failures.
-The diagnostic may contain only a hardcoded documented field identifier (or
-`UNKNOWN_CONTRACT_BOUNDARY`), a fixed expected-type enum, a fixed issue-category enum, and an optional
-bounded top-level record index. It must never contain a value, raw fragment, arbitrary key, Zod
-message/path serialization, title, employer text, URL value, description, stack, profile, or other
-private content.
-
-## Requirements, architecture, proposed files, and data flow
-
-- `packages/job-sources/src/lever/v2-reader.ts`: model the documented opening/body/plain,
-  salary-description, and category-level members; retain documented type/object/array checks, URL
-  validation, nullable country, exact workplace enum, inert conversion, deep-frozen raw payload, and
-  fail-closed parsing. Remove undocumented per-field/array/value limits and the page-level duplicate
-  bound. Convert Zod issues through a hardcoded path/type map into one redacted diagnostic. A
-  structurally valid but locally unusable title/location/description is a product-semantic stop, not
-  `SCHEMA_CHANGED`.
-- `packages/job-sources/src/source-capability.ts` and
-  `packages/job-sources/src/secure-source-transport.ts`: define/export strict fixed-enum diagnostic
-  schemas and an explicit product-unusable stop code, and allow `SecureSourceError` to carry only a
-  validated redacted diagnostic.
-- `packages/job-sources/src/source-runner.ts` and
-  `packages/database/src/source-enablement-repository.ts`: propagate the validated diagnostic only on
-  a stopped run and place it in existing `source.run.stopped` redacted audit JSON. The existing audit
-  JSON column avoids a database migration. Recovery parses invalid/tampered diagnostic data to null.
-- `apps/web/lib/source-workspace.ts` and `apps/web/app/sources/page.tsx`: expose and render only the
-  parsed fixed-enum diagnostic so the owner can understand a future contract boundary without access
-  to provider values. No raw metadata reaches the view.
-- `packages/job-sources/src/source-capability.test.ts` and
-  `packages/database/src/source-enablement-repository.test.ts`: use fictional fixtures for official
-  fields, long response-budget-valid values, more than 100 locations/lists, unusual string IDs,
-  signed finite salaries, all workplace variants, nullable country, unknown extensions, malformed
-  types/shapes/URLs/enums, diagnostic allowlisting/redaction, product-unusable classification, and
-  durable stopped-run audit/recovery behavior.
-- `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `README.md`, and this plan: record the field-by-field
-  A/B/C/D matrix and accurate five-attempt readiness without private/live payload content or causal
-  speculation.
-
-The bounded data flow is:
-
-`approved synthetic JSON bytes -> existing 2 MB transport cap -> documented Zod shapes -> either
-inert mapped record + immutable raw provenance, product-semantic unusable stop, or fixed-enum redacted
-schema diagnostic -> existing stopped-run audit JSON -> validated recovery/UI rendering`.
-
-No source host, path, query, DNS, TLS/SNI, IP pinning, redirect, retry, concurrency, request/page
-budget, capability expiry, persistence authority, candidate-outbound, employer-target, upload, or
-submission code may change. No new package, dependency, lockfile change, or database migration is
-expected. Migrations `0000`-`0007` remain immutable.
-
-## Risks, security/privacy, testing, rollback, and acceptance criteria
-
-Primary risks are accidentally weakening documented structural checks, serializing provider values in
-diagnostics, misclassifying a local usability decision as provider drift, promoting new fields into
-eligibility evidence, broadening live authority, or claiming the offline fix explains an unavailable
-private body. Controls are a hardcoded diagnostic allowlist, strict diagnostic schemas, one selected
-structural issue only, unknown-path collapse, synthetic adversarial fixtures, raw audit inspection,
-authority/migration diffs, public-showcase and privacy scans, and an exact zero-network boundary.
-Private profile, vacancy, database, backups, source allowlist, response data, generated documents,
-packets, browser/session state, tokens, and credentials remain ignored and must not be printed or
-committed.
-
-Rollback is a normal revert of this branch/PR. The change has no migration or external side effect;
-existing stopped audits remain compatible because the new diagnostic member is optional. No source
-capability or run is created or mutated.
-
-Testing must include formatting, zero-warning lint, strict typecheck, focused source and repository
-tests, complete unit and integration suites, serialized E2E, local production and showcase builds,
-public-showcase boundary audit, privacy audit, full and production dependency audits, real database
-status, schema/integrity/FKs, synthetic backup/restore and migration tests, migration immutability,
-preflight, release check, `git diff --check`, and `git fsck --strict`.
-
-Acceptance requires every documented-valid synthetic variant within the two-megabyte response budget
-to parse without an undocumented per-field rejection; malformed documented values to stop as
-`SCHEMA_CHANGED / RESPONSE_BODY`; each such stop to contain only the fixed diagnostic tuple; arbitrary
-unknown keys/values to remain inert raw provenance and never appear in diagnostics or evidence;
-product-semantic unusability to use a distinct stable stop classification; all authority and migration
-diffs to remain empty; README and contract docs to state five attempts, accepted JSON at the latest
-attempt, zero persisted real jobs, and Source-enabled Personal Beta `NOT_READY`; and one PR titled
-`fix: align Lever parser with documented contract` to have exact-head local and GitHub CI green. Only
-then may the owner's conditional normal-merge authorization be used, followed by a clean refresh of
-`main`. No sixth request is permitted before, during, or after merge in this task.
-
-Exact implementation sequence:
-
-1. Commit this blueprint before changing application code.
-2. Add strict diagnostic contracts and propagate them through errors, stopped-run audit persistence,
-   recovery, and owner-visible rendering.
-3. Align the Lever response schema, documented members, inert mapping, and product-unusable boundary.
-4. Add the synthetic field/boundary/redaction/durable-audit matrix and the official A/B/C/D contract
-   document; update README readiness conservatively.
-5. Run focused gates, inspect the full authority/privacy/migration diff, then run the complete release
-   matrix and record exact results here.
-6. Commit and push the same branch, open the named PR, require exact-head push and PR workflows green,
-   self-review the complete base-to-head delta, and merge only if every pre-approved condition holds.
-7. Refresh clean `main`, confirm lifetime action counters remain `5/0/0/0`, and return the exact sixth-
-   GET proposal without executing it.
-
-## Lever contract boundary implementation results - 2026-09-12
-
-Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD RELEASE AND PR CI PENDING`. The official
-field matrix is recorded in `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`. Every named provider member now
-has a documented structural rule, a separately identified local product semantic, or an independent
-resource/security control. The response parser no longer imposes the undocumented ID syntax/length,
-title/description/list text lengths, 100-element list/all-location limits, 100-character country
-limit, non-negative salary constraint, currency/interval lengths, or 100-record schema-array bound.
-Country instead follows the documented nullable ISO alpha-2 form. The approved page size and record
-cap still stop oversized pages as `PAGE_SIZE_EXCEEDED` before records are mapped; the production whole-
-response byte bound remains unchanged.
-
-Explicitly typed provider fields now include `opening`, `openingPlain`, `descriptionBody`,
-`descriptionBodyPlain`, `salaryDescription`, `salaryDescriptionPlain`, and `categories.level`. They are
-retained as deeply frozen raw provenance and do not become new eligibility or scoring evidence.
-Existing combined descriptions, lists, additional text, categories, salary range, URLs, country, and
-workplace type retain strict documented shapes and inert conversion. Unknown extensions remain
-passthrough raw provenance only. Empty or inert-empty local identity content now stops as
-`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY`, not provider `SCHEMA_CHANGED`.
-
-`SCHEMA_CHANGED / RESPONSE_BODY` errors now carry at most one strict diagnostic with a hardcoded
-documented field identifier (or `UNKNOWN_CONTRACT_BOUNDARY`), a fixed expected-structure enum, a fixed
-issue-category enum, and an optional bounded top-level record index. The `SecureSourceError`, source
-runner, stopped-run sink, existing redacted audit JSON, recovery query, server-side workspace, and
-owner recovery UI propagate only that validated tuple. Values, raw fragments, provider keys, Zod
-messages, stack traces, titles, URLs, descriptions, employers, and candidate data are never included.
-Invalid/tampered diagnostic members parse to null. Existing audits remain compatible and no migration
-is required.
-
-The changed implementation/docs set is `PROJECT_PLAN.md`, `README.md`,
-`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `packages/job-sources/src/source-capability.ts`,
-`packages/job-sources/src/secure-source-transport.ts`,
-`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
-`packages/job-sources/src/source-capability.test.ts`,
-`packages/database/src/source-enablement-repository.ts`,
-`packages/database/src/source-enablement-repository.test.ts`, `apps/web/lib/source-workspace.ts`, and
-`apps/web/app/sources/page.tsx`. No source request/URL/query/DNS/TLS/pinning/redirect/retry/concurrency,
-capability authority, page/request budget, target, runner, upload, submission, dependency, lockfile,
-schema, or migration file changed.
-
-Synthetic focused validation passes 98 tests across the source-contract and durable repository files.
-It covers long but two-megabyte-budget-valid title/description strings, 101 locations and lists,
-unusual opaque IDs, negative finite salaries, long currency/interval strings, nullable and absent
-country, all workplace values, documented opening/body/plain/salary-description fields, unknown
-extensions, every named malformed type family, missing required fields, invalid URL/enum/ISO format,
-unknown boundary collapse, product-unusable classification, exact diagnostic keys, invalid diagnostic
-rejection, durable audit storage, tamper-to-null recovery, and absence of fictional sentinel values.
-
-The complete pre-commit `npm.cmd run release:check` passed doctor, schema/status and aggregate
-preflight, format check, zero-warning lint, strict typecheck, 421 unit tests across 47 files, 21
-integration tests across three files, the local production build with 31 route units, the static
-showcase build with six pages, public-showcase audit across 19 source/config files plus the export, 31
-serialized Playwright tests, privacy audit, and full/production dependency audits with zero known
-vulnerabilities. Privacy checked 305 tracked files, 823 history paths, 821 history blobs, 1,289 build/
-test artifacts, and 11 private canaries. Fifteen focused database migration/schema/backup/restore and
-runtime-path tests across three files pass.
-
-The real database was read only and remains schema v7, zero pending migrations, integrity `PASS`, and
-zero foreign-key issues. Migrations `0000`-`0007` have an empty start-to-working-tree diff and no
-migration was added. `git diff --check` and `git fsck --strict` exit successfully; the latter reports
-only pre-existing unreachable objects. This task has made zero source requests, employer-form visits,
-uploads, or submissions, so lifetime counts remain exactly `5/0/0/0`.
-
-Remaining release mechanics are to commit the implementation and result record, rerun the complete
-release gate on that exact clean head, recheck migration/diff/fsck invariants, push only this branch,
-open the named PR, require exact-head push and PR workflows green, and self-review the full base-to-head
-delta. Normal merge is permitted only if every owner-preapproved condition remains satisfied. No live
-GET follows the merge in this task.
-
-# Non-critical Lever workplace enum drift policy - 2026-09-12
-
-Status: `BLUEPRINT APPROVED BY OWNER / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean
-starting `main` and `origin/main` are `64680f0b6c5c096f21318143dbca74570a52430b`; implementation
-branch is `fix/lever-workplace-drift-policy`. The real local database is schema v7 with zero pending
-migrations, integrity `PASS`, and zero foreign-key issues. The sixth and only authorized bounded
-request in the preceding train reached an accepted 2xx JSON body and stopped at the existing
-value-free diagnostic `SCHEMA_CHANGED / RESPONSE_BODY / INVALID_ENUM / workplaceType / enum / record
-0`. That private response was not inspected, reconstructed, logged, inferred, or guessed. The actual
-provider value remains unknown. Lifetime real source/form/upload/submission counts start and must end
-this task at exactly `6/0/0/0`; this task authorizes no source or employer network action.
-
-## Objective, policy decision, assumptions, and requirements
-
-`workplaceType` is non-critical descriptive metadata: it does not establish source/posting identity,
-authorization, eligibility, candidate evidence, employer interaction, or final-submit authority. The
-objective is therefore to preserve Lever's four documented values exactly while allowing only null or
-an undocumented string to become internal unknown plus a non-fatal, value-free drift warning. The
-policy statement is: **Unknown values in non-critical provider enums are treated as provider drift
-and normalized to unknown; they are never promoted to supported semantics.** This is resilience
-against a documented-contract violation, not evidence that a guessed value exists in Lever.
-
-Required behavior is exact: documented `unspecified`, `on-site`, `remote`, and `hybrid` retain their
-current mappings; absence maps to internal `null` without a warning; provider null and an unknown
-string map to internal `null` with `PROVIDER_ENUM_DRIFT`; and object, array, boolean, number, or any
-other non-string/non-null representation remains a fatal `SCHEMA_CHANGED / RESPONSE_BODY` structural
-failure. Drift must never map to documented `unspecified` or create remote, hybrid, onsite, or other
-eligibility/fit evidence. The undocumented string is never added to the official enum and is never
-included in a diagnostic, public log, audit display, test output, or documentation. It may exist only
-inside the existing immutable private raw observation payload after successful persistence.
-
-## Architecture, proposed files, data flow, and dependencies
-
-- `packages/job-sources/src/lever/v2-reader.ts`: keep a separate four-value official enum; accept only
-  absent, string, or null at the provider shape; map recognized strings as today; map null/unknown
-  string to internal null; emit a fixed warning with page-local record index; preserve the parsed raw
-  payload deeply frozen; reject every other structural type through the existing redacted fatal
-  diagnostic path.
-- `packages/job-sources/src/source-capability.ts`: add one strict fixed-enum non-fatal diagnostic
-  schema and one strict `source.provider.drift` audit metadata schema. Its only members are
-  `runId`, `issueCategory=PROVIDER_ENUM_DRIFT`, `field=workplaceType`,
-  `expectedStructuralType=enum`, and an already-bounded record index. It contains no provider value.
-- `packages/database/src/source-enablement-repository.ts`: record each page's validated drift warning
-  in the existing append-only `audit_events` JSON within the same page transaction. This requires no
-  schema change. A warning does not alter run status, stop code, budgets, identity, observation/job
-  versioning, normalization, evaluation, or queue authority.
-- `packages/job-sources/src/source-capability.test.ts` and
-  `packages/database/src/source-enablement-repository.test.ts`: add the complete fictional matrix for
-  official values, absent/null/fictional unknown strings, structural failures, raw immutability,
-  value-free warning metadata, successful persistence/pipeline continuation, unknown R2 location
-  semantics, and deterministic replay.
-- `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`: document the explicit non-critical-drift boundary without
-  representing unknown drift as a supported provider enum.
-- `README.md`: correct the readiness count to six bounded attempts and state that the latest stopped
-  at a value-free non-critical workplace-type diagnostic; no ingestion success is claimed.
-- `PROJECT_PLAN.md`: record this blueprint and exact verified outcome.
-
-The bounded data flow is:
-
-`synthetic JSON -> existing response-byte and structural boundary -> official workplace enum mapping
-OR null/unknown-string to internal null + fixed warning OR structural value to fatal redacted stop ->
-existing immutable private raw observation -> existing normalization/R2/queue pipeline -> existing
-append-only audit JSON`.
-
-No new dependency, package, lockfile, migration, table, or external service is planned. Host, path,
-query, DNS, TLS/SNI, address pinning, request/record/page/byte/time budgets, redirect/retry/concurrency,
-capability/approval semantics, persistence authority, candidate outbound, runner target, form, upload,
-and submission behavior are explicitly unchanged. Migrations `0000`-`0007` remain immutable.
-
-## Risks, security/privacy controls, testing, rollback, and acceptance
-
-Primary risks are accidentally treating arbitrary structures as harmless, leaking an undocumented
-value through warning metadata, conflating drift with documented `unspecified`, allowing raw provider
-text into matching evidence, duplicating warnings or observations on replay, or broadening live
-authority. Controls are a provider boundary limited to `string|null|absent`, a separate exact official
-enum, a strict fixed diagnostic schema, explicit diagnostic-key/value assertions, fictional sentinel
-tests, transaction-bound warning persistence, immutable content identities, normalization assertions,
-authority/migration diffs, and the repository privacy/showcase audits. Private profile, vacancy,
-database, backups, capability allowlists, response payloads, generated documents, packets,
-browser/session state, tokens, and credentials remain ignored and may not be printed or committed.
-
-Testing must cover all four official enum mappings; absence; null; fictional unknown string; object,
-array, number, and boolean failures; raw payload retention/immutability; no sentinel in warnings;
-successful page/run/persistence/R2/queue progression; no workplace evidence promotion; and replay
-idempotency. Required gates are focused source and durable repository tests, formatting, zero-warning
-lint, strict typecheck, complete unit/integration/E2E, local and showcase production builds, showcase
-boundary audit, privacy audit, full/production dependency audits, database/schema/integrity/FKs,
-backup/restore tests and preview, migration immutability, aggregate preflight/release check,
-`git diff --check`, and `git fsck --strict`.
-
-Rollback is a normal revert of the unmerged branch/PR or merged commit. No database down-migration or
-private-data cleanup is needed; existing warning audits use the current generic append-only table and
-historical stopped-run diagnostics remain compatible. Acceptance requires every exact policy case and
-privacy assertion to pass; no live/private value to be read or exposed; only non-critical
-`workplaceType` null/unknown strings to be relaxed; structural corruption to remain fatal; official
-semantics and all authority controls to remain exact; schema v7/pending 0/integrity PASS/FKs 0; no
-migration; exact-head local and GitHub CI green; and lifetime actions unchanged at `6/0/0/0`.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before application code.
-2. Add the strict non-fatal warning contract and focused parser mapping with the synthetic policy
-   matrix.
-3. Persist only validated value-free warnings through the existing audit table and prove full
-   source-to-R2/queue continuation plus replay idempotency.
-4. Update the contract document and accurate README readiness without private/live response detail.
-5. Run focused gates, inspect authority/privacy/migration diffs, then run the complete validation
-   matrix and record exact results here.
-6. Commit/push only this branch, open PR `fix: tolerate non-critical Lever workplace drift`, require
-   exact-head push and pull-request CI green, and self-review the full base-to-head delta.
-7. Merge normally only if every owner-preapproved condition remains true, refresh clean `main`, and
-   return an exact separately gated seventh-GET proposal without executing it.
-
-## Implementation and pre-commit validation results
-
-Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The parser now keeps
-`LeverOfficialWorkplaceTypeV2Schema` as the exact documented four-value enum while the provider shape
-admits only absent, string, or null. Official values retain their existing mapping; absent maps to
-internal null without warning; null and a fictional undocumented string map to internal null with a
-strict `PROVIDER_ENUM_DRIFT / workplaceType / enum / recordIndex` warning. Object, array, number, and
-boolean fixtures still stop as `SCHEMA_CHANGED / RESPONSE_BODY` with only the existing safe structural
-diagnostic. Unknown never becomes documented `unspecified`.
-
-Each mapped record and page carries only the fixed warning tuple. `runLeverSourceDiscovery` exposes
-the tuple without a provider value, and `SourceEnablementRepository.persistPage` validates and writes
-it as `source.provider.drift` in the existing `audit_events` table inside the page transaction. The
-synthetic durable test proves a drifted record completes, persists its immutable raw fictional value,
-normalizes every location workplace type to `UNKNOWN`, reaches R2 evaluation and queue, and replays
-without duplicate observations, job versions, evaluations, or queue decisions. A replay produces one
-run-scoped warning for its own audit trail; neither warning contains the fictional value or any value,
-title, or URL member.
-
-Changed implementation/documentation files are `packages/job-sources/src/source-capability.ts`,
-`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
-`packages/job-sources/src/source-capability.test.ts`,
-`packages/database/src/source-enablement-repository.ts`,
-`packages/database/src/source-enablement-repository.test.ts`,
-`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `README.md`, and this plan. No transport, URL, query, DNS,
-TLS/SNI, pinning, request/budget, capability approval, target, form, upload, submission, dependency,
-lockfile, schema, or migration file changed.
-
-Focused source/durable repository validation passes 105 tests across two files, including the full
-official/absent/null/unknown-string/structural-type matrix, strict diagnostic rejection, raw
-immutability, persistence, no evidence promotion, full pipeline continuation, and replay. Strict
-typecheck passes. The pre-commit `npm.cmd run release:check` passes doctor, database/preflight, format,
-zero-warning lint, strict typecheck, 428 unit tests across 47 files, 21 integration tests across three
-files, local production build, six-page showcase build and boundary audit, 31 serialized E2E tests,
-privacy audit, and full plus production dependency audits with zero vulnerabilities. Privacy checked
-306 tracked files, 836 history paths, 834 history blobs, 1,250 build/test artifacts, and 11 private
-canaries without exposing values.
-
-Fifteen focused database schema/migration/backup/restore/runtime tests pass. The ignored backup
-`backup-2026-09-12T07-37-37.897Z-6b114f6f` is schema v7 with integrity `PASS`, and its exact restore
-preview passes. The real database remains schema v7, pending migrations 0, integrity `PASS`, and zero
-foreign-key issues. Migrations `0000`-`0007` have an empty start-to-working-tree diff; no migration
-was added. Aggregate preflight passes with zero active source capabilities and no approved real target.
-`git diff --check` and `git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
-
-This task made zero source requests, employer-form visits, uploads, or submissions. The private sixth
-response was not read or exposed, candidate outbound is zero, and lifetime real action counts remain
-exactly `6/0/0/0`. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner
-framework remains synthetic-only with real target approval required.
-
-Remaining mechanics are to commit this implementation/result record, rerun the complete release gate
-on the exact clean commit, recheck scope/privacy/migration/fsck invariants, push only this branch, open
-the named PR, and require exact-head push and pull-request CI green. Then self-review the complete
-base-to-head delta and use the owner's normal-merge pre-approval only if every stated condition still
-holds. No seventh request follows the merge; a separately specified fresh authority remains required.
-
-# Seventh bounded source verification and persistence-boundary correction - 2026-09-12
-
-Status: `LIVE AUTHORITY SPENT / FAILED CLOSED / OFFLINE CORRECTION PLANNED / NO EIGHTH GET`.
-The exact clean starting `main` and `origin/main` were
-`96ce246d743e128b562f49ac1803ef6260e9a6c7`. Preflight passed with schema v7, zero pending
-migrations, integrity `PASS`, zero foreign-key issues, unchanged migrations `0000`-`0007`, a valid
-private profile, seven historical source capabilities and zero enabled capabilities, zero approved
-real runner targets, privacy `PASS`, and lifetime real actions `6/0/0/0`. Ignored backup
-`backup-2026-09-12T07-51-38.473Z-c9d72f44` and its exact restore preview passed before activation.
-
-Fresh deterministic ignored capability `lever_a7308e8f9d1855f1801b81d5` was derived from the approved
-source, tenant, region, exact URL, seventh-verification purpose and T0. It passed the strict
-`SourceCapabilityV2` schema with parser version
-`lever-v2:96ce246d743e128b562f49ac1803ef6260e9a6c7`, one request, 25 records/page, 2 MB response,
-30-second request and 60-second run limits, concurrency one, and zero redirects/retries. The real
-owner `/sources` workflow was submitted once through the approved headless Chromium fallback.
-Exactly one GET reached an accepted 25-record, 370311-byte response and the persistence boundary,
-then stopped durably as `PERSISTENCE_FAILED / PERSISTENCE`. Request/page-budget counters are
-`1/1/25`, retries and redirects are zero, and the page transaction committed no page, observation,
-payload, job version, R2 evaluation or queue decision. No schema diagnostic or provider-drift warning
-survived because persistence rolled back before either page or warning audit. The private response
-was not read, reconstructed or inferred. Candidate data outbound, employer visits, form actions,
-uploads and submissions were zero. The capability was revoked once through the owner UI, recorded as
-immutable version 2 in the database and ignored allowlist, and enabled capability count returned to
-zero. Lifetime real actions are now exactly `7/0/0/0`; no eighth GET is authorized.
-
-## Deterministic defect, objective, assumptions, and requirements
-
-Offline validation against a private clone of the real schema proved that a normal 25-record
-fictional page persists completely, including 25 observations, one page, value-free workplace drift
-audits, integrity `PASS`, and zero foreign-key issues. The real database state and page cardinality
-therefore do not reproduce the stop. The live provider value that triggered the transaction remains
-unknown and unavailable by design.
-
-A deterministic parser-to-persistence defect is nevertheless established from current code and a
-synthetic input: `mapPosting` treats non-empty ID/title as sufficient local record usability, while
-`persistLeverObservation` later also requires a usable inert description and either primary or
-all-locations evidence. A documented, structurally valid posting lacking either local field crosses
-the response parser as accepted, consumes the page budget, reaches the transaction, and is collapsed
-to generic `PERSISTENCE_FAILED`; any earlier valid records in that page roll back. This violates the
-existing distinction between provider contract failure and local `SOURCE_RECORD_UNUSABLE`. It is not
-claimed to prove which private record or field caused the seventh stop.
-
-The objective is narrow: make the already-required local location/description semantics fail closed
-as `SOURCE_RECORD_UNUSABLE / RESPONSE_BODY` before page budget consumption or persistence begins.
-Official Lever structural validation, unknown extensions, the four official workplace values,
-non-critical null/unknown-string drift, value-free drift audits, inert conversion, immutable raw
-provenance, request authority and all downstream R2 behavior remain unchanged. No provider value,
-title, location, description, URL, arbitrary key, stack or Zod text may enter diagnostics or Git.
-
-## Architecture, files, data flow, and dependencies
-
-- `packages/job-sources/src/lever/v2-reader.ts`: compute inert description, primary location and
-  deduplicated all-locations before completing the mapped record. If ID/title, effective location, or
-  description is unusable, throw the existing closed `SOURCE_RECORD_UNUSABLE` at `RESPONSE_BODY`.
-  Preserve all valid fallbacks: an all-locations entry satisfies location, and inert `lists[]` or
-  additional text may satisfy description. Do not add undocumented schema constraints or expose
-  which private field failed.
-- `packages/job-sources/src/source-capability.test.ts`: reproduce locationless and descriptionless
-  documented-valid postings, prove the closed product-semantic stop, and prove all-locations and
-  lists-only fallbacks remain accepted. Keep structural and workplace drift matrices unchanged.
-- `packages/database/src/source-enablement-repository.test.ts`: prove a page containing an earlier
-  valid fictional record plus a later unusable record never enters persistence and stops as
-  `SOURCE_RECORD_UNUSABLE`, not `PERSISTENCE_FAILED`; no partial page, observation or downstream work
-  is committed.
-- `README.md` and this plan: record the seventh attempt accurately without private response content
-  or a claim that the correction is the private root cause.
-
-Data flow becomes `bounded JSON -> documented structural parse -> inert mapping -> local required-
-field usability gate -> SOURCE_RECORD_UNUSABLE stop OR immutable page transaction -> R2/queue`.
-There is no new package, dependency, lockfile, table or migration. Source host/path/query, DNS,
-TLS/SNI, pinning, request/record/page/byte/time caps, capability expiry, redirects, retries,
-concurrency, candidate outbound, target, runner, form, upload and submission authority are unchanged.
-
-## Risks, privacy/security, tests, rollback, acceptance, and exact steps
-
-Risks are misclassifying provider structure as local usability, rejecting a valid fallback, claiming
-causality from inaccessible data, or broadening authority. Controls are fictional fixtures, the
-existing closed stop code, a no-field diagnostic, explicit fallback tests, authority/migration diffs,
-privacy and showcase audits, and a permanent no-eighth-request boundary. Private profile, vacancy,
-database, backups, allowlist, source payloads, generated documents, packets, session state, tokens
-and credentials remain ignored and uncommitted.
-
-Acceptance requires the exact synthetic regression and fallback matrix to pass; structural failures
-and provider-drift behavior to remain unchanged; no persistence attempt or partial record from an
-unusable page; complete format, lint, strict typecheck, unit, integration, E2E, local/showcase build,
-showcase boundary, privacy, dependency, database/backup/restore, migration immutability, preflight,
-release, diff and strict fsck gates; schema v7/pending 0/integrity `PASS`/FKs 0; no migration; and one
-offline PR with exact-head push and PR CI green. Rollback is a normal revert of the branch/merge; no
-database rollback is required. The exact sequence is: commit this blueprint; add the failing
-fictional regression; implement the narrow pre-persistence usability gate; update safe readiness
-docs; run focused and full gates; commit/push one branch; open one PR; self-review the full delta; and
-use the owner's conditional normal-merge authority only if scope, privacy, migration and exact-head
-CI conditions all remain satisfied. After merge, refresh clean `main` and stop without a source or
-employer request.
-
-## Offline correction implementation and pre-commit verification
-
-Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The focused synthetic
-regression first reproduced the defect: documented-valid records with wholly empty inert description
-or no effective location crossed the parser, and a mixed two-record page stopped only after budget
-consumption as `PERSISTENCE_FAILED` with page/record counters `1/2`. The implementation now computes
-the inert description plus primary/deduplicated fallback locations before returning a mapped record.
-Missing ID/title, description, or effective location stops as the existing value-free
-`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY`; an all-locations value still satisfies location and inert
-list/additional content still satisfies description. A mixed page stops before `consumePage` or the
-transaction, so page, record, observation, evaluation and queue counts remain zero. No private field
-or record index is exposed, and no claim is made that this code gap was the inaccessible live cause.
-
-The actual implementation/documentation diff is limited to
-`packages/job-sources/src/lever/v2-reader.ts`,
-`packages/job-sources/src/source-capability.test.ts`,
-`packages/database/src/source-enablement-repository.test.ts`, `README.md`, and this plan. The full
-formatting check also reported four merged PR24 files as noncanonical; running Prettier produced no
-Git content diff for those files. There is no source capability, transport, network, budget, provider
-structural schema, drift policy, persistence schema, R2, runner, target, form, upload, submission,
-dependency or migration change.
-
-Focused source and durable-repository validation passes 109 tests across two files. The complete
-pre-commit `npm.cmd run release:check` passes doctor, database and aggregate preflight, formatting,
-zero-warning lint, strict typecheck, 432 unit tests across 47 files, 21 integration tests across three
-files, the 31-route local production build, the six-page showcase build, showcase boundary audit, 31
-serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
-vulnerabilities. Privacy checked 306 tracked files, 846 history paths, 844 history blobs, 1270 build/
-test artifacts, and 11 private canaries. Twenty-one focused database/schema/migration/backup/restore/
-runtime tests pass across four files.
-
-The verified pre-run ignored backup
-`backup-2026-09-12T07-51-38.473Z-c9d72f44` and post-run backup
-`backup-2026-09-12T08-09-22.333Z-98eec30f` are schema v7 with integrity `PASS`; both exact restore
-previews pass. The real database remains schema v7, pending migrations zero, integrity `PASS`, and
-foreign-key issues zero. Migrations `0000`-`0007` are unchanged and no migration exists beyond 0007.
-`git diff --check` and `git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
-
-The seventh and only live request in this train remains terminal `STOPPED / PERSISTENCE_FAILED /
-PERSISTENCE`, with one request, one in-memory accepted page, 25 records, 370311 bytes, zero retries,
-zero redirects, and no committed run page or real observation. Fatal field/type/index details are not
-durably available for persistence failures. Durable non-fatal provider-drift warning count is zero;
-the rolled-back in-memory page's warning count cannot safely be recovered. The capability is revoked
-as immutable version 2, active source capabilities are zero, and candidate data outbound is zero.
-This offline correction made no source/form/upload/submission action, so lifetime counts remain
-exactly `7/0/0/0`. No Melbourne/VIC match, real role ranking, or target-readiness packet exists.
-Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner framework remains
-ready only for synthetic targets with real target approval required.
-
-Remaining mechanics are to commit the coherent implementation/result record, rerun the complete
-release gate on the exact clean commit, verify authority/migration/privacy/diff/fsck invariants, push
-this branch, open one offline PR, and require exact-head push plus pull-request GitHub Actions green.
-After a clean full-delta self-review, normal merge is permitted only under the owner's pre-approved
-conditions. Refresh `main` after merge and stop. No eighth source request or employer action is
-authorized.
-
-# Per-record Lever source accounting before eighth GET - 2026-09-12
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting
-`main` and `origin/main` are `0c709cee07dc4a953d6dda88eb2de2528fb4563c`; the implementation branch
-is `fix/lever-per-record-accounting`. The real action baseline is exactly seven source GETs, zero
-employer-form visits, zero uploads, and zero submissions. No network or employer interaction is
-authorized in this task.
-
-## Current state, objective, assumptions, and requirements
-
-PR #25 correctly moved ApplyPilot's local identity/title/location/description usability gate ahead
-of persistence, but `parseLeverPage` still maps the structurally valid provider array with a throwing
-per-record mapper. One locally unusable posting therefore aborts the whole otherwise valid page and
-discards accepted siblings. Provider-contract structure and local product usability need distinct
-failure semantics.
-
-The objective is to validate the complete Lever page structurally first, then classify every posting
-independently as `ACCEPTED` or `SOURCE_RECORD_UNUSABLE`. Provider structural failures remain
-page-fatal and permit no partial persistence. Local unusability is a per-record disposition and must
-not discard valid siblings. Provider/wire cardinality, rather than accepted cardinality, must drive
-the source record budget and next cursor. Only accepted records may enter observation persistence,
-normalization, job versioning, R2 evaluation, queueing, or target preparation.
-
-Safe unusable reasons are fixed to `UNUSABLE_IDENTITY`, `UNUSABLE_TITLE`,
-`MISSING_EFFECTIVE_LOCATION`, and `MISSING_USABLE_DESCRIPTION`. A diagnostic may contain only one of
-those reason codes and the bounded page-local record index. It may never contain a provider value,
-title, location, description, URL, arbitrary key, raw fragment, stack, or Zod message. Workplace
-drift behavior remains exact: official values retain semantics; absence is unknown without warning;
-null or an undocumented string becomes unknown plus a value-free warning; structural corruption is
-page-fatal.
-
-## Architecture, proposed files, data flow, and dependencies
-
-- `packages/job-sources/src/source-capability.ts`: add a strict fixed-enum per-record unusable
-  diagnostic and `source.record.unusable` audit metadata. Extend the existing page-persisted audit
-  with explicit provider, accepted, unusable, drift-warning, and persisted-observation aggregates
-  while retaining `recordCount` as the provider-count compatibility field.
-- `packages/job-sources/src/lever/v2-reader.ts`: keep whole-page Zod validation first; replace the
-  throwing page mapper with a disposition outcome; retain the throwing detail boundary; expose
-  provider count, accepted records, safe unusable diagnostics, and drift diagnostics. Build the page
-  digest from an ordered per-provider-record disposition sequence: accepted entries use their local
-  immutable identity/content digests, while unusable entries use only record index and fixed reason.
-  Advance the cursor and consume the record budget by provider count.
-- `packages/job-sources/src/source-runner.ts`: collect and return accepted records only while keeping
-  provider-count budget semantics and safe aggregate diagnostics.
-- `packages/database/src/source-enablement-repository.ts`: transactionally persist accepted records,
-  the provider-count page row, fixed unusable audits, fixed drift audits, and aggregate page audit.
-  Zero-accepted pages remain valid persisted pages and do not become `PERSISTENCE_FAILED`.
-- `apps/web/lib/source-workspace.ts` and `apps/web/app/sources/page.tsx`: recover and render only safe
-  aggregates for provider records, accepted records, unusable records, drift warnings, and persisted
-  observations. Existing historical rows remain readable without a migration.
-- `packages/job-sources/src/source-capability.test.ts` and
-  `packages/database/src/source-enablement-repository.test.ts`: add the complete synthetic matrix for
-  25 valid, mixed unusable position/reason/count cases, all unusable, documented fallbacks, accepted
-  and unusable drift, structural fatality, replay, cursor, provider-count budget, safe audits, and
-  downstream accepted-only processing.
-- `README.md`, `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, and this plan: document the policy and
-  readiness honestly without claiming the inaccessible seventh response's cause.
-
-The data flow becomes `bounded provider response -> full documented structural validation -> ordered
-per-record accepted/unusable disposition -> provider-count budget/cursor/digest -> one atomic page
-transaction containing accepted observations and value-free accounting -> accepted-only R2/queue`.
-No new package, dependency, lockfile, table, column, migration, external service, capability, or
-network authority is planned. Migrations `0000`-`0007` remain immutable.
-
-## Risks, security/privacy, testing, rollback, and acceptance
-
-Primary risks are accidentally allowing a structural failure to partially persist, advancing by the
-accepted count and replaying provider records, making unusable records free against source limits,
-building a digest that ignores unusable dispositions, leaking raw provider values through audits,
-or producing downstream state for rejected records. Controls are strict whole-page validation,
-ordered value-free disposition tokens, explicit provider/accepted count assertions, transaction
-tests, fixed diagnostic schemas, drift-on-unusable redaction checks, replay assertions, authority and
-migration diffs, and the existing privacy/showcase audits. Private profiles, vacancies, databases,
-backups, allowlists, source payloads, generated documents, packets, browser/session state, tokens,
-and credentials remain ignored and uncommitted.
-
-Testing must run focused reader/runner/repository tests, format check, zero-warning lint, strict
-typecheck, complete unit and integration suites, serialized E2E, local and showcase production
-builds, showcase boundary and privacy audits, full and production dependency audits, real database
-status, schema/integrity/FKs, synthetic migration/backup/restore tests and restore preview, migration
-immutability, aggregate preflight and release check, `git diff --check`, and `git fsck --strict`.
-
-Rollback is a normal revert of the branch or merge commit. Audit additions use the current generic
-append-only audit table, so no down-migration or private-data cleanup is required. Acceptance
-requires the fifteen-case synthetic matrix to pass; structural failures to remain page-fatal with no
-partial page; provider count to drive budget, cursor, page row, and run accounting; accepted-only
-downstream processing; deterministic digest differentiation for unusable dispositions; safe recovery
-aggregates; zero-accepted pages to persist and complete; unchanged workplace-drift and authority
-policy; schema v7/pending zero/integrity `PASS`/FKs zero; no migration; privacy `PASS`; exact-head
-local and GitHub CI green; and lifetime actions unchanged at `7/0/0/0`.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before changing application code.
-2. Add the strict unusable disposition/audit contract and refactor the reader around whole-page
-   structural validation followed by non-throwing per-record classification.
-3. Correct provider-count budget, pagination, and deterministic page-digest semantics.
-4. Persist accepted observations plus value-free unusable/drift accounting atomically, including
-   zero-accepted pages, and expose safe recovery/UI aggregates.
-5. Add the complete fictional synthetic matrix and update accurate source-policy documentation.
-6. Run focused checks, inspect authority/privacy/migration diffs, then run the full validation matrix
-   and record exact results here.
-7. Commit and push only this branch; open PR `fix: account for unusable Lever records individually`;
-   require exact-head push and pull-request CI green; self-review the complete base-to-head diff; and
-   merge normally only if every owner-preapproved condition still holds.
-8. Refresh clean `main`, confirm action counters remain `7/0/0/0`, and stop with an exact proposed
-   eighth-GET authority. Do not execute it.
-
-## Implementation and pre-commit validation results
-
-Status: `IMPLEMENTED / PRE-COMMIT RELEASE PASS / EXACT-HEAD CI PENDING`. The Lever v2 reader now
-validates the complete provider array first, then creates an ordered disposition for every provider
-record. Accepted records retain immutable raw provenance and normal mapping. Locally unusable records
-produce only a strict `reasonCode` plus bounded `recordIndex`; they do not throw from page parsing and
-cannot discard accepted siblings. Single-record detail parsing retains its existing fail-closed
-`SOURCE_RECORD_UNUSABLE / RESPONSE_BODY` behavior.
-
-The page result now exposes provider cardinality, accepted records, unusable cardinality and safe
-diagnostics, provider drift diagnostics, cursor, next cursor, page digest, byte count, and request
-count. Source budget consumption and pagination use provider cardinality: a 25-record wire page with
-24 accepted records consumes 25 and advances from cursor 0 to 25 when the capability permits another
-page. The page digest hashes an ordered disposition sequence. Accepted positions use a local hash of
-their immutable identity/content digest; unusable positions use only position and fixed reason, so
-the same accepted records with a different unusable disposition cannot collide by construction.
-
-The existing page transaction persists accepted observations only, records the page row with
-provider cardinality, writes one strict value-free `source.record.unusable` audit per rejected
-record, retains value-free `source.provider.drift` audits including for unusable records, and records
-provider/accepted/unusable/drift/persisted-observation aggregate counts. A 24/1 page completes and
-continues R2/queue for 24 jobs. A 0/25 page also persists its page/accounting and completes without
-`PERSISTENCE_FAILED`; it creates no observation, job version, evaluation, queue decision, or target.
-Recovery and `/sources` now distinguish provider records, accepted records, unusable records, drift
-warnings, and newly persisted observations. Historical page rows remain compatible and no schema
-change is required.
-
-The complete implementation/documentation diff is limited to `PROJECT_PLAN.md`, `README.md`,
-`docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, `packages/job-sources/src/source-capability.ts`,
-`packages/job-sources/src/lever/v2-reader.ts`, `packages/job-sources/src/source-runner.ts`,
-`packages/job-sources/src/source-capability.test.ts`,
-`packages/database/src/source-enablement-repository.ts`,
-`packages/database/src/source-enablement-repository.test.ts`, `apps/web/lib/source-workspace.ts`, and
-`apps/web/app/sources/page.tsx`. No transport, URL, host, path, query, DNS, TLS/SNI, pinning,
-response/request/page/record/time budget, redirect, retry, concurrency, capability approval,
-candidate-outbound, target, runner, upload, submission, dependency, lockfile, schema, or migration
-file changed.
-
-Focused reader/runner/repository validation passes 120 tests across two files. The synthetic matrix
-covers 25 accepted and persisted records; 24/1 description and location cases; first, last, multiple,
-and all-25 unusable records; all-locations plus list/additional text fallbacks; accepted and unusable
-workplace drift with no raw-value leak; mixed structural corruption remaining page-fatal without
-partial persistence; exact replay without duplicate observation/job/evaluation/queue state; provider-
-count cursor and budget semantics; deterministic digest differentiation; safe page/unusable audits;
-and recovery aggregates. The complete unit suite passes 443 tests across 47 files; integration passes
-21 tests across three files; and serialized Playwright E2E passes 31 tests.
-
-The pre-commit `npm.cmd run release:check` passes doctor, database/preflight, formatting, zero-warning
-lint, strict typecheck, the complete unit and integration suites, the local production build with 31
-route units, the static showcase build with six pages, showcase boundary audit across 19 source/config
-files plus the export, all 31 E2E tests, privacy audit, and full plus production dependency audits with
-zero known vulnerabilities. Privacy checked 306 tracked files, 852 reachable-history paths, 850
-reachable-history blobs, 1,276 build/test artifacts, and 11 private canaries.
-
-The real database was read only by application validation and backed up through the normal safe local
-maintenance path as ignored backup `backup-2026-09-12T08-57-59.538Z-956067ba`; its exact restore
-preview passed at schema v7 with integrity `PASS`. Fifteen focused database schema, migration,
-backup/restore, and local-runtime tests pass across three files. The real database remains schema v7,
-zero pending migrations, integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0007` have
-an empty baseline-to-working-tree diff and no migration was added. `git diff --check` and
-`git fsck --strict` pass; fsck reports only pre-existing unreachable objects.
-
-This task made zero source requests, employer-form visits, uploads, or submissions. No private source
-response was read, reconstructed, inferred, logged, or committed. Lifetime real action counts remain
-exactly `7/0/0/0`. Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; successful
-real ingestion is still unproven until a separately authorized run persists at least one real
-observation. Remaining mechanics are an exact-head clean release rerun, scope/privacy/migration diff
-review, branch push, one PR titled `fix: account for unusable Lever records individually`, exact-head
-push and pull-request CI, full-delta self-review, conditional normal merge, clean `main` refresh, and
-then stop without executing an eighth GET.
-
-# Eighth source persistence-boundary hardening - 2026-09-12
-
-Status: `LIVE AUTHORITY SPENT / FAILED CLOSED / OFFLINE FIX PLANNED / NO NINTH GET`. The exact clean
-starting `main` and `origin/main` were `30aab1cf39e6cf3b284b4f3e6e32e44cf8c918ba` with schema v7,
-zero pending migrations, integrity `PASS`, zero foreign-key issues, migrations `0000`-`0007`
-unchanged, privacy and aggregate preflight `PASS`, zero active source capabilities, zero approved
-real targets, and lifetime actions `7/0/0/0`. Ignored backup
-`backup-2026-09-12T09-17-14.599Z-fb4f1091` and its exact restore preview passed before activation.
-
-One fresh deterministic ignored capability `lever_f5c85d8768d86bc8eaff1a15` used the exact owner-
-approved Shield AI host/path/query, one request, 25 provider records/page, 2 MB response, 30-second
-request and 60-second run limits, zero redirects/retries, concurrency one, and parser
-`lever-v2:30aab1cf39e6cf3b284b4f3e6e32e44cf8c918ba`. The production `/sources` owner workflow was
-submitted once. The eighth and only request in this train accepted one 25-record, 370311-byte page
-and then stopped durably as `PERSISTENCE_FAILED / PERSISTENCE`. Request/retry/redirect counts are
-`1/0/0`; the transaction committed no page, observation, job version, evaluation, queue decision, or
-private payload. The capability was revoked once through the owner UI and synchronized to immutable
-ignored version 2. No response body or provider value was read, reconstructed, inferred, or logged.
-Candidate outbound, employer visits, form actions, uploads, and submissions were zero; lifetime real
-actions are now `8/0/0/0`. No ninth request is authorized.
-
-## Deterministic defect, objective, assumptions, and requirements
-
-The real SQLite schema is structurally identical to a fresh 0000-0007 database, the existing legacy
-observation parses under the current `JobSchema`, and a normal fictional record persists against an
-ignored clone of the real database. The failure is therefore not generic schema, integrity, profile,
-or historical-observation corruption. The inaccessible private response remains unavailable and no
-claim is made about its exact member values.
-
-Fictional boundary tests prove a separate deterministic defect in the merged path. Provider-
-structurally valid records are classified `ACCEPTED` before the downstream import/R2 contracts are
-checked. A 600-character experience requirement then fails the R2 `ExperienceValue.domain` 500-
-character bound during the page transaction. Oversized identities, normalized fields, and inert link
-values likewise cross the source acceptance boundary and fail only during persistence. One such
-record rolls back all valid siblings and collapses to generic `PERSISTENCE_FAILED`, contradicting the
-accepted/unusable accounting guarantee.
-
-The objective is to make `ACCEPTED` mean locally persistence-safe without loosening the official
-Lever structural contract or any security/resource limit. Bounded source evidence will be split
-deterministically into safe chunks before R2 normalization, retaining all allowed content and source
-provenance. Values that cannot safely satisfy immutable local identity/title/location/description or
-HTTPS link limits will receive a fixed value-free per-record unusable reason before budget/digest and
-persistence. Provider count must continue to drive source budget and cursor; accepted-only records
-must continue downstream; valid siblings must never be rolled back by one locally unpersistable
-record. Existing workplace drift semantics, raw private payload immutability, and value-free audits
-remain unchanged.
-
-## Architecture, proposed files, data flow, and dependencies
-
-- `packages/job-sources/src/source-capability.ts`: extend only the closed local unusable-reason enum
-  for a link that cannot satisfy the HTTPS/length product boundary; no free-form diagnostic member.
-- `packages/job-sources/src/lever/v2-reader.ts`: after whole-page provider validation and inert
-  conversion, apply explicit local persistence bounds for identity, title, effective location,
-  description, and inert HTTPS links. Existing reason codes cover unusable identity/title/location/
-  description; a new fixed `UNUSABLE_LINK_BOUNDARY` covers link policy. These checks are product/
-  resource dispositions, not undocumented Lever schema restrictions.
-- `packages/database/src/source-enablement-repository.ts`: build requirement/responsibility evidence
-  arrays from deterministic bounded chunks instead of whole arbitrary-length list sections. Raw
-  payload, normalized description, and immutable observation provenance remain unmodified.
-- `packages/job-importer/src/r2a-normalization.ts`: cap derived normalized requirement values at the
-  already-declared evidence-schema limits so a bounded source pointer cannot construct an oversized
-  experience, licence, work-rights, physical, or general-text value. This is a defensive alignment
-  to existing R2 schemas, not a new semantic extractor or content claim.
-- `packages/job-sources/src/source-capability.test.ts` and
-  `packages/database/src/source-enablement-repository.test.ts`: reproduce the 600-character
-  experience failure, long single-line/list evidence, field/link boundary rejection, mixed sibling
-  continuation, zero raw-value leakage, accepted/unusable accounting, replay, and downstream counts.
-- `README.md`, `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md`, and this plan: record the failed eighth run
-  and the local persistence guarantee without claiming the private response cause.
-
-The flow remains `bounded response -> official whole-page structural validation -> inert mapping ->
-local persistence-boundary disposition -> provider-count budget/cursor/digest -> atomic accepted-
-only page persistence -> bounded evidence normalization -> R2/queue`. No host, path, query, DNS, TLS,
-request, redirect, retry, page, record, byte, timeout, concurrency, approval, target, runner, upload,
-submission, package, dependency, lockfile, table, column, or migration change is planned.
-
-## Risks, privacy/security, testing, rollback, and acceptance
-
-Risks are accidentally treating product bounds as provider-contract failure, truncating candidate-
-facing job truth, losing requirement evidence, miscounting provider records, leaking rejected values,
-or broadening URL/network authority. Controls are whole-page structural validation first, fixed reason
-codes plus record index only, deterministic bounded evidence chunks with raw/description preservation,
-mixed-page/replay assertions, unchanged capability/transport diffs, ignored private runtime files,
-and full privacy/security audits. Candidate/profile/document/answer data remains absent from source
-requests and Git. No response fixture may contain or derive from the private live body.
-
-Testing must include focused source/repository regressions, format, lint, strict typecheck, unit,
-integration, serialized E2E, local and showcase builds, showcase boundary audit, privacy and both
-dependency audits, schema/status/integrity/FKs, migration/backup/restore tests and exact restore
-preview, migration immutability, aggregate preflight and release check, `git diff --check`, and `git
-fsck --strict`. Rollback is a normal revert of the offline code/docs commit; no database rollback or
-private evidence deletion is permitted.
-
-Acceptance requires every provider record to have exactly one accepted/unusable disposition; fixed
-diagnostics to contain only reason/index; a 600+ character fictional requirement and bounded long-list
-case to persist without R2 failure; unsafe local field/link cases to become per-record unusable while
-valid siblings persist and continue R2/queue; provider count to remain the budget/cursor basis; schema
-v7/pending zero/integrity `PASS`/FKs zero; migrations unchanged; privacy `PASS`; exact-head local and
-GitHub CI green; no ninth request; and lifetime actions exactly `8/0/0/0`.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before changing application code.
-2. Add the closed persistence-boundary disposition and deterministic evidence chunking with fictional
-   regressions that first reproduce the current transaction failure.
-3. Run focused source/repository tests and inspect the complete authority/privacy/migration diff.
-4. Run the full validation matrix, record exact results here, commit and push the same branch, and
-   open one offline PR.
-5. Require exact-head push and PR CI green, self-review the complete base-to-head delta, and use the
-   owner's normal-merge pre-approval only if scope is exact, privacy passes, no migration exists, and
-   no ninth request occurred. Refresh clean `main` and stop.
-
-## Eighth source offline hardening implementation and local validation results
-
-Status: `IMPLEMENTED / LOCAL RELEASE PASS / EXACT-HEAD CI PENDING / NO NINTH GET`. The new reader
-boundary preserves the official provider schema first, then applies local persistence limits as per-
-record dispositions. Identity over 2,048 code units becomes `UNUSABLE_IDENTITY`; inert title over
-4,096 becomes `UNUSABLE_TITLE`; an absent or over-1,000-code-unit effective/alternate location becomes
-`MISSING_EFFECTIVE_LOCATION`; an empty or over-128-KiB combined inert description becomes
-`MISSING_USABLE_DESCRIPTION`; and a link that exceeds 2,048 code units, is not HTTPS, or contains URL
-credentials becomes `UNUSABLE_LINK_BOUNDARY`. Diagnostics retain only the fixed reason and record
-index. Provider count still drives the cursor, record budget, and disposition digest.
-
-Lever requirement and responsibility sections are now split deterministically at whitespace where
-possible into at most 500-code-unit evidence chunks before the existing 500-item ceiling. The full
-inert description, typed sections, and immutable raw private payload are unchanged. R2 normalized
-experience, recency, licence-alternative, work-rights, physical, and general-text values are capped
-only at their existing declared schema limits, preventing bounded source spans from constructing an
-oversized derived value. An over-bound optional department falls back to a bounded team or the
-existing `Unclassified` behavior instead of aborting an otherwise persistable record.
-
-The permanent fictional regressions first failed on the merged implementation: the local boundary
-matrix accepted all five non-persistable records, and one 600-character experience requirement made
-a two-record page stop with accepted count zero. After the change, 172 focused tests across source,
-repository, and R2 normalization files pass. The mixed three-record repository case completes with
-provider/accepted/unusable counts `3/2/1`, persists two observations and job versions, produces two R2
-evaluations and queue decisions, records only `UNUSABLE_LINK_BOUNDARY` plus index 2 for the rejected
-sibling, and has zero FK issues. It proves long list evidence and valid siblings no longer roll back,
-while an unsafe link never enters downstream state or audit text.
-
-The full dirty-tree `npm.cmd run release:check` passes doctor, database/aggregate preflight,
-formatting, zero-warning lint, strict typecheck, 445 unit tests across 47 files, 21 integration tests
-across three files, the 31-route local production build, the six-page showcase build, showcase
-boundary audit, all 31 serialized E2E tests, privacy audit, and full plus production dependency audits
-with zero known vulnerabilities. Privacy checked 306 tracked files, 864 reachable-history paths, 862
-reachable-history blobs, 1,285 build/test artifacts, and 11 private canaries. Twenty-eight focused
-database/schema/migration/backup/restore tests pass across three files.
-
-The post-run ignored backup `backup-2026-09-12T09-46-07.548Z-b4ce0b86` is schema v7 with integrity
-`PASS`, and its exact restore preview passes. The real database remains schema v7 with zero pending
-migrations, integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0007` have no starting-
-main-to-working-tree diff and no migration was added. `git diff --check` and `git fsck --strict` pass;
-fsck reports only pre-existing unreachable objects. The private capability is immutable matching
-version 2 `REVOKED` in the ignored allowlist and database, active source capability count is zero,
-real target capability versions and bindings are zero, and aggregate preflight passes.
-
-No live request occurred during diagnosis or implementation. Request #8 remains the sole request in
-this train and terminal `STOPPED / PERSISTENCE_FAILED / PERSISTENCE`; durable provider/request/retry/
-redirect counts are `25/1/0/0`. Because the page transaction rolled back, accepted/unusable/drift
-counts are not durably recoverable and must not be guessed; zero corresponding audits persisted. No
-page, observation, normalized job, duplicate result, evaluation, queue decision, Melbourne match,
-role ranking, or target-readiness packet exists. First real source ingestion remains unproven. No
-candidate data was sent, and lifetime source/form/upload/submission counts are exactly `8/0/0/0`.
-Source-enabled Personal Beta and Personal Live V1 remain `NOT_READY`; the runner framework remains
-ready only for synthetic targets with explicit real-target approval required.
-
-Remaining release mechanics are to commit this exact implementation/result record, rerun the full
-release gate on the exact clean commit, inspect the complete base-to-head authority/privacy/migration
-delta, push only this branch, open one offline PR, and require exact-head push plus PR CI green. A
-normal merge is pre-approved only if the delta remains this documented public-contract compatibility
-and local persistence hardening scope, privacy passes, no migration exists, and no ninth request
-occurs. After normal merge, refresh clean `main` and stop; any future live request needs a new exact
-owner approval.
-
-# Lever accepted-to-persistence closure - 2026-09-12
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY / NO NINTH GET`. The exact clean
-starting `main` and `origin/main` are `f1d9c70eb477e9b16f60a4431c70b00255cc527e`; work is isolated on
-`fix/lever-persistence-closure`. The real database starts at schema v7 with zero pending migrations,
-integrity `PASS`, zero foreign-key issues, aggregate preflight and privacy `PASS`, zero active source
-capabilities, and zero active real-target capabilities. Lifetime real source/form/upload/submission
-counts are `8/0/0/0` and must remain unchanged. No live source request, employer interaction, form
-interaction, upload, or submission is authorized.
-
-## Current state, objective, assumptions, and requirements
-
-PR #27 moved several product bounds before persistence and bounded long requirement evidence, but an
-`ACCEPTED` record has not yet been proven safe through every deterministic constructor. Static review
-shows that structured values longer than the 1,000-code-unit `SourceEvidencePointer.excerpt` limit can
-still form full-length evidence spans; a provider-valid 1,001-character title is the required first
-failing regression. A delimiter-free location between 201 and 1,000 characters can preserve an
-allowed raw label while exceeding the 200-character derived locality/suburb limits. A long commitment
-can create an oversized structured employment evidence span even when only a short recognized token
-supports the employment type. Optional salary strings can exceed pointer or normalized-text limits,
-and negative structured salary values can reach a nonnegative R2 salary schema. Travel above 100%,
-negative numeric text that is accidentally reparsed as positive, and non-finite numeric conversions
-are further content-domain boundaries that must be omitted rather than coerced. These are synthetic,
-independently demonstrated risks; no claim is made that any one caused private request #8.
-
-The objective is the invariant: **A Lever record classified `ACCEPTED` has passed every deterministic
-provider-controlled boundary necessary to construct local job and R2 evidence models; optional
-unsupported derived metadata is omitted safely rather than causing transaction rollback.** Provider
-structural validation remains unchanged and page-fatal. Core identity/title/effective-location/
-description/link failures retain fixed, value-free per-record `SOURCE_RECORD_UNUSABLE` accounting.
-Canonical job title, location, description, links, and immutable raw provenance remain intact within
-their existing local limits. Evidence pointers remain bounded; no global evidence schema limit is
-raised. Database, integrity, and operational failures remain `PERSISTENCE_FAILED / PERSISTENCE`.
-
-## Architecture, proposed files, data flow, and dependencies
-
-- `packages/job-importer/src/r2a-normalization.ts`: introduce one surrogate-safe exact source-span
-  bound used by field, requirement, and coverage pointers; retain source offsets/hashes against the
-  immutable source. Bound only the R2 identity evidence value when the canonical persisted title is
-  longer, bound derived locality/suburb to their declared limits while preserving `rawLabel`, and use
-  the exact recognized substring for structured employment evidence. Validate all extracted numeric
-  values against their declared semantic domains before constructing R2 values: omit invalid travel,
-  commute, hours, experience, and structured salary semantics without inventing a replacement.
-  Optional oversized salary components are skipped; recognized safe salary components and provenance
-  remain available.
-- `packages/database/src/source-enablement-repository.test.ts`: add the permanent end-to-end closure
-  harness through the actual Lever reader, source runner, page transaction, parsed job, normalization,
-  R2 persistence, and queue path. Cover title 999/1000/1001/4096; location 199/200/201/1000;
-  commitment 999/1000/1001/4096+; salary signs/currency/interval edges; numeric-domain edges; textual
-  R2 limits; structured field edges; Unicode boundaries; a mixed 25-record page; operational failure;
-  and exact replay.
-- `packages/job-importer/src/r2a-normalization.test.ts` and, only if needed,
-  `packages/job-sources/src/source-capability.test.ts`: add focused constructor and disposition
-  regressions that identify the exact failing boundaries before the implementation is changed.
-- `docs/LEVER_PUBLIC_POSTINGS_CONTRACT.md` and this plan: document the closure invariant, core versus
-  optional policy, bounded exact evidence, numeric omission policy, synthetic results, and release
-  evidence. `README.md` changes only if readiness wording materially changes; no live-ingestion claim
-  is permitted.
-
-The data flow remains `whole-page provider schema -> inert Lever mapping -> core local usability
-disposition -> provider-count budget/digest -> atomic accepted-only page persistence -> ParsedJobFields
-and Job construction -> bounded exact R2 evidence/semantic-domain validation -> R2 persistence ->
-evaluation/queue`. No new package, fuzzing dependency, transport, host, path, query, DNS, TLS/SNI,
-request, page/record/byte/time budget, redirect, retry, concurrency, capability, target, runner,
-upload, submission, table, column, schema, or migration change is planned. Migrations `0000`-`0007`
-remain immutable.
-
-## Risks, privacy/security, testing, rollback, and acceptance
-
-Primary risks are truncating canonical job truth instead of only evidence, producing an evidence hash
-that does not match the exact immutable source span, splitting a Unicode surrogate pair, silently
-clamping invalid numeric claims, swallowing programmer/database faults, turning optional metadata
-into a core unusable reason, weakening provider validation, or leaking synthetic/provider values via
-diagnostics. Controls are exact source slicing with surrogate-safe bounds, canonical-field preservation
-assertions, schema parsing of every constructed normalization, explicit semantic-domain predicates,
-fixed value-free diagnostics, injected operational failure, base-to-head authority/migration review,
-and full privacy/security audits. No request #8 body, private provider value, reconstructed live job,
-candidate data, secret, session, database, backup, allowlist, document, or packet may enter tests or
-Git.
-
-Testing begins with failing synthetic regressions for the 1,001-character title and all additionally
-confirmed deterministic gaps. The closure matrix must send every case through `readLeverPageV2` and
-the real isolated-database persistence/R2/queue path. Every structurally valid record must finish as
-either pre-persistence `SOURCE_RECORD_UNUSABLE` with a fixed reason/index or `ACCEPTED` with successful
-downstream persistence. The mixed page must account for 25 provider records, persist every accepted
-sibling, retain provider-count cursor/budget semantics, and expose no values in diagnostics. Replay
-must add no observation, job version, evaluation, or queue duplicate. An injected SQLite/repository
-fault must remain page-fatal `PERSISTENCE_FAILED / PERSISTENCE`.
-
-Validation must run focused source/persistence/R2 closure tests, format, zero-warning lint, strict
-typecheck, complete unit and integration suites, serialized E2E, local and showcase production
-builds, showcase boundary audit, privacy audit, full and production dependency audits, real database
-status, schema/integrity/FKs, synthetic migration/backup/restore tests plus safe restore preview,
-migration immutability, aggregate preflight and release check, `git diff --check`, and `git fsck
---strict`. Rollback is a normal revert of the offline code/test/docs commits; there is no database or
-private-data rollback because no migration or live mutation is allowed.
-
-Acceptance requires the closure matrix and mixed 25-record test to pass; optional invalid metadata to
-remain accepted with unsupported derivations omitted; canonical title/location/provenance to remain
-unchanged; every pointer/hash/schema to validate; operational failures to remain page-fatal; replay to
-be idempotent; provider validation and all authority controls to be unchanged; schema v7/pending zero/
-integrity `PASS`/FKs zero; no migration; privacy and dependency audits `PASS`; exact-head local and
-GitHub push/PR CI green; no ninth request; and lifetime actions exactly `8/0/0/0`.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before changing application code or tests.
-2. Add the failing deterministic closure regressions, including the required 1,001-character title,
-   and record the exact pre-fix failures without reading any private payload.
-3. Implement bounded exact evidence construction, derived location bounds, exact employment-token
-   spans, and numeric/salary omission at the narrow normalization boundary; do not add a broad catch.
-4. Complete the generated boundary matrix, mixed 25-record path, operational-failure control, replay,
-   and value-free diagnostic assertions using fictional data only.
-5. Run focused checks, update contract documentation and this plan with exact results, inspect the
-   complete authority/privacy/migration delta, then run the full validation matrix.
-6. Commit and push only `fix/lever-persistence-closure`; open PR `fix: close Lever accepted-to-
-persistence contract`; require exact-head push and pull-request CI green and self-review the full
-   base-to-head diff.
-7. Merge normally only if every owner-preapproved condition still holds, refresh clean `main`, verify
-   lifetime action counts remain `8/0/0/0`, and stop. Do not execute request #9.
-
-## Implementation and pre-commit validation results
-
-Status: `IMPLEMENTED / DIRTY-TREE RELEASE PASS / EXACT-HEAD CI PENDING / NO NINTH GET`. The required
-regressions were added before the implementation and produced ten exact failures on the merged code:
-title lengths 1,001 and 4,096 exceeded the 1,000-code-unit evidence excerpt; delimiter-free location
-lengths 201 and 1,000 exceeded derived locality/suburb bounds; commitment lengths 999/1,000 used the
-whole optional field and 1,001/4,097 overflowed the pointer; travel 101/150 percent failed the R2
-numeric domain; and negative/long salary metadata reached invalid structured evidence. An additional
-reversed textual salary regression proved a safely constructible but semantically invalid range.
-These fictional failures independently establish closure gaps and do not identify request #8's
-unknown private cause.
-
-R2A pointer construction now takes a surrogate-safe exact excerpt of at most 1,000 code units from
-the immutable source for every field, requirement, and coverage pointer. Structured identity evidence
-uses the same bounded value, while the canonical job retains its complete accepted title. Derived
-location retains the accepted raw label and bounds only locality/suburb to 200 code units. Structured
-employment evidence points to the exact recognized token instead of the complete commitment field.
-Bullet normalization now requires whitespace after a marker, so a negative number is not silently
-turned positive by treating its minus sign as a list bullet.
-
-All numeric constructors validate before building an R2 value. Non-finite, negative, or reversed
-hours/experience/commute ranges are omitted rather than corrected; travel outside 0-100 is omitted;
-and reversed textual salary ranges are omitted. Structured salary accepts documented finite provider
-numbers at the provider boundary, records safe source components, and creates a salary semantic only
-when minimum/maximum are nonnegative and ordered. A long/unsupported currency or interval is omitted
-from component evidence; safe amounts can still become salary evidence with null currency or
-`UNKNOWN` period. `FORTNIGHT` is recognized. No canonical field, immutable raw payload, structural
-provider schema, or fixed unusable diagnostic was loosened, and no broad exception handler was added.
-
-The permanent mixed-page closure harness sends 25 fictional structurally valid Lever postings through
-the actual page reader, run budget, repository transaction, ParsedJobFields and Job schemas,
-observation identity, R2A schemas/persistence, evaluation, and queue. It combines title boundaries
-999/1,000/1,001/4,096; location 199/200/201/1,000; commitment 999/1,000/1,001/4,097; positive, zero,
-negative, extremely large, long-currency, recognized, undocumented, and long-interval salary cases;
-travel 0/100/101/150; zero/non-finite hours and experience; zero/negative commute; long requirements,
-workplace drift, optional department fallback, nullable country, unsafe link, and a surrogate-pair
-boundary. Results are provider/accepted/unusable `25/24/1`; all 24 accepted siblings create exactly 24
-observations, job versions, R2 evaluations, and queue decisions. The 4,096-character canonical title
-and 1,000-character canonical location remain exact. The unsafe link alone produces fixed
-`UNUSABLE_LINK_BOUNDARY` plus index 24, with no value in the audit. Provider count drives the one-page
-budget/cursor, all evidence pointers are bounded, and FKs are clean.
-
-Exact replay produces the same `25/24/1` disposition/accounting and zero additional observations, job
-versions, evaluations, or queue decisions. A separate actual SQLite abort trigger during observation
-insert leaves page/job/observation counts zero and returns `STOPPED / PERSISTENCE_FAILED / PERSISTENCE`;
-the SQLite message is absent from audit data. This proves content-domain omission did not weaken real
-operational failure handling.
-
-Focused source/normalization/repository validation passes 188 tests across three files; focused
-database/schema/migration/backup/restore validation passes 28 tests across three files. The complete
-dirty-tree `npm.cmd run release:check` passes doctor, database/aggregate preflight, format, zero-warning
-lint, strict typecheck, 461 unit tests across 47 files, 21 integration tests across three files, the
-31-route local production build, six-page showcase production build and showcase audit, all 31
-serialized E2E tests, privacy audit, and full plus production dependency audits with zero known
-vulnerabilities. Privacy checked 306 tracked files, 874 reachable-history paths, 872 reachable-history
-blobs, 1,302 build/test artifacts, and 11 private canaries.
-
-The real database remains schema v7 with zero pending migrations, integrity `PASS`, and zero foreign-
-key issues. Migrations `0000`-`0007` remain unchanged and no migration was added. No transport,
-host/path/query, DNS, TLS/SNI, request/page/record/byte/time budget, redirect, retry, concurrency,
-capability, candidate-outbound, target, runner, upload, submission, dependency, or lockfile file is
-changed. `README.md` remains unchanged because readiness has not materially changed. No source GET,
-employer/form interaction, upload, or submission occurred; lifetime actions remain `8/0/0/0`.
-
-Remaining mechanics are final diff/migration/privacy review, the coherent implementation/results
-commit, an exact-head clean release rerun, branch push, one PR, exact-head push plus PR CI, full-delta
-self-review, conditional normal merge, and clean `main` refresh. Request #9 remains unauthorized.
-
-# Real-target read-only inspection runner - 2026-09-13
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting `main`
-and `origin/main` are `afde976438a564c0c397110ff357e986a78cce3a`; work is isolated on
-`feat/real-target-inspection-runner`. The owner has separately accepted the successful bounded source
-run as sufficient for Source-enabled Personal Beta `READY`. The runner framework is ready for
-controlled validation only with exact target approval, and Personal Live V1 remains `NOT_READY`.
-Lifetime real source/form/upload/submission counts start at `9/0/0/0` and must remain unchanged. No
-employer page visit, live target network action, form interaction, field entry, authentication,
-upload, submission, or candidate-data transmission is authorized during this implementation.
-
-## Current state, objective, assumptions, and requirements
-
-The merged `TargetIndependentApplicationRunner` is an application-execution lane. Its immutable
-binding already freezes packet, candidate/job/evaluation versions, target destination, adapter/form
-versions, documents, answers, disclosures, and unresolved count. It correctly pauses
-`PACKET_NOT_READY` when `binding.unresolvedCount > 0`, and its normal progression exposes map, fill,
-final review, consent, and submit operations only after readiness and stale-binding gates. Those
-protections must not be weakened.
-
-The existing `RunnerTargetCapability` and durable `runner_target_capability_versions` table bind a
-target kind, exact origin/path prefix, adapter/form versions, approval lifecycle, and expiry, but do
-not encode an allowed operation. The existing `FrozenRunnerBinding` and `runner_run_bindings` likewise
-do not bind operation scope. Alias, approval reference, adapter version, or form version cannot serve
-as a hidden authorization flag. Consequently, the current durable fields cannot prove that an
-approval is unusable for application operations; the smallest sound extension is an explicit
-operation set in capability version 2 plus a frozen operation in an inspection binding. Additive
-migration `0008` is therefore justified. Migrations `0000`-`0007` remain byte-for-byte immutable.
-
-The objective is a distinct, target-independent `TargetInspectionRunner` with one callable operation,
-`OPEN_AND_INSPECT_ONLY`, and no fill, upload, final-consent, or submit API. It must validate a concrete
-read-only Lever real-target adapter entirely against fictional local HTML and browser fixtures. It
-must also prepare, without activating, the exact private local packet and draft target-capability
-proposal needed for a later owner approval.
-
-**The first real employer validation uses a dedicated read-only inspection runner. Packet readiness
-blockers may be observed during inspection but do not authorize application filling. The normal
-application runner remains fail-closed on unresolved packet/document/answer/disclosure state.**
-
-Requirements are exact capability ID/version/digest, `REAL_TARGET`, origin, path prefix, operation,
-adapter/form versions, packet ID/digest, job/profile/evaluation versions, all document/answer/
-disclosure digests, unresolved count, and target URL binding; fail-closed destination, stale packet,
-capability, origin/path, adapter, and form checks; zero candidate values as browser inputs; passive
-DOM/form introspection only; enum-level protection stops; safe semantic field inventory; and durable
-value-free audit events. A `REVIEW_REQUIRED` packet is inspectable in this lane and remains unusable
-by the application lane.
-
-## Architecture, data flow, proposed files, and dependencies
-
-- `packages/application-runner/src/target-runner.ts`: evolve the capability contract to schema
-  version 2 with a non-empty, explicit `allowedOperations` set drawn from
-  `OPEN_AND_INSPECT_ONLY`, `MAP_FOR_FILL`, `FILL`, `UPLOAD`, and `SUBMIT`; require real inspection
-  capabilities to contain only `OPEN_AND_INSPECT_ONLY`; bind the selected operation immutably; retain
-  all v1 apply-runner behavior for its existing synthetic fixtures and fail closed if its required
-  application operations are absent.
-- New inspection-domain module(s) in `packages/application-runner`: define the narrow adapter browser
-  port, semantic inventory schemas, classification states, protection/destination/form validation,
-  immutable inspection binding, and `TargetInspectionRunner`. The browser port provides navigation
-  plus read-only snapshot data and deliberately has no typing, selection, clicking, file chooser,
-  upload, authentication, popup-following, or submit primitive.
-- New Lever real inspection adapter: `lever-real-inspection-v1` validates synthetic structural
-  contract `lever-application-inspection-v1`, exact destination scope, popup/hidden-step signals,
-  supported inert controls, and safe field semantics. It never captures field values or unnecessary
-  prose and never auto-learns a changed live form.
-- `packages/database/drizzle/0008_real_target_inspection_scope.sql`, schema, and runner repository:
-  add explicit operation JSON to immutable target capability versions and operation to frozen runner
-  bindings; persist safe `runner.inspection.bound/opened/completed/stopped` events through typed audit
-  metadata. Upgrade tests cover schema 7 to 8 and rollback by restoring the verified pre-migration
-  backup; no existing migration is modified.
-- Fictional test fixtures and an existing loopback synthetic target route/server exercise the real
-  adapter implementation without an external request. If a new route is necessary, it remains
-  guarded by `APPLYPILOT_SYNTHETIC_MODE=1` and must follow the installed Next.js documentation.
-- `apps/web` owner surfaces expose operation scope, proposed/approved state, read-only results, and
-  recovery signals without private URLs, labels, candidate answers, or session data. Server actions
-  cannot create approval or invoke a real target during this train.
-- `ARCHITECTURE.md`, `docs/APPLICATION_RUNNER.md`, `docs/OFFLINE_GO_LIVE_ENABLEMENT.md`, and
-  `docs/GO_LIVE_CHECKLIST.md` document the separate lane, exact future approval, release truth, and
-  continued `NOT_READY` classification for Personal Live V1.
-- Private ignored runtime artifacts hold the real target URL, frozen packet identifiers/digests, and
-  a draft unapproved target capability. None are committed, printed in tracked logs, or copied into
-  fixtures.
-
-Data flow is `private current job/profile/evaluation -> existing packet preparation -> immutable
-frozen inspection binding -> exact operation-capability gate -> read-only browser navigation -> inert
-DOM snapshot -> Lever structural-contract/protection/destination checks -> generic semantic inventory
--> offline mapping classification -> safe durable audit`. Candidate profile data is excluded from the
-browser port. The normal lane remains `READY packet -> exact application capability -> open -> map ->
-fill -> final review -> one-use consent -> submit`, with every existing stop preserved.
-
-No new production dependency is planned. Existing Zod, SQLite/Drizzle, Playwright, Vitest, Next.js,
-and local runtime confinement are sufficient. The real adapter must depend on a narrow injected
-read-only browser interface so unit/integration tests can prove zero mutation events.
-
-## Risks, security/privacy, testing, rollback, and acceptance
-
-Primary risks are accidentally broadening one capability into fill/submit authority, weakening packet
-readiness, allowing redirect or popup escape, confusing passive DOM reads with candidate-data entry,
-persisting form prose or values, approving a capability during preparation, relying on an invented
-live form hash, or leaking the private target/packet into Git. Controls are explicit operation enums
-in both capability and binding; a separate class and narrower browser port; origin/path checks before
-and after navigation; zero-click/zero-write tests; deterministic `FORM_CHANGED`, `DESTINATION_CHANGED`,
-and protection stops; strict safe inventory schemas; typed redacted audits; private ignored runtime
-files; release diff and privacy audits; and active-target-capability count zero at handoff.
-
-The synthetic matrix covers a normal form; unknown required control; CV and cover-letter uploads;
-work rights, sponsorship, citizenship/export-control, and clearance questions; CAPTCHA, auth, MFA,
-bot/rate/access/restriction signals; unsupported widget; changed form; changed destination/path;
-popup/new-tab; hidden submit; file chooser; and both `REVIEW_REQUIRED` and `READY_TO_APPLY` packets.
-Negative authority tests invoke or attempt map-for-fill, fill, upload, final review, consent, and submit
-under the same capability/packet and require denial before browser mutation. Existing application-
-runner tests must continue proving unresolved packets pause `PACKET_NOT_READY`, unknown required
-answers and disclosures stop, stale packets/documents stop, consent is fresh and one-use, and an
-ambiguous outcome never triggers blind retry.
-
-Validation includes focused runner/database/adapter/authority tests; format; zero-warning lint;
-strict typecheck; full unit, integration, serialized E2E; local and showcase production builds;
-showcase boundary and privacy audits; full and production dependency audits; real database status,
-schema/pending/integrity/FKs; verified backup and restore preview; 0000-0007 immutability plus schema
-7-to-8 upgrade; aggregate preflight and release check; `git diff --check`; and `git fsck --strict`.
-The complete base-to-head diff must contain no real payload, private URL, candidate fact, credential,
-session value, or live network primitive invocation.
-
-Rollback is a normal revert of code/docs/migration `0008`, followed by restoring the verified schema
-7 backup if the private database is upgraded. The target proposal remains unapproved and removable as
-an ignored private file. No external rollback exists because no target request or employer mutation is
-permitted.
-
-Acceptance requires operation scope to be explicit and immutable; the inspection runner to expose
-only read-only inspection; the Lever real adapter and every synthetic matrix case to pass; browser
-writes/value changes/uploads/submissions/candidate outbound to equal zero; application-runner
-protections to remain unchanged; safe audits to contain enums/IDs/counts only; exact private packet
-and unapproved capability proposal to be prepared; active real-target approvals to remain zero;
-schema v8/pending zero/integrity `PASS`/FKs zero after a verified backup/upgrade; privacy/security and
-all release gates to pass; exact-head push and PR CI to be green; and lifetime actions to remain
-`9/0/0/0`. Only then may the owner-preapproved PR merge occur normally. The merged implementation is
-still not evidence that first real target validation occurred.
-
-## Exact implementation sequence
-
-1. Commit this blueprint on `feat/real-target-inspection-runner` before application-code changes.
-2. Add failing tests that demonstrate v1 capability/binding cannot machine-enforce operation scope
-   and that the normal runner rejects unresolved packets.
-3. Add immutable v2 operation scope and migration `0008`, preserving all prior migrations and normal
-   application semantics.
-4. Implement the separate inspection binding, read-only browser port, runner, safe inventory and
-   classifications, typed audits, and fictional Lever inspection adapter/matrix.
-5. Add the minimum owner UI/recovery status needed to expose scoped readiness without enabling live
-   actions; update architecture and runner/go-live documentation.
-6. Use only ignored private local data to resolve/freeze the selected packet and write a draft,
-   deterministic, unapproved target capability proposal with fresh expiry bounds; do not navigate.
-7. Create and verify a real-database backup, migrate schema 7 to 8, run integrity/FK/privacy checks,
-   and prove exact restore from the backup. Stop and restore on any failure.
-8. Run focused and complete validation, update this plan with exact results and limitations, inspect
-   the full authority/privacy/migration diff, and commit coherent work.
-9. Push only this branch, open PR `feat: add read-only real target inspection`, require exact-head push
-   and PR CI green, self-review, then merge normally only if every owner-preapproved condition remains
-   true. Refresh clean `main`; do not perform a live employer inspection after merge.
-
-## Implementation and validation result
-
-Status: `IMPLEMENTED / PRIVATE OFFLINE PREPARATION COMPLETE / PR GATES PENDING`. Capability schema v2
-now carries canonical operation scope and rejects any real-target operation set other than the single
-`OPEN_AND_INSPECT_ONLY` value. Additive migration `0008_real_target_inspection_scope.sql` stores that
-scope plus a separate inspection binding/lifecycle; a base-to-working-tree diff confirms migrations
-`0000`–`0007` are unchanged. The normal application runner still requires the complete application
-operation set and pauses unresolved packets as `PACKET_NOT_READY`.
-
-The dedicated `TargetInspectionRunner`, `lever-real-inspection-v1`, and
-`lever-application-inspection-v1` expose only passive DOM inspection. The fresh browser context permits
-only GET/HEAD, confines navigation and subresources to the approved origin, refuses out-of-scope
-navigation, popup/download escape, write requests, hidden interactive steps, unsupported widgets,
-authentication/protection signals, and page/form drift, and receives no candidate values. Its result
-schema requires browser writes, value changes, uploads, submissions, and candidate outbound fields to
-be literal zero. The durable current-binding check covers capability version/digest, newest packet and
-job/profile/evaluation tuples, evaluation freshness, target, and packet document/answer/disclosure
-digests. A real capability ID is deterministically packet-bound, and one capability version/packet/
-operation can create only one durable inspection binding. The owner-confirmed production command
-requires the exact capability ID/version/digest and packet ID/digest and an already persisted current
-approval before it can launch; it was not invoked during this train.
-
-The real local database had schema 7, one pending migration, integrity `PASS`, and zero FK issues. A
-verified schema-7 backup and restore preview passed; the confirmed migration created another verified
-schema-7 backup and completed at schema 8 with zero pending migrations, integrity `PASS`, zero FK
-issues, 26 jobs, 29 job versions, 173 field-evidence rows, 268 requirement-evidence rows, and 493
-coverage items. Private offline preparation then bound the exact owner-selected request-9 source run,
-Lever tenant capability, external job ID, role, and local application destination; persisted one
-review-required packet with two unresolved readiness blockers; and wrote one ignored DRAFT capability
-proposal. No target capability or inspection binding was activated. A new schema-8 backup and restore
-preview passed. Active source and target capabilities are both zero.
-
-Completed validation at this point: formatting check; zero-warning lint; strict typecheck; 58 focused
-runner/database/schema tests; 489 full unit tests across 48 files; 21 integration tests across 3 files;
-33 serialized Playwright E2E tests including the fictional target matrix; local production build;
-showcase production build; showcase boundary audit (`19` source files and export checked); privacy
-audit (`306` tracked files, `880` history paths, `878` history blobs, `1393` build/test artifacts, and
-`11` private canaries); full dependency audit; and production dependency audit. Both dependency
-audits report zero vulnerabilities. One initial unit run correctly exposed a stale schema-7 test
-fixture; the fixture was updated to current schema 8 and the complete rerun passed. Remaining gates are
-aggregate preflight/release check, final diff/fsck, exact-head commit/push/PR CI, full-delta self-review,
-conditional normal merge, and clean-main verification. Lifetime real actions remain `9/0/0/0`.
-
-The first clean committed-head release check at `2bc99e3c9eb9047da2705be8ccab8e001f32311c`
-passed 491 unit, 21 integration, 33 E2E, both builds, privacy, dependency, database, and release
-classification gates. During the subsequent full-delta self-review, an actual out-of-scope loopback
-redirect fixture showed that the browser blocked navigation safely but reported `FORM_CHANGED`
-instead of the required precise `DESTINATION_CHANGED`. The first focused redirect rerun therefore
-reported 1 passed/1 failed, and a second attempt still reported 1 passed/1 failed. The adapter now
-returns a value-free `DESTINATION_CHANGED` snapshot whenever navigation is blocked or the page URL no
-longer equals the exact bound URL; the focused E2E rerun passes 2/2. A new exact-head commit, complete
-release rerun, and both refreshed GitHub CI checks are required before merge.
-
-# First real-target stop diagnosis and value-free diagnostics - 2026-09-13
-
-Status: `BLUEPRINT COMPLETE / PATH B SELECTED / OFFLINE ONLY`. The clean starting `main` and
-`origin/main` are `322e03f48087ca38dc6d3a927fc16c703f81630d`. Work is isolated on
-`fix/target-inspection-diagnostics`. Historical run
-`inspection_94d7d62f-e962-4d1b-88cb-9353ccdc3323` used target capability version 1 and the exact
-reviewed packet, reached `runner.inspection.opened`, then durably stopped as `PAGE_CHANGED`; it has no
-completed event. Capability version 2 is immutable `REVOKED`, active real-target capabilities are
-zero, and lifetime source/employer/upload/submission actions are `9/1/0/0`.
-
-## Current state and decision
-
-The durable record proves only that `TargetInspectionRunner` did not receive an accepted observation.
-It does not retain whether the cause was a generic HTTP error, Playwright navigation exception,
-read-only snapshot rejection, DOM-evaluation exception, adapter-output rejection, or another adapter
-exception. Binding/version staleness is not implicated: the browser-open event was recorded only after
-the current-binding gate passed, and the persisted stop is not `TARGET_APPROVAL_REQUIRED`. No
-destination-policy or HTTP class is durably present. The deepest safe conclusion is therefore
-`UNKNOWN_SAFE_BOUNDARY`, and `DIAGNOSTIC GAP CONFIRMED`; no real adapter/form defect is proven.
-
-Path B is selected. Preserve the public fail-closed stop reason `PAGE_CHANGED`, but attach exactly one
-fixed, value-free internal diagnostic category when that broad code is produced:
-`HTTP_ERROR`, `NAVIGATION_EXCEPTION`, `SNAPSHOT_INVALID`, `DOM_INSPECTION_EXCEPTION`,
-`ADAPTER_OUTPUT_INVALID`, or `UNKNOWN_INSPECTION_EXCEPTION`. Do not retain URL values, status text,
-response/page/form content, selectors, exception messages/stacks, cookies, storage, headers, or
-candidate data. Numeric HTTP status is not required and will not be persisted. Existing audit JSON and
-inspection `classification_summary_json` can safely store the enum, so no migration is justified and
-`0000`-`0008` remain immutable.
-
-## Objective, scope, assumptions, and requirements
-
-The objective is to make every future `PAGE_CHANGED` terminal record distinguish the approved safe
-failure classes while leaving navigation authority, target/path policy, form interpretation, operation
-scope, candidate isolation, and public stop semantics unchanged. This task is offline: zero employer
-GET/HEAD, browser launches, source calls, form interactions, uploads, submissions, and candidate
-outbound fields. Historical capability/run rows are immutable. A version-3 DRAFT may be created only
-after the narrow fix is reviewed and merged, current packet/job/profile/evaluation bindings still
-match, and all gates are green; creation is not approval or run authority.
-
-Requirements are: typed diagnostic errors at the inspection boundary; explicit classification of
-generic HTTP >=400, navigation exceptions, snapshot-schema rejection, DOM inspection exceptions,
-adapter-output schema rejection, and unknown exceptions; strict audit schemas; durable category
-storage without schema change; unchanged public `PAGE_CHANGED`; no exception content; no authority
-broadening; and regression proof that all protection-specific stops remain specific. Because only
-diagnostic plumbing changes and the adapter's network/form semantics do not, adapter version remains
-`lever-real-inspection-v1` and form contract remains `lever-application-inspection-v1`.
-
-## Architecture, files, data flow, and dependencies
-
-- `packages/application-runner/src/inspection-runner.ts`: define the diagnostic enum/error contract,
-  classify adapter throws and adapter-output parse failures, add the category to stopped results and
-  audit records, and require a category for broad `PAGE_CHANGED` stops.
-- `packages/application-runner/src/lever-inspection-adapter.ts`: convert generic HTTP, snapshot
-  validation, navigation, and DOM-evaluation failures into the fixed categories. Preserve exact
-  GET/HEAD, origin/path, popup/download/write and zero-mutation behavior.
-- `packages/application-runner/src/target-runner.ts`: extend only the strict stopped-audit metadata
-  schema with a nullable diagnostic enum.
-- `packages/database/src/runner-enablement-repository.ts`: store the value-free diagnostic category in
-  existing JSON metadata for stopped inspections; no new column or migration.
-- Focused unit/database/E2E tests: reproduce HTTP 404/500, navigation exception, invalid snapshot,
-  DOM-evaluation exception, adapter-output rejection, and unknown exception; assert the shared public
-  `PAGE_CHANGED`, distinct durable category, redacted audit storage, and zero mutations.
-- `docs/APPLICATION_RUNNER.md` and this plan: document public-versus-internal semantics and the real-run
-  diagnosis without claiming a form change or successful target validation.
-
-Data flow is `read-only browser/adapter failure -> fixed diagnostic error/category ->
-TargetInspectionRunner public PAGE_CHANGED -> strict value-free stopped audit -> existing local JSON
-summary`. Dependencies remain Playwright, Zod, SQLite, and the existing audit repository. No new
-package, external service, schema, or target contract is introduced.
-
-## Risks, security/privacy, testing, rollback, and acceptance
-
-Risks are exception-text leakage, overclaiming the historical cause, changing protection precedence,
-misclassifying adapter-output failures, or silently broadening target behavior. Controls are closed
-enums, no error serialization, strict schemas, synthetic-only fixtures, public stop invariance,
-privacy/diff audits, and exact base-to-head authority review. Historical run classification remains
-`UNKNOWN_SAFE_BOUNDARY`; the new categories are prospective and are not backfilled.
-
-Testing covers the complete PAGE_CHANGED collapse matrix, current semantic inventory/protection tests,
-database storage/redaction, negative authority, format, zero-warning lint, strict typecheck, full unit
-and integration, serialized E2E, local/showcase builds and showcase audit, privacy and dependency
-audits, schema/pending/integrity/FKs, migration immutability, release check, `git diff --check`, and
-`git fsck --strict`. Backup/restore is not required because no schema or real-database mutation is
-needed for the code change; the existing database is read-only until the post-merge private draft is
-written. Rollback is a normal revert of the narrow code/docs commits; existing historical evidence and
-private data are not deleted or rewritten.
-
-Acceptance requires all six synthetic categories to produce `PAGE_CHANGED` with the correct value-free
-diagnostic; specific safety stops to remain unchanged; the database to persist only the enum; no
-private/live payload in Git; adapter/form versions unchanged with justification; no migration; full
-local and exact-head GitHub CI green; normal merge of the narrow PR only after self-review; clean merged
-main; current private bindings reverified; one ignored version-3 DRAFT with predecessor 2 and fresh
-24-hour/30-minute expiries; active approved real targets zero; no new inspection binding/run; and
-lifetime actions still `9/1/0/0`.
-
-## Exact implementation steps
-
-1. Commit this blueprint before application-code changes.
-2. Add failing synthetic tests for every currently collapsed path and strict audit redaction.
-3. Implement typed value-free diagnostics and existing-JSON persistence without changing public stop,
-   adapter/form versions, authority, or migrations.
-4. Run focused gates, full release validation, migration diff, privacy/authority self-review, and commit.
-5. Push one narrow branch, open one PR, obtain exact-head push/PR CI green, and merge normally only if
-   the reviewed delta remains within this blueprint.
-6. Refresh clean `main`, reverify private packet/version/target history, and create ignored capability
-   version 3 DRAFT with predecessor 2 and fresh expiries using production digest logic.
-7. Verify zero active target capability, zero new inspection run/action, update this result record, and
-   stop for exact owner approval of the returned draft.
-
-## Implementation and validation result
-
-Status: `IMPLEMENTED / PATH B / OFFLINE RELEASE GATES GREEN / PR PENDING`. Historical evidence was
-verified without mutation: the one run used capability version 1 and the reviewed packet, recorded
-bound/opened/stopped events, ended `STOPPED / PAGE_CHANGED`, has no completed event, and version 2 is
-`REVOKED`. Because the old stopped audit contains no diagnostic category or safe snapshot, its deepest
-cause remains `UNKNOWN_SAFE_BOUNDARY`. No software/form defect is proven and the historical record is
-not backfilled.
-
-The prospective implementation keeps public `PAGE_CHANGED` while adding the six fixed categories from
-the blueprint to stopped results, strict audits, and the existing inspection summary JSON. The Lever
-adapter maps generic HTTP >=400, navigation, snapshot, DOM, and adapter-output boundaries without
-serializing error details; the runner supplies `UNKNOWN_INSPECTION_EXCEPTION` for an unclassified
-throw. Audit metadata is validated before any lifecycle mutation, and a regression proves injected
-exception text is rejected while the binding remains `OPENED`. Adapter version remains
-`lever-real-inspection-v1` and form contract remains `lever-application-inspection-v1` because
-authority, navigation, DOM semantics, and form classification are unchanged. No migration was added
-and migrations `0000`-`0008` have no base-to-working-tree diff.
-
-The initial focused matrix failed six new assertions while all 22 prior cases passed, proving the
-collapse. After implementation, 39 focused inspection/database tests pass, including HTTP 404, HTTP
-500, browser navigation exception, invalid read-only snapshot, DOM inspection exception,
-adapter-output rejection, and unknown adapter exception. A complete dirty-tree release check passed
-501 unit tests across 49 files, 21 integration tests across three files, both local and showcase builds,
-the 19-file showcase audit, 33 serialized E2E tests, privacy audit, and both dependency audits with zero
-vulnerabilities. Privacy checked 315 tracked files, 922 history paths, 920 history blobs, 1,424
-build/test artifacts, and 11 private canaries. Schema remains 8, pending migrations zero, integrity
-`PASS`, and foreign-key issues zero. The final post-review code adjustment strengthened snapshot
-classification and pre-mutation audit validation; strict typecheck and all 39 focused tests pass after
-that adjustment. A clean exact-head release rerun, diff/fsck, PR CI, normal merge, and offline private
-version-3 preparation remain.
-
-No source or employer request, browser launch, form action, upload, submission, or candidate outbound
-field occurred in this task. Active source and real-target capabilities remain zero. Lifetime actions
-remain `9/1/0/0`; Source-enabled Personal Beta remains `READY`, first real target validation remains
-unproven, and Personal Live V1 remains `NOT_READY`.
-
-# Lever read-only DOM inspection hardening - 2026-09-13
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / OFFLINE ONLY`. The exact clean starting
-`main` and `origin/main` are `c6ccb8dd044212d74f16100e335e12e9d6969e00`; work is isolated on
-`fix/lever-dom-inspection`. Lifetime real source/employer/upload/submission actions are `9/2/0/0`
-and must not change. No employer GET/HEAD, browser navigation to an employer, form interaction,
-upload, submission, or candidate-data transmission is authorized.
-
-## Current state, evidence, objective, and assumptions
-
-The second real inspection run `inspection_6b8108c7-6c18-4258-a867-a3acaec283b8` used the exact
-approved version-4 capability and current packet, reached the exact in-scope Lever destination, and
-then stopped `PAGE_CHANGED` with the value-free internal category `DOM_INSPECTION_EXCEPTION`.
-Browser writes, form mutations, clicks, uploads, submissions, and candidate outbound fields were all
-zero. The run retained no real DOM content, exception detail, response body, header, cookie, field
-value, or employer prose. Version 5 is its immutable revoked successor and active real-target
-capabilities are zero. Historical runs and capability versions 1-5 remain immutable.
-
-The durable category proves that the existing `page.evaluate` call rejected, but not which DOM
-expression or page lifecycle event caused it. Static inspection shows that the current callback
-allows any one failure from label collection iteration, label text, element attributes/identity,
-visibility-style lookup, or another control property to abort the complete snapshot. It also maps
-all evaluation rejection to `DOM_INSPECTION_EXCEPTION`, including execution-context destruction from
-a navigation, reload, page close, or crash. A static `querySelectorAll` result is normally safe, but
-nodes may detach or the page may navigate after `domcontentloaded`; `getComputedStyle` and overridden
-native accessors are observable throw boundaries. No assumption is made that the live page contained
-any particular control or markup.
-
-The objective is a single passive, bounded, robust DOM snapshot in which an individually unreadable
-or detached control becomes a safe unsupported control instead of crashing the whole inventory,
-while whole-page instability still fails closed. Navigation/reload/close/crash during evaluation
-must be classified as `NAVIGATION_EXCEPTION`; stable-context failures that prevent any trustworthy
-snapshot remain `DOM_INSPECTION_EXCEPTION`; schema and final observation failures remain
-`SNAPSHOT_INVALID` and `ADAPTER_OUTPUT_INVALID`. Public failure remains `PAGE_CHANGED`.
-
-## Requirements, architecture, files, and data flow
-
-- `packages/application-runner/src/lever-inspection-adapter.ts`: isolate permitted per-control reads
-  behind browser-local defensive helpers; bound and surrogate-protect every retained string; tolerate
-  missing labels and detached nodes; mark controls unsupported when identity, label, attributes, or
-  computed style cannot be safely read; detect shadow-DOM/custom interaction as unsupported; retain
-  one evaluation, one `goto`, no retry, and exact GET/HEAD/origin/path enforcement. Add passive main-
-  frame navigation, page-close, and crash observation around evaluation so context instability maps
-  to `NAVIGATION_EXCEPTION` without retaining exception text or URLs.
-- `packages/application-runner/src/inspection-runner.test.ts`: cover value-free unit boundaries for
-  stable evaluation failure, navigation/reload/context destruction, page close/crash, invalid safe
-  snapshot, adapter-output validation, exact authority, and zero mutation.
-- `apps/web/app/synthetic-inspection/page.tsx` and `tests/e2e/target-inspection.spec.ts`: extend the
-  fictional loopback fixture/matrix across ordinary forms, labels present/absent, detached/mutating
-  controls, simulated style and label access failures, navigation/reload/context loss, unusual native
-  inputs, long/Unicode attributes, hidden/custom controls, no/multiple forms, more than 200 controls,
-  dynamic insertion, shadow DOM, and submit/no-submit structure. No external host is permitted.
-- `docs/APPLICATION_RUNNER.md`: document the defensive snapshot and lifecycle classification without
-  claiming the real target/form has been validated. `PROJECT_PLAN.md` records exact results.
-
-Data flow remains `one exact in-scope goto -> passive lifecycle guard -> one bounded browser-context
-snapshot -> strict safe snapshot schema -> inert semantic classification -> strict observation ->
-value-free audit`. There is no candidate input channel and no map/fill/upload/submit/final-consent
-method. The target capability, path/origin, operation, packet, policy, and form contract do not
-change. Because extraction and lifecycle classification materially change, adapter version becomes
-`lever-real-inspection-v2`; form contract remains `lever-application-inspection-v1` because accepted
-structural semantics do not change. Policy remains `real-target-inspection-v1`.
-
-## Risks, security/privacy, testing, rollback, and acceptance
-
-Risks are treating an unreliable page as stable, inventing fields after a failed read, retaining
-employer text, masking a navigation as a benign control failure, introducing a second request,
-weakening destination enforcement, or allowing inspection authority into application operations.
-Controls are a fixed field cap, bounded strings, explicit unsupported classification, lifecycle
-epochs/listeners with no payloads, exact URL checks before and after evaluation, strict Zod schemas,
-literal-zero metrics, fictional fixtures, negative authority tests, and privacy/diff review. No error
-message, stack, URL from an exception, raw HTML, value, response body, cookie, storage item, header,
-or candidate fact may be persisted.
-
-Testing begins with red synthetic reproduction of a per-control style/text accessor failure and a
-navigation/context failure that v1 misclassifies. The complete A-W matrix must then prove supported
-forms inventory safely, benign unreadable controls stop as `UNSUPPORTED_CONTROL`, structurally
-unreliable pages fail closed, navigation instability maps to `NAVIGATION_EXCEPTION`, and snapshot/
-observation failures keep their existing categories. Tests must prove one `goto`, no retry, no
-external request, and zero browser write, value change, click, typing, selection, file chooser,
-upload, submission, candidate outbound, or application-operation authority.
-
-Validation includes format, zero-warning lint, strict typecheck, focused runner/adapter/database and
-DOM matrix tests, full unit/integration/serialized E2E, local and showcase production builds,
-showcase boundary and privacy audits, full and production dependency audits, aggregate preflight and
-release check, schema/pending/integrity/FKs, migration immutability, `git diff --check`, and `git fsck
---strict`. Schema remains 8, pending migrations zero, integrity `PASS`, and FKs zero; migrations
-`0000`-`0008` are immutable and no migration is expected. Rollback is a normal revert of the offline
-code/test/docs commit; private history is untouched.
-
-Acceptance requires a precise deterministic synthetic reproduction; the narrow defensive extraction
-and lifecycle classification to pass the complete matrix; adapter v2/form v1; all zero-mutation and
-negative-authority invariants; no real/private data in Git; full local and exact-head GitHub CI green;
-normal merge of the owner-preapproved PR; clean refreshed main; and an ignored, inactive version-6
-DRAFT with predecessor 5 only after packet/job/profile/evaluation bindings are revalidated. Creating
-v6 is not approval or authority for employer visit 3.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before changing application code or tests.
-2. Add red synthetic unit and Playwright regressions for isolated property/style failure and
-   navigation/context instability, then extend the complete A-W fictional matrix.
-3. Implement bounded defensive per-control extraction plus passive navigation/close/crash lifecycle
-   classification, with one evaluation, no wait, no retry, and no second navigation.
-4. Bump only the adapter to `lever-real-inspection-v2`; retain form and policy versions and all
-   operation/destination authority.
-5. Run focused and complete validation, update this plan/docs with exact results, inspect the full
-   privacy/authority/migration diff, and commit coherent work.
-6. Push `fix/lever-dom-inspection`, open PR `fix: harden Lever read-only DOM inspection`, require exact-
-   head push and PR CI green, self-review, and merge normally only if every preapproved condition
-   remains true.
-7. Refresh clean main, verify private history and current packet/version bindings, create ignored
-   version-6 DRAFT with predecessor 5 and fresh 24-hour/30-minute expiries using production digest
-   logic, keep it inactive, and stop for exact owner approval without any live request.
-
-## Implementation and validation result
-
-Status: `IMPLEMENTED / CLEAN COMMITTED-HEAD RELEASE PASS / EXACT-HEAD CI PENDING / OFFLINE ONLY`. Historical
-visit #2 remains immutable at `STOPPED / PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`; no content or
-cause detail was backfilled. The live destination, form, or exact throwing expression cannot be
-inferred from the retained enum. The deterministic software class is nevertheless reproduced:
-before the fix, a fictional `getComputedStyle` failure aborted the complete browser evaluation, and
-three new lifecycle tests showed main-frame navigation, close, and crash all misclassified as stable
-`DOM_INSPECTION_EXCEPTION` while 31 prior focused cases remained green.
-
-The static callback audit covered collection query/conversion/mapping; tag, attribute, ID,
-`hasAttribute`, connection, labels collection and label-text access; computed style and style
-properties; control detachment and list mutation; form and structural marker reads; navigation,
-reload, execution-context destruction, main-frame detach, page close/crash; unusual native controls;
-long/Unicode strings; control/form caps; dynamic controls; and open shadow interaction. Whole-page
-query/conversion failure still rejects as `DOM_INSPECTION_EXCEPTION`. Snapshot-schema rejection and
-final observation rejection remain `SNAPSHOT_INVALID` and `ADAPTER_OUTPUT_INVALID`.
-
-`lever-real-inspection-v2` performs the same single exact `goto` and one passive evaluation. Every
-individual control string/boolean/label/style read is isolated; retained strings are length bounded
-and do not end on a lone high surrogate. A failed read or detached control becomes an unsupported
-control. Changed control identity/order, more than 200 controls, more than 20 forms, unreadable page
-markers, opaque interactive shadow DOM, or another incomplete structure fails closed through the
-existing unsupported-control signal. Passive main-frame navigation/reload/detach and page close/
-crash events are counted without payloads around evaluation; an unstable context maps to
-`NAVIGATION_EXCEPTION`. There is no sleep, second `goto`, retry, error-text inspection, page content,
-field value, raw HTML, response body, cookie, storage, header, click, write, upload, submission, or
-candidate-data channel.
-
-The form contract remains `lever-application-inspection-v1`: semantic fields, structural acceptance,
-and protection behavior are unchanged. Only extraction robustness and safe lifecycle classification
-changed, so adapter v2 is the appropriate version boundary. Target origin/path, operation, packet,
-policy, request methods, and application authority remain unchanged. Inspection authority still
-cannot construct map/fill/upload/submit/final-consent operations.
-
-The fictional A-W matrix covers ordinary and multiple forms; labels present, absent, null, and
-throwing; detached and mutating controls; style failure; execution-context navigation, same-origin
-client navigation, reload, main-frame detach, page close/crash; unusual native inputs; 10,000-unit
-attributes; Unicode/surrogate boundaries; hidden and custom controls; no form; over 200 controls;
-dynamic insertion; interactive shadow DOM; and submit/no-submit structure. Five Playwright tests pass
-and assert zero non-GET/HEAD requests, unchanged empty control values, no retry, correct fail-closed
-signals, and bounded raw structural fields. Focused runner/adapter/database tests pass `64/64`.
-
-The complete dirty-tree release check passes format, zero-warning lint, strict typecheck, `507` unit
-tests across `49` files, `21` integration tests across `3` files, both production builds (`31` local
-routes and `6` showcase pages), the `19`-file showcase audit, all `36` serialized E2E tests, privacy
-audit, and full plus production dependency audits with zero vulnerabilities. Privacy checked `315`
-tracked files, `931` reachable-history paths, `929` reachable-history blobs, `1,417` build/test
-artifacts, and `11` private canaries. Schema is 8, pending migrations zero, integrity `PASS`, and FKs
-zero. No migration was added and `0000`-`0008` have no base-to-working-tree diff. The release summary
-remains Source-enabled Personal Beta `READY`, first real target validation unproven, and Personal Live
-V1 `NOT_READY`.
-
-The committed implementation head `360a4f22fcb553d8f0f6aba4f95da7f3886ad7f8` passed the complete clean
-release check: format, zero-warning lint, strict typecheck, 507/507 unit tests in 49 files, 21/21
-integration tests in 3 files, local production build with 31 generated pages, public-showcase build
-with 6 pages, showcase audit across 19 source files, and 36/36 serialized Playwright tests. The
-privacy audit passed across 315 tracked files, 938 historical paths, 936 historical blobs, 1,428
-build/test artifacts, and 11 private canaries. Full and production dependency audits reported zero
-vulnerabilities. Release state was schema 8, zero pending migrations, integrity `PASS`, zero foreign-
-key issues, zero active source capabilities, and runner `TARGET_APPROVAL_REQUIRED`. `git diff
---check` passed and `git fsck --strict` exited successfully; its informational output listed only
-unreachable local objects and no repository corruption. The focused post-hardening runner/database
-set also passed 64/64 tests, and the expanded target-inspection Playwright file passed 5/5 tests.
-
-The complete A-W synthetic matrix now covers normal forms, labels present/absent, unusual native
-types, long/Unicode attributes, no/multiple forms, more than 200 controls, dynamic insertion, shadow
-interaction, no submit control, custom/hidden/document/eligibility/protection widgets, isolated
-style/label failures, detachment/list mutation, same-origin navigation, reload, and page close.
-Inventory tests assert bounded safe metadata, unchanged input values, and zero non-GET/HEAD browser
-requests. Lifecycle tests additionally cover execution-context destruction, main-frame detachment,
-and crash. Stable whole-snapshot failure remains `DOM_INSPECTION_EXCEPTION`; lifecycle instability
-is now `NAVIGATION_EXCEPTION`; invalid snapshot and invalid observation remain separately classified.
-
-Remaining mechanics are the plan-results commit, complete clean final-branch-head release rerun,
-branch push, PR creation, exact-head push/PR CI, conditional normal merge, clean main refresh, current
-private binding verification, and inactive version-6 draft creation. No employer or source request,
-browser launch to an employer, form interaction, upload, submission, or candidate outbound field
-occurred; lifetime actions remain `9/2/0/0`.
-
-# Real-target capability identity-family remediation - 2026-09-13
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
-`main`/`origin/main` at `a40ea60e3f7233c01a7960d30c4f0246024b7d1c` on
-`fix/target-capability-identity-versioning`. Lifetime real source/employer/upload/submission actions
-remain `9/2/0/0`; no employer visit, GET/HEAD, browser navigation, inspection run, candidate value,
-form action, upload, submission, or candidate outbound field is authorized.
-
-## Current state, confirmed defect, objective, and assumptions
-
-The third employer inspection was correctly stopped before run creation or network activity. The
-approved configuration used historical family ID `runner_b8af8ddb92a86973d3f2c1fb` with adapter
-`lever-real-inspection-v2`, while the unchanged production identity function independently derived
-`runner_2fb0a3653f3e4337c60abce6`. Production returned the safe pre-execution boundary
-`INSPECTION_PROPOSAL_SCOPE_CHANGED`; navigation and candidate outbound remained zero. The old family
-is now closed by immutable version 8 `REVOKED`, digest
-`10b52954c65715c4b589794c071fed40eb4e23431fe6de478dc8ca145591d2f0`, revoked at
-`2026-09-13T08:12:27.910Z`. Versions 1-8 and both stopped inspection runs must not change.
-
-Static audit confirms the deterministic identity function intentionally binds `targetKind`, exact
-origin, exact path prefix, operation, form version, adapter version, and packet digest. It is correct
-and must remain unchanged. `prepare-target-inspection.ts` already derives a fresh ID and starts at
-version 1, while `run-target-inspection.ts` and database `bindInspection` validate identity only at
-execution/binding. The gap is earlier persistence and offline refresh: strict capability schema and
-digest validation do not prove deterministic identity, `persistTargetCapabilityVersion` currently
-accepts a real-target version without packet identity context, the owner UI persists/revokes such a
-value directly from the allowlist, and no checked refresh/succession helper exists. Manual private
-proposal/allowlist refresh therefore changed adapter v1 to v2 while carrying forward the old ID and
-version chain. The live gate was correct; the creation/versioning workflow was not.
-
-The objective is to make identity validation a reusable pre-persistence invariant, encode safe
-same-family versus new-family succession once, align preparation/approval/revocation/execution, and
-then replace only the ignored malformed current proposal with a production-created adapter-v2 family
-version 1 DRAFT after the code is reviewed and merged. Historical database and report records stay
-immutable. The current packet digest and job/profile/evaluation bindings must be revalidated before
-private proposal preparation.
-
-## Requirements, architecture, files, and data flow
-
-- `packages/application-runner/src/target-runner.ts`: retain
-  `deterministicRunnerTargetCapabilityId` byte-for-byte in behavior; add a strict identity-input
-  schema/helper, a central `TARGET_CAPABILITY_IDENTITY_MISMATCH` assertion that also checks capability
-  scope fields, and a single succession helper. An unchanged derived identity continues the previous
-  family at `version + 1` with `predecessorVersion = previous.version`; a changed identity starts the
-  newly derived family at version 1 with a null predecessor. Lifecycle metadata, alias, approval
-  values, timestamps, version, and predecessor never enter deterministic identity.
-- `packages/application-runner/src/inspection-runner.ts`: validate the packet-bound deterministic
-  identity while freezing an inspection binding so malformed capability/proposal pairs fail offline
-  before persistence or execution.
-- `packages/database/src/runner-enablement-repository.ts`: require packet-bound identity context and
-  the central assertion before persisting every `REAL_TARGET` capability version. Synthetic-local
-  persistence remains compatible. Reuse the assertion in inspection binding and keep per-family
-  immutable/sequential database rules.
-- `scripts/prepare-target-inspection.ts`: construct the initial proposal through the succession
-  helper with no previous family, producing derived family version 1/null predecessor; assert the
-  resulting binding before writing the ignored proposal.
-- `scripts/run-target-inspection.ts`: replace its duplicate inline identity calculation with the same
-  central assertion while retaining every exact confirmation, authority, readiness, destination,
-  packet, one-navigation, and zero-write gate.
-- `apps/web/lib/runner-workspace.ts`: read and strictly validate the current ignored inspection
-  proposal/packet context before approval persistence, pass the identity context to the repository,
-  and use the succession helper for same-scope revocation. No UI action opens an employer page.
-- Focused tests in application-runner and database packages cover identity rotation, lifecycle
-  non-rotation, same-family v1-v2-v3, adapter-change new-family v1, malformed cross-family
-  persistence rejection, and prepare/execution-equivalent preflight. Applicable runner documentation
-  records the contract and the separate 30-minute usability observation.
-
-Data flow becomes `validated packet + exact target/adapter/form/operation -> canonical identity
-inputs -> deterministic ID -> central assertion -> family-aware capability construction -> frozen
-binding -> approval persistence -> execution preflight`. An identity-scope change cannot inherit a
-predecessor from another family. DRAFT-to-APPROVED promotion of an unpersisted reviewed proposal keeps
-its family/version; persisted refresh/revocation successors use the same-family next-version rule.
-The database schema already represents independent IDs/families, so no migration is required.
-
-## Dependencies, risks, security/privacy, testing, rollback, and acceptance
-
-Dependencies remain Zod, the existing SHA-256 canonicalizer, application-runner schemas, SQLite
-repository, and ignored private proposal/allowlist files. No new package or service is needed. Risks
-are weakening identity by dropping adapter/form/packet fields, treating lifecycle metadata as scope,
-linking a new ID to an old predecessor, breaking synthetic-local runner fixtures, reading or
-committing private proposal data, mutating historical versions, or accidentally invoking a live
-runner. Controls are an unchanged deterministic function, strict schemas, explicit single-operation
-identity input, fail-closed pre-persistence assertion, fictional inputs, migration diff, privacy
-audit, and zero invocation of the real inspection runner.
-
-The synthetic matrix changes each identity field independently and requires a new ID; changes each
-non-identity lifecycle field independently and requires the same derived ID; proves v1-v2-v3
-same-family succession; proves adapter change starts version 1/null predecessor; rejects old ID plus
-new adapter before persistence; and proves preparation and execution assertions agree. Focused
-database tests must show malformed real-target persistence creates no row while a correctly derived
-new family persists and binds. Existing negative operation, consent, zero-mutation, target-inspection,
-and loopback tests remain green.
-
-Complete validation is format, zero-warning lint, strict typecheck, focused identity/proposal/
-repository/inspection tests, all unit and integration tests, serialized Playwright E2E, local and
-showcase production builds, showcase boundary audit, privacy audit, full and production dependency
-audits, aggregate preflight/release check, schema 8/pending 0/integrity PASS/FKs 0, immutable
-`0000`-`0008`, `git diff --check`, and `git fsck --strict`. Rollback is a normal revert of the code,
-tests, and docs commit; the post-merge private repair archives the malformed proposal and uses the
-normal production preparation script, without deleting or rewriting history.
-
-Acceptance requires the deterministic function to remain unchanged; all seven identity fields and
-all listed non-identity fields to behave as specified; cross-identity continuation to fail before
-persistence; preparation, approval/revocation, binding, and execution to share one contract; no
-migration or authority broadening; full local and exact-head GitHub CI green; normal owner-preapproved
-merge; clean refreshed main; old family latest state still v8 REVOKED; current packet bindings exact;
-and one ignored, inactive adapter-v2 family version-1 DRAFT whose production-derived ID equals the
-independently expected value. Creating that DRAFT does not approve or execute it.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before tests or application-code changes.
-2. Add red tests for adapter/form/packet/origin/path/operation/target-kind rotation, lifecycle
-   non-rotation, unsafe cross-family succession, and persistence-before-execution rejection.
-3. Implement the central identity assertion and family-aware succession helper without modifying the
-   deterministic identity algorithm.
-4. Apply the helpers to binding, database persistence, preparation, owner approval/revocation, and
-   execution preflight; update runner/offline documentation and the separate expiry usability note.
-5. Run focused and complete release gates, update this record with exact results, inspect privacy,
-   migration, authority, and history diffs, and commit coherent work.
-6. Push `fix/target-capability-identity-versioning`, open PR
-   `fix: enforce target capability identity families`, require exact-head push/PR CI green, self-
-   review, and merge normally only if every preapproved condition remains true.
-7. Refresh clean main; revalidate old-family v8 and both historical runs, packet/job/profile/
-   evaluation currency, active source/target counts, and lifetime `9/2/0/0`.
-8. Archive the ignored malformed proposal, invoke the normal production preparation path offline for
-   adapter v2, verify the independently derived new ID, version 1/null predecessor, exact packet,
-   production digest, 24-hour/30-minute windows, zero active authority/run/network action, and stop
-   for fresh owner approval.
-
-## Implementation and pre-PR validation results
-
-Implemented the unchanged deterministic identity contract as a central assertion and added one
-family-aware succession helper. Initial proposal preparation now always derives a version-1 family;
-packet freezing, real-target database persistence, owner approval/revocation, binding, and execution
-preflight share the same packet-bound assertion. The audited defect boundary was the unchecked manual
-private refresh workflow together with pre-existing persistence paths that schema-validated but did
-not deterministically re-derive identity before write. The execution gate remains unchanged in
-authority and was correct to stop the malformed proposal.
-
-The focused fictional matrix passes 83 tests across target capability, inspection runner, and
-runner-enablement persistence suites. It covers all seven identity rotations, lifecycle/timestamp/
-alias/version/predecessor non-rotation, same-family v1-v2-v3, adapter-change new-family v1/null,
-no-row malformed persistence, and a complete fictional prepare/approve/execution-preflight A-to-B
-family sequence with zero writes. Five focused serialized target-inspection E2E cases also pass.
-The independently reviewed adapter-v2 inputs derive
-`runner_2fb0a3653f3e4337c60abce6` in production code.
-
-The complete clean release check at implementation/test head
-`44a6dda33d01e485e81510b272423801a465b701` passed doctor, schema/status/preflight, format, lint,
-strict typecheck, 526 unit tests across 49 files, 21 integration tests across 3 files, both production
-builds and showcase boundary audit, 36 serialized E2E tests, privacy audit over 315 tracked files,
-955 history paths, 953 history blobs, 1,463 build/test artifacts and 11 private canaries, and full/
-production dependency audits with zero known vulnerabilities. It reported schema 8, pending 0,
-integrity PASS, zero FK issues, source-enabled Personal Beta READY, zero active source capabilities,
-and target approval required. Fifteen focused database schema/migration/backup/restore/runtime tests
-also pass. Fresh ignored backup `backup-2026-09-13T08-43-22.442Z-708bea72` is schema 8 with integrity
-PASS and its exact restore preview passes. Migrations `0000`-`0008` have no diff from starting main;
-`git diff --check` and `git fsck --strict` pass (fsck reports only unreachable objects). The results-
-only plan commit is followed by one final exact-head release check before push.
-
-No migration was added or edited, no private proposal/report value is included in Git, and no source
-or employer request, real browser navigation, inspection run, candidate value, form interaction,
-upload, submission, or outbound candidate field occurred. The 30-minute expiry remains unchanged:
-it is security-compatible but operationally fragile for separate review/approval/start. A future
-authority-design review should consider a 90-120 minute window or a short execution lease; this PR
-does not broaden duration or authority.
-
-# Lever DOM snapshot boundary remediation - 2026-09-14
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
-`main`/`origin/main` at `d4fe7f2c554849e40afd99e55ddb5e8bf6596d9c` on
-`fix/lever-dom-snapshot-boundary`. Lifetime real source/employer/upload/submission actions are
-`9/3/0/0` and must not change. No source request, employer GET/HEAD, employer browser navigation,
-inspection run, form interaction, candidate value, upload, submission, or candidate outbound field
-is authorized.
-
-## Current state, objective, and evidence limits
-
-Historical visit #3 (`inspection_dad326c3-5309-4352-bba0-39272ca7fc3e`) passed deterministic
-capability identity, approved digest, frozen packet/version binding, exact destination, and the
-one-navigation gate. The target opened, navigation remained stable, and every zero-mutation counter
-remained zero. The run then failed closed at `PAGE_CHANGED / DOM_INSPECTION_EXCEPTION`, persisted
-`BOUND -> OPENED -> STOPPED`, and terminated through same-family v2 `REVOKED`. Both historical
-adapter-v2 versions and all three inspection runs remain immutable; active approved target
-capabilities are zero.
-
-The exact historical exception and page value are intentionally unknowable because only the fixed
-value-free category was retained. Live page data must not be recovered, reconstructed, replayed, or
-inferred. This task may establish only a _compatible reproduced failure mechanism_ from fictional
-local pages. Its objective is to audit every current snapshot expression, reproduce the stable-URL
-failure class offline, replace unnecessary dependence on employer-controlled main-world JavaScript
-with the narrowest browser-owned passive-read boundary, preserve fail-closed/data-minimized/one-
-navigation/zero-write behavior, and add a fixed value-free diagnostic stage without a migration.
-Employer visit #4 is not authorized.
-
-## Expression-level audit and planned treatment
-
-| Expression or boundary                                          | Current guard                                                         | Failure class / contamination risk                                      | Synthetic reproduction | Selected treatment                                                                                  |
-| --------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `document.querySelectorAll` and `document.querySelector`        | Some calls locally caught; initial control query is top-level         | B/C/D; page override or mutation can reject the entire evaluation       | A, B, L, N-Q           | Replace with Playwright-owned locator/handle enumeration; stage `DOM_QUERY`                         |
-| Page-world `Array.from`, NodeList iteration                     | Initial conversion top-level; later conversions inconsistently caught | B/C/D; poisoned iterator/constructor or mutation can abort              | G, H, M-P              | Avoid page-world collection/Array primitives; use bounded automation-side arrays; `DOM_ENUMERATION` |
-| Page-world array `.slice`, `.map`, `.every`                     | Top-level during primary mapping                                      | B/C/D; poisoned prototype or concurrent replacement can abort/fabricate | I, M-P                 | Automation-side native arrays plus two-pass bounded semantic-stability check                        |
-| String `.slice`, `.replace`, `.trim`, `.toLowerCase` and RegExp | Read helper catches readers, not all normalizer/prototype calls       | B/C; poisoned String/RegExp can abort the callback                      | J, W                   | Normalize and bound only in trusted Node context after primitive reads                              |
-| `tagName`, `id`, `isConnected`, custom-element properties       | Individual reads mostly caught                                        | C/D; hostile getters, detach, replacement                               | E, K, S, P             | Avoid page properties; use tag-specific browser-owned selectors and stable handles                  |
-| `getAttribute`, `hasAttribute`, label collections/text          | Individual calls caught, collection conversion partly exposed         | C/D; prototype overrides, throwing getters, odd values                  | C, D, G, K, L          | Playwright handle/locator metadata reads in its utility boundary, bounded in Node                   |
-| `getComputedStyle` and style properties                         | Per-control callback catches the call                                 | C/D; patched function/getters; dynamic style                            | F, M                   | Use Playwright passive visibility API; failures become fixed control-read stage                     |
-| Shadow-root scanning                                            | Outer local catch, but page-world query/iteration remains exposed     | C/D; closed/open shadow and large DOM                                   | R, T                   | Browser-owned bounded structural query; interactive shadow uncertainty fails closed                 |
-| `document.forms`, structural markers, popup/hidden-step queries | Local catches, but page-world primitives remain trusted               | C/D                                                                     | B, Q, R                | Browser-owned locator counts/attributes; retain caps and protection policy                          |
-| Return-object construction                                      | No dedicated stage                                                    | B/C/F; poisoned access during construction                              | J, M, AA               | Construct only from validated primitives in Node                                                    |
-| Playwright result serialization                                 | Outer catch only                                                      | E/F; unserializable return or destroyed context                         | X-AA                   | Remove the large returned object; classify fixed stage/category per passive boundary                |
-| Frame/page lifecycle                                            | Event counters around evaluation                                      | E; close/crash/reload/context destruction                               | X-Z                    | Retain lifecycle listeners; instability remains `NAVIGATION_EXCEPTION`                              |
-
-The audit classes are A locally guarded, B top-level unguarded, C page-world prototype/function
-contamination, D DOM mutation, E execution-context lifecycle, and F serialization/result transfer.
-Tests preserve these labels and do not claim a synthetic case proves the historical cause.
-
-## Implementation outcome (offline, pre-PR)
-
-The selected Strategy B remediation is implemented as adapter `lever-real-inspection-v3`. Production
-now obtains minimal structural metadata through Playwright locator/element-handle operations, builds
-the snapshot in Node, and requires two canonically identical bounded passes after the document load
-state. The exact target, main frame, route restrictions, single-`goto` limit, zero-write counters,
-200-control/400-label/20-form caps, and fail-closed shadow/custom/overflow behavior remain enforced.
-The v2 main-world implementation is retained only behind a loopback-enforcing regression factory so
-the compatible failure class can remain proven without exposing it as the production execution path.
-
-Fixed optional DOM stages now use the existing JSON audit and inspection-summary columns, so schema 8
-and migrations `0000`-`0008` are unchanged. Unit/database tests prove that only the fixed enum is
-retained. The expanded fictional browser suite covers all requested main-world primitive poisoning,
-unusual returns, prototype mutation, DOM/control/form replacement and detachment, interactive shadow
-DOM, control/label bounds, Unicode truncation, lifecycle loss, result serialization, service-worker
-blocking, CSP/resource aborts, JavaScript-disabled/server-rendered markup, semantic classification,
-and exact zero-mutation metrics.
-
-Verified so far:
-
-- `npm run format`: PASS.
-- `npm run lint`: PASS.
-- `npm run typecheck`: PASS.
-- focused runner/database Vitest selection: PASS, 84/84.
-- `npx playwright test tests/e2e/target-inspection.spec.ts`: PASS, 11/11.
-- v2 compatible stable-URL `DOM_INSPECTION_EXCEPTION` reproduction: PASS on fictional loopback only.
-- employer/source requests, employer browser visits, and inspection runs during this task: 0.
-- candidate values, clicks, typing, form writes, file-chooser actions, uploads, submissions, and
-  candidate outbound during this task: 0 / 0 / 0 / 0 / 0 / 0 / 0 / NONE.
-
-The repository-wide release matrix, database/backup checks, immutable-migration verification, PR CI,
-merge, clean-main refresh, private binding validation, and offline v3-family DRAFT preparation remain
-the next ordered steps. No live authority exists or is introduced by this implementation.
-
-## Strategy comparison and selected architecture
-
-- Strategy A, current single main-world `page.evaluate`, is compact but trusts employer-controlled
-  JavaScript primitives and collapses an unguarded primitive/transfer failure into one category.
-- Strategy B, Playwright-owned passive reads, uses selector/element-handle metadata reads from its
-  automation utility boundary. It avoids a user callback in the employer main world, never reads
-  control values, and permits fixed-stage isolation. Collections and strings stay strictly capped;
-  two bounded semantic passes must agree before accepting a snapshot.
-- Strategy C, CDP/isolated browser snapshots, is Chromium-specific, returns substantially broader
-  DOM/text data before minimization, couples the runner to protocol internals, and adds maintenance
-  and privacy surface. It will be assessed but is not selected unless Strategy B proves inadequate.
-
-Select Strategy B provisionally. Implement an adapter-v3 passive collector behind the existing
-browser contract. One exact `goto` is followed by bounded browser-owned reads; there is no reload,
-retry, fallback fetch, second browser, click, focus, fill, scroll, dispatch, upload, or submit.
-Collect at most 200 controls and 20 forms, retain only tag/type/name/id/autocomplete/required/
-visibility/minimum-label metadata, never read `value`, and construct hashes/classification in Node.
-Two metadata passes must be canonically identical while URL/main-frame/page state stay stable. Any
-semantic mutation, unreadable primitive, opaque interactive shadow structure, or lifecycle change
-fails closed without arbitrary sleeps.
-
-## Diagnostics, versioning, files, and data flow
-
-Add a strict fixed `DomInspectionDiagnosticStage` enum: `DOM_QUERY`, `DOM_ENUMERATION`,
-`DOM_CONTROL_READ`, `DOM_PAGE_METADATA`, `DOM_RESULT_SERIALIZATION`, and `DOM_UNKNOWN`.
-`DOM_INSPECTION_EXCEPTION` remains the internal category and `PAGE_CHANGED` the public stop. The
-optional stage travels only through existing result/audit JSON and never contains error messages,
-stacks, selectors, page text, HTML, values, response data, headers, cookies, storage, or new URLs.
-No migration is expected.
-
-Runtime extraction semantics materially change, so adapter version becomes
-`lever-real-inspection-v3`; form stays `lever-application-inspection-v1` and policy stays
-`real-target-inspection-v1`. Adapter version is identity-bound, so future v3 authority must use a new
-derived family at version 1/null predecessor. The closed v2 family must not be reused or edited.
-
-Expected tracked changes are this plan, `docs/APPLICATION_RUNNER.md`, application-runner adapter/
-diagnostic code and tests, database audit tests if required, and fictional Playwright fixtures/specs.
-No migration, private report, live payload, candidate document, or authority file is planned. Data
-flow becomes `single exact goto -> bounded metadata pass A -> lifecycle/destination gate -> pass B ->
-canonical equality gate -> Zod snapshot -> existing classifier -> existing terminal policy`.
-
-## Testing, security, rollback, and acceptance
-
-Fictional tests cover A-AB: poisoned document/Element/HTMLElement/NodeList/Array/String/style/label
-primitives; unusual objects; prototype/DOM/control/form mutations; shadow/custom controls; large
-DOM/control/label/attribute inputs; Unicode/surrogate edges; close/reload/context destruction;
-serialization failure; and stable evaluation rejection. They also cover realistic text/email/tel/
-select/radio/checkbox/textarea/file/submit/optional/required/dynamic/hidden/consent/eligibility
-structures and every existing semantic classification. Route tests prove cross-origin resource aborts
-do not broaden authority; service-worker blocking, CSP, script errors, JS assumptions, no extensions,
-and headless mode remain tested/documented without weakening controls.
-
-Acceptance requires a deterministic pre-remediation compatible `DOM_INSPECTION_EXCEPTION`, hostile
-main-world primitives unable to crash or fabricate v3, bounded schema-valid output or fixed-stage
-fail-closed result, classifier parity, one navigation/no retries/zero mutations, no authority
-broadening, schema 8/pending 0/integrity PASS/FKs 0, immutable `0000`-`0008`, full local and exact-head
-CI green, privacy/dependency audits green, and normal owner-preapproved merge. Rollback is a normal
-revert of tracked code/docs; historical database/capability/run evidence is never rewritten.
-
-## Exact implementation and release sequence
-
-1. Commit this blueprint before changing application code.
-2. Add baseline hostile-main-world tests proving compatible stable-URL v2 failures and documenting
-   cases that instead produce lifecycle or schema diagnostics.
-3. Implement fixed stages and the Playwright-owned bounded two-pass collector; bump only adapter to
-   v3 and preserve form/policy/authority contracts.
-4. Add the A-AB hostile/mutation/lifecycle/serialization/network/fixture/classification matrix and
-   focused runner/database/identity/frozen-binding negative-authority tests.
-5. Update docs and this section with audit, strategy results, exact tests, limitations, and rollback.
-6. Run format, lint, typecheck, focused/unit/integration/E2E, both builds/showcase audit, privacy,
-   dependency audits, preflight/release, DB/backup-restore/migration checks, diff-check, and fsck.
-7. Push, open PR `fix: harden Lever DOM snapshot boundary`, require exact-head push/PR CI green,
-   self-review, and merge normally only if every owner-preapproved condition remains true.
-8. Refresh clean main and revalidate packet/job/profile/evaluation. If current, use production
-   deterministic preparation offline to create only a new v3 version-1/null-predecessor DRAFT with
-   fresh 24-hour/30-minute windows; never approve or execute. If stale, return
-   `PACKET_REFRESH_REQUIRED` without authority creation.
-
-## Completed local release validation
-
-Implementation head `cdd212cea88f95f2c8270eb252949fdc4f2b0f20` passed the complete local
-`npm run release:check`: doctor, schema/preflight, format check, lint, strict typecheck, 527/527 unit
-tests (49 files), 21/21 integration tests (3 files), local and showcase production builds, public
-showcase audit, 42/42 E2E tests, privacy audit, full dependency audit, production dependency audit,
-and release summary. The focused inspection/browser file passed 11/11 independently and the focused
-runner/identity/database selection passed 84/84. Privacy checked 316 tracked files, 970 history paths,
-968 history blobs, 1,531 build/test artifacts, and 11 private canaries. Both dependency audits found
-zero vulnerabilities.
-
-The real private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
-foreign-key issues. Ignored backup `backup-2026-09-14T08-27-01.561Z-e82e45b8` is schema 8 with
-integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
-starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
-`git fsck --strict` passed; fsck reported only harmless unreachable objects. The committed worktree
-was clean throughout validation. No source request, employer request/navigation, inspection run,
-candidate value, click, typing, form mutation, file chooser, upload, submission, or candidate outbound
-occurred. Lifetime real actions therefore remain `9/3/0/0`.
-
-Because this validation result is now recorded in the plan, rerun the complete release command on the
-final documentation-inclusive commit before push. Then require exact-head push and PR Actions green,
-self-review the complete diff, and merge only under the owner's stated pre-approval conditions.
-
-# Lever destination-change diagnostics after visit 4 - 2026-09-14
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
-merged `main`/`origin/main` at `2b14c6b54b640a09381095978912e877399a06a6` on
-`fix/lever-destination-diagnostics`. The owner approved and separately started v3 capability
-`runner_75d47133dbf66be997939992` version 1, digest
-`442e6b12da1980131d365554cdb4f07046690d2addc9e70e8fcdbbc14f70e260`, for exactly one
-`OPEN_AND_INSPECT_ONLY` attempt. Visit 4 run
-`inspection_959441f0-4e9d-42f0-bcbc-f7139b3ed2cb` executed at the exact target once, made no retry,
-and stopped safely with `DESTINATION_CHANGED` before DOM inventory. Candidate values, clicks,
-typing, form changes, file chooser actions, uploads, submissions, and candidate outbound were all
-zero/NONE. The family is terminal at immutable version 2 `REVOKED`, digest
-`02e24991bf3938cd44103ed81af811adb925e59393d1dd107e9bdb595e2d4ef9`; active approved target
-authority is zero. Lifetime real actions are now `9/4/0/0`. Visit 5 is not authorized.
-
-## Evidence limit, objective, and assumptions
-
-The durable visit records intentionally contain only the public stop and zero-value counters. They do
-not retain the attempted/final URL or distinguish a blocked out-of-scope main navigation, a safe-
-scope but non-exact query/path variation, a popup, or a URL-read failure. Therefore the historical
-destination is unknowable and this plan does not claim which condition occurred. No employer page,
-network trace, response body, history, cache, HTML, or browser state may be recovered or re-requested.
-
-The narrow offline objective is to make a future terminal `DESTINATION_CHANGED` actionable without
-weakening exact destination authority or retaining employer data. Add only a fixed, value-free cause
-enum; preserve the public stop, one exact `goto`, zero retry, cross-origin/path blocking, exact final-
-URL gate, zero mutation, and all existing candidate-data boundaries. This change must not make visit
-4 successful retroactively and must not authorize or execute visit 5.
-
-## Architecture, data flow, and proposed files
-
-Introduce a strict `DestinationChangeDiagnostic` enum with fixed values for blocked out-of-scope main
-navigation, final-origin change, final-path change, final query/fragment variation, popup attempt, and
-unknown destination state. The browser snapshot sets at most one fixed value at the point the safety
-condition is detected. The adapter carries it only when the protection signal is
-`DESTINATION_CHANGED`; `TargetInspectionRunner` retains it in the stopped result and existing JSON
-audit/inspection-summary metadata. Any other stop clears it. No URL, query key/value, path value,
-selector, page text, exception message, response data, header, cookie, storage, or candidate value is
-retained.
-
-Data flow becomes `route/final-url/popup safety condition -> fixed enum -> schema-validated snapshot
--> DESTINATION_CHANGED protection result -> fixed enum in existing JSON metadata`. Expected tracked
-changes are this plan; application-runner schemas, adapter, runner and tests; database JSON audit tests;
-fictional local Playwright fixtures/specs; and runner docs. No database migration or private/live
-artifact is expected. Migrations `0000`-`0008` remain immutable.
-
-Because the production inspection output and diagnostic semantics change, bump
-`lever-real-inspection-v3` to `lever-real-inspection-v4`. Keep form
-`lever-application-inspection-v1`, policy `real-target-inspection-v1`, and the deterministic identity
-function unchanged. Adapter v4 must produce a new deterministic capability family at version 1/null
-predecessor after merge; neither the closed v2 nor v3 family may be reused.
-
-## Security, risks, tests, rollback, and acceptance
-
-Primary risks are accidentally retaining a real URL component, treating an in-scope variation as
-authorized, converting the diagnostic into retry behavior, mis-associating a cause with a non-
-destination stop, weakening popup/route blocking, or expanding real operation scope. Controls are a
-closed enum, strict Zod schemas, invariant clearing outside `DESTINATION_CHANGED`, synthetic-only
-fixtures, exact navigation-count assertions, zero-value metrics, and privacy/history audits.
-
-Fictional tests cover blocked cross-origin/path main navigation, exact-path query/fragment variation,
-in-prefix path variation, popup attempts, URL-read failure, malformed/extra diagnostic data,
-non-destination clearing, persistence of only the enum, one `goto`, no retry, no writes, and existing
-DOM/classification/lifecycle matrices. Full validation is format, lint, strict typecheck, focused
-runner/adapter/database tests, all unit/integration/E2E, local and showcase builds, showcase and
-privacy audits, both dependency audits, release check, schema/pending/integrity/FKs, ignored backup
-and restore preview, migration immutability, `git diff --check`, and `git fsck --strict`.
-
-Acceptance requires a value-free fixed cause for every synthetic destination stop, no exact URL data
-outside the already approved binding, no authority/network broadening, no migration, exact-head local
-and GitHub CI green, normal offline PR merge under the owner's standing authorization, clean refreshed
-main, packet/job/profile/evaluation currency, zero active authority, and only an offline adapter-v4
-version-1/null-predecessor DRAFT. Rollback is a normal revert of tracked code/docs; immutable visit 4,
-capability, database, and private evidence are never rewritten.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before application-code changes.
-2. Add failing schema/runner/database and fictional Playwright tests for each fixed destination cause.
-3. Implement the minimal enum propagation and v4 bump without changing route/final-URL decisions.
-4. Update docs and this plan with exact behavior and validation results.
-5. Run the focused and complete release matrix plus backup/migration/Git integrity checks.
-6. Push one offline PR titled `fix: classify Lever destination changes`, require exact-head CI green,
-   self-review, and merge normally only if all standing safety conditions remain satisfied.
-7. Refresh clean main, revalidate the current technical packet, archive the used v3 proposal, and use
-   production preparation offline to create only a new adapter-v4 family DRAFT. Do not approve or
-   execute it. Stop at the mandatory fresh capability-approval gate.
-
-## Implementation and local validation completed
-
-The offline implementation is complete. `DestinationChangeDiagnostic` is a closed, value-free enum
-covering blocked out-of-scope main navigation, final-origin change, final-path change, final
-query/fragment variation, popup attempt, and unknown destination state. Strict snapshot, observation,
-audit, and repository boundaries propagate it only with `DESTINATION_CHANGED`; mismatched,
-value-bearing, extra, and unsupported data fails schema validation. The production Playwright reader
-sets the cause at route, exact-final-URL, load, popup, and bounded-pass lifecycle boundaries while
-retaining the existing one-`goto`, no-retry, zero-write behavior. It never records the observed URL.
-Adapter identity is now `lever-real-inspection-v4`; form and policy remain unchanged. This is an
-identity change only: no authority, operation, origin, path, retry, redirect, persistence-table, or
-network behavior was broadened, and no migration was added.
-
-Tracked implementation changes are limited to the application-runner contracts/adapter/runner and
-tests, the existing database JSON summary and tests, fictional Playwright assertions, and accurate
-README/runner/enablement documentation. Unit tests cover every fixed cause, unknown fallback,
-blocked main navigation, one navigation, non-destination clearing/rejection, strict audit pairing,
-value-bearing input rejection, and persistence of only the fixed enum. The existing fictional E2E
-matrix now verifies the final-path and popup causes, and navigation instability distinguishes an
-exact-destination change from same-destination reload/close failures. Historical visit 4 remains only
-`DESTINATION_CHANGED`; it was not relabelled with an unobserved cause.
-
-The focused strict typecheck and runner/database selection passed 57/57 tests. The focused browser
-regressions passed, including the 2/2 destination/lifecycle subset. The complete
-`npm.cmd run release:check` passed doctor; schema/preflight; formatting; lint; strict typecheck;
-536/536 unit tests in 49 files; 21/21 integration tests in 3 files; local and showcase production
-builds; public showcase audit; 42/42 E2E tests; privacy audit; full and production dependency audits;
-and release summary. Privacy checked 316 tracked files, 972 history paths, 970 history blobs, 1,544
-build/test artifacts, and 11 private canaries; both dependency audits found zero vulnerabilities.
-The first release attempt stopped at formatting after E2E-generated fixture files required Prettier;
-running Prettier produced no tracked semantic diff, and the complete rerun passed.
-
-The private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
-foreign-key issues. Ignored backup `backup-2026-09-14T09-27-24.419Z-5efc3049` is schema 8 with
-integrity `PASS`, and its exact restore preview passed without applying a restore. A direct diff from
-starting main confirms migrations `0000`-`0008` are byte-for-byte unchanged. `git diff --check` and
-`git fsck --strict` passed; fsck reported only harmless dangling objects. No request or browser action
-occurred during remediation or validation. Lifetime real actions remain source/employer visit/upload/
-submission `9/4/0/0`; active source and target capabilities are both zero. Source-enabled Personal
-Beta remains ready; Personal Live V1 remains not ready pending a successfully approved real-target
-validation.
-
-Before push, rerun the complete release command on the clean documentation-inclusive commit. Then
-push this same branch, require exact-head push and PR checks green, self-review the complete diff,
-and merge only under the owner's standing fully offline authorization. After merge, prepare only the
-fresh adapter-v4 DRAFT and stop before approval or execution.
-
-# Lever popup-attempt semantics after visit 5 - 2026-09-14
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
-merged `main`/`origin/main` at `4f71ac271e218bbe9fca2bf1f096232c02c99c2d` on
-`fix/lever-popup-declaration-semantics`. The owner approved and separately started adapter-v4
-capability `runner_b164d5f4219112b1833c8a6a` version 1, approved digest
-`b0e2086943750a6b3c1b891577351dd1279be175557e8dda8cb2030b28561327`, for exactly one
-`OPEN_AND_INSPECT_ONLY` attempt. Visit 5 run
-`inspection_46c7e0db-7e85-4c65-bf08-eec17315320e` made one main navigation with no retry and stopped
-before inventory on `DESTINATION_CHANGED` / `POPUP_ATTEMPT`. Candidate values, clicks, typing, form
-changes, file chooser actions, uploads, submissions, and candidate outbound were all zero/NONE. The
-family is terminal at immutable version 2 `REVOKED`, digest
-`31b626545f43b1fd7a07606fd1b2fcd65f701f86f6964c8ffabad7584c660658`; active approved target
-authority is zero. Lifetime real actions are now source/employer visit/upload/submission `9/5/0/0`.
-Visit 6 is not authorized.
-
-## Root cause, evidence limit, and objective
-
-Offline code inspection found a deterministic semantic conflation in adapter v4. The Playwright
-`popup` event handler correctly marks and closes a popup that actually opens, but the passive DOM pass
-also searches for any inert anchor or form with `target="_blank"`, names that fact `popupDeclared`, and
-ORs it into `popupAttempted`. Merely declaring a possible new-tab destination is not an attempted
-popup when the runner performs no click or submission. Common employer pages may contain such inert
-links, so the current code can stop without any popup event. The durable fixed diagnostic deliberately
-does not distinguish these two inputs; visit 5 therefore cannot be relabelled as a proven browser
-popup, and no employer content or additional request may be used to infer which input was present.
-
-The narrow objective is to make `POPUP_ATTEMPT` mean an observed Playwright popup event only. An inert
-`target="_blank"` declaration remains unread and unactivated and must not stop otherwise valid passive
-inspection. Any actual popup remains closed immediately and produces the existing fail-closed
-`DESTINATION_CHANGED` / `POPUP_ATTEMPT` result. Preserve exact main destination checks, one main
-`goto`, zero retries, request blocking, no clicks, no writes, and all candidate-data boundaries.
-
-## Architecture, files, data flow, and dependencies
-
-Remove `popupDeclared` from the production `PassiveDomPass`, its DOM metadata query, canonical
-two-pass snapshot, and final popup calculation. Keep the runtime page `popup` listener and its fixed
-diagnostic unchanged. Data flow becomes `observed Playwright popup event -> close child page ->
-POPUP_ATTEMPT`; an inert declaration has no security effect because no runner operation activates it.
-Do not change the loopback-only legacy v2 regression reader except where tests require explicit
-historical compatibility.
-
-Expected tracked changes are this plan; the Lever inspection adapter and unit tests; fictional local
-inspection fixtures/E2E; and readiness/runner documentation. No external dependency or database
-migration is required. Migrations `0000`-`0008` remain immutable. Because the accepted runtime
-semantics change, bump adapter identity from `lever-real-inspection-v4` to
-`lever-real-inspection-v5`; keep form `lever-application-inspection-v1`, policy
-`real-target-inspection-v1`, identity derivation, operation, target, and all authority fields
-unchanged. Any future v5 proposal must be a new deterministic version-1/null-predecessor family.
-
-## Security, tests, rollback, and acceptance
-
-Primary risks are missing a real popup, creating an implicit popup allowance, weakening navigation
-blocking, allowing a second main navigation, or accidentally reusing v4 authority. Controls are the
-existing pre-navigation popup listener and immediate close, a synthetic actual-popup event fixture,
-an inert-declaration fixture, navigation/request counters, zero-mutation assertions, strict adapter
-identity, and complete privacy/security gates. No popup is followed or inspected.
-
-Synthetic acceptance requires: inert `target="_blank"` anchor and form declarations complete passive
-inventory; a scripted same-origin fictional popup produces the actual Playwright event, is closed,
-and stops with `POPUP_ATTEMPT`; no candidate value, click, type, form mutation, upload, submission, or
-non-read request occurs; the main page executes exactly one `goto`; existing destination, lifecycle,
-hostile-DOM, control, and protection matrices remain fail-closed. Run format, lint, strict typecheck,
-all unit/integration/E2E, local/showcase builds and audit, privacy and dependency audits, preflight,
-release check, schema/pending/integrity/FKs, ignored backup/restore preview, migration immutability,
-`git diff --check`, and `git fsck --strict`.
-
-Acceptance also requires a normal offline PR with exact-head push/PR CI green and self-review before
-the owner's standing pre-authorized merge. Rollback is a normal revert of tracked code/docs; immutable
-visits 1-5, capability versions, database evidence, and private reports are never rewritten. After
-merge, refresh clean main, archive the used v4 proposal, revalidate the current packet, prepare only a
-new adapter-v5 DRAFT offline, and stop at its fresh approval gate. Never make visit 6 automatically.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before changing application code.
-2. Add synthetic inert-declaration and actual-popup-event regressions with no-retry/zero-write checks.
-3. Remove declaration-to-attempt conflation from the production reader and bump only adapter to v5.
-4. Update README, runner/enablement docs, and this plan with exact results and limitations.
-5. Run focused and complete local gates plus backup/migration/Git-integrity checks.
-6. Push one PR `fix: distinguish popup attempts from declarations`, require exact-head CI, self-review,
-   and merge only if the offline safety conditions remain satisfied.
-7. Refresh main, archive the v4 proposal, and prepare only the fresh v5-family DRAFT. Stop before
-   approval or execution with the exact mandatory capability-approval line.
-
-## Implementation and validation completed
-
-The strictly offline implementation is complete. Production adapter identity is now
-`lever-real-inspection-v5`. Its passive DOM pass no longer reads or reports inert `target="_blank"`
-declarations. `POPUP_ATTEMPT` is set only by the already installed Playwright `popup` event handler;
-an observed child page is still closed immediately and the inspection still fails closed as
-`DESTINATION_CHANGED`. Exact final-origin/path/query checks, one main `goto`, zero retries, read-only
-request enforcement, protection stops, and zero candidate/form mutations are unchanged. The
-loopback-only historical v2 regression reader remains unchanged. No authority field, target, network
-budget, operation, form contract, policy, persistence schema, or migration changed.
-
-The fictional browser fixture now distinguishes an inert new-tab declaration from an actual scripted
-popup event. The inert declaration completes normal passive inspection. The observed popup is closed,
-leaves only the main page, stops with `DESTINATION_CHANGED` / `POPUP_ATTEMPT`, uses one main
-navigation, makes no non-read request, and performs no browser write. The complete existing
-destination, lifecycle, hostile-DOM, bounds, protection, and semantic-field matrices remain covered.
-Documentation records that visit 5's historical fixed diagnostic cannot prove whether an actual popup
-opened because adapter v4 conflated declarations with events; immutable visit evidence was not
-rewritten.
-
-Focused validation passed strict typecheck, 49/49 application-runner unit tests, and both focused
-browser regressions (the complete fictional inspection matrix plus inert-declaration/observed-popup
-semantics). The complete `npm.cmd run release:check` passed doctor; schema/preflight; formatting;
-lint; strict typecheck; 536/536 unit tests in 49 files; 21/21 integration tests in 3 files; local and
-showcase production builds; public-showcase audit; 43/43 E2E tests; privacy audit; full and production
-dependency audits; and release classification. Privacy checked 316 tracked files, 984 history paths,
-982 history blobs, 1,572 build/test artifacts, and 11 private canaries. Both dependency audits found
-zero vulnerabilities.
-
-The private database remains schema 8 with zero pending migrations, integrity `PASS`, and zero
-foreign-key issues. Ignored backup `backup-2026-09-14T10-21-37.786Z-69ac25b5` is schema 8 with
-integrity `PASS`; its exact restore preview passed without applying a restore. A direct diff from
-starting main confirms migrations `0000`-`0008` are unchanged. `git diff --check` and
-`git fsck --strict` passed; fsck reported only harmless dangling objects. No real source or browser
-action occurred during remediation or validation. Lifetime real actions remain source/employer
-visit/upload/submission `9/5/0/0`; active source and target capabilities are both zero.
-Source-enabled Personal Beta remains ready. Personal Live V1 remains not ready pending a successful
-owner-approved real-target validation.
-
-Before push, commit these implementation/docs/results on the same branch and rerun the complete
-release command at that exact clean commit. Then require exact-head push and PR checks green,
-self-review the complete diff, and merge only under the owner's standing fully offline authorization.
-After merge, create only the fresh adapter-v5 DRAFT through production offline preparation and stop
-before approval or execution.
-
-# Lever unsupported-control inventory and overnight readiness - 2026-09-14
-
-Status: `BLUEPRINT COMPLETE / IMPLEMENTATION PENDING / STRICTLY OFFLINE`. Work starts from clean
-merged `main`/`origin/main` at `1da9ddf368651bd1b9f768846ad457d61e266489` on
-`fix/lever-unsupported-control-inventory`. Owner-approved adapter-v5 visit 6 run
-`inspection_52a3c739-dcb0-46a8-9886-13e476485bf8` made exactly one employer navigation with zero
-retries and stopped as `UNSUPPORTED_CONTROL` before retaining an inventory. Durable evidence contains
-no unsupported-control subtype; the exact live trigger therefore remains unknown. Candidate values,
-clicks, writes, form changes, uploads, submissions, and candidate outbound were zero/NONE. The v5
-family is terminal at immutable version 2 `REVOKED`, digest
-`34b11ee5365a08fdbe439f6945218a0a2f528b20cfcf788f334816c2bff905d3`; active source and target
-authority are both zero. Lifetime real actions are source/employer visit/upload/submission `9/6/0/0`.
-No seventh visit or other network action is authorized in this work.
-
-## Diagnosis, objective, and evidence boundary
-
-Adapter v5 has two independent routes to `UNSUPPORTED_CONTROL`. The browser-level route combines a
-blocked write request, observed download, control/label/form overflow, failed label/control metadata
-read, control-set mismatch, shadow control, explicit hidden-step marker, explicit unsupported marker,
-or explicit page signal into one boolean/signal. The adapter-level route then stops the entire
-inspection whenever any field maps to control type `CUSTOM`. That includes safely observed ordinary
-native controls such as a non-submit button or an unfamiliar input type, as well as unknown semantics.
-The runner discards the complete observation whenever either route emits the signal. This makes the
-historical live result compatible with multiple mechanisms but does not prove which occurred.
-
-The primary objective is to preserve a complete, bounded, read-only structural inventory when an
-individual field is safely observable but unsupported. Such a field remains explicitly
-`inspectionStatus=UNSUPPORTED`; required or otherwise material unresolved fields remain blockers for
-mapping/filling and are never answered. Whole-inspection `UNSUPPORTED_CONTROL` remains mandatory for
-page-level interaction, protection/safety events, and structural uncertainty that prevents a
-trustworthy inventory. Add a fixed, value-free unsupported-control diagnostic so any future terminal
-stop distinguishes those classes without retaining live labels, HTML, values, URLs beyond the bound
-target, exceptions, cookies, storage, headers, or response bodies.
-
-## Architecture, data flow, files, and versioning
-
-Add a closed `UnsupportedControlDiagnostic` contract with deterministic causes for blocked write,
-download, control/label/form/section bounds, unreadable control or label metadata, unstable control
-scope, shadow controls, hidden interactive steps, declared custom widgets, explicit unsupported
-signals, and unknown unsupported state. Propagate it only when the public stop is
-`UNSUPPORTED_CONTROL`, through strict snapshot and observation schemas, runner result/audit metadata,
-and the existing JSON classification summary. Incorrect pairings and extra/value-bearing fields fail
-validation. No database column or migration is required.
-
-Separate raw-control read integrity from final control support. A failed primitive read or declared
-custom widget remains a structural terminal condition with a fixed cause. A completely readable
-native control whose type or semantic is not supported becomes an inventory field with
-`inspectionStatus=UNSUPPORTED` and does not by itself stop inspection. Hidden native controls remain
-`NOT_APPLICABLE`; document, eligibility/review, consent, radio, checkbox, select, textarea, and final
-submit classifications remain explicit. Add bounded visible-section count to the passive two-pass
-snapshot and final observation so successful inspection records form structure as well as fields.
-Any inconsistent two-pass result still fails closed as DOM enumeration change.
-
-The changed runtime semantics require adapter identity `lever-real-inspection-v6`. Keep form
-`lever-application-inspection-v1`, policy `real-target-inspection-v1`, deterministic identity logic,
-exact origin/path, one `goto`, GET/HEAD-only routing, zero retries, and zero mutations unchanged.
-After merge, production offline preparation must create a new v6 deterministic family at version 1
-with null predecessor. Never extend or reactivate v5.
-
-Expected tracked files are `target-runner.ts`, `inspection-runner.ts` and their tests; the Lever
-inspection adapter and its tests; runner database persistence/tests using existing JSON; fictional
-inspection fixtures/E2E; README and runner/enablement documentation; and this plan. Candidate and
-local-role audit outputs remain ignored/private or are summarized only as non-sensitive readiness
-metadata. Migrations `0000`-`0008` remain immutable.
-
-## Synthetic matrix, application-engine audit, and independent offline tracks
-
-Fictional tests cover every terminal cause plus readable non-submit buttons, unknown native input
-types, unknown optional and required fields, radio groups, checkboxes, files, consent, hidden controls,
-combobox/custom markers, dynamically mounted controls, shadow controls, hidden steps, blocked writes,
-downloads, blocked cross-origin passive assets, count/section bounds, duplicate controls, malformed
-metadata, and stable zero-write navigation. Compatible synthetic mechanisms must be described as such;
-none may be claimed as visit 6's exact cause.
-
-Independently audit the target-independent application engine for `MAP_FOR_FILL`, `FILL`, `UPLOAD`,
-and `SUBMIT`. The current schema deliberately confines REAL_TARGET capability to inspection-only,
-while the synthetic target-independent runner already binds current packet/job/profile/evaluation,
-document/answer/disclosure digests, target/form/adapter, staged map/fill, one-use final consent,
-exactly one submit attempt, and terminal `OUTCOME_UNKNOWN`. Do not weaken the real-target restriction
-or build a target-specific fill adapter before a real form inventory exists. Close any target-
-independent synthetic safety gaps found, but park real execution authority behind later separate
-reviewed operation capabilities and a suitable non-validation target.
-
-Audit current private candidate evidence and documents without copying values into Git. Produce one
-consolidated missing-facts/current-document decision for the owner, never inventing work rights,
-sponsorship, citizenship, clearance, experience, or answers. Rank at most three relevant roles from
-already-local normalized job data, prioritizing Melbourne/Victoria/Australia and evidence-backed fit;
-if no worthwhile role exists, record `FRESH_SOURCE_FETCH_REQUIRED` without fetching. Never select or
-submit the Shield AI London validation role.
-
-## Security, testing, rollback, and acceptance
-
-Primary risks are treating material uncertainty as harmless, losing a real page-level safety stop,
-retaining live content in a diagnostic, weakening cross-origin/write blocking, introducing a hidden
-retry, or accidentally enabling real fill/upload/submit. Controls are fixed enums, strict pairing,
-per-field unsupported status, terminal structural causes, bounded two-pass equality, synthetic-only
-browser fixtures, exact navigation/request counters, zero-value assertions, identity rotation, and
-privacy/history audits.
-
-Run format, lint, strict typecheck, focused inspection/unit/database tests, the complete unsupported
-matrix, hostile-page/lifecycle/identity/negative-authority tests, all unit/integration/E2E, local and
-showcase production builds/audit, privacy and dependency audits, release check,
-schema/pending/integrity/FKs, ignored backup/restore preview, migration immutability,
-`git diff --check`, and `git fsck --strict`. Acceptance requires a complete safe inventory with
-field-level unsupported entries, a fixed cause for every terminal unsupported synthetic pathway,
-zero real actions during remediation, no authority broadening, no migration, exact-head local and
-GitHub CI green, self-review, and normal merge only under the owner's standing offline authorization.
-
-Rollback is a normal revert of tracked code/docs. Immutable visits 1-6, capability history, private
-database/report evidence, and real-action counts are never rewritten. After merge, refresh clean main,
-archive the v5 proposal, prepare only the fresh v6 DRAFT offline, and park its approval gate while
-completing the application-engine, candidate-readiness, document, and local-role audits. Stop only
-when all remaining work needs fresh owner authority or facts.
-
-## Exact implementation sequence
-
-1. Commit this blueprint before application-code changes.
-2. Add strict unsupported-diagnostic contracts and failing runner/database pairing tests.
-3. Add fictional adapter/unit/E2E cases for every terminal cause and harmless field-level case.
-4. Implement v6 per-field inventory semantics, bounded section count, terminal diagnostics, and JSON
-   audit propagation without changing network or mutation behavior.
-5. Audit and, only where target-independent gaps exist, harden the synthetic application pipeline.
-6. Complete private candidate/document and local-role audits without network access or tracked values.
-7. Update docs and this plan with exact implementation and validation results.
-8. Run focused and complete release gates plus backup/migration/Git checks, commit, push one offline
-   PR, require exact-head CI, self-review, and merge normally if every condition passes.
-9. Refresh main, create only a production-derived adapter-v6 version-1/null-predecessor DRAFT, keep
-   source and target authority inactive, complete remaining offline audits, and return one compact
-   morning checkpoint with the first exact owner action.
-
-## Implementation and offline audit checkpoint - 2026-09-14
-
-Status: `IMPLEMENTED / LOCAL RELEASE GATES PASS / PR PENDING`. Blueprint commit
-`260032fa9f998acbd791ed9aa2c1d4d3e11524c0` precedes all runtime edits. The adapter identity is now
-`lever-real-inspection-v6`; form and policy contracts remain unchanged. No source request, employer
-visit, upload, submission, authentication action, capability approval, authority broadening, or
-migration occurred. Lifetime real source/employer/upload/submission counts remain `9/6/0/0`; active
-source and approved target capabilities remain zero.
-
-Implemented inspection behavior:
-
-- readable native controls with unfamiliar types or semantics are retained as per-field
-  `UNSUPPORTED` entries rather than terminating an otherwise trustworthy inventory;
-- structural uncertainty still terminates with `UNSUPPORTED_CONTROL`, now paired strictly with one
-  fixed value-free cause for blocked writes, downloads, control/label/form/section limits, unreadable
-  metadata, control-set mismatch, shadow controls, hidden steps, declared custom widgets, explicit
-  signals, or unknown state;
-- successful observations and audits include bounded visible-section counts; stopped audits and the
-  existing JSON summary retain only the closed diagnostic enum;
-- the passive browser still performs one `goto`, two bounded reads, GET/HEAD-only routing, zero
-  navigation retries and zero browser writes, and does not retain values, HTML, arbitrary page text,
-  response bodies, URLs beyond the approved binding, exception text, cookies, storage, or headers;
-- v5 visit 6 remains historical `UNSUPPORTED_CONTROL` with no subtype. The expanded fictional matrix
-  reproduces compatible mechanisms only and does not claim the exact live cause.
-
-The target-independent application-engine audit found and closed two synthetic safety gaps without
-enabling `REAL_TARGET` application operations. Adapter observations are now strict bounded Zod
-objects, and interrupted or malformed open/map/fill stages pause after exactly one call. Final consent
-now carries a digest of the complete frozen run binding; the database store validates every persisted
-binding field without a schema change. `MAP_FOR_FILL`, `FILL`, document-digest-verified `UPLOAD`, and
-fresh one-use-consent `SUBMIT` are ready for synthetic controlled validation only. Ambiguous or lost
-submit outcomes remain terminal `OUTCOME_UNKNOWN` with no retry. Real map/fill/upload/submit remains
-deliberately disabled until a successful inspection, a suitable non-validation target, and separate
-owner-reviewed operation authority exist.
-
-Private readiness was audited locally without copying values into Git. The private profile validates
-and contains verified identity, contact, location, three education records, three employment records,
-and 48 skill records. It contains no project records and no explicit profile facts for citizenship,
-sponsorship, relocation, clearance, or a declared years-of-experience answer; its work-right hours
-basis is not temporally bounded. Those are one consolidated missing-facts set and must remain unknown
-until owner evidence exists. Four current-profile CV artifacts exist, but all are stale, unapproved,
-and tailored to a retail role; there is no explicitly owner-approved current robotics/mechatronics CV.
-No upload is authorized. Already-local normalized jobs contain no worthwhile Melbourne/Victoria/
-Australia technical role, so the technical shortlist result is `FRESH_SOURCE_FETCH_REQUIRED`; no
-fetch or application is authorized, and the Shield AI London validation role remains forbidden for
-submission.
-
-Validation completed before the final documentation checkpoint:
-
-- format check, ESLint and strict TypeScript: pass;
-- focused application-runner/database suite: pass (136 tests before the final additional persistence
-  regression; that regression is rerun below before commit);
-- full unit: 49 files / 556 tests pass;
-- integration: 3 files / 21 tests pass;
-- Playwright E2E: 43 tests pass, including the expanded unsupported-control, hostile-page, lifecycle,
-  target-identity, synthetic application, accessibility and no-JavaScript matrices;
-- local production build, showcase build and public-showcase boundary audit: pass;
-- privacy audit: pass; all-dependency and production-dependency audits: zero vulnerabilities;
-- database: schema 8, pending migrations 0, integrity pass, foreign-key issues 0;
-- a fresh ignored private backup and its non-destructive restore preview: pass;
-- migrations `0000`-`0008`: unchanged; `git diff --check` and `git fsck --strict`: pass (only
-  pre-existing unreachable objects reported by fsck).
-
-Remaining sequence is to rerun the exact final local gates after the added persistence regression,
-commit and push this one offline change set, open one PR, require exact-head CI green, self-review and
-merge under the owner's conditional offline authorization. After clean merged main, archive the used
-v5 private proposal and derive only a new v6 family version-1/null-predecessor DRAFT from the still-
-current private packet. Do not approve or execute it. The first parked live gate will be the exact
-owner approval string for that DRAFT; a separate future one-shot owner start remains mandatory.
-
-## Final overnight checkpoint - 2026-09-14
-
-Status: `OFFLINE WORK COMPLETE / OWNER GATES PARKED`. Exact implementation head
-`68eb73faeb3f05ff1f4923395c455234b190f8ab` passed the clean-worktree release check and both exact-head
-GitHub quality runs. PR 36 merged normally as `afeae5326f4915c6ca74a7ad8a0b978a4f98895a`.
-Local `main` and `origin/main` were refreshed and matched that merge commit before this checkpoint
-branch was created. The final exact-head counts were 557 unit, 21 integration, and 43 E2E tests;
-format, lint, typecheck, local/showcase builds, showcase audit, privacy audit, dependency audits,
-schema 8/pending 0/integrity/FKs, backup/restore preview, migration immutability, diff check, and strict
-Git object verification all passed. Migrations `0000`-`0008` remain unchanged.
-
-The used v5 private proposal is archived as ignored local history. The production offline preparer
-revalidated the existing packet/job/profile/evaluation/source/destination bindings on merged main and
-created a new immutable v6-family DRAFT only:
-
-- capability `runner_54c11308154f25428d22350a`, version 1, predecessor null;
-- DRAFT digest `085da71304dece7cb2b0719e1ce8ba2f88df61e4b618d146f11cac85f5fc164d`;
-- packet `inspection_packet_275845864840bc559fec8224`, digest
-  `69cbad61af3830a30ce919cc1d0830696ddc2dbdd043965205c9c166e6196a78`;
-- adapter/form `lever-real-inspection-v6` / `lever-application-inspection-v1`;
-- policy/capability expiry `2026-09-15T11:22:54.576Z` / `2026-09-14T11:52:54.576Z`;
-- active capability false; authorized network actions zero.
-
-Post-preparation preflight and privacy audits pass. Active source capability count is zero; active
-approved real-target capability count is zero. Lifetime real source/employer/upload/submission counts
-remain `9/6/0/0`. First real target validation remains unproven. Source-enabled Personal Beta remains
-ready; Personal Live V1 remains not ready. All useful independent offline work in this run is complete:
-the application lane is synthetic-only, the candidate fact gaps require owner evidence, the four local
-CV artifacts require a new relevant current document and explicit owner approval, and a useful local
-Australian technical shortlist requires fresh source-network authority. The next operation must be
-owner approval of the exact v6 DRAFT before its expiry; even after that, a separate exact one-shot
-`INSPECT` start is mandatory. No Shield AI validation application may be submitted.
-
-## Adapter-v6 controlled inspection result - 2026-09-15
-
-Status: `SAFE TERMINAL STOP / NO RETRY AUTHORITY`. The initial v6 proposal above expired without
-approval or execution and remains ignored private history. From unchanged clean main
-`d64ccda0db72e4c8b01bd43a26140bd48a2735c0`, the production offline preparer revalidated the same
-current packet and created a fresh v6-family version-1/null-predecessor DRAFT. The owner approved
-that exact DRAFT, the normal immutable capability ledger persisted the resulting APPROVED digest
-`7a852c008b5d5fc49aca710cdfac374aa85a4501a448c47f28731513a593e391`, and a separate exact owner
-start authorized one `OPEN_AND_INSPECT_ONLY` attempt.
-
-Run `inspection_db6c1681-6bd0-47d9-b444-b3b6f1aa63df` performed exactly one employer navigation
-through `lever-real-inspection-v6` and stopped safely as `UNSUPPORTED_CONTROL`. Its fixed value-free
-diagnostic is `BLOCKED_WRITE_REQUEST`. The route was aborted before transmission. Candidate fields
-outbound, browser writes, form changes, uploads, and submissions were all zero; there was no retry.
-No raw HTML, request body, response body, cookie, storage, secret header, arbitrary page text, or
-candidate value was retained. The consumed authority was immediately succeeded by immutable version
-2 `REVOKED`, digest `23ea21e9043202a99103a7c4b9851099036d5f8a7b212e3fa843fefe30ac2fee`.
-The current active approved real-target capability count is zero.
-
-Offline diagnosis found no defect within the approved v6 contract. The adapter aborts every
-non-`GET`/`HEAD` request and treats the attempt as structural uncertainty. The exact owner-reviewed
-inspection authority also required any write request to stop. Silently continuing after the blocked
-request would therefore change and weaken the reviewed safety contract; it is not an authorized
-remediation. No v7 adapter, replacement DRAFT, or employer visit #8 is created automatically.
-
-Lifetime real source/employer/upload/submission counts are now `9/7/0/0`. First real employer target
-validation remains unproven, Source-enabled Personal Beta remains `READY`, and Personal Live V1
-remains `NOT_READY`. All previously recorded candidate-fact, current-CV, local-shortlist, and
-synthetic-only application-operation blockers remain unchanged. Any next Shield AI inspection would
-require an explicit owner-reviewed architecture decision about whether an aborted page-generated
-write attempt may coexist with a trustworthy passive inventory, a separately reviewed adapter
-version and offline test proof, then a new exact capability approval and fresh one-shot start. The
-Shield AI London role remains technical validation only and must never be filled or submitted.
-
-The documentation-only terminal checkpoint passed the full local release check: format, ESLint,
-strict TypeScript, 557 unit tests, 21 integration tests, 43 Playwright E2E tests, local and showcase
-production builds, public-showcase audit, privacy audit, all-dependency and production-dependency
-audits with zero vulnerabilities, schema 8/pending 0/integrity pass/foreign-key issues 0, and release
-classification. `git diff --check` passed. `git fsck --strict` reported only the previously known
-unreachable objects and no repository corruption. No migration or application-code change was made.
-
-## Offline scriptless passive-inspection remediation blueprint - 2026-09-15
-
-Current state: clean `main` at merge commit `533b8ab7bcff29761804b7b322156ce01a5d3a25` records the
-single v6 visit as a policy-correct `BLOCKED_WRITE_REQUEST` stop. The v6 capability is terminal,
-active approved source and target capability counts are zero, and lifetime real
-source/employer/upload/submission counts are fixed at `9/7/0/0`. No live authority exists for this
-branch.
-
-Objective: preserve the existing fail-closed rule that any observed non-`GET`/`HEAD` request stops an
-inspection, while preventing employer page scripts from originating such requests in the first
-place. The production fresh-browser inspection context will disable JavaScript before navigation.
-This is a narrower passive execution environment, not permission to ignore, inspect, replay, or send
-a blocked request. It must remain compatible with server-rendered form inspection and retain every
-existing origin, destination, popup, download, protection, structural-stability, no-write, and
-zero-retry gate.
-
-Assumptions and requirements:
-
-- the live diagnostic proves only that a non-read request was attempted; its body, endpoint, purpose,
-  and initiating script remain deliberately unknown and must not be inspected or inferred;
-- the public target is inspectable only if its useful structural form is server rendered; if a
-  scriptless future visit exposes no trustworthy form, the existing `FORM_CHANGED`/structural stop
-  remains authoritative;
-- direct adapter tests with JavaScript enabled must continue to prove that a generated write request
-  is aborted and terminates as `BLOCKED_WRITE_REQUEST`;
-- only the production fresh-browser wrapper changes runtime policy by setting
-  `javaScriptEnabled: false`; service workers remain blocked, permissions empty, downloads disabled,
-  exactly one navigation and zero retries/writes remain mandatory;
-- runtime semantics change, so the adapter identity advances from
-  `lever-real-inspection-v6` to `lever-real-inspection-v7`. Because adapter version is part of the
-  deterministic target identity, any later proposal must be a new family at version 1 with null
-  predecessor;
-- there is no schema change or migration. Migrations `0000`-`0008` remain immutable.
-
-Proposed files and data flow:
-
-- `packages/application-runner/src/lever-inspection-adapter.ts`: bump the reviewed adapter constant
-  to v7 and create the fresh browser context with JavaScript disabled; do not change route or DOM
-  classification behavior;
-- `tests/e2e/target-inspection.spec.ts`: add a production-wrapper regression using the fictional
-  server-rendered `blocked-write` fixture. The same fixture must stop in a normal script-enabled
-  direct-adapter context, while the scriptless fresh-browser path must complete with a safe field
-  inventory, zero non-read transmission, and zero mutation;
-- `docs/OFFLINE_GO_LIVE_ENABLEMENT.md` and `docs/PERSONAL_LIVE_V1.md`: describe v7 accurately as an
-  offline-remediated, unvalidated real-target path and retain the requirement for separate exact
-  approval and owner start;
-- `PROJECT_PLAN.md`: record implementation, tests, security/privacy evidence, and remaining gates.
-
-Dependencies are unchanged: the existing Playwright runtime, local fictional fixtures, immutable
-capability model, packet binding, and database ledger are reused. Security/privacy risks are an
-incomplete scriptless form, accidental relaxation of blocked-write handling, script-dependent
-protection signals becoming invisible, or a false claim of real validation. Mitigations are the
-existing two-pass stable DOM checks, exact form/version/submit requirements, explicit protection
-markup inspection, unchanged route-level method/origin enforcement, versioned capability identity,
-synthetic differential coverage, and continued `NOT_READY` classification until a separately
-authorized real validation completes. No page content, request body, response body, cookies,
-storage, headers, candidate values, or live URLs beyond the already approved target identity may be
-added to Git or diagnostics.
-
-Testing strategy: run focused application-runner and target-inspection suites first, then format,
-lint, strict typecheck, all unit and integration tests, both production builds, all E2E, privacy and
-dependency audits, database status, migration immutability, backup/restore preview, release check,
-`git diff --check`, and `git fsck --strict`. Real source, employer, upload, and submission actions for
-this implementation must remain `0/0/0/0`. Rollback is a normal revert of the v7 code/docs commit;
-the historical v6 run and capability versions remain immutable private evidence.
-
-Acceptance criteria: the script-enabled fictional write fixture still stops with
-`BLOCKED_WRITE_REQUEST`; the production fresh-browser wrapper disables JavaScript and completes the
-same server-rendered fixture without any non-read transmission or mutation; all existing safety
-matrices and full gates pass; exact-head CI is green; no migration or authority broadening exists;
-and one offline PR may merge under the owner's standing conditional authorization. Only after a
-clean merged main may the preparer derive a v7 DRAFT. That DRAFT must remain unapproved and
-unexecuted until fresh exact owner approval and a separate one-shot `INSPECT` confirmation.
-
-Implementation steps: (1) encode this blueprint; (2) bump adapter identity and disable JavaScript in
-the fresh production browser context; (3) add the differential fictional regression; (4) update
-readiness docs; (5) run focused and full validation; (6) record actual results; (7) commit, push, open
-one offline PR, require exact-head CI, self-review and merge only if every conditional gate passes;
-(8) refresh clean main and prepare only the next ignored v7 DRAFT if all private bindings remain
-current.
-
-Implementation result: `OFFLINE COMPLETE / REVIEW GATES IN PROGRESS`. Adapter identity is now
-`lever-real-inspection-v7`. The production fresh-browser wrapper sets `javaScriptEnabled: false`
-before creating its sole page; request routing, method/origin blocking, DOM classification, binding,
-audit, zero-mutation, and zero-retry behavior are otherwise unchanged. A new differential E2E proves
-that the production wrapper completes the server-rendered fictional `blocked-write` form without a
-non-read transmission, while the existing script-enabled matrix still stops the same fixture as
-`UNSUPPORTED_CONTROL` / `BLOCKED_WRITE_REQUEST`.
-
-Validation results: focused runner tests passed (63); the new production-wrapper E2E passed; the
-complete script-enabled inspection matrix passed; and the full release check passed with format,
-ESLint, strict TypeScript, 557 unit tests, 21 integration tests, 44 E2E tests, both production builds,
-public-showcase audit, privacy audit, all-dependency and production-dependency audits with zero
-vulnerabilities, schema 8/pending 0/integrity pass/foreign-key issues 0, and correct release
-classification. Ignored private backup `backup-2026-09-14T20-39-54.644Z-bf2459df` and its
-non-destructive restore preview both passed at schema 8/integrity pass. No migration changed;
-migrations `0000`-`0008` remain immutable. `git diff --check` passed, and `git fsck --strict` reported
-only the previously known unreachable objects. This offline implementation made zero real source,
-employer, upload, or submission actions; lifetime counts remain `9/7/0/0`. Remaining work is exact
-commit/push CI, self-review, conditional merge, clean-main refresh, and an offline v7 DRAFT only if
-the current private packet bindings still pass production preparation.
-
-## Final v7 owner-gate checkpoint - 2026-09-15
-
-PR 39 passed both exact-head GitHub quality runs at
-`6241d0c6de9a4d81f03bbb174dfb337be24c03e3` and merged normally as
-`f7452058a4a42e77c8fd40358ecdd1b10bc56cff`. Local `main` and `origin/main` were clean and equal at
-that merge before proposal preparation. The consumed v6 proposal was archived as ignored private
-history. The production preparer revalidated the unchanged packet, job, profile, evaluation, source,
-and destination bindings and created only this new v7-family DRAFT:
-
-- capability `runner_0b90dfd4fffe091d3a9a3f6c`, version 1, predecessor null;
-- DRAFT digest `bd209a79932245e86edf90eec7f3b573bedc534381acb4ede6973a58d8dcb9fd`;
-- packet `inspection_packet_275845864840bc559fec8224`, digest
-  `69cbad61af3830a30ce919cc1d0830696ddc2dbdd043965205c9c166e6196a78`;
-- adapter/form `lever-real-inspection-v7` / `lever-application-inspection-v1`;
-- operation `[OPEN_AND_INSPECT_ONLY]`, policy `real-target-inspection-v1`;
-- policy/capability expiry `2026-09-15T20:45:14.392Z` / `2026-09-14T21:15:14.392Z`;
-- active capability false; authorized network actions zero.
-
-The new family has zero persisted ledger rows and current active approved real-target capabilities
-remain zero. Post-preparation preflight and privacy audit pass; the database remains schema 8,
-pending migrations 0, integrity pass, and foreign-key issues 0. Lifetime real
-source/employer/upload/submission counts remain `9/7/0/0`. No v7 employer request has occurred.
-Source-enabled Personal Beta remains `READY`, first real target validation remains unproven, and
-Personal Live V1 remains `NOT_READY`. The next action is exact owner approval of this DRAFT before
-its expiry. Approval alone must not start inspection; a separate exact one-shot `INSPECT`
-confirmation remains mandatory.
-
-## Durable first-real-target validation readiness blueprint - 2026-09-15
-
-Current state: clean branch `fix/real-target-validation-readiness` starts from merged `main`
-`eaa78a6e1ca76d5d329b090fc727e6ea6c229286`. Under the owner's exact one-shot v7 authority, run
-`inspection_f0af2018-8022-42ad-8406-fe478f134a6d` completed a passive inspection of the exact bound
-Shield AI target through `lever-real-inspection-v7`. It produced a bounded 79-control value-free
-inventory with zero browser writes, form changes, candidate fields outbound, uploads, or submissions.
-The consumed approved capability version was immediately succeeded by immutable version 2
-`REVOKED`; active approved real-target capabilities returned to zero. Schema 8, pending migrations
-zero, integrity, foreign keys, privacy, and preflight checks pass. Lifetime real
-source/employer/upload/submission counts are now `9/8/0/0`.
-
-Objective: correct the offline preflight and release projections so the completed, scope-consistent,
-terminally revoked real-target inspection is recognized as durable proof of first real target
-validation. This is classification logic only. It must not grant target authority, enable a runner
-operation, remove the continuing per-target owner-approval requirement, or classify Personal Live V1
-as ready.
-
-Assumptions and requirements:
-
-- proof must be derived only from local private database evidence already written by the normal
-  inspection runner and immutable capability ledger; no separate mutable readiness flag is needed;
-- a row qualifies only when its binding is `COMPLETED`, has no safe stop reason, has a bounded nonzero
-  field inventory, and joins to the originally `APPROVED` `REAL_TARGET` capability for exactly
-  `[OPEN_AND_INSPECT_ONLY]`;
-- target URL/origin/path, form contract, and adapter recorded on the binding must exactly match the
-  bound capability and remain within its approved destination scope;
-- the classification summary must be valid, bounded, value-free aggregate JSON, and a direct
-  successor of the consumed capability must prove terminal `REVOKED` state;
-- missing tables, missing evidence, stopped/opened/bound runs, malformed JSON, inconsistent bindings,
-  unbounded counts, or nonterminal authority must fail closed to `REQUIRED`;
-- current target authority remains `TARGET_APPROVAL_REQUIRED`, Source-enabled Personal Beta remains
-  `READY`, and Personal Live V1 remains `NOT_READY` because every future employer target interaction
-  still requires a fresh exact owner-approved capability and separate start;
-- migrations `0000`-`0008` are immutable and no migration is required.
-
-Architecture and proposed files:
-
-- `scripts/lib/target-readiness.ts`: add a small read-only, Zod-validated projection over the existing
-  runner inspection and target capability tables. Return only `PROVEN`/`REQUIRED` and a count of
-  qualifying completed inspections; never expose field labels, employer prose, candidate data, or
-  target content;
-- `scripts/lib/target-readiness.test.ts`: cover absent schema/evidence, stopped or inconsistent rows,
-  malformed aggregates, missing terminal revocation, and a valid completed/revoked lineage;
-- `scripts/preflight-summary.ts` and `scripts/release-summary.ts`: consume the projection while the
-  private database is open, report first-real-target validation independently from current target
-  authority, and omit only the stale `FIRST_REAL_TARGET_VALIDATION_REQUIRED` blocker when proof is
-  valid;
-- readiness documentation and this plan: record the real validation outcome, unchanged authority
-  boundary, exact validation results, and remaining owner gates without private field values.
-
-Data flow: read-only SQLite connection -> table existence check -> bounded joined inspection rows ->
-strict row/aggregate validation -> exact destination/contract/operation/terminal-lineage checks ->
-aggregate readiness result -> safe one-line preflight/release status. Dependencies remain the existing
-`better-sqlite3`, Zod, schema 8, and immutable capability records. No network, browser, application,
-candidate-document, or private-data write occurs in this implementation.
-
-Risks include treating a stopped or structurally inconsistent run as proof, conflating historical
-validation with present authority, leaking target contents through summaries, or breaking release
-checks against databases predating schema 8. Mitigations are fail-closed table detection, strict
-bounded parsing, exact cross-record comparisons, proof of a revoked successor, aggregate-only output,
-and explicit independent reporting of `TARGET_APPROVAL_REQUIRED`. Rollback is a normal revert of this
-offline code/docs commit; the private completed run and immutable capability history remain untouched.
-
-Testing strategy: run focused target-readiness tests, then format, lint, strict typecheck, complete
-unit/integration/E2E suites, both production builds, privacy and dependency audits, database
-schema/integrity/foreign-key checks, migration immutability, backup/restore preview, preflight,
-release check, `git diff --check`, and `git fsck --strict`. Implementation-time real
-source/employer/upload/submission actions must remain `0/0/0/0`.
-
-Acceptance criteria: the valid completed v7 run plus revoked successor yields
-`first_real_target_validation=PROVEN`; every unsafe or incomplete synthetic case yields `REQUIRED`;
-release output no longer claims `FIRST_REAL_TARGET_VALIDATION_REQUIRED`; current runner authority
-still reports `TARGET_APPROVAL_REQUIRED`; Personal Live V1 remains `NOT_READY`; all local and exact-head
-CI gates pass; no migration or authority broadening occurs. Implementation steps: (1) encode this
-blueprint; (2) implement the fail-closed projection and tests; (3) integrate both summaries; (4) update
-readiness docs; (5) run focused and full validation; (6) record actual results; (7) commit, push, open
-one offline PR, require exact-head green CI, self-review, and merge only under the owner's existing
-conditional offline authorization; (8) refresh clean main and stop at the next genuine owner gate.
-
-Implementation result: `OFFLINE COMPLETE / LOCAL GATES PASS`. The new read-only readiness projection
-checks only schema-8 aggregate inspection/capability evidence and fails closed unless a completed real
-target binding is internally scope-consistent and has an immediate revoked successor. Seven focused
-regressions cover missing schema/evidence, stopped evidence, malformed aggregates, adapter mismatch,
-broadened operations, unbounded counts, nonterminal authority, and the valid completed/revoked case.
-Against the ignored private database it reports exactly one qualifying completed inspection:
-`first_real_target_validation=PROVEN completed_inspection_count=1`. Current runner state remains
-`TARGET_APPROVAL_REQUIRED`, the stale `FIRST_REAL_TARGET_VALIDATION_REQUIRED` blocker is removed,
-and Personal Live V1 remains `NOT_READY` with `REAL_RUNNER_TARGET_APPROVAL_REQUIRED`.
-
-Validation results: the complete release check passed after a no-diff local line-ending normalization
-of two already-merged v7 files. Formatting, ESLint, strict TypeScript, 564 unit tests, 21 integration
-tests, both production builds, public-showcase audit, 44 Playwright E2E tests, privacy audit over 318
-tracked files/1,015 history paths/1,013 history blobs/1,608 build-test artifacts/11 canaries, and both
-dependency audits with zero vulnerabilities passed. The private database remains schema 8, pending
-migrations 0, integrity `PASS`, foreign-key issues 0. Ignored backup
-`backup-2026-09-14T23-38-40.497Z-33369254` and its non-destructive restore preview passed at schema 8
-with integrity `PASS`. Migrations `0000`-`0008` have no diff from merged main. `git diff --check`
-passed; `git fsck --strict` reported only the previously known dangling objects and no corruption.
-No migration or dependency change was made. This implementation made zero real source, employer,
-upload, or submission actions; lifetime counts remain `9/8/0/0`.
-
-Remaining work: commit the coherent offline delta, push this branch, open one PR, require both
-exact-head CI events, self-review the diff and merge only if the standing conditional offline gates
-remain satisfied, then refresh clean `main`. The next product action remains owner-gated: historical
-target validation grants no present source or employer authority, and no fill/upload/submit path is
-enabled.
-
-## Persistent green-banner grant and supervised-readiness train - 2026-09-22
-
-Current state: clean `main` at `227df70175f6beed75e4812fa0aee6668216de2f`, with first real target
-validation proven from one completed, revoked passive inspection. Source and target capabilities are
-inactive; lifetime real source/employer/upload/submission counts are `9/8/0/0`. Personal Live V1 is
-not ready because no genuinely suitable Australian technical role has been selected and the real
-application-operation lane is not yet enabled.
-
-Objective: implement the standing owner-authorized `GREEN_BANNER_SESSION_GRANT_V1` as a narrow parent
-authority, then use only deterministic short-lived child capabilities to advance safe readiness toward
-one supervised real application. The parent never authorizes `SUBMIT`; it may cover bounded public
-source discovery, role evaluation, passive target inspection, evidence-backed CV generation, packet
-freezing, MAP_FOR_FILL/FILL/UPLOAD validation, and fill-preview. A fresh one-use final-submit consent
-remains required after the green banner and no submission may occur in this train.
-
-Requirements and safety boundaries:
-
-- the parent grant is immutable, digest-bound, auditable, and stored privately; its allowed-operation
-  ceiling is a closed set that explicitly excludes `SUBMIT`;
-- every child binds operation, source/provider or target origin/path/tenant, packet and current main,
-  plus document/answer/disclosure digests where applicable; child expiry remains short and terminal;
-- child scope is a strict subset of the parent ceiling and cannot widen provider, host, path, tenant,
-  target, packet, adapter, form, document, answer, disclosure, or operation scope;
-- expired children may be re-derived only from the still-valid parent and the same immutable scope;
-- all live source requests remain bounded, public, unauthenticated, HTTPS-only, candidate-blind,
-  redirect-free where required, and protected by existing DNS/host/path/query/byte/time/retry caps;
-- employer interaction remains passive until a suitable role and packet exist; CAPTCHA, MFA, auth,
-  bot, access, rate, destination, form, unsupported-control, or site-drift signals stop and exclude a
-  target without bypass or blind retry;
-- real fill-preview may enter only evidence-backed values and upload the exact frozen current CV;
-  final submit is excluded and ambiguous outcomes remain `OUTCOME_UNKNOWN`;
-- no candidate fact is inferred. Unknown citizenship, visa/work-right, sponsorship, clearance,
-  dates, years of experience, or application answers remain `REVIEW_REQUIRED` and may disqualify a
-  role; local profile evidence is the only claim source;
-- private profile, database, generated CV, packet, browser state, cookies, and live payloads remain
-  ignored/local and never enter Git, CI, reports, or diagnostics.
-
-Architecture and proposed files:
-
-- additive migration `0009_green_banner_session_grant.sql` adds immutable parent grant and child binding
-  ledgers with explicit operation ceilings, deterministic digests, scope JSON, terminal state, and
-  parent foreign keys; migrations `0000`-`0008` remain byte-for-byte unchanged;
-- `packages/application-runner/src/green-banner-grant.ts` defines strict parent/child schemas,
-  canonical digests, deterministic child derivation, subset checks, expiry, and terminal transitions;
-- `packages/database/src/green-banner-repository.ts` persists and validates parent/child lineage
-  transactionally without exposing private values;
-- source discovery reuses the existing Lever/Greenhouse secure transports and R2 persistence, while
-  a target-independent operation engine extends synthetic proofs to real-target child authority;
-- current-document generation reuses the fact-bound resume engine and writes only to the ignored
-  private artifact root; packet binding reuses current job/profile/evaluation/document digest checks.
-
-Data flow: parent grant record -> bounded child scope derivation -> immutable child ledger -> source or
-target runner -> evidence-only persistence -> terminal child state -> aggregate readiness projection.
-Dependencies remain Zod, SQLite, existing source adapters/transports, application runner, resume engine,
-and current R2 version bindings. No network request occurs while implementing or testing the authority
-primitive.
-
-Risks are parent-scope escalation, accidental submit exposure, stale packet/document use, candidate
-data disclosure, capability reuse after expiry, and source/target retry. Mitigations are closed enums,
-canonical digest comparison, strict subset checks, current-version joins, one-use terminal children,
-short expiries, route-level caps, privacy audits, synthetic hostile fixtures, and explicit submit
-exclusion tests. Rollback is a normal revert plus tested backup restore; old capability and inspection
-history remain immutable.
-
-Testing strategy: parent/child digest and scope-escalation unit tests; migration fresh/upgrade/restore
-tests; synthetic source and target child lifecycle tests; stale packet/document/answer/disclosure
-tests; negative submit, expiry, replay, and terminal-state tests; then the complete format/lint/
-typecheck/unit/integration/build/E2E/privacy/dependency/preflight/release/diff/fsck matrix. Live
-action counts during authority implementation are `0/0/0/0`.
-
-Acceptance criteria: a valid parent can derive only allowed short-lived children; every broadened child
-or `SUBMIT` request fails closed; child expiry/revocation is terminal and replay-free; schema and FKs
-remain valid; exact-head CI is green; no private data or network action is introduced by the offline
-PR. After merge, use the parent to discover a suitable Australian technical role, generate a verified
-engineering CV, freeze a packet, inspect the selected target, and prove controlled real fill-preview.
-Stop at `# 🟢 **WE ARE READY**` only when every stated criterion is evidenced; otherwise stop only at
-an irreducible owner-only factual blocker.
-
-Implementation steps: (1) encode this blueprint; (2) add migration 0009 and immutable grant domain;
-(3) add repository and synthetic scope/replay tests; (4) run full gates, commit, push, open one PR,
-wait for exact-head CI, self-review and merge under the standing grant; (5) refresh main; (6) create
-the parent grant record privately; (7) derive and execute bounded source children until a suitable role
-exists; (8) generate/freeze the evidence-backed current CV and packet; (9) extend/validate real target
-MAP/FILL/UPLOAD offline and with one controlled fill-preview; (10) record exact results and stop at
-green readiness or a single consolidated owner-only factual blocker.
-
-### Continuation result - bounded source discovery
-
-The private database was backed up and migrated additively to schema 9 before execution. The parent grant
-was initialized privately and remained ACTIVE. A first launch failed before any network request because
-the orchestration helper was imported from the wrong package; the stale child was revoked through the
-normal immutable workflow. The corrected child then performed one bounded public Shield AI Lever run:
-four GET requests, four pages, 100 provider records, and 83 persisted observations/job versions. No
-candidate data was sent. The source capability was revoked and its child consumed after completion;
-active approved source capabilities returned to zero.
-
-The source-to-R2 handoff initially used the legacy importer evaluator and stopped before queue completion.
-This was diagnosed offline, corrected to use the current R2 normalization/evaluation/queue repositories,
-and replayed without another network request. All 83 records now have current R2 evaluations and queue
-decisions; replay is idempotent. All three Melbourne roles are `REVIEW_REQUIRED` (not recommended) because
-current extraction coverage and eligibility evidence are incomplete; the two technical candidates are
-`Engineer II, Autonomy (R5713)` and `Computer Vision Engineer (C++) (R4633)`. Unknown work-rights,
-experience, skills, hours, licences, certifications, education, schedule, and vehicle facts remain
-unknown and were not inferred. Lever `lists[]`, workplace type, and inert text handling were observed in
-the persisted source payloads without rendering or retaining raw payloads in reports.
-
-Safe run evidence: source run `0dba8b34-fb59-4cc8-a7ef-c3b97e8d5bbf` is COMPLETE with request/page/record
-counts `4/4/100`; accepted/persisted counts are `100/83`; R2 evaluations/queue decisions are `83/83`.
-Lifetime real-action counts are source `13`, employer visits `8`, uploads `0`, submissions `0` (the source
-count includes the four requests in this run). No employer target was visited. The next task is to
-prepare a private local packet for the best reviewable Melbourne technical role, then continue the
-standing-grant target/packet readiness gates without submitting.
-
-### Continuation result - private document and passive target inspection
-
-For `Computer Vision Engineer (C++) (R4633)` (`2cfe6692-a266-4d27-8832-ef652fa57ee4`), a current
-fact-bound CV was generated privately as PDF and DOCX, validated, and approved locally. A review-only
-packet was frozen with the exact Lever apply URL and current job/profile/legacy-evaluation bindings;
-its readiness remains `REVIEW_REQUIRED` because the source expiry is unknown and the R2 result is not
-eligible/recommended. This did not authorize fill or submission.
-
-Under the standing grant, one parent-derived `OPEN_AND_INSPECT_ONLY` child and one matching short-lived
-runner capability were used for exactly one real employer inspection of that non-validation Shield AI
-role. The inspection completed safely: 46 controls were inventoried, with 27 unsupported controls and
-one document-required control. No candidate values were entered or sent; clicks, writes, uploads, and
-submissions were all zero. The target capability was revoked and the child consumed immediately;
-current active approved real-target capabilities are zero. Historical expired/revoked capability rows
-remain immutable and are not active.
-
-This establishes passive target compatibility only. Fill-preview cannot proceed without owner facts for
-the unresolved review blockers and safe answers for required/unsupported controls. No answer was
-invented and no protection was bypassed. Lifetime counts are now source `13`, employer visits `9`,
-uploads `0`, submissions `0`.
-
-### Validation and release checkpoint
-
-After the live evidence was persisted, the full local matrix passed: Prettier, ESLint, TypeScript,
-unit (`52` files / `575` tests), integration (`3` files / `21` tests), production local and showcase
-builds, E2E (`44` passed), privacy audit, dependency audits (zero vulnerabilities), doctor, preflight,
-database status, restore preview and confirmed restore, `git diff --check`, and strict fsck inspection.
-The real database is schema 9 with zero pending migrations, integrity PASS, and zero foreign-key issues;
-the schema-9 backup restored successfully with a recovery backup. Migrations `0000`-`0008` remain
-unchanged; `0009` is additive only. Release summary classified Source-enabled Personal Beta READY and
-Personal Live V1 NOT_READY with `REAL_RUNNER_TARGET_APPROVAL_REQUIRED` plus the unresolved role facts
-above. No final-submit consent was issued and no submission occurred.
-
-### Post-merge persistent grant checkpoint - 2026-09-22
-
-PR #42 (`feat: add persistent green banner readiness grant`) was reviewed at exact head
-`cfc92088dd2eed295117efe3e378cf4aae148057`. Both exact-head GitHub quality workflows passed
-(`35667558221` and `35667575630`), and the pull request was merged normally as
-`467e288959edd6983c5086bbee979aad23e434d8`. Local `main` was refreshed with fast-forward only and
-matches `origin/main` at that merge commit; the worktree is clean. The additive schema-9 grant
-implementation is now on `main`; migrations `0000`-`0008` remain immutable.
-
-Post-merge offline checks passed: database schema 9, pending migrations 0, integrity `PASS`, foreign
-key issues 0; privacy audit; doctor/preflight; release summary; `git diff --check`; and strict fsck
-inspection (only previously known dangling objects). The release classification is
-`SOURCE_ENABLED_PERSONAL_BETA_READY`; source and target authorities are inactive. Lifetime real-action
-counts remain source `13`, employer visits `9`, uploads `0`, submissions `0`.
-
-The persistent parent grant remains submit-excluded. Its completed bounded source discovery, current
-engineering CV generation, private packet freeze, and one passive inspection are preserved locally;
-no further live source or employer action was taken after the merged implementation. Personal Live V1
-is still `NOT_READY`: the selected Melbourne technical role remains `REVIEW_REQUIRED` because material
-eligibility/application facts are unsupported or unknown (including job expiry, work rights or
-sponsorship, experience/skills, education/certifications/licences, hours/schedule, and vehicle where
-applicable), and the inspected form contains unsupported controls plus a required document control.
-No candidate answer was invented, no fill-preview or upload was attempted, and no submit consent was
-issued. These are now the sole owner-only factual gates; the next step requires the owner to provide
-truthful answers/evidence for the required fields and explicitly resolve any unsupported control before
-any bounded MAP/FILL/UPLOAD preview can be considered. Final submission remains separately excluded.
+- [ ] Code rollback test.
+- [ ] Config rollback test.
+- [ ] Isolated DB restore test.
+- [ ] Prove restore cannot resurrect consumed consent/authority.
+- [ ] Prove restore cannot cause duplicate submission.
+- [ ] Incident response/kill switch.
+- [ ] Credential/session revocation.
+- [ ] Provider drift procedure.
+- [ ] Operator install/start/stop/check/backup/restore/rollback guide.
+
+Exit: another engineer can operate/recover the system safely.
+
+## 8. Testing and verification matrix
+
+Repository commands to map to tasks:
+
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run test:integration`
+- `npm run build`
+- `npm run test:e2e`
+- `npm run privacy:audit`
+- `npm audit`
+- `npm run audit:production`
+- `npm run db:status`
+- `npm run preflight`
+- `npm run release:check`
+- backup/restore commands
+- `git diff --check`
+- `git fsck --strict`
+
+Integration path:
+`profile -> source -> observation -> normalization -> R2 -> queue -> document -> packet -> inspection -> map -> fill -> upload -> review -> consent -> outcome`
+
+Regression must cover:
+
+- source drift;
+- inert content;
+- page/request budgets;
+- restart/replay;
+- accepted-to-persistence boundary;
+- source accounting;
+- current R2;
+- packet staleness;
+- capability identity;
+- parent/child scope;
+- destination/popup/write-request behavior;
+- unsupported controls;
+- document mismatch;
+- duplicate external action;
+- ambiguous outcome.
+
+Security/privacy must cover:
+
+- SSRF/DNS/host/path/query;
+- target origin/path;
+- redirects;
+- no secret logs;
+- no candidate data in source discovery;
+- parent revocation;
+- child expiry/replay;
+- unauthorized operations;
+- submit exclusion;
+- candidate isolation;
+- upload disclosure;
+- private artifact exclusion from Git/CI/build/showcase.
+
+Host/device:
+
+- Windows/PowerShell;
+- Node/npm;
+- SQLite;
+- Chromium;
+- headless/headful assumptions;
+- PDF fonts/rendering;
+- disk exhaustion;
+- interrupted process;
+- reboot/sleep;
+- connectivity loss;
+- timezone/DST;
+- concurrent processes.
+
+Robotics hardware: `NOT_APPLICABLE` unless a real dependency is introduced.
+
+## 9. Safety/failure handling
+
+- Unknown facts stay unknown.
+- Protection signal => stop.
+- Ambiguous submit => `OUTCOME_UNKNOWN`.
+- No blind retry.
+- Typing/upload are external disclosure operations before final submit and must be scoped/audited.
+- Persist only minimal safe evidence needed for audit/recovery.
+
+## 10. Database/migration/backup/recovery
+
+Expected current state to verify:
+
+- schema 9;
+- pending 0;
+- integrity PASS;
+- FK issues 0;
+- migrations 0000-0008 immutable;
+- 0009 additive.
+
+Checklist:
+
+- [ ] migration hashes/status;
+- [ ] future-schema refusal;
+- [ ] transaction boundaries;
+- [ ] WAL-aware backup correctness;
+- [ ] isolated restore;
+- [ ] authority reconciliation after restore;
+- [ ] restore cannot resurrect consumed submit consent or cause duplicate external actions.
+
+## 11. Staging/pre-production
+
+- separate DB;
+- separate grants;
+- separate documents;
+- separate browser state;
+- separate ports;
+- synthetic external targets only;
+- release artifact digest;
+- release SHA;
+- schema compatibility;
+- config version;
+- recovery rehearsal.
+
+## 12. Deployment procedure
+
+Production runbook must include:
+
+1. stop writers;
+2. verify approved artifact;
+3. verify config/secrets without printing;
+4. verify schema;
+5. create/verify backup;
+6. migrate only if required;
+7. install/start;
+8. health/version/schema checks;
+9. verify external actions default-deny;
+10. verify authority state;
+11. verify browser runtime/private storage;
+12. enable only approved scope;
+13. monitor;
+14. roll back on defined trigger.
+
+## 13. Blocker register
+
+Use:
+`ID | category | affected task | evidence | impact | resolver | next action | unblock condition`
+
+Categories:
+
+- `OWNER_FACT`
+- `OWNER_DECISION`
+- `ENGINEERING`
+- `PROVIDER_EVIDENCE`
+- `CONFIGURATION`
+- `SECURITY_POLICY`
+- `MISSING_VERIFICATION`
+
+Initial blockers:
+
+| ID      | Category             | Affected task | Evidence                                                                                                                                                  | Impact                                                                                                         | Resolver / next action                                                                           | Unblock condition                                                                     |
+| ------- | -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| BLK-001 | ENGINEERING          | P4            | Real-target capability schema rejects application operations; only inspection is allowed.                                                                 | No real MAP/FILL lane exists.                                                                                  | Implement a separately scoped, non-submit real operation lane with frozen authority and audits.  | Synthetic and integration tests prove exact target/form/packet binding and no submit. |
+| BLK-002 | MISSING_VERIFICATION | P4            | No real upload, verify, or fill-preview adapter method, runner method, persistence, or lifecycle audit.                                                   | UPLOAD/VERIFY/FILL_PREVIEW cannot be claimed ready.                                                            | Add explicit operation entry points and durable lifecycle evidence, or keep them disabled.       | Positive and negative tests cover each operation and protection stop.                 |
+| BLK-003 | PROVIDER_EVIDENCE    | P2/P7         | Selected provider record has no datePosted/expiry and empty extracted requirements.                                                                       | Role freshness and job-level requirements remain unknown; packet cannot be current for application operations. | Obtain a fresh bounded provider record or retain REVIEW_REQUIRED.                                | Provider evidence supplies temporal bounds and material requirements.                 |
+| BLK-004 | MISSING_VERIFICATION | P2/P4         | Current R2 evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5` differs from packet's legacy evaluation `b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`.              | Existing packet is stale for any application operation.                                                        | Regenerate/rebind a private packet only after current role/evaluation gates pass.                | Packet job/profile/evaluation/document digests are all current and audited.           |
+| BLK-005 | ENGINEERING          | P4/P7         | Inspection recorded 27 unsupported controls and 1 document-required control.                                                                              | Unknown controls must fail closed; no fill/upload readiness.                                                   | Classify supported controls and implement conservative handling; stop on uncertainty.            | Every material control has a tested supported or safe-stop disposition.               |
+| BLK-006 | MISSING_VERIFICATION | P3            | Run accounting proves `100 accepted = 83 created + 17 deterministic duplicate/no-op dispositions`, but individual duplicate identities were not retained. | Aggregate accounting is sound; per-record audit cannot be independently reconstructed.                         | Add per-record disposition audit in a future integrity task if required.                         | Restart/replay and per-record disposition tests provide durable evidence.             |
+| BLK-007 | SECURITY_POLICY      | P4/P7         | Current policy permits real passive inspection only; SUBMIT is excluded and real application operations are rejected.                                     | No real fill/upload/submit action may run under current authority.                                             | Require a future reviewed policy and code change before enabling any real application operation. | Explicit policy approval plus exact-head reviewed implementation.                     |
+| BLK-008 | MISSING_VERIFICATION | P4/P7         | Form inspection evidence is passive and target-specific; no real non-submit execution proof exists.                                                       | Personal Live V1 remains NOT_READY.                                                                            | Complete P4, then run one separately approved non-submit validation.                             | Durable real MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW evidence with zero submit.           |
+
+Do not classify every unresolved item as owner-only.
+
+## 14. Risk and decision logs
+
+Risk register must include:
+
+- repeated live debugging;
+- fixture bias;
+- uncalibrated scoring;
+- stale grants/packets;
+- unsupported controls;
+- private-data exposure;
+- cumulative parent authority;
+- recovery-induced duplicate action;
+- provider/ATS drift.
+
+Decision format:
+`ID | date | context | options | selected | rationale | evidence/approval | consequences | supersedes`
+
+Do not estimate deadlines, percentages, or prompt counts without defensible evidence.
+
+## 15. Historical preservation
+
+Archive:
+`docs/project-history/PROJECT_PLAN.before-production-rebaseline.md`
+
+Record:
+
+- source commit;
+- source blob/hash;
+- major checkpoint index.
+
+Historical index should include:
+
+- Phase 0/1 bootstrap;
+- SEEK work;
+- real-world intake;
+- R2A/B/C/D;
+- source-enabled beta;
+- public showcase;
+- Personal Live V1 enablement;
+- real source runs;
+- target inspection v1-v7;
+- first real target validation;
+- persistent green-banner grant;
+- bounded source discovery;
+- engineering CV generation;
+- selected Melbourne target inspection;
+- PR #42/#43 checkpoint.
+
+## 16. Old-to-new crosswalk
+
+Map every unresolved old roadmap item into P0-P11.
+
+Examples:
+
+- truth store -> P2
+- sources -> P1/P3
+- normalization/R2 -> P3
+- documents -> P2
+- application preparation -> P2/P4
+- assisted filling -> P4/P7
+- final review -> P5/P8
+- submit -> P5/P10
+- deployment -> P6/P9
+- security/recovery -> P6/P9/P11
+- optional scheduling/notifications/analytics/AI -> DEFERRED unless needed for narrow production scope
+
+## 17. Current iteration handoff
+
+Current task:
+`P0 — baseline reconciliation and production-plan rebase`
+
+Scope:
+documentation/evidence reconciliation only.
+
+No:
+
+- source fetch;
+- employer visit;
+- fill;
+- upload;
+- submission;
+- capability mutation;
+- migration;
+- deployment;
+- secret/config mutation;
+- application-code change.
+
+Required PR:
+`docs: reconcile readiness and rebuild the production project plan`
+
+Leave OPEN and UNMERGED.
+
+This iteration's read-only evidence is complete. No source/employer request, capability
+mutation, candidate-fact mutation, document/packet mutation, migration, restore, deployment,
+secret/config change, application-code change, or dependency/workflow change was performed.
+Temporary read-only diagnostic scripts were deleted before handoff.
+
+### Read-only verification record (2026-09-22)
+
+| Check                                                             | Result                                                                                                |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `git status --short --branch`, baseline/origin comparison         | PASS before this documentation branch; no application-code diff introduced                            |
+| `npm.cmd run db:status`                                           | PASS — schema 9, pending 0, integrity PASS, FK issues 0                                               |
+| `npm.cmd run privacy:audit`                                       | PASS — tracked/history/build-private-data audit completed without printing private values             |
+| `npm.cmd run preflight`                                           | PASS — profile, database, loopback/output-root, source/target authority, backup readiness gates       |
+| `npx.cmd tsx scripts/release-summary.ts --quality-gates-complete` | PASS for reconciled baseline; this branch's expected worktree dirt is documentation-only until commit |
+| `npx.cmd prettier --check PROJECT_PLAN.md`                        | REQUIRED before commit                                                                                |
+| `git diff --check`                                                | REQUIRED before commit                                                                                |
+| `git fsck --strict`                                               | PASS on baseline; known dangling historical objects only                                              |
+
+Follow-up before commit: `npx.cmd prettier --check PROJECT_PLAN.md` PASS and `git diff --check`
+PASS (the only output is Git's LF/CRLF normalization warning).
+
+No backup, restore, migration, source request, employer request, browser session, document generation,
+packet generation, capability mutation, deployment, or application action was performed in this
+iteration. Action counters added by this iteration are source/employer/upload/submission `0/0/0/0`.
+
+Exactly one recommended next task:
+
+`P4-001 — Implement and verify the real non-submit operation lane`
+
+Dependencies: P1 architecture audit complete; P2 current provider evidence and role decision;
+current profile/evaluation/document bindings; a newly generated private packet only after those
+gates pass; explicit future security-policy review for any real operation beyond inspection.
+
+Acceptance: real-target authority permits only explicitly reviewed non-submit operations; MAP,
+FILL, UPLOAD, VERIFY, and FILL_PREVIEW have separate adapter/runner entry points, packet/document
+and answer/disclosure bindings, durable lifecycle/audit records, stale/replay/interruption/protection
+stops, and synthetic/integration negative tests; SUBMIT remains unavailable; no live action is run
+as part of implementation.
