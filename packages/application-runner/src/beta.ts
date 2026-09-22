@@ -92,6 +92,16 @@ export interface PacketReadiness {
   warnings: string[];
 }
 
+export interface PacketReadinessOptions {
+  /**
+   * A qualified local verification ledger may establish a bounded preparation
+   * window even when the provider does not publish an expiry.  The packet
+   * deliberately keeps jobExpiryState=UNKNOWN; this option only prevents that
+   * provider-unknown fact from being mistaken for an expired job.
+   */
+  allowUnknownProviderExpiry?: boolean;
+}
+
 export function deriveJobExpiryState(
   expiresAt: string | null | undefined,
   now: Date = new Date(),
@@ -112,14 +122,26 @@ export function deriveDuplicatePacketState(
   return "UNKNOWN";
 }
 
-export function assessPacketReadiness(input: ApplicationPacket): PacketReadiness {
+export function assessPacketReadiness(
+  input: ApplicationPacket,
+  options: PacketReadinessOptions = {},
+): PacketReadiness {
   const packet = ApplicationPacketSchema.parse(input);
   const blockers: string[] = [];
   const warnings: string[] = [];
   if (!packet.versionsCurrent) blockers.push("STALE_PACKET_INPUTS");
   if (packet.eligibilityStatus === "INELIGIBLE") blockers.push("JOB_INELIGIBLE");
   if (packet.jobExpiryState === "EXPIRED") blockers.push("JOB_EXPIRED");
-  if (packet.jobExpiryState === "UNKNOWN") blockers.push("JOB_EXPIRY_UNKNOWN");
+  if (
+    packet.jobExpiryState === "UNKNOWN" &&
+    !(
+      options.allowUnknownProviderExpiry === true &&
+      packet.verificationEvidence?.providerExpiresAt === null &&
+      packet.verificationEvidence.operation === "PREPARATION"
+    )
+  ) {
+    blockers.push("JOB_EXPIRY_UNKNOWN");
+  }
   if (packet.duplicateState === "UNRESOLVED") blockers.push("DUPLICATE_DANGER_UNRESOLVED");
   if (packet.duplicateState === "UNKNOWN") blockers.push("DUPLICATE_STATE_UNKNOWN");
   if (!packet.targetUrl || !packet.targetHost) blockers.push("APPLICATION_DESTINATION_INVALID");

@@ -633,7 +633,9 @@ export class BetaRepository {
     status: ReturnType<typeof assessPacketReadiness>["status"];
   } {
     const packet = ApplicationPacketSchema.parse(input);
-    const readiness = assessPacketReadiness(packet);
+    const readiness = assessPacketReadiness(packet, {
+      allowUnknownProviderExpiry: true,
+    });
     return this.sqlite.transaction(() => {
       const versionState = this.sqlite
         .prepare(

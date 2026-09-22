@@ -32,6 +32,8 @@ import {
   R2Repository,
   SourceEnablementRepository,
   SqliteNonSubmitRunStore,
+  loadPersistedApplicationPacket,
+  resolvePersistedApplicationPacket,
   runLeverSourceToQueue,
 } from "@applypilot/database";
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
@@ -784,9 +786,9 @@ test("persists source verification through canonical R2 and packet services to a
         eligibilityStatus: "ELIGIBLE",
         targetUrl,
         targetHost: new URL(targetUrl).hostname,
-        // This local preparation state is derived from qualified verification freshness;
-        // provider expiry remains UNKNOWN (providerExpiresAt=null) and is never invented.
-        jobExpiryState: freshness.state === "FRESH" ? "ACTIVE" : "UNKNOWN",
+        // Provider expiry remains UNKNOWN (providerExpiresAt=null). The shared
+        // resolver applies the explicit fictional preparation/action windows.
+        jobExpiryState: "UNKNOWN",
         duplicateState: "CLEAR",
         versionsCurrent: true,
         documents: [
@@ -824,9 +826,22 @@ test("persists source verification through canonical R2 and packet services to a
         targetHost: new URL(targetUrl).hostname,
         formVersion: "fixture-form-v1",
       });
+      const freshContextSqlite = new BetterSqlite3(fixture.databasePath);
+      freshContextSqlite.pragma("foreign_keys = ON");
+      const reloadedPacket = loadPersistedApplicationPacket({
+        sqlite: freshContextSqlite,
+        packetId: packet.id,
+        expectedDigest: persistedPacketDigest,
+        runId,
+        now: fixedNow,
+      });
+      expect(reloadedPacket.packet.jobExpiryState).toBe("UNKNOWN");
+      freshContextSqlite.close();
+      const packetForRunner = reloadedPacket.packet;
       const target = capability(targetUrl);
-      const binding = freezeRunnerBinding(packet, target);
+      const binding = freezeRunnerBinding(packetForRunner, target);
       const bindingDigest = runnerBindingDigest(binding);
+      let operationNow = fixedNow;
       const store = new SqliteNonSubmitRunStore(
         sqlite,
         runId,
@@ -834,25 +849,16 @@ test("persists source verification through canonical R2 and packet services to a
         () => fixedNow,
       );
       const currentBinding = () => {
-        r2.assertCurrentPreparing(lineage.jobId, lineage.r2EvaluationId);
-        const currentDocument = sqlite
-          .prepare(
-            `SELECT d.content_digest AS digest, d.stale, a.invalidated_at AS invalidatedAt
-           FROM document_artifacts d LEFT JOIN document_approvals a
-           ON a.document_artifact_id=d.id AND a.content_digest=d.content_digest
-           WHERE d.id=? ORDER BY a.approved_at DESC LIMIT 1`,
-          )
-          .get(documentId) as
-          | { digest: string; stale: number; invalidatedAt: string | null }
-          | undefined;
-        if (
-          !currentDocument ||
-          currentDocument.digest !== documentDigest ||
-          currentDocument.stale !== 0 ||
-          currentDocument.invalidatedAt
-        )
-          throw new Error("R46_07_DOCUMENT_CURRENTNESS_REQUIRED");
-        return freezeRunnerBinding(packet, target);
+        const resolved = resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PRE_EXTERNAL_ACTION",
+          now: operationNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        });
+        return freezeRunnerBinding(resolved.packet, target);
       };
       const adapter = new LoopbackNonSubmitAdapter({
         browser,
@@ -860,12 +866,12 @@ test("persists source verification through canonical R2 and packet services to a
         operationKey: `r46-07-${repetition}`,
       });
       const runner = new TargetIndependentNonSubmitRunner(
-        packet,
+        packetForRunner,
         target,
         binding,
         adapter,
         currentBinding,
-        () => fixedNow,
+        () => operationNow,
         store,
       );
       expect((await runner.map()).state).toBe("MAPPED");
@@ -891,6 +897,35 @@ test("persists source verification through canonical R2 and packet services to a
       ).toEqual({ packetDigest: persistedPacketDigest, previewDigest: preview.previewDigest });
       expect((runner as unknown as { submit?: unknown }).submit).toBeUndefined();
 
+      // The provider expiry is intentionally UNKNOWN. The explicit policy
+      // expires pre-external actions at exactly fifteen minutes and preparation
+      // at twenty-four hours; both gates are checked before adapter dispatch.
+      operationNow = new Date(fixedNow.getTime() + 15 * 60 * 1000);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PRE_EXTERNAL_ACTION",
+          now: operationNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }),
+      ).toThrow("PACKET_FRESHNESS_VERIFICATION_STALE");
+      operationNow = new Date(fixedNow.getTime() + 24 * 60 * 60 * 1000);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PREPARATION",
+          now: operationNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }),
+      ).toThrow("PACKET_FRESHNESS_VERIFICATION_STALE");
+      operationNow = fixedNow;
+
       // A queue transition after freeze invalidates the real currentness callback before
       // another browser write; no target request or upload is permitted on this path.
       r2.recordQueueDecision({
@@ -902,7 +937,7 @@ test("persists source verification through canonical R2 and packet services to a
         reasonCode: "OWNER_REVIEW_REQUIRED",
       });
       const staleRunner = new TargetIndependentNonSubmitRunner(
-        packet,
+        packetForRunner,
         target,
         binding,
         adapter,
@@ -938,12 +973,17 @@ test("persists source verification through canonical R2 and packet services to a
       await adapter.close();
       sqlite.close();
       const child = spawnSync(
-        process.execPath,
+        process.env.ComSpec ?? "cmd.exe",
         [
-          "-e",
-          `const D=require('better-sqlite3'); const db=new D(process.argv[1]); const row=db.prepare('SELECT packet_digest AS packetDigest, preview_digest AS previewDigest FROM application_run_previews WHERE run_id=?').get(process.argv[2]); if(!row||!row.packetDigest||/^0+$/.test(row.packetDigest)) process.exit(2); console.log(JSON.stringify(row)); db.close();`,
+          "/d",
+          "/s",
+          "/c",
+          "npx.cmd tsx scripts/r46-08-load-packet.ts",
           fixture.databasePath,
+          packet.id,
+          persistedPacketDigest,
           runId,
+          bindingDigest,
         ],
         { cwd: process.cwd(), encoding: "utf8" },
       );

@@ -68,6 +68,23 @@ const DurableSnapshotSchema = z
         message: "CHECKPOINT_SEQUENCE_AHEAD",
       });
     }
+    for (let index = 1; index < value.checkpoints.length; index += 1) {
+      if (value.checkpoints[index - 1].sequence >= value.checkpoints[index].sequence) {
+        context.addIssue({
+          code: "custom",
+          path: ["checkpoints", index, "sequence"],
+          message: "CHECKPOINT_SEQUENCE_NOT_STRICTLY_INCREASING",
+        });
+      }
+    }
+    const latest = value.checkpoints.at(-1);
+    if (latest && latest.state !== value.state && value.state !== "PAUSED") {
+      context.addIssue({
+        code: "custom",
+        path: ["state"],
+        message: "SNAPSHOT_STATE_MISMATCH",
+      });
+    }
   });
 
 function parseSnapshot(value: unknown): NonSubmitDurableSnapshot {
@@ -84,6 +101,10 @@ function assertDigest(value: string, name: string): void {
   }
 }
 
+function stableJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
 /** SQLite-backed operation claims/checkpoints for the synthetic non-submit lane. */
 export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
   constructor(
@@ -93,16 +114,71 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
     private readonly now: () => Date = () => new Date(),
   ) {
     assertDigest(packetDigest, "PACKET_DIGEST");
+    const binding = this.sqlite
+      .prepare(
+        `SELECT json_extract(p.readiness_json,'$.packetDigest') AS packetDigest
+         FROM application_runs r JOIN application_packets p ON p.id=r.packet_id
+         WHERE r.id=?`,
+      )
+      .get(runId) as { packetDigest: string | null } | undefined;
+    if (!binding) throw new Error("APPLICATION_RUN_NOT_FOUND");
+    if (binding.packetDigest !== packetDigest) throw new Error("PACKET_BINDING_MISMATCH");
   }
 
   load(bindingDigest: string): NonSubmitDurableSnapshot | null {
+    assertDigest(bindingDigest, "BINDING_DIGEST");
     const row = this.sqlite
       .prepare(
-        `SELECT effect_json AS effectJson FROM application_run_operations
+        `SELECT operation,state,effect_json AS effectJson FROM application_run_operations
          WHERE run_id=? AND binding_digest=? ORDER BY created_at DESC, rowid DESC LIMIT 1`,
       )
-      .get(this.runId, bindingDigest) as { effectJson: string } | undefined;
-    if (!row) return null;
+      .get(this.runId, bindingDigest) as
+      | { operation: RunnerTargetOperation; state: string; effectJson: string }
+      | undefined;
+    if (!row) {
+      const other = this.sqlite
+        .prepare("SELECT 1 FROM application_run_operations WHERE run_id=? LIMIT 1")
+        .get(this.runId);
+      if (other) throw new Error("BINDING_DIGEST_MISMATCH");
+      return null;
+    }
+    if (row.effectJson === "{}" && row.state === "CLAIMED") {
+      const previous = this.sqlite
+        .prepare(
+          `SELECT effect_json AS effectJson FROM application_run_operations
+           WHERE run_id=? AND state<>'CLAIMED' ORDER BY created_at DESC,rowid DESC LIMIT 1`,
+        )
+        .get(this.runId) as { effectJson: string } | undefined;
+      const base = previous
+        ? parseSnapshot(JSON.parse(previous.effectJson))
+        : {
+            state: "PREPARED" as const,
+            sequence: 0,
+            checkpoints: [],
+            claimedOperations: [],
+            activeOperation: null,
+          };
+      const latest = base.checkpoints.at(-1);
+      const recovery = {
+        sequence: base.sequence + 1,
+        state: "PAUSED" as const,
+        stopReason: row.operation === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
+        occurredAt: this.now().toISOString(),
+        targetUrl: latest?.targetUrl ?? "http://127.0.0.1/unknown",
+        formVersion: latest?.formVersion ?? "recovery",
+        adapterVersion: latest?.adapterVersion ?? "recovery",
+        fieldReadBack: [],
+        uploadEvidence: null,
+        previewDigest: null,
+      };
+      return parseSnapshot({
+        state: "PAUSED",
+        sequence: recovery.sequence,
+        checkpoints: [...base.checkpoints, recovery],
+        claimedOperations: base.claimedOperations,
+        activeOperation: null,
+      });
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.effectJson) as unknown;
@@ -113,26 +189,29 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
   }
 
   claim(bindingDigest: string, operation: RunnerTargetOperation): boolean {
+    assertDigest(bindingDigest, "BINDING_DIGEST");
     if (!["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation)) {
       throw new Error("NON_SUBMIT_OPERATION_FORBIDDEN");
     }
-    const inProgress = this.sqlite
-      .prepare(
-        `SELECT 1 FROM application_run_operations
-         WHERE run_id=? AND binding_digest=? AND state='CLAIMED' LIMIT 1`,
-      )
-      .get(this.runId, bindingDigest);
-    if (inProgress) return false;
-    const now = this.now().toISOString();
     try {
-      this.sqlite
-        .prepare(
-          `INSERT INTO application_run_operations
-           (id,run_id,binding_digest,operation,operation_key,state,effect_json,created_at,updated_at)
-           VALUES (?,?,?,?,?,'CLAIMED','{}',?,?)`,
-        )
-        .run(randomUUID(), this.runId, bindingDigest, operation, operation, now, now);
-      return true;
+      return this.sqlite.transaction(() => {
+        const inProgress = this.sqlite
+          .prepare(
+            `SELECT 1 FROM application_run_operations
+             WHERE run_id=? AND binding_digest=? AND state='CLAIMED' LIMIT 1`,
+          )
+          .get(this.runId, bindingDigest);
+        if (inProgress) return false;
+        const now = this.now().toISOString();
+        this.sqlite
+          .prepare(
+            `INSERT INTO application_run_operations
+             (id,run_id,binding_digest,operation,operation_key,state,effect_json,created_at,updated_at)
+             VALUES (?,?,?,?,?,'CLAIMED','{}',?,?)`,
+          )
+          .run(randomUUID(), this.runId, bindingDigest, operation, operation, now, now);
+        return true;
+      })();
     } catch (error) {
       if (String(error).includes("UNIQUE")) return false;
       throw error;
@@ -150,28 +229,46 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
         .prepare(
           `UPDATE application_run_operations
            SET state=?, effect_json=?, updated_at=?
-           WHERE run_id=? AND binding_digest=? AND operation_key=?`,
+           WHERE run_id=? AND binding_digest=? AND operation_key=?
+             AND state='CLAIMED' AND effect_json='{}'`,
         )
         .run(parsed.state, JSON.stringify(parsed), now, this.runId, bindingDigest, operation);
       if (updated.changes !== 1) throw new Error("NON_SUBMIT_SNAPSHOT_CLAIM_MISSING");
       const latest = parsed.checkpoints.at(-1);
       if (latest?.state === "FILL_PREVIEW" && latest.previewDigest) {
-        this.sqlite
+        const existing = this.sqlite
           .prepare(
-            `INSERT INTO application_run_previews
-             (id,run_id,packet_digest,preview_digest,snapshot_json,created_at)
-             SELECT ?,?,?,?, ?,?
-             WHERE NOT EXISTS (SELECT 1 FROM application_run_previews WHERE run_id=?)`,
+            `SELECT packet_digest AS packetDigest,preview_digest AS previewDigest,
+                    snapshot_json AS snapshotJson
+             FROM application_run_previews WHERE run_id=?`,
           )
-          .run(
-            randomUUID(),
-            this.runId,
-            this.packetDigest,
-            latest.previewDigest,
-            JSON.stringify(latest),
-            now,
-            this.runId,
-          );
+          .get(this.runId) as
+          | { packetDigest: string; previewDigest: string; snapshotJson: string }
+          | undefined;
+        if (existing) {
+          if (
+            existing.packetDigest !== this.packetDigest ||
+            existing.previewDigest !== latest.previewDigest ||
+            existing.snapshotJson !== JSON.stringify(latest)
+          ) {
+            throw new Error("NON_SUBMIT_PREVIEW_CONFLICT");
+          }
+        } else {
+          this.sqlite
+            .prepare(
+              `INSERT INTO application_run_previews
+               (id,run_id,packet_digest,preview_digest,snapshot_json,created_at)
+               VALUES (?,?,?,?,?,?)`,
+            )
+            .run(
+              randomUUID(),
+              this.runId,
+              this.packetDigest,
+              latest.previewDigest,
+              JSON.stringify(latest),
+              now,
+            );
+        }
       }
     })();
   }
@@ -183,14 +280,23 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
          WHERE run_id=? ORDER BY created_at,rowid`,
       )
       .all(this.runId) as Array<{ effectJson: string }>;
-    return rows.flatMap(({ effectJson }) => {
+    const bySequence = new Map<number, NonSubmitRunnerCheckpoint>();
+    for (const { effectJson } of rows) {
       let parsed: unknown;
       try {
         parsed = JSON.parse(effectJson) as unknown;
       } catch {
         throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
       }
-      return parseSnapshot(parsed).checkpoints;
-    });
+      if (effectJson === "{}") throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
+      for (const checkpoint of parseSnapshot(parsed).checkpoints) {
+        const prior = bySequence.get(checkpoint.sequence);
+        if (prior && stableJson(prior) !== stableJson(checkpoint)) {
+          throw new Error("NON_SUBMIT_SNAPSHOT_CONFLICT");
+        }
+        bySequence.set(checkpoint.sequence, checkpoint);
+      }
+    }
+    return [...bySequence.values()].sort((left, right) => left.sequence - right.sequence);
   }
 }

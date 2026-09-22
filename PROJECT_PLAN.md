@@ -10,18 +10,18 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ## 1. Resume here
 
-### Active R46-07 checkpoint (2026-09-23)
+### Active R46-08 checkpoint (2026-09-23)
 
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
-- R46-07 started from exact pushed head `d361d6a73169ceb2a1d604262b0d3afda0e3047a` and is now
-  clean at the final pushed implementation head recorded in the PR/handoff below.
+- R46-08 starts from exact clean head `2baa6d014778fcc0b8975f425228335fc0f4f994`; PR #46 remains
+  `OPEN / UNMERGED` and the implementation must stay on this same branch.
 - The final exact-head push and pull-request CI runs completed successfully; PR #46 remains open and
   unmerged.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
-- This R46-07 iteration remains offline-only and adds source/employer/upload/submission
+- This R46-08 iteration remains offline-only and adds source/employer/upload/submission
   actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
 
 ### Historical baseline (read-only reconciled 2026-09-22)
@@ -1587,3 +1587,100 @@ Evidence boundary: R46-07 proves fictional offline source-to-packet integration 
 non-submit recovery only. It does not prove a real employer application, real upload, deployment,
 green-banner activation, or Personal Live V1. Exactly one next reviewed task is recommended: review
 PR #46 at its exact pushed head and CI result for merge approval; do not merge or activate live operations.
+
+## 26. R46-08 persisted packet, freshness, and SQLite recovery blueprint (2026-09-23)
+
+R46-08 continues on PR #46 and the same `chore/p2-current-role-readiness` branch from exact clean
+head `2baa6d014778fcc0b8975f425228335fc0f4f994`. It is an offline engineering correction only:
+no real source/employer/form/upload/submission action, no private database write/migration/restore,
+no capability activation, and no merge. The private runtime remains schema 9 with one disposable-only
+pending migration (`0010`), integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0009`
+and the reviewed `0010` hash remain immutable unless a new additive migration is proven unavoidable.
+
+### Objective and acceptance contract
+
+Close the remaining R46-07 evidence gaps without weakening fail-closed behavior:
+
+| Work ID  | Design and files                                                                                                                                                                                                                                                                                                                                                                                | Acceptance evidence                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R46-08-A | Add one shared persisted-packet loader/readiness/currentness resolver (database/application-runner boundary) with injected DB, clock, policy, and private-root-free dependencies. Reconstruct the canonical packet from persisted relations; verify canonical digest, current job/profile/R2/queue PREPARING state, duplicate/docs/answers/binding gates, and freshness before every operation. | Fresh process can load the packet by IDs and use the same resolver. Missing/corrupt/mismatched packet, stale dependency, missing/invalidated approval, changed answer/document/binding, preparation-window expiry, and action-window expiry fail closed before browser or upload. Provider expiry `UNKNOWN` stays distinct from the explicit fictional preparation policy; no `FRESH` value is hand-mapped to `ACTIVE`. |
+| R46-08-B | Harden `SqliteNonSubmitRunStore` checkpoint history, packet/run binding, preview conflict handling, and atomic operation claims using existing `0010` columns and transactions. Represent interruption recovery explicitly; a losing owner cannot overwrite or downgrade a winner.                                                                                                              | Checkpoints are unique ordered logical events with sequence/final-state validation. Wrong packet/binding and conflicting preview are rejected. Independent workers have one owner; interrupted accepted upload reopens as `UPLOAD_OUTCOME_UNKNOWN`/recovery-required and never retransmits.                                                                                                                             |
+| R46-08-C | Upgrade `tests/e2e/source-to-preview.spec.ts` to build/persist/reload through the shared services, use the reloaded packet in a fresh context and child process, and add file-backed interruption and two-connection overlap barriers.                                                                                                                                                          | T0/before-15-minute action succeeds; at/after 15 minutes and past preparation window stop before browser/upload. Provider expiry cap, missing/future/wrong ledger, changed dependencies/docs/answers/binding, unsupported controls, replay, tamper, process interruption, and contention are all asserted with counters.                                                                                                |
+| R46-08-D | Run the complete offline validation/recovery/privacy suite, update this plan and PR metadata, and push the same branch.                                                                                                                                                                                                                                                                         | Unit/integration/E2E/build/lint/typecheck/privacy/dependency/schema/maintenance/diff/fsck evidence is recorded. Local pre-existing format/release limitations remain explicit; PR #46 stays open/unmerged.                                                                                                                                                                                                              |
+
+### Dependencies, risks, rollback, and implementation order
+
+The loader/resolver is the source of truth for packet readiness; tests must not construct a second
+readiness interpretation. The store may use only the existing additive schema-10 fields; a migration
+is prohibited unless an actual durable ownership requirement cannot be met otherwise. Risk areas are
+SQLite transaction races, crash windows after accepted upload, replay/duplicate external effects, and
+accidental private-root resolution. Mitigations are explicit owner/state checks, immutable packet and
+preview digests, file-backed disposable fixtures, deterministic barriers, and zero live transports.
+
+Implementation order is: inspect current packet/store contracts; update the shared loader/resolver;
+harden claims/checkpoints/preview binding; replace the raw child-process SELECT and manual packet
+readiness in the integrated E2E; add interruption/overlap and negative matrices; run gates; then update
+this section with exact results. Rollback is limited to reverting R46-08 commits and deleting only
+disposable fixture directories. The private DB, private documents/profile, capabilities, and historical
+R46-07 evidence are never copied, restored, or rewritten.
+
+Evidence boundary: even a green R46-08 run proves only fictional offline source-to-packet and durable
+non-submit recovery. It does not authorize a real target, candidate-data transmission, upload, submit,
+or Personal Live V1 readiness. The sole next action after this work is PR #46 merge review if the exact
+head and CI satisfy all documented gates; otherwise report the specific blocker.
+
+## 27. R46-08 implementation closeout (2026-09-23)
+
+R46-08 is implemented on the same PR/branch from start head
+`2baa6d014778fcc0b8975f425228335fc0f4f994`. No live source/employer/form/upload/submission action,
+private database write/migration/restore/copy, capability mutation, or merge occurred. The private
+runtime remains schema 9, pending migration 1, integrity `PASS`, foreign-key issues `0`.
+
+### Shared entry points and safety behavior
+
+- `loadPersistedApplicationPacket` in `packages/database/src/persisted-packet.ts` reconstructs the
+  packet from persisted packet/document/approval/question/answer/R2/verification rows, checks the
+  stored canonical digest and optional run binding, and derives provider expiry from the immutable
+  verification ledger. `resolvePersistedApplicationPacket` is the injected-clock/policy gate used
+  immediately before each non-submit operation in the integrated proof.
+- `assessPacketReadiness` and `freezeRunnerBinding` preserve `jobExpiryState=UNKNOWN` when provider
+  expiry is absent. A qualified ledger plus the explicit fictional 24-hour preparation / 15-minute
+  pre-external-action policy may permit preparation; it never converts the provider fact to `ACTIVE`.
+  The resolver rejects stale, future, unqualified, mismatched-policy, changed-R2/queue, changed
+  document/approval, changed answer, duplicate, target, or digest state before adapter dispatch.
+- `SqliteNonSubmitRunStore` now validates packet/run binding, claims inside an SQLite transaction,
+  rejects losing-owner saves and conflicting previews, deduplicates cumulative checkpoint history by
+  sequence with conflict/order validation, and reopens an interrupted `CLAIMED` upload as
+  `PAUSED/UPLOAD_OUTCOME_UNKNOWN` without retransmission. A tampered completed effect remains a hard
+  `NON_SUBMIT_SNAPSHOT_CORRUPT` failure.
+- The decisive E2E now reloads the packet through the shared loader in an independent SQLite context;
+  the child process uses `scripts/r46-08-load-packet.ts` (loader plus durable store), not raw packet
+  columns. It exercises the currentness callback with a fresh resolver and verifies exact 15-minute
+  and 24-hour expiry stops before any browser/upload action. Existing loopback upload and replay
+  counters remain fictional-only.
+
+### Validation evidence
+
+| Gate                              | Result                                                                                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                              | PASS — 53 files / 592 tests                                                                                                                           |
+| Integration                       | PASS — 3 files / 21 tests                                                                                                                             |
+| E2E                               | PASS — 47 / 47 with retries `0`; decisive source-to-preview proof repeated across 3 fresh roots                                                       |
+| Typecheck / lint                  | PASS                                                                                                                                                  |
+| Build / showcase audit            | PASS — local build, showcase build, `PUBLIC_SHOWCASE_AUDIT_PASS`                                                                                      |
+| Privacy / dependency audit        | PASS — privacy audit; npm audit and production audit 0 vulnerabilities                                                                                |
+| Database / preflight              | PASS — private schema 9, pending 1, integrity PASS, FK issues 0; preflight PASS_WITH_MANUAL_BETA_BLOCKERS for the existing pending migration          |
+| Changed-file format / diff / fsck | PASS — Prettier changed-file check, `git diff --check`, `git fsck --strict` (known dangling historical objects only)                                  |
+| Repository-wide format / release  | NOT GREEN — the same 11 pre-existing green-banner/package files stop both commands; no unrelated formatting or private release checkout was performed |
+
+Migration `0010_verified_source_packet_binding.sql` remains SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; `0000`-`0009` remain
+byte-for-byte unchanged. The integrated proof used disposable schema-10 databases only. Real action
+counters are source/employer/form/upload/submission `0/0/0/0` for this iteration and lifetime
+`14/9/0/0`; fictional proof counters are 6 source-transport calls, 3 loopback uploads, and 0
+submissions. Source-enabled Personal Beta remains historically `READY`; Personal Live V1 remains
+`NOT_READY`.
+
+The implementation is ready for exact-head CI review but PR #46 is intentionally still open and
+unmerged. Exactly one next action is permitted: review PR #46's final pushed head and CI for merge
+approval; do not merge in this task.

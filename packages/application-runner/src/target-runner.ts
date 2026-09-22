@@ -530,7 +530,7 @@ export function freezeRunnerBinding(
   if (target.hash || target.origin !== origin.origin || !pathAllowed) {
     throw new Error("TARGET_CAPABILITY_MISMATCH");
   }
-  const readiness = assessPacketReadiness(packet);
+  const readiness = assessPacketReadiness(packet, { allowUnknownProviderExpiry: true });
   const unresolvedCount = readiness.blockers.length;
   return FrozenRunnerBindingSchema.parse({
     packetId: packet.id,
@@ -981,7 +981,10 @@ export class TargetIndependentNonSubmitRunner {
       runnerTargetReadiness(capability, now()).status !== "TARGET_ENABLED"
     ) {
       this.pause("TARGET_APPROVAL_REQUIRED");
-    } else if (binding.unresolvedCount > 0 || assessPacketReadiness(packet).blockers.length > 0) {
+    } else if (
+      binding.unresolvedCount > 0 ||
+      assessPacketReadiness(packet, { allowUnknownProviderExpiry: true }).blockers.length > 0
+    ) {
       this.pause("PACKET_NOT_READY");
     } else {
       this.record("PREPARED", null);
@@ -1036,8 +1039,11 @@ export class TargetIndependentNonSubmitRunner {
       return this.pause("OPERATION_REPLAYED");
     }
     if (this.durableStore && !this.durableStore.claim(this.bindingDigest, operationName)) {
-      return this.pause(
+      return this.record(
+        "PAUSED",
         operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
+        undefined,
+        false,
       );
     }
     this.claimedOperations.push(operationName);
@@ -1091,6 +1097,7 @@ export class TargetIndependentNonSubmitRunner {
     state: NonSubmitRunnerState,
     stopReason: SyntheticStopReason | null,
     observation?: TargetObservation,
+    persist = true,
   ) {
     this.state = state;
     const checkpoint: NonSubmitRunnerCheckpoint = {
@@ -1106,12 +1113,14 @@ export class TargetIndependentNonSubmitRunner {
       previewDigest: observation?.previewDigest ?? null,
     };
     this.checkpoints.push(checkpoint);
-    this.durableStore?.save(this.bindingDigest, {
-      state: this.state,
-      sequence: this.sequence,
-      checkpoints: this.checkpoints,
-      claimedOperations: this.claimedOperations,
-    });
+    if (persist) {
+      this.durableStore?.save(this.bindingDigest, {
+        state: this.state,
+        sequence: this.sequence,
+        checkpoints: this.checkpoints,
+        claimedOperations: this.claimedOperations,
+      });
+    }
     return checkpoint;
   }
 }

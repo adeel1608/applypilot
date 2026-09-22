@@ -15,6 +15,7 @@ export * from "./source-enablement-repository";
 export * from "./runner-enablement-repository";
 export * from "./green-banner-repository";
 export * from "./non-submit-run-store";
+export * from "./persisted-packet";
 
 export function openApplyPilotDatabase(path: string) {
   const sqlite = new BetterSqlite3(path);
