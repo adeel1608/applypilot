@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 import BetterSqlite3 from "better-sqlite3";
 import {
@@ -7,6 +7,7 @@ import {
   TargetIndependentNonSubmitRunner,
   RunnerTargetCapabilitySchema,
   freezeRunnerBinding,
+  type NonSubmitTargetAdapter,
 } from "@applypilot/application-runner";
 import {
   loadPersistedApplicationPacket as loadPacket,
@@ -14,8 +15,17 @@ import {
 } from "@applypilot/database";
 
 async function main(): Promise<void> {
-  const [databasePath, packetId, packetDigest, runId, documentPath] = process.argv.slice(2);
-  if (!databasePath || !packetId || !packetDigest || !runId || !documentPath) {
+  const [databasePath, packetId, packetDigest, runId, documentPath, barrierPath, releasePath] =
+    process.argv.slice(2);
+  if (
+    !databasePath ||
+    !packetId ||
+    !packetDigest ||
+    !runId ||
+    !documentPath ||
+    !barrierPath ||
+    !releasePath
+  ) {
     throw new Error("R46_09_WORKER_ARGUMENTS_REQUIRED");
   }
 
@@ -47,12 +57,28 @@ async function main(): Promise<void> {
   });
   const binding = freezeRunnerBinding(packet, capability);
   const store = new SqliteNonSubmitRunStore(sqlite, runId, packetDigest);
-  const adapter = new LoopbackNonSubmitAdapter({
+  const baseAdapter = new LoopbackNonSubmitAdapter({
     documentBytes: {
       [packet.documents[0].digest]: readFileSync(documentPath),
     },
     operationKey: "r46-09-killed-worker",
   });
+  const adapter: NonSubmitTargetAdapter = {
+    targetKind: baseAdapter.targetKind,
+    map: (value, currentBinding) => baseAdapter.map(value, currentBinding),
+    fill: (value, currentBinding) => baseAdapter.fill(value, currentBinding),
+    upload: async (value, currentBinding) => {
+      const observation = await baseAdapter.upload(value, currentBinding);
+      writeFileSync(
+        barrierPath,
+        JSON.stringify({ accepted: true, uploadEvidence: observation.uploadEvidence }),
+      );
+      while (!existsSync(releasePath)) await new Promise((resolve) => setTimeout(resolve, 10));
+      return observation;
+    },
+    verify: (value, currentBinding) => baseAdapter.verify(value, currentBinding),
+    fillPreview: (value, currentBinding) => baseAdapter.fillPreview(value, currentBinding),
+  };
   const runner = new TargetIndependentNonSubmitRunner(
     packet,
     capability,
@@ -66,7 +92,7 @@ async function main(): Promise<void> {
   await runner.fill();
   await runner.upload();
   console.log(JSON.stringify({ state: runner.snapshot().state }));
-  await adapter.close();
+  await baseAdapter.close();
   sqlite.close();
 }
 

@@ -559,7 +559,7 @@ test("persists source verification through canonical R2 and packet services to a
   test.setTimeout(120_000);
   for (let repetition = 0; repetition < 3; repetition += 1) {
     const fixture = await createDiskFixture();
-    const { server, targetUrl, counts, setUploadBarrier } = await fixtureServer();
+    const { server, targetUrl, counts } = await fixtureServer();
     const transportCounts = { dns: 0, requests: 0 };
     let sqlite = fixture.sqlite;
     try {
@@ -868,7 +868,6 @@ test("persists source verification through canonical R2 and packet services to a
       });
       const barrierPath = join(fixture.root, `r46-09-upload-${repetition}.accepted`);
       const releasePath = join(fixture.root, `r46-09-upload-${repetition}.release`);
-      setUploadBarrier({ barrierPath, releasePath });
       const workerArgs = [
         join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
         "scripts/r46-09-upload-worker.ts",
@@ -877,6 +876,8 @@ test("persists source verification through canonical R2 and packet services to a
         persistedPacketDigest,
         interruptionRunId,
         documentPath,
+        barrierPath,
+        releasePath,
       ];
       const worker = spawn(process.execPath, workerArgs, {
         cwd: process.cwd(),
