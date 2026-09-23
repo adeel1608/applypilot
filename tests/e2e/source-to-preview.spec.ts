@@ -902,12 +902,22 @@ test("persists source verification through canonical R2 and packet services to a
       };
       await waitForBarrier();
       expect(counts.uploads).toBe(1);
-      const workerClosed = new Promise<void>((resolve) => worker.once("close", () => resolve()));
+      const workerExited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+        (resolve) => worker.once("exit", (code, signal) => resolve({ code, signal })),
+      );
       worker.kill("SIGKILL");
-      if (worker.exitCode === null) {
-        await workerClosed;
+      const termination = await Promise.race([
+        workerExited,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+      ]);
+      if (termination === null && worker.exitCode === null && worker.signalCode === null) {
+        throw new Error("R46_09_WORKER_TERMINATION_UNPROVEN");
       }
-      expect(worker.exitCode !== null || worker.signalCode !== null).toBe(true);
+      expect(
+        termination !== null
+          ? termination.code !== null || termination.signal !== null
+          : worker.exitCode !== null || worker.signalCode !== null,
+      ).toBe(true);
       const recoverySqlite = new BetterSqlite3(fixture.databasePath);
       recoverySqlite.pragma("foreign_keys = ON");
       expect(
