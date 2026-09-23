@@ -10,26 +10,26 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ## 1. Resume here
 
-### Active R46-09 checkpoint (2026-09-23)
+### Active R46-10 checkpoint (2026-09-23)
 
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
-- R46-08 starts from exact clean head `2baa6d014778fcc0b8975f425228335fc0f4f994`; PR #46 remains
-  `OPEN / UNMERGED` and the implementation must stay on this same branch.
-- R46-09 is committed at exact head `38509aeb77874381f7662f73fe14c18bdfc99897`; exact-head push
-  CI `35801714598` and pull-request CI `35801718606` completed successfully; PR #46 remains open
-  and unmerged.
+- R46-10 started from exact clean head `e44c662c2593c556d76cdb38d8acafab2b8dfd87` and is now
+  committed at exact final head `0f4a8d1612b8f2e161824c4cd7a4f14bbc5f29b1`; exact-head push CI
+  `35813500403` and pull-request CI `35813503020` both completed successfully with 47 E2E tests.
+  PR #46 remains `OPEN / UNMERGED`; an earlier exact-head run `35812359481` timed out only because
+  the expanded decisive test exceeded its old 120-second test timeout and was superseded by the
+  bounded termination-proof fix.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
 - This R46-08 iteration remains offline-only and adds source/employer/upload/submission
   actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
-- R46-09 is the active offline-only correction on the same branch and PR, starting at exact head
-  `af275a3eb5e32449ca876d13e0986f15c04fbdee`. It must close immutable packet representation,
-  explicit policy/operation authority, owner-bound operation claims, and actual killed-worker upload
-  recovery without changing migration `0010`, touching the private runtime, or performing any live
-  source/employer/upload/submission action. The iteration delta remains `0/0/0/0`; PR #46 stays
-  open and unmerged.
+- R46-10 is the active offline-only correction on the same branch and PR. It preserves R46-09's
+  immutable packet representation, explicit policy/operation authority, owner-bound claims, and
+  killed-worker proof while closing normal invalidation retention, successful-predecessor/canonical
+  history validation, resolver linkage, and exact mid-run expiry evidence. The iteration delta remains
+  `0/0/0/0`; migrations and the private runtime remain untouched; PR #46 stays open and unmerged.
 
 ### Historical baseline (read-only reconciled 2026-09-22)
 
@@ -1912,5 +1912,6 @@ remain confined to loopback/source fixtures (no candidate data outbound).
    authorization and missing current CV/expiry evidence.
 7. **Pass green-banner acceptance review:** `NOT_STARTED`; no readiness banner emitted.
 
-Final implementation head and new exact-head CI IDs are added below after the same-branch commit/push;
-PR #46 remains open and unmerged. The next permitted action is human review of that exact head.
+Final implementation head is `0f4a8d1612b8f2e161824c4cd7a4f14bbc5f29b1`; exact-head push CI is
+`35813500403` and pull-request CI is `35813503020`, both green with 47 E2E tests. PR #46 remains
+open and unmerged. The next permitted action is human review of that exact head.
