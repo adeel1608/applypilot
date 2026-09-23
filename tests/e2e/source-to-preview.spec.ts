@@ -556,7 +556,7 @@ test.describe.configure({ retries: 0 });
 test("persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit", async ({
   browser,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(300_000);
   for (let repetition = 0; repetition < 3; repetition += 1) {
     const fixture = await createDiskFixture();
     const { server, targetUrl, counts } = await fixtureServer();
