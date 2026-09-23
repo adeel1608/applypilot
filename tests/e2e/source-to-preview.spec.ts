@@ -909,7 +909,6 @@ test("persists source verification through canonical R2 and packet services to a
           new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
         ]);
       }
-      await writeFile(releasePath, "release");
       const recoverySqlite = new BetterSqlite3(fixture.databasePath);
       recoverySqlite.pragma("foreign_keys = ON");
       expect(
@@ -922,6 +921,7 @@ test("persists source verification through canonical R2 and packet services to a
         activeOperation: "UPLOAD",
       });
       recoverySqlite.close();
+      await writeFile(releasePath, "release");
       // Keep the barrier configuration until server shutdown; the released
       // request may still be unwinding after the worker is terminated.
       const freshContextSqlite = new BetterSqlite3(fixture.databasePath);
