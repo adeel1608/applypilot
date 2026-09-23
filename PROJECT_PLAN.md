@@ -1762,6 +1762,6 @@ Fictional proof counters for this iteration are 6 source-transport calls, 6 loop
 (three successful runs plus three killed-worker accepted uploads), and 0 submissions. Real action
 counters remain source/employer/form/upload/submission `0/0/0/0` for this iteration and lifetime
 `14/9/0/0`. Private data remains local and untracked. Final implementation head is
-`38509aeb77874381f7662f73fe14c18bdfc99897`; exact-head push CI `35801714598` and PR CI
-`35801718606` both passed with 47 E2E tests. PR #46 is still `OPEN / UNMERGED`. The sole next
+`ac3689c471898262b3f7ca376110e9fef72ae874`; exact-head push CI `35802043804` and PR CI
+`35802046850` both passed with 47 E2E tests. PR #46 is still `OPEN / UNMERGED`. The sole next
 action is human review of PR #46 for merge approval; this task does not merge it.
