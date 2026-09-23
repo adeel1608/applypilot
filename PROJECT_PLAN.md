@@ -16,16 +16,15 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
   `feat: implement verified source-to-packet and non-submit foundations`.
 - R46-08 starts from exact clean head `2baa6d014778fcc0b8975f425228335fc0f4f994`; PR #46 remains
   `OPEN / UNMERGED` and the implementation must stay on this same branch.
-- The implementation is now committed at exact head `f0b6525e2115555f06dc580d64371dd64ec81ce8`;
-  exact-head push and PR CI are still running and must be rechecked before handoff.
-- The final exact-head push and pull-request CI runs completed successfully; PR #46 remains open and
-  unmerged.
+- R46-09 is committed at exact head `38509aeb77874381f7662f73fe14c18bdfc99897`; exact-head push
+  CI `35801714598` and pull-request CI `35801718606` completed successfully; PR #46 remains open
+  and unmerged.
 - Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
 - Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
   `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
 - This R46-08 iteration remains offline-only and adds source/employer/upload/submission
   actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
-- R46-09 is the next offline-only correction on the same branch and PR, starting at exact head
+- R46-09 is the active offline-only correction on the same branch and PR, starting at exact head
   `af275a3eb5e32449ca876d13e0986f15c04fbdee`. It must close immutable packet representation,
   explicit policy/operation authority, owner-bound operation claims, and actual killed-worker upload
   recovery without changing migration `0010`, touching the private runtime, or performing any live
@@ -1762,6 +1761,7 @@ or merge occurred.
 Fictional proof counters for this iteration are 6 source-transport calls, 6 loopback uploads
 (three successful runs plus three killed-worker accepted uploads), and 0 submissions. Real action
 counters remain source/employer/form/upload/submission `0/0/0/0` for this iteration and lifetime
-`14/9/0/0`. Private data remains local and untracked. PR #46 is still `OPEN / UNMERGED`; exact-head
-CI must be rechecked after the final push. The sole next action is human review of PR #46 for merge
-approval if that exact-head CI remains green; this task does not merge it.
+`14/9/0/0`. Private data remains local and untracked. Final implementation head is
+`38509aeb77874381f7662f73fe14c18bdfc99897`; exact-head push CI `35801714598` and PR CI
+`35801718606` both passed with 47 E2E tests. PR #46 is still `OPEN / UNMERGED`. The sole next
+action is human review of PR #46 for merge approval; this task does not merge it.
