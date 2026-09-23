@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,6 +22,7 @@ import {
   runnerBindingDigest,
   freezeRunnerBinding,
   type RunnerTargetCapability,
+  type NonSubmitClaimHandle,
   type NonSubmitDurableSnapshot,
   type NonSubmitDurableStore,
   type RunnerTargetOperation,
@@ -222,12 +224,16 @@ function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function fixtureServer(): Promise<{
+async function fixtureServer(
+  options: { barrierPath?: string; releasePath?: string } = {},
+): Promise<{
   server: Server;
   targetUrl: string;
   counts: { uploads: number; submissions: number };
+  setUploadBarrier: (barrier: { barrierPath: string; releasePath: string } | null) => void;
 }> {
   const counts = { uploads: 0, submissions: 0 };
+  let uploadBarrier = options.barrierPath && options.releasePath ? options : null;
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -257,6 +263,22 @@ async function fixtureServer(): Promise<{
       if (request.method === "POST" && request.url === "/__fixture_upload") {
         counts.uploads += 1;
         const receivedDigest = sha256(Buffer.concat(chunks));
+        if (uploadBarrier?.barrierPath && uploadBarrier.releasePath) {
+          writeFileSync(
+            uploadBarrier.barrierPath,
+            JSON.stringify({ count: counts.uploads, receivedDigest }),
+          );
+          const release = setInterval(() => {
+            if (existsSync(uploadBarrier!.releasePath!)) {
+              clearInterval(release);
+              response.writeHead(200, { "content-type": "application/json" });
+              response.end(
+                JSON.stringify({ acknowledgementId: `ack-${counts.uploads}`, receivedDigest }),
+              );
+            }
+          }, 10);
+          return;
+        }
         response.writeHead(200, { "content-type": "application/json" });
         response.end(
           JSON.stringify({ acknowledgementId: `ack-${counts.uploads}`, receivedDigest }),
@@ -276,7 +298,14 @@ async function fixtureServer(): Promise<{
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("FIXTURE_SERVER_ADDRESS_REQUIRED");
-  return { server, targetUrl: `http://127.0.0.1:${address.port}/apply`, counts };
+  return {
+    server,
+    targetUrl: `http://127.0.0.1:${address.port}/apply`,
+    counts,
+    setUploadBarrier: (barrier) => {
+      uploadBarrier = barrier;
+    },
+  };
 }
 
 function capability(targetUrl: string): RunnerTargetCapability {
@@ -312,16 +341,20 @@ class FailOnceAfterUploadCheckpointStore implements NonSubmitDurableStore {
     return this.delegate.load(bindingDigest);
   }
 
-  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean {
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null {
     return this.delegate.claim(bindingDigest, operation);
   }
 
-  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void {
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void {
     if (!this.failed && snapshot.state === "UPLOADED") {
       this.failed = true;
       throw new Error("R46_07_CHECKPOINT_INTERRUPTED_AFTER_UPLOAD");
     }
-    this.delegate.save(bindingDigest, snapshot);
+    this.delegate.save(bindingDigest, snapshot, claim);
   }
 }
 
@@ -523,9 +556,10 @@ test.describe.configure({ retries: 0 });
 test("persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit", async ({
   browser,
 }) => {
+  test.setTimeout(120_000);
   for (let repetition = 0; repetition < 3; repetition += 1) {
     const fixture = await createDiskFixture();
-    const { server, targetUrl, counts } = await fixtureServer();
+    const { server, targetUrl, counts, setUploadBarrier } = await fixtureServer();
     const transportCounts = { dns: 0, requests: 0 };
     let sqlite = fixture.sqlite;
     try {
@@ -826,6 +860,70 @@ test("persists source verification through canonical R2 and packet services to a
         targetHost: new URL(targetUrl).hostname,
         formVersion: "fixture-form-v1",
       });
+      const interruptionRunId = beta.registerApplicationRun({
+        packetId: packet.id,
+        targetKind: "SYNTHETIC_LOCAL",
+        targetHost: new URL(targetUrl).hostname,
+        formVersion: "fixture-form-v1",
+      });
+      const barrierPath = join(fixture.root, `r46-09-upload-${repetition}.accepted`);
+      const releasePath = join(fixture.root, `r46-09-upload-${repetition}.release`);
+      setUploadBarrier({ barrierPath, releasePath });
+      const workerArgs = [
+        join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
+        "scripts/r46-09-upload-worker.ts",
+        fixture.databasePath,
+        packet.id,
+        persistedPacketDigest,
+        interruptionRunId,
+        documentPath,
+      ];
+      const worker = spawn(process.execPath, workerArgs, {
+        cwd: process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let workerStdout = "";
+      let workerStderr = "";
+      worker.stdout?.on("data", (chunk) => (workerStdout += String(chunk)));
+      worker.stderr?.on("data", (chunk) => (workerStderr += String(chunk)));
+      const waitForBarrier = async () => {
+        const started = Date.now();
+        while (!existsSync(barrierPath)) {
+          if (worker.exitCode !== null) {
+            throw new Error(
+              `R46_09_WORKER_EXITED:${worker.exitCode}:${workerStdout}:${workerStderr}`,
+            );
+          }
+          if (Date.now() - started > 30_000)
+            throw new Error(`R46_09_UPLOAD_BARRIER_TIMEOUT:${workerStdout}:${workerStderr}`);
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      };
+      await waitForBarrier();
+      expect(counts.uploads).toBe(1);
+      const workerClosed = new Promise<void>((resolve) => worker.once("close", () => resolve()));
+      worker.kill();
+      await writeFile(releasePath, "release");
+      if (worker.exitCode === null) {
+        await Promise.race([
+          workerClosed,
+          new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+        ]);
+      }
+      const recoverySqlite = new BetterSqlite3(fixture.databasePath);
+      recoverySqlite.pragma("foreign_keys = ON");
+      expect(
+        new SqliteNonSubmitRunStore(recoverySqlite, interruptionRunId, persistedPacketDigest).load(
+          runnerBindingDigest(freezeRunnerBinding(packet, capability(targetUrl))),
+        ),
+      ).toMatchObject({
+        recoveryRequired: true,
+        recoveryReason: "UPLOAD_OUTCOME_UNKNOWN",
+        activeOperation: "UPLOAD",
+      });
+      recoverySqlite.close();
+      // Keep the barrier configuration until server shutdown; the released
+      // request may still be unwinding after the worker is terminated.
       const freshContextSqlite = new BetterSqlite3(fixture.databasePath);
       freshContextSqlite.pragma("foreign_keys = ON");
       const reloadedPacket = loadPersistedApplicationPacket({
@@ -865,6 +963,17 @@ test("persists source verification through canonical R2 and packet services to a
         documentBytes: { [documentDigest]: documentBytes },
         operationKey: `r46-07-${repetition}`,
       });
+      expect(
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PRE_EXTERNAL_ACTION",
+          now: fixedNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }).digest,
+      ).toBe(persistedPacketDigest);
       const runner = new TargetIndependentNonSubmitRunner(
         packetForRunner,
         target,
@@ -884,10 +993,10 @@ test("persists source verification through canonical R2 and packet services to a
       const preview = await runner.fillPreview();
       expect(preview.state).toBe("FILL_PREVIEW");
       expect(preview.previewDigest).toMatch(/^[a-f0-9]{64}$/);
-      expect(counts).toEqual({ uploads: 1, submissions: 0 });
+      expect(counts).toEqual({ uploads: 2, submissions: 0 });
       expect(
         sqlite.prepare("SELECT count(*) AS count FROM application_run_operations").get(),
-      ).toEqual({ count: 5 });
+      ).toEqual({ count: 8 });
       expect(
         sqlite
           .prepare(
@@ -949,7 +1058,7 @@ test("persists source verification through canonical R2 and packet services to a
         state: "PAUSED",
         stopReason: "PAGE_CHANGED",
       });
-      expect(counts).toEqual({ uploads: 1, submissions: 0 });
+      expect(counts).toEqual({ uploads: 2, submissions: 0 });
       r2.recordQueueDecision({
         jobId: lineage.jobId,
         state: "PREPARING",
@@ -968,7 +1077,7 @@ test("persists source verification through canonical R2 and packet services to a
           persistedPacketDigest,
           () => fixedNow,
         ).claim(bindingDigest, "MAP_FOR_FILL"),
-      ).toBe(false);
+      ).toBeNull();
       competingSqlite.close();
       await adapter.close();
       sqlite.close();
@@ -1011,7 +1120,7 @@ test("persists source verification through canonical R2 and packet services to a
         state: "FILL_PREVIEW",
         sequence: 6,
       });
-      expect(counts).toEqual({ uploads: 1, submissions: 0 });
+      expect(counts).toEqual({ uploads: 2, submissions: 0 });
       expect(sqlite.pragma("foreign_key_check")).toEqual([]);
       sqlite
         .prepare(
@@ -1044,7 +1153,7 @@ test("persists source verification through canonical R2 and packet services to a
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );
-      await rm(fixture.root, { recursive: true, force: true });
+      await rm(fixture.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   }
 });

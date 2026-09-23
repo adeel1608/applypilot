@@ -6,6 +6,7 @@ import { z } from "zod";
 import type {
   NonSubmitDurableSnapshot,
   NonSubmitDurableStore,
+  NonSubmitClaimHandle,
   NonSubmitRunnerCheckpoint,
   RunnerTargetOperation,
 } from "@applypilot/application-runner";
@@ -51,6 +52,8 @@ const DurableSnapshotSchema = z
     checkpoints: z.array(DurableCheckpointSchema),
     claimedOperations: z.array(RunnerTargetOperationSchema).max(5),
     activeOperation: RunnerTargetOperationSchema.nullable().optional(),
+    recoveryRequired: z.boolean().optional(),
+    recoveryReason: z.string().min(1).nullable().optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -158,25 +161,15 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
             claimedOperations: [],
             activeOperation: null,
           };
-      const latest = base.checkpoints.at(-1);
-      const recovery = {
-        sequence: base.sequence + 1,
-        state: "PAUSED" as const,
-        stopReason: row.operation === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
-        occurredAt: this.now().toISOString(),
-        targetUrl: latest?.targetUrl ?? "http://127.0.0.1/unknown",
-        formVersion: latest?.formVersion ?? "recovery",
-        adapterVersion: latest?.adapterVersion ?? "recovery",
-        fieldReadBack: [],
-        uploadEvidence: null,
-        previewDigest: null,
-      };
       return parseSnapshot({
         state: "PAUSED",
-        sequence: recovery.sequence,
-        checkpoints: [...base.checkpoints, recovery],
+        sequence: base.sequence,
+        checkpoints: base.checkpoints,
         claimedOperations: base.claimedOperations,
-        activeOperation: null,
+        activeOperation: row.operation,
+        recoveryRequired: true,
+        recoveryReason:
+          row.operation === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
       });
     }
     let parsed: unknown;
@@ -188,51 +181,101 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
     return parseSnapshot(parsed);
   }
 
-  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean {
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null {
     assertDigest(bindingDigest, "BINDING_DIGEST");
     if (!["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation)) {
       throw new Error("NON_SUBMIT_OPERATION_FORBIDDEN");
     }
     try {
       return this.sqlite.transaction(() => {
+        const existingBinding = this.sqlite
+          .prepare(
+            "SELECT binding_digest AS bindingDigest FROM application_run_operations WHERE run_id=? LIMIT 1",
+          )
+          .get(this.runId) as { bindingDigest: string } | undefined;
+        if (existingBinding && existingBinding.bindingDigest !== bindingDigest) {
+          throw new Error("BINDING_DIGEST_MISMATCH");
+        }
+        const prior = this.sqlite
+          .prepare(
+            "SELECT operation,state FROM application_run_operations WHERE run_id=? AND state<>'CLAIMED' ORDER BY created_at,rowid",
+          )
+          .all(this.runId) as Array<{ operation: RunnerTargetOperation; state: string }>;
+        const expected: Record<string, RunnerTargetOperation | null> = {
+          MAP_FOR_FILL: null,
+          FILL: "MAP_FOR_FILL",
+          UPLOAD: "FILL",
+          VERIFY: "UPLOAD",
+          FILL_PREVIEW: "VERIFY",
+        };
+        const required = expected[operation];
+        if (required && !prior.some((item) => item.operation === required)) return null;
         const inProgress = this.sqlite
           .prepare(
             `SELECT 1 FROM application_run_operations
              WHERE run_id=? AND binding_digest=? AND state='CLAIMED' LIMIT 1`,
           )
           .get(this.runId, bindingDigest);
-        if (inProgress) return false;
+        if (inProgress) return null;
         const now = this.now().toISOString();
+        const claimId = randomUUID();
         this.sqlite
           .prepare(
             `INSERT INTO application_run_operations
              (id,run_id,binding_digest,operation,operation_key,state,effect_json,created_at,updated_at)
              VALUES (?,?,?,?,?,'CLAIMED','{}',?,?)`,
           )
-          .run(randomUUID(), this.runId, bindingDigest, operation, operation, now, now);
-        return true;
+          .run(claimId, this.runId, bindingDigest, operation, operation, now, now);
+        return { claimId, bindingDigest, operation };
       })();
     } catch (error) {
-      if (String(error).includes("UNIQUE")) return false;
+      if (String(error).includes("UNIQUE")) return null;
       throw error;
     }
   }
 
-  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void {
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void {
     assertDigest(bindingDigest, "BINDING_DIGEST");
     const parsed = parseSnapshot(snapshot);
     const now = this.now().toISOString();
-    const operation = parsed.claimedOperations.at(-1);
+    if (claim.bindingDigest !== bindingDigest) throw new Error("NON_SUBMIT_CLAIM_OWNER_REQUIRED");
+    const operation = claim.operation;
     if (!operation) return;
+    if (parsed.claimedOperations.at(-1) !== operation)
+      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
+    const required: Partial<Record<RunnerTargetOperation, RunnerTargetOperation>> = {
+      FILL: "MAP_FOR_FILL",
+      UPLOAD: "FILL",
+      VERIFY: "UPLOAD",
+      FILL_PREVIEW: "VERIFY",
+    };
+    if (
+      !["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation) ||
+      (required[operation] && !parsed.claimedOperations.includes(required[operation]!))
+    )
+      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
     this.sqlite.transaction(() => {
       const updated = this.sqlite
         .prepare(
           `UPDATE application_run_operations
            SET state=?, effect_json=?, updated_at=?
-           WHERE run_id=? AND binding_digest=? AND operation_key=?
+           WHERE id=? AND run_id=? AND binding_digest=? AND operation=? AND operation_key=?
              AND state='CLAIMED' AND effect_json='{}'`,
         )
-        .run(parsed.state, JSON.stringify(parsed), now, this.runId, bindingDigest, operation);
+        .run(
+          parsed.state,
+          JSON.stringify(parsed),
+          now,
+          claim.claimId,
+          this.runId,
+          bindingDigest,
+          operation,
+          operation,
+        );
       if (updated.changes !== 1) throw new Error("NON_SUBMIT_SNAPSHOT_CLAIM_MISSING");
       const latest = parsed.checkpoints.at(-1);
       if (latest?.state === "FILL_PREVIEW" && latest.previewDigest) {

@@ -202,8 +202,9 @@ describe("Beta repository", () => {
       () => new Date(now),
     );
     const bindingDigest = "d".repeat(64);
-    expect(durable.claim(bindingDigest, "MAP_FOR_FILL")).toBe(true);
-    expect(durable.claim(bindingDigest, "FILL")).toBe(false);
+    const mapClaim = durable.claim(bindingDigest, "MAP_FOR_FILL");
+    expect(mapClaim).toMatchObject({ operation: "MAP_FOR_FILL", bindingDigest });
+    expect(durable.claim(bindingDigest, "FILL")).toBeNull();
     expect(() => durable.load("f".repeat(64))).toThrow("BINDING_DIGEST_MISMATCH");
     expect(
       () => new SqliteNonSubmitRunStore(sqlite, runId, "f".repeat(64), () => new Date(now)),
@@ -217,31 +218,111 @@ describe("Beta repository", () => {
         packetDigest(packet),
         () => new Date(now),
       ).claim(bindingDigest, "MAP_FOR_FILL"),
-    ).toBe(false);
+    ).toBeNull();
     competingSqlite.close();
-    durable.save(bindingDigest, {
-      state: "MAPPED",
-      sequence: 1,
-      claimedOperations: ["MAP_FOR_FILL"],
-      checkpoints: [
-        {
-          sequence: 1,
-          state: "MAPPED",
-          stopReason: null,
-          occurredAt: now,
-          targetUrl: packet.targetUrl!,
-          formVersion: "fixture-form-v1",
-          adapterVersion: "fixture-adapter-v1",
-          fieldReadBack: [],
-          uploadEvidence: null,
-          previewDigest: null,
-        },
-      ],
-    });
+    durable.save(
+      bindingDigest,
+      {
+        state: "MAPPED",
+        sequence: 1,
+        claimedOperations: ["MAP_FOR_FILL"],
+        checkpoints: [
+          {
+            sequence: 1,
+            state: "MAPPED",
+            stopReason: null,
+            occurredAt: now,
+            targetUrl: packet.targetUrl!,
+            formVersion: "fixture-form-v1",
+            adapterVersion: "fixture-adapter-v1",
+            fieldReadBack: [],
+            uploadEvidence: null,
+            previewDigest: null,
+          },
+        ],
+      },
+      mapClaim!,
+    );
     expect(durable.load(bindingDigest)).toMatchObject({ state: "MAPPED", sequence: 1 });
     expect(durable.checkpoints()).toHaveLength(1);
-    const previewBindingDigest = "e".repeat(64);
-    expect(durable.claim(previewBindingDigest, "FILL_PREVIEW")).toBe(true);
+    const previewBindingDigest = bindingDigest;
+    const fillClaim = durable.claim(previewBindingDigest, "FILL");
+    expect(fillClaim).toMatchObject({ operation: "FILL" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "FILLED",
+        sequence: 2,
+        claimedOperations: ["MAP_FOR_FILL", "FILL"],
+        checkpoints: [
+          {
+            sequence: 2,
+            state: "FILLED",
+            stopReason: null,
+            occurredAt: now,
+            targetUrl: packet.targetUrl!,
+            formVersion: "fixture-form-v1",
+            adapterVersion: "fixture-adapter-v1",
+            fieldReadBack: [],
+            uploadEvidence: null,
+            previewDigest: null,
+          },
+        ],
+      },
+      fillClaim!,
+    );
+    const uploadClaim = durable.claim(previewBindingDigest, "UPLOAD");
+    expect(uploadClaim).toMatchObject({ operation: "UPLOAD" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "UPLOADED",
+        sequence: 3,
+        claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD"],
+        checkpoints: [
+          {
+            sequence: 3,
+            state: "UPLOADED",
+            stopReason: null,
+            occurredAt: now,
+            targetUrl: packet.targetUrl!,
+            formVersion: "fixture-form-v1",
+            adapterVersion: "fixture-adapter-v1",
+            fieldReadBack: [],
+            uploadEvidence: null,
+            previewDigest: null,
+          },
+        ],
+      },
+      uploadClaim!,
+    );
+    const verifyClaim = durable.claim(previewBindingDigest, "VERIFY");
+    expect(verifyClaim).toMatchObject({ operation: "VERIFY" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "VERIFIED",
+        sequence: 4,
+        claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY"],
+        checkpoints: [
+          {
+            sequence: 4,
+            state: "VERIFIED",
+            stopReason: null,
+            occurredAt: now,
+            targetUrl: packet.targetUrl!,
+            formVersion: "fixture-form-v1",
+            adapterVersion: "fixture-adapter-v1",
+            fieldReadBack: [],
+            uploadEvidence: null,
+            previewDigest: null,
+          },
+        ],
+      },
+      verifyClaim!,
+    );
+    const previewClaim = durable.claim(previewBindingDigest, "FILL_PREVIEW");
+    expect(previewClaim).toMatchObject({ operation: "FILL_PREVIEW" });
     sqlite.exec(`
       CREATE TRIGGER synthetic_preview_persistence_failure
       BEFORE INSERT ON application_run_previews
@@ -250,7 +331,7 @@ describe("Beta repository", () => {
     const previewSnapshot = {
       state: "FILL_PREVIEW" as const,
       sequence: 2,
-      claimedOperations: ["MAP_FOR_FILL", "FILL_PREVIEW"],
+      claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
       checkpoints: [
         {
           sequence: 2,
@@ -266,19 +347,19 @@ describe("Beta repository", () => {
         },
       ],
     };
-    expect(() => durable.save(previewBindingDigest, previewSnapshot)).toThrow(
+    expect(() => durable.save(previewBindingDigest, previewSnapshot, previewClaim!)).toThrow(
       "synthetic preview persistence interruption",
     );
     expect(
       sqlite
         .prepare(
           `SELECT state, effect_json AS effectJson FROM application_run_operations
-           WHERE run_id=? AND binding_digest=?`,
+           WHERE run_id=? AND binding_digest=? AND operation_key='FILL_PREVIEW'`,
         )
         .get(runId, previewBindingDigest),
     ).toEqual({ state: "CLAIMED", effectJson: "{}" });
     sqlite.exec("DROP TRIGGER synthetic_preview_persistence_failure");
-    durable.save(previewBindingDigest, previewSnapshot);
+    durable.save(previewBindingDigest, previewSnapshot, previewClaim!);
     expect(
       sqlite
         .prepare(
@@ -299,7 +380,27 @@ describe("Beta repository", () => {
       () => new Date(now),
     );
     const recoveryBinding = "f".repeat(64);
-    expect(recoveryStore.claim(recoveryBinding, "UPLOAD")).toBe(true);
+    const recoveryClaim = recoveryStore.claim(recoveryBinding, "MAP_FOR_FILL");
+    expect(recoveryClaim).toMatchObject({ operation: "MAP_FOR_FILL" });
+    recoveryStore.save(
+      recoveryBinding,
+      { state: "MAPPED", sequence: 1, claimedOperations: ["MAP_FOR_FILL"], checkpoints: [] },
+      recoveryClaim!,
+    );
+    const recoveryUploadClaim = recoveryStore.claim(recoveryBinding, "FILL");
+    expect(recoveryUploadClaim).toMatchObject({ operation: "FILL" });
+    recoveryStore.save(
+      recoveryBinding,
+      {
+        state: "FILLED",
+        sequence: 2,
+        claimedOperations: ["MAP_FOR_FILL", "FILL"],
+        checkpoints: [],
+      },
+      recoveryUploadClaim!,
+    );
+    const recoveryClaimUpload = recoveryStore.claim(recoveryBinding, "UPLOAD");
+    expect(recoveryClaimUpload).toMatchObject({ operation: "UPLOAD" });
     sqlite.close();
     const reopenedSqlite = new BetterSqlite3(databasePath);
     reopenedSqlite.pragma("foreign_keys = ON");
@@ -312,7 +413,9 @@ describe("Beta repository", () => {
       ).load(recoveryBinding),
     ).toMatchObject({
       state: "PAUSED",
-      checkpoints: [expect.objectContaining({ stopReason: "UPLOAD_OUTCOME_UNKNOWN" })],
+      recoveryRequired: true,
+      recoveryReason: "UPLOAD_OUTCOME_UNKNOWN",
+      activeOperation: "UPLOAD",
     });
     reopenedSqlite.close();
     rmSync(databasePath, { force: true });

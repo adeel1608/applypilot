@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import {
   ApplicationPacketSchema,
-  PROPOSED_LOCAL_VERIFICATION_POLICY,
   assessPacketReadiness,
   assessVerificationFreshness,
-  deriveJobExpiryState,
+  VerificationFreshnessOperationSchema,
+  VerificationFreshnessPolicySchema,
   packetDigest,
   type ApplicationPacket,
   type PacketReadiness,
@@ -19,6 +19,8 @@ import { R2Repository } from "./r2-repository";
 const ReadinessEnvelopeSchema = z
   .object({
     packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    packetContractVersion: z.string().min(1).optional(),
+    frozenPacket: z.unknown().optional(),
     verificationEvidence: z.unknown().nullable().optional(),
   })
   .passthrough();
@@ -109,15 +111,18 @@ function currentVersionState(sqlite: BetterSqlite3.Database, row: PacketRow): bo
   if (
     !current ||
     current.currentJob !== row.jobVersionId ||
-    current.activeProfile !== row.profileVersionId ||
-    current.evaluationJob !== row.jobId ||
-    current.evaluationJobVersion !== row.jobVersionId ||
-    current.evaluationProfile !== row.profileVersionId ||
-    current.stale !== 0
+    current.activeProfile !== row.profileVersionId
   ) {
     return false;
   }
-  if (!row.r2EvaluationId) return true;
+  if (!row.r2EvaluationId) {
+    return (
+      current.evaluationJob === row.jobId &&
+      current.evaluationJobVersion === row.jobVersionId &&
+      current.evaluationProfile === row.profileVersionId &&
+      current.stale === 0
+    );
+  }
   const r2 = sqlite
     .prepare(
       `SELECT job_id AS jobId,job_version_id AS jobVersionId,profile_version_id AS profileVersionId,
@@ -186,152 +191,22 @@ export function loadPersistedApplicationPacket(
     parseJson(row.readinessJson, "PACKET_PERSISTED_CORRUPT"),
   );
   if (!envelope.success) return fail("PACKET_PERSISTED_CORRUPT");
-  const verificationEvidence = envelope.data.verificationEvidence ?? null;
-  const documents = input.sqlite
-    .prepare(
-      `SELECT d.id,d.type,d.file_name AS fileName,d.content_digest AS digest,d.stale,
-              pd.required,
-              EXISTS(SELECT 1 FROM document_approvals a
-                     WHERE a.document_artifact_id=d.id AND a.content_digest=d.content_digest
-                       AND a.invalidated_at IS NULL) AS approved
-       FROM application_packet_documents pd
-       JOIN document_artifacts d ON d.id=pd.document_artifact_id
-       WHERE pd.packet_id=? ORDER BY d.id`,
-    )
-    .all(row.id) as Array<{
-    id: string;
-    type: string;
-    fileName: string;
-    digest: string;
-    stale: number;
-    required: number;
-    approved: number;
-  }>;
-  const answers = input.sqlite
-    .prepare(
-      `SELECT q.question_key AS questionId,q.question_text AS questionText,q.required,q.sensitive,
-              a.answer_json AS answerJson,a.certainty AS truthState,a.disclosure_state AS disclosureState,
-              a.fact_references_json AS factReferences
-       FROM application_questions q
-       LEFT JOIN application_answer_versions a ON a.id=(
-         SELECT a2.id FROM application_answer_versions a2
-         WHERE a2.question_id=q.id ORDER BY a2.version DESC LIMIT 1)
-       WHERE q.packet_id=? ORDER BY q.id`,
-    )
-    .all(row.id) as Array<{
-    questionId: string;
-    questionText: string;
-    required: number;
-    sensitive: number;
-    answerJson: string | null;
-    truthState: string | null;
-    disclosureState: string | null;
-    factReferences: string | null;
-  }>;
-  const evidence = verificationEvidence
-    ? z
-        .object({
-          verificationId: z.string().min(1),
-          verifiedAt: z.iso.datetime(),
-          contentHash: z.string().regex(/^[a-f0-9]{64}$/),
-          providerExpiresAt: z.string().nullable(),
-        })
-        .passthrough()
-        .safeParse(verificationEvidence)
-    : null;
-  if (verificationEvidence && !evidence?.success)
-    return fail("PACKET_VERIFICATION_EVIDENCE_CORRUPT");
-  const ledger = evidence?.success
-    ? (input.sqlite
-        .prepare(
-          `SELECT v.verified_at AS verifiedAt,v.content_hash AS contentHash,
-                  v.qualification_state AS qualificationState,o.expires_at AS providerExpiresAt,
-                  jv.job_id AS jobId,jv.id AS jobVersionId
-           FROM source_record_verifications v
-           LEFT JOIN source_observations o ON o.id=v.source_observation_id
-           LEFT JOIN job_versions jv ON jv.id=v.job_version_id
-           WHERE v.id=?`,
-        )
-        .get(evidence.data.verificationId) as
-        | {
-            verifiedAt: string;
-            contentHash: string | null;
-            qualificationState: string;
-            providerExpiresAt: string | null;
-            jobId: string | null;
-            jobVersionId: string | null;
-          }
-        | undefined)
-    : undefined;
-  if (
-    evidence?.success &&
-    (!ledger ||
-      ledger.qualificationState !== "QUALIFIED" ||
-      ledger.jobId !== row.jobId ||
-      ledger.jobVersionId !== row.jobVersionId ||
-      ledger.verifiedAt !== evidence.data.verifiedAt ||
-      ledger.contentHash !== evidence.data.contentHash ||
-      ledger.providerExpiresAt !== evidence.data.providerExpiresAt)
-  ) {
-    return fail("PACKET_VERIFICATION_EVIDENCE_MISMATCH");
-  }
-  const providerExpiresAt = ledger?.providerExpiresAt ?? null;
-  const packet = ApplicationPacketSchema.safeParse({
-    id: row.id,
-    jobId: row.jobId,
-    jobVersionId: row.jobVersionId ?? fail("PACKET_PERSISTED_CORRUPT"),
-    profileVersionId: row.profileVersionId,
-    evaluationVersionId: row.evaluationVersionId ?? fail("PACKET_PERSISTED_CORRUPT"),
-    r2EvaluationId: row.r2EvaluationId,
-    verificationEvidence,
-    eligibilityStatus:
-      (row.r2EvaluationId
-        ? (
-            input.sqlite
-              .prepare("SELECT eligibility_status AS value FROM r2_evaluation_versions WHERE id=?")
-              .get(row.r2EvaluationId) as { value: string } | undefined
-          )?.value
-        : (
-            input.sqlite
-              .prepare("SELECT eligibility_status AS value FROM evaluation_versions WHERE id=?")
-              .get(row.evaluationVersionId) as { value: string } | undefined
-          )?.value) ?? "REVIEW_REQUIRED",
-    targetUrl: row.targetUrl,
-    targetHost: row.targetHost,
-    jobExpiryState: deriveJobExpiryState(providerExpiresAt, input.now ?? new Date()),
-    duplicateState: input.sqlite
-      .prepare(
-        `SELECT 1 FROM r2_duplicate_candidates c WHERE c.state='SUGGESTED' AND
-         (c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id=?) OR
-          c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id=?)) LIMIT 1`,
-      )
-      .get(row.jobId, row.jobId)
-      ? "UNRESOLVED"
-      : "CLEAR",
-    versionsCurrent: currentVersionState(input.sqlite, row),
-    documents: documents.map((document) => ({
-      id: document.id,
-      type: document.type,
-      fileName: document.fileName,
-      digest: document.digest,
-      approved: Boolean(document.approved),
-      stale: Boolean(document.stale),
-      required: Boolean(document.required),
-    })),
-    answers: answers.map((answer) => ({
-      questionId: answer.questionId,
-      questionText: answer.questionText,
-      required: Boolean(answer.required),
-      sensitive: Boolean(answer.sensitive),
-      value: parseAnswerValue(answer.answerJson),
-      truthState: answer.truthState ?? "UNKNOWN",
-      disclosureState: answer.disclosureState ?? "UNKNOWN",
-      factReferences: answer.factReferences
-        ? (parseJson(answer.factReferences, "PACKET_PERSISTED_CORRUPT") as string[])
-        : [],
-    })),
-  });
+  if (envelope.data.frozenPacket === undefined)
+    return fail("PACKET_HISTORICAL_REPRESENTATION_UNAVAILABLE");
+  const packet = ApplicationPacketSchema.safeParse(envelope.data.frozenPacket);
   if (!packet.success) return fail("PACKET_PERSISTED_CORRUPT");
+  if (
+    packet.data.id !== row.id ||
+    packet.data.jobId !== row.jobId ||
+    packet.data.jobVersionId !== row.jobVersionId ||
+    packet.data.profileVersionId !== row.profileVersionId ||
+    packet.data.evaluationVersionId !== row.evaluationVersionId ||
+    packet.data.r2EvaluationId !== row.r2EvaluationId ||
+    packet.data.targetUrl !== row.targetUrl ||
+    packet.data.targetHost !== row.targetHost
+  )
+    return fail("PACKET_PERSISTED_DIGEST_MISMATCH");
+  const providerExpiresAt = packet.data.verificationEvidence?.providerExpiresAt ?? null;
   const digest = packetDigest(packet.data);
   if (input.expectedDigest && input.expectedDigest !== digest)
     return fail("PACKET_DIGEST_BINDING_MISMATCH");
@@ -348,11 +223,18 @@ export function loadPersistedApplicationPacket(
 export function resolvePersistedApplicationPacket(
   input: PersistedPacketResolveInput,
 ): PersistedPacketResolveResult {
+  if (input.policy === undefined) return fail("PACKET_POLICY_REQUIRED");
+  if (input.operation === undefined) return fail("PACKET_OPERATION_REQUIRED");
   const now = input.now ?? new Date();
-  const policy = input.policy ?? PROPOSED_LOCAL_VERIFICATION_POLICY;
+  let policy: VerificationFreshnessPolicy;
+  let operation: VerificationFreshnessOperation;
+  try {
+    policy = VerificationFreshnessPolicySchema.parse(input.policy);
+    operation = VerificationFreshnessOperationSchema.parse(input.operation);
+  } catch {
+    return fail("PACKET_AUTHORITY_INVALID");
+  }
   const loaded = loadPersistedApplicationPacket({ ...input, now });
-  if (loaded.readiness.blockers.length)
-    return fail(`PACKET_NOT_READY:${loaded.readiness.blockers.join(",")}`);
   const evidence = loaded.packet.verificationEvidence;
   if (!evidence) return fail("PACKET_VERIFICATION_REQUIRED");
   if (
@@ -361,6 +243,96 @@ export function resolvePersistedApplicationPacket(
     evidence.preExternalActionMaxAgeMs !== policy.preExternalActionMaxAgeMs
   )
     return fail("PACKET_FRESHNESS_POLICY_MISMATCH");
+  if (
+    !currentVersionState(input.sqlite, {
+      id: loaded.packet.id,
+      jobId: loaded.packet.jobId,
+      jobVersionId: loaded.packet.jobVersionId,
+      profileVersionId: loaded.packet.profileVersionId,
+      evaluationVersionId: loaded.packet.evaluationVersionId,
+      r2EvaluationId: loaded.packet.r2EvaluationId,
+      targetUrl: loaded.packet.targetUrl,
+      targetHost: loaded.packet.targetHost,
+      readinessJson: "",
+    })
+  )
+    return fail("PACKET_VERSION_STATE_REQUIRED");
+  const readiness = assessPacketReadiness(loaded.packet, { allowUnknownProviderExpiry: true });
+  if (readiness.blockers.length) return fail(`PACKET_NOT_READY:${readiness.blockers.join(",")}`);
+  const currentEvidence = input.sqlite
+    .prepare(
+      `SELECT v.verified_at AS verifiedAt,v.content_hash AS contentHash,
+              v.qualification_state AS qualificationState,o.expires_at AS providerExpiresAt
+       FROM source_record_verifications v
+       LEFT JOIN source_observations o ON o.id=v.source_observation_id
+       WHERE v.id=?`,
+    )
+    .get(evidence.verificationId) as
+    | {
+        verifiedAt: string;
+        contentHash: string | null;
+        qualificationState: string;
+        providerExpiresAt: string | null;
+      }
+    | undefined;
+  if (
+    !currentEvidence ||
+    currentEvidence.qualificationState !== "QUALIFIED" ||
+    currentEvidence.verifiedAt !== evidence.verifiedAt ||
+    currentEvidence.contentHash !== evidence.contentHash ||
+    currentEvidence.providerExpiresAt !== evidence.providerExpiresAt
+  )
+    return fail("PACKET_VERIFICATION_EVIDENCE_MISMATCH");
+  for (const document of loaded.packet.documents) {
+    const currentDocument = input.sqlite
+      .prepare(
+        `SELECT d.content_digest AS digest,d.stale,
+                EXISTS(SELECT 1 FROM document_approvals a
+                  WHERE a.document_artifact_id=d.id AND a.content_digest=d.content_digest
+                    AND a.invalidated_at IS NULL) AS approved
+         FROM document_artifacts d WHERE d.id=?`,
+      )
+      .get(document.id) as { digest: string; stale: number; approved: number } | undefined;
+    if (
+      !currentDocument ||
+      currentDocument.digest !== document.digest ||
+      Boolean(currentDocument.stale) !== document.stale ||
+      Boolean(currentDocument.approved) !== document.approved
+    )
+      return fail("PACKET_DOCUMENT_CURRENTNESS_REQUIRED");
+  }
+  for (const answer of loaded.packet.answers) {
+    const currentAnswer = input.sqlite
+      .prepare(
+        `SELECT a.answer_json AS answerJson,a.certainty AS truthState,a.disclosure_state AS disclosureState,
+                a.fact_references_json AS factReferences
+         FROM application_questions q
+         LEFT JOIN application_answer_versions a ON a.id=(
+           SELECT a2.id FROM application_answer_versions a2
+           WHERE a2.question_id=q.id ORDER BY a2.version DESC LIMIT 1)
+         WHERE q.packet_id=? AND q.question_key=?`,
+      )
+      .get(loaded.packet.id, answer.questionId) as
+      | {
+          answerJson: string | null;
+          truthState: string | null;
+          disclosureState: string | null;
+          factReferences: string | null;
+        }
+      | undefined;
+    if (!currentAnswer) return fail("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+    const currentValue = parseAnswerValue(currentAnswer.answerJson);
+    const currentRefs = currentAnswer.factReferences
+      ? parseJson(currentAnswer.factReferences, "PACKET_PERSISTED_CORRUPT")
+      : [];
+    if (
+      currentValue !== answer.value ||
+      (currentAnswer.truthState ?? "UNKNOWN") !== answer.truthState ||
+      (currentAnswer.disclosureState ?? "UNKNOWN") !== answer.disclosureState ||
+      JSON.stringify(currentRefs) !== JSON.stringify(answer.factReferences)
+    )
+      return fail("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+  }
   if (loaded.packet.r2EvaluationId) {
     try {
       new R2Repository(input.sqlite, () => now).assertCurrentPreparing(
@@ -371,7 +343,6 @@ export function resolvePersistedApplicationPacket(
       return fail("PACKET_R2_CURRENTNESS_REQUIRED");
     }
   }
-  const operation = input.operation ?? "PREPARATION";
   const freshness = assessVerificationFreshness({
     verifiedAt: evidence.verifiedAt,
     evidenceQualified: true,

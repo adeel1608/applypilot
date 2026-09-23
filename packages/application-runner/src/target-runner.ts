@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
@@ -898,23 +898,36 @@ export interface NonSubmitDurableSnapshot {
   checkpoints: NonSubmitRunnerCheckpoint[];
   claimedOperations: string[];
   activeOperation?: RunnerTargetOperation | null;
+  recoveryRequired?: boolean;
+  recoveryReason?: SyntheticStopReason | null;
+}
+
+export interface NonSubmitClaimHandle {
+  claimId: string;
+  bindingDigest: string;
+  operation: RunnerTargetOperation;
 }
 
 export interface NonSubmitDurableStore {
   load(bindingDigest: string): NonSubmitDurableSnapshot | null;
-  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean;
-  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void;
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null;
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void;
 }
 
 export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
   private readonly snapshots = new Map<string, NonSubmitDurableSnapshot>();
+  private readonly claims = new Map<string, NonSubmitClaimHandle>();
 
   load(bindingDigest: string): NonSubmitDurableSnapshot | null {
     const value = this.snapshots.get(bindingDigest);
     return value ? structuredClone(value) : null;
   }
 
-  claim(bindingDigest: string, operation: RunnerTargetOperation): boolean {
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null {
     const snapshot = this.snapshots.get(bindingDigest) ?? {
       state: "PREPARED",
       sequence: 0,
@@ -922,15 +935,41 @@ export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
       claimedOperations: [],
       activeOperation: null,
     };
-    if (snapshot.claimedOperations.includes(operation) || snapshot.activeOperation) return false;
+    if (!["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation))
+      return null;
+    const required: Partial<Record<RunnerTargetOperation, RunnerTargetOperation>> = {
+      FILL: "MAP_FOR_FILL",
+      UPLOAD: "FILL",
+      VERIFY: "UPLOAD",
+      FILL_PREVIEW: "VERIFY",
+    };
+    if (required[operation] && !snapshot.claimedOperations.includes(required[operation]!))
+      return null;
+    if (snapshot.claimedOperations.includes(operation) || snapshot.activeOperation) return null;
     snapshot.activeOperation = operation;
     snapshot.claimedOperations.push(operation);
     this.snapshots.set(bindingDigest, snapshot);
-    return true;
+    const handle = { claimId: randomUUID(), bindingDigest, operation };
+    this.claims.set(bindingDigest, handle);
+    return handle;
   }
 
-  save(bindingDigest: string, snapshot: NonSubmitDurableSnapshot): void {
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void {
+    const owner = this.claims.get(bindingDigest);
+    if (
+      !owner ||
+      owner.claimId !== claim.claimId ||
+      claim.bindingDigest !== bindingDigest ||
+      claim.operation !== snapshot.claimedOperations.at(-1)
+    ) {
+      throw new Error("NON_SUBMIT_CLAIM_OWNER_REQUIRED");
+    }
     this.snapshots.set(bindingDigest, structuredClone({ ...snapshot, activeOperation: null }));
+    this.claims.delete(bindingDigest);
   }
 }
 
@@ -953,6 +992,9 @@ export class TargetIndependentNonSubmitRunner {
   private readonly checkpoints: NonSubmitRunnerCheckpoint[] = [];
   private readonly claimedOperations: string[] = [];
   private readonly bindingDigest: string;
+  private activeClaim: NonSubmitClaimHandle | null = null;
+  private recoveryRequired = false;
+  private recoveryReason: SyntheticStopReason | null = null;
 
   constructor(
     private readonly packet: ApplicationPacket,
@@ -973,6 +1015,8 @@ export class TargetIndependentNonSubmitRunner {
       this.sequence = recovered.sequence;
       this.checkpoints.push(...recovered.checkpoints);
       this.claimedOperations.push(...recovered.claimedOperations);
+      this.recoveryRequired = recovered.recoveryRequired === true;
+      this.recoveryReason = recovered.recoveryReason ?? null;
       return;
     }
     if (
@@ -1025,6 +1069,8 @@ export class TargetIndependentNonSubmitRunner {
       state: this.state,
       checkpoints: this.checkpoints.map((checkpoint) => ({ ...checkpoint })),
       claimedOperations: [...this.claimedOperations],
+      recoveryRequired: this.recoveryRequired,
+      recoveryReason: this.recoveryReason,
       submitEnabled: false as const,
     };
   }
@@ -1038,13 +1084,17 @@ export class TargetIndependentNonSubmitRunner {
     if (this.claimedOperations.includes(operationName)) {
       return this.pause("OPERATION_REPLAYED");
     }
-    if (this.durableStore && !this.durableStore.claim(this.bindingDigest, operationName)) {
-      return this.record(
-        "PAUSED",
-        operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
-        undefined,
-        false,
-      );
+    if (this.durableStore) {
+      const claim = this.durableStore.claim(this.bindingDigest, operationName);
+      if (!claim) {
+        return this.record(
+          "PAUSED",
+          operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
+          undefined,
+          false,
+        );
+      }
+      this.activeClaim = claim;
     }
     this.claimedOperations.push(operationName);
     try {
@@ -1114,12 +1164,18 @@ export class TargetIndependentNonSubmitRunner {
     };
     this.checkpoints.push(checkpoint);
     if (persist) {
-      this.durableStore?.save(this.bindingDigest, {
-        state: this.state,
-        sequence: this.sequence,
-        checkpoints: this.checkpoints,
-        claimedOperations: this.claimedOperations,
-      });
+      if (this.durableStore && this.activeClaim)
+        this.durableStore.save(
+          this.bindingDigest,
+          {
+            state: this.state,
+            sequence: this.sequence,
+            checkpoints: this.checkpoints,
+            claimedOperations: this.claimedOperations,
+          },
+          this.activeClaim,
+        );
+      this.activeClaim = null;
     }
     return checkpoint;
   }

@@ -832,6 +832,8 @@ export class BetaRepository {
             JSON.stringify({
               ...readiness,
               packetDigest: packetDigest(packet),
+              packetContractVersion: packet.r2EvaluationId ? "r2-packet-v2" : "legacy-packet-v1",
+              frozenPacket: packet,
               verificationEvidence: packet.verificationEvidence ?? null,
             }),
             version,
@@ -858,6 +860,8 @@ export class BetaRepository {
             JSON.stringify({
               ...readiness,
               packetDigest: packetDigest(packet),
+              packetContractVersion: "legacy-packet-v1",
+              frozenPacket: packet,
               verificationEvidence: packet.verificationEvidence ?? null,
             }),
             version,
