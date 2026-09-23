@@ -115,6 +115,14 @@ function currentVersionState(sqlite: BetterSqlite3.Database, row: PacketRow): bo
   ) {
     return false;
   }
+  if (
+    row.r2EvaluationId &&
+    (current.evaluationJob !== row.jobId ||
+      current.evaluationJobVersion !== row.jobVersionId ||
+      current.evaluationProfile !== row.profileVersionId)
+  ) {
+    return false;
+  }
   if (!row.r2EvaluationId) {
     return (
       current.evaluationJob === row.jobId &&
@@ -262,10 +270,18 @@ export function resolvePersistedApplicationPacket(
   const currentEvidence = input.sqlite
     .prepare(
       `SELECT v.verified_at AS verifiedAt,v.content_hash AS contentHash,
-              v.qualification_state AS qualificationState,o.expires_at AS providerExpiresAt
+              v.qualification_state AS qualificationState,v.run_id AS runId,
+              v.page_id AS pageId,v.job_version_id AS jobVersionId,
+              v.source_observation_id AS sourceObservationId,
+              o.expires_at AS providerExpiresAt
        FROM source_record_verifications v
-       LEFT JOIN source_observations o ON o.id=v.source_observation_id
-       WHERE v.id=?`,
+       JOIN source_run_checkpoints r ON r.id=v.run_id AND r.status='COMPLETE'
+       JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id AND p.page_digest=v.page_digest
+         AND v.record_index < p.record_count
+       JOIN job_versions jv ON jv.id=v.job_version_id AND jv.source_observation_id=v.source_observation_id
+       LEFT JOIN source_observations o ON o.id=v.source_observation_id AND o.content_hash=v.content_hash
+       WHERE v.id=? AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+         AND v.job_version_id IS NOT NULL AND v.source_observation_id IS NOT NULL`,
     )
     .get(evidence.verificationId) as
     | {
@@ -273,11 +289,19 @@ export function resolvePersistedApplicationPacket(
         contentHash: string | null;
         qualificationState: string;
         providerExpiresAt: string | null;
+        runId: string;
+        pageId: string;
+        jobVersionId: string;
+        sourceObservationId: string;
       }
     | undefined;
   if (
     !currentEvidence ||
     currentEvidence.qualificationState !== "QUALIFIED" ||
+    currentEvidence.jobVersionId !== loaded.packet.jobVersionId ||
+    !currentEvidence.runId ||
+    !currentEvidence.pageId ||
+    !currentEvidence.sourceObservationId ||
     currentEvidence.verifiedAt !== evidence.verifiedAt ||
     currentEvidence.contentHash !== evidence.contentHash ||
     currentEvidence.providerExpiresAt !== evidence.providerExpiresAt
@@ -286,15 +310,28 @@ export function resolvePersistedApplicationPacket(
   for (const document of loaded.packet.documents) {
     const currentDocument = input.sqlite
       .prepare(
-        `SELECT d.content_digest AS digest,d.stale,
+        `SELECT d.job_id AS jobId,d.job_version_id AS jobVersionId,
+                d.profile_version_id AS profileVersionId,d.content_digest AS digest,d.stale,
                 EXISTS(SELECT 1 FROM document_approvals a
                   WHERE a.document_artifact_id=d.id AND a.content_digest=d.content_digest
                     AND a.invalidated_at IS NULL) AS approved
          FROM document_artifacts d WHERE d.id=?`,
       )
-      .get(document.id) as { digest: string; stale: number; approved: number } | undefined;
+      .get(document.id) as
+      | {
+          jobId: string;
+          jobVersionId: string;
+          profileVersionId: string;
+          digest: string;
+          stale: number;
+          approved: number;
+        }
+      | undefined;
     if (
       !currentDocument ||
+      currentDocument.jobId !== loaded.packet.jobId ||
+      currentDocument.jobVersionId !== loaded.packet.jobVersionId ||
+      currentDocument.profileVersionId !== loaded.packet.profileVersionId ||
       currentDocument.digest !== document.digest ||
       Boolean(currentDocument.stale) !== document.stale ||
       Boolean(currentDocument.approved) !== document.approved
@@ -304,23 +341,35 @@ export function resolvePersistedApplicationPacket(
   for (const answer of loaded.packet.answers) {
     const currentAnswer = input.sqlite
       .prepare(
-        `SELECT a.answer_json AS answerJson,a.certainty AS truthState,a.disclosure_state AS disclosureState,
+        `SELECT q.question_key AS questionKey,q.question_text AS questionText,q.required,q.sensitive,
+                a.answer_json AS answerJson,a.certainty AS truthState,a.disclosure_state AS disclosureState,
                 a.fact_references_json AS factReferences
          FROM application_questions q
          LEFT JOIN application_answer_versions a ON a.id=(
            SELECT a2.id FROM application_answer_versions a2
            WHERE a2.question_id=q.id ORDER BY a2.version DESC LIMIT 1)
-         WHERE q.packet_id=? AND q.question_key=?`,
+         WHERE q.packet_id=? AND q.question_key=? ORDER BY q.version DESC LIMIT 1`,
       )
       .get(loaded.packet.id, answer.questionId) as
       | {
+          questionKey: string;
+          questionText: string;
+          required: number;
+          sensitive: number;
           answerJson: string | null;
           truthState: string | null;
           disclosureState: string | null;
           factReferences: string | null;
         }
       | undefined;
-    if (!currentAnswer) return fail("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+    if (
+      !currentAnswer ||
+      currentAnswer.questionKey !== answer.questionId ||
+      currentAnswer.questionText !== answer.questionText ||
+      Boolean(currentAnswer.required) !== answer.required ||
+      Boolean(currentAnswer.sensitive) !== answer.sensitive
+    )
+      return fail("PACKET_ANSWER_CURRENTNESS_REQUIRED");
     const currentValue = parseAnswerValue(currentAnswer.answerJson);
     const currentRefs = currentAnswer.factReferences
       ? parseJson(currentAnswer.factReferences, "PACKET_PERSISTED_CORRUPT")

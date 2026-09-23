@@ -905,11 +905,9 @@ test("persists source verification through canonical R2 and packet services to a
       const workerClosed = new Promise<void>((resolve) => worker.once("close", () => resolve()));
       worker.kill("SIGKILL");
       if (worker.exitCode === null) {
-        await Promise.race([
-          workerClosed,
-          new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-        ]);
+        await workerClosed;
       }
+      expect(worker.exitCode !== null || worker.signalCode !== null).toBe(true);
       const recoverySqlite = new BetterSqlite3(fixture.databasePath);
       recoverySqlite.pragma("foreign_keys = ON");
       expect(
@@ -947,6 +945,75 @@ test("persists source verification through canonical R2 and packet services to a
         persistedPacketDigest,
         () => fixedNow,
       );
+      const verificationLink = sqlite
+        .prepare(
+          `SELECT job_version_id AS jobVersionId,page_id AS pageId
+           FROM source_record_verifications WHERE id=?`,
+        )
+        .get(lineage.verificationId) as { jobVersionId: string; pageId: string };
+      sqlite
+        .prepare("UPDATE source_record_verifications SET job_version_id=NULL WHERE id=?")
+        .run(lineage.verificationId);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PREPARATION",
+          now: fixedNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }),
+      ).toThrow("PACKET_VERIFICATION_EVIDENCE_MISMATCH");
+      sqlite
+        .prepare("UPDATE source_record_verifications SET job_version_id=?,page_id=? WHERE id=?")
+        .run(verificationLink.jobVersionId, verificationLink.pageId, lineage.verificationId);
+      const answerLink = sqlite
+        .prepare(
+          `SELECT a.id AS answerId,a.answer_json AS answerJson,a.disclosure_state AS disclosureState
+           FROM application_questions q
+           JOIN application_answer_versions a ON a.question_id=q.id
+           WHERE q.packet_id=? AND q.question_key=? ORDER BY a.version DESC LIMIT 1`,
+        )
+        .get(packet.id, "fictional-answer") as {
+        answerId: string;
+        answerJson: string;
+        disclosureState: string;
+      };
+      sqlite
+        .prepare("UPDATE application_answer_versions SET answer_json=? WHERE id=?")
+        .run(JSON.stringify("changed-fictional-answer"), answerLink.answerId);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PREPARATION",
+          now: fixedNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }),
+      ).toThrow("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+      sqlite
+        .prepare("UPDATE application_answer_versions SET disclosure_state=? WHERE id=?")
+        .run("NOT_APPROVED", answerLink.answerId);
+      sqlite
+        .prepare("UPDATE application_answer_versions SET answer_json=? WHERE id=?")
+        .run(answerLink.answerJson, answerLink.answerId);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PREPARATION",
+          now: fixedNow,
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        }),
+      ).toThrow("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+      sqlite
+        .prepare("UPDATE application_answer_versions SET disclosure_state=? WHERE id=?")
+        .run(answerLink.disclosureState, answerLink.answerId);
       const currentBinding = () => {
         const resolved = resolvePersistedApplicationPacket({
           sqlite,
@@ -985,7 +1052,43 @@ test("persists source verification through canonical R2 and packet services to a
         store,
       );
       expect((await runner.map()).state).toBe("MAPPED");
+      operationNow = new Date(fixedNow.getTime() + 15 * 60 * 1000);
+      const mappedBeforeExpiry = store.load(bindingDigest);
+      const expiryBeforeFill = new TargetIndependentNonSubmitRunner(
+        packetForRunner,
+        target,
+        binding,
+        adapter,
+        currentBinding,
+        () => operationNow,
+        store,
+      );
+      expect(await expiryBeforeFill.fill()).toMatchObject({
+        state: "PAUSED",
+        stopReason: "PAGE_CHANGED",
+      });
+      expect(store.load(bindingDigest)).toEqual(mappedBeforeExpiry);
+      expect(counts.uploads).toBe(1);
+      operationNow = fixedNow;
       expect((await runner.fill()).state).toBe("FILLED");
+      operationNow = new Date(fixedNow.getTime() + 15 * 60 * 1000);
+      const filledBeforeExpiry = store.load(bindingDigest);
+      const expiryBeforeUpload = new TargetIndependentNonSubmitRunner(
+        packetForRunner,
+        target,
+        binding,
+        adapter,
+        currentBinding,
+        () => operationNow,
+        store,
+      );
+      expect(await expiryBeforeUpload.upload()).toMatchObject({
+        state: "PAUSED",
+        stopReason: "PAGE_CHANGED",
+      });
+      expect(store.load(bindingDigest)).toEqual(filledBeforeExpiry);
+      expect(counts.uploads).toBe(1);
+      operationNow = fixedNow;
       const uploadCheckpoint = await runner.upload();
       expect(uploadCheckpoint.uploadEvidence?.receivedDigest).toBe(documentDigest);
       expect((await runner.verify()).fieldReadBack).toEqual([
@@ -1122,6 +1225,48 @@ test("persists source verification through canonical R2 and packet services to a
         sequence: 6,
       });
       expect(counts).toEqual({ uploads: 2, submissions: 0 });
+      const historicalBeforeSupersession = loadPersistedApplicationPacket({
+        sqlite,
+        packetId: packet.id,
+        expectedDigest: persistedPacketDigest,
+      });
+      const reopenedBeta = new BetaRepository(
+        sqlite,
+        () => fixedNow,
+        () => `reopened:${repetition}`,
+      );
+      reopenedBeta.recordDocumentArtifact({
+        id: `doc:fictional-superseding:${repetition}`,
+        jobId: lineage.jobId,
+        jobVersionId: lineage.jobVersionId,
+        profileVersionId,
+        type: "CV",
+        template: "fictional-r46-07-superseding",
+        format: "PDF",
+        fileName: `fictional-r46-07-superseding-${repetition}.pdf`,
+        localPath: join(fixture.documentsRoot, `fictional-r46-07-superseding-${repetition}.pdf`),
+        contentDigest: sha256(Buffer.from(`fictional-r46-07-superseding-${repetition}`)),
+        claimEvidence: ["fictional:superseding"],
+        layoutResult: { pageCount: 1 },
+      });
+      const historicalAfterSupersession = loadPersistedApplicationPacket({
+        sqlite,
+        packetId: packet.id,
+        expectedDigest: persistedPacketDigest,
+      });
+      expect(historicalAfterSupersession.packet).toEqual(historicalBeforeSupersession.packet);
+      expect(historicalAfterSupersession.digest).toBe(historicalBeforeSupersession.digest);
+      expect(() =>
+        resolvePersistedApplicationPacket({
+          sqlite,
+          packetId: packet.id,
+          expectedDigest: persistedPacketDigest,
+          runId,
+          operation: "PREPARATION",
+          policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+          now: fixedNow,
+        }),
+      ).toThrow("PACKET_DOCUMENT_CURRENTNESS_REQUIRED");
       expect(sqlite.pragma("foreign_key_check")).toEqual([]);
       sqlite
         .prepare(

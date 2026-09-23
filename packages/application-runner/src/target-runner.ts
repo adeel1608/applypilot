@@ -918,6 +918,23 @@ export interface NonSubmitDurableStore {
   ): void;
 }
 
+const nonSubmitOperationPrefix: RunnerTargetOperation[] = [
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
+];
+const nonSubmitOperationState: Record<RunnerTargetOperation, NonSubmitRunnerState> = {
+  MAP_FOR_FILL: "MAPPED",
+  FILL: "FILLED",
+  UPLOAD: "UPLOADED",
+  VERIFY: "VERIFIED",
+  FILL_PREVIEW: "FILL_PREVIEW",
+  OPEN_AND_INSPECT_ONLY: "OPENED",
+  SUBMIT: "PAUSED",
+};
+
 export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
   private readonly snapshots = new Map<string, NonSubmitDurableSnapshot>();
   private readonly claims = new Map<string, NonSubmitClaimHandle>();
@@ -935,15 +952,18 @@ export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
       claimedOperations: [],
       activeOperation: null,
     };
-    if (!["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation))
-      return null;
-    const required: Partial<Record<RunnerTargetOperation, RunnerTargetOperation>> = {
-      FILL: "MAP_FOR_FILL",
-      UPLOAD: "FILL",
-      VERIFY: "UPLOAD",
-      FILL_PREVIEW: "VERIFY",
-    };
-    if (required[operation] && !snapshot.claimedOperations.includes(required[operation]!))
+    if (!nonSubmitOperationPrefix.includes(operation)) return null;
+    const operationIndex = nonSubmitOperationPrefix.indexOf(operation);
+    if (
+      snapshot.state === "PAUSED" ||
+      snapshot.recoveryRequired ||
+      snapshot.claimedOperations.length !== operationIndex ||
+      snapshot.claimedOperations.some(
+        (value, index) => value !== nonSubmitOperationPrefix[index],
+      ) ||
+      (operationIndex > 0 &&
+        snapshot.state !== nonSubmitOperationState[nonSubmitOperationPrefix[operationIndex - 1]!])
+    )
       return null;
     if (snapshot.claimedOperations.includes(operation) || snapshot.activeOperation) return null;
     snapshot.activeOperation = operation;
@@ -967,6 +987,26 @@ export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
       claim.operation !== snapshot.claimedOperations.at(-1)
     ) {
       throw new Error("NON_SUBMIT_CLAIM_OWNER_REQUIRED");
+    }
+    const operationIndex = nonSubmitOperationPrefix.indexOf(claim.operation);
+    if (
+      operationIndex < 0 ||
+      snapshot.claimedOperations.length !== operationIndex + 1 ||
+      snapshot.claimedOperations.some(
+        (value, index) => value !== nonSubmitOperationPrefix[index],
+      ) ||
+      (snapshot.state !== "PAUSED" && snapshot.state !== nonSubmitOperationState[claim.operation])
+    ) {
+      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
+    }
+    if (snapshot.state !== "PAUSED") {
+      const latest = snapshot.checkpoints.at(-1);
+      if (!latest || latest.state !== snapshot.state || latest.stopReason !== null)
+        throw new Error("NON_SUBMIT_TRANSITION_RESULT_INVALID");
+      if (claim.operation === "UPLOAD" && latest.uploadEvidence === null)
+        throw new Error("NON_SUBMIT_UPLOAD_EVIDENCE_REQUIRED");
+      if (claim.operation === "FILL_PREVIEW" && latest.previewDigest === null)
+        throw new Error("NON_SUBMIT_PREVIEW_EVIDENCE_REQUIRED");
     }
     this.snapshots.set(bindingDigest, structuredClone({ ...snapshot, activeOperation: null }));
     this.claims.delete(bindingDigest);

@@ -8,6 +8,7 @@ import type {
   NonSubmitDurableStore,
   NonSubmitClaimHandle,
   NonSubmitRunnerCheckpoint,
+  NonSubmitRunnerState,
   RunnerTargetOperation,
 } from "@applypilot/application-runner";
 import {
@@ -108,6 +109,104 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+const NON_SUBMIT_PREFIX: RunnerTargetOperation[] = [
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
+];
+
+const OPERATION_STATE: Record<RunnerTargetOperation, NonSubmitRunnerState> = {
+  MAP_FOR_FILL: "MAPPED",
+  FILL: "FILLED",
+  UPLOAD: "UPLOADED",
+  VERIFY: "VERIFIED",
+  FILL_PREVIEW: "FILL_PREVIEW",
+  OPEN_AND_INSPECT_ONLY: "OPENED",
+  SUBMIT: "PAUSED",
+};
+
+type PersistedOperation = {
+  operation: RunnerTargetOperation;
+  state: string;
+  effectJson: string;
+};
+
+function parsePersistedRows(rows: PersistedOperation[]): NonSubmitDurableSnapshot[] {
+  return rows.map((row) => {
+    if (row.effectJson === "{}" || row.state === "CLAIMED")
+      throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
+    let value: unknown;
+    try {
+      value = JSON.parse(row.effectJson) as unknown;
+    } catch {
+      throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
+    }
+    const snapshot = parseSnapshot(value);
+    if (snapshot.state !== row.state && !(row.state === "PAUSED" && snapshot.state === "PAUSED"))
+      throw new Error("NON_SUBMIT_SNAPSHOT_CORRUPT");
+    return snapshot;
+  });
+}
+
+function assertSnapshotHistory(
+  snapshot: NonSubmitDurableSnapshot,
+  operation: RunnerTargetOperation,
+  previousOperations: RunnerTargetOperation[],
+  previousCheckpoints: NonSubmitRunnerCheckpoint[],
+): void {
+  if (!NON_SUBMIT_PREFIX.includes(operation)) throw new Error("NON_SUBMIT_OPERATION_FORBIDDEN");
+  const operationIndex = NON_SUBMIT_PREFIX.indexOf(operation);
+  if (previousOperations.length !== operationIndex)
+    throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
+  if (
+    previousOperations.some((value, index) => value !== NON_SUBMIT_PREFIX[index]) ||
+    snapshot.claimedOperations.length !== operationIndex + 1 ||
+    snapshot.claimedOperations.some((value, index) => value !== NON_SUBMIT_PREFIX[index])
+  )
+    throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
+
+  const first = snapshot.checkpoints[0];
+  const hasPrepared = first?.state === "PREPARED";
+  const expectedLength =
+    previousCheckpoints.length + 1 + (previousCheckpoints.length === 0 && hasPrepared ? 1 : 0);
+  if (snapshot.checkpoints.length !== expectedLength)
+    throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+  for (let index = 0; index < previousCheckpoints.length; index += 1) {
+    if (stableJson(snapshot.checkpoints[index]) !== stableJson(previousCheckpoints[index]))
+      throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+  }
+  if (hasPrepared && (first.sequence !== 1 || first.stopReason !== null))
+    throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+  const offset = hasPrepared ? 1 : 0;
+  for (let index = 0; index < snapshot.checkpoints.length; index += 1) {
+    const checkpoint = snapshot.checkpoints[index];
+    if (checkpoint.sequence !== index + 1) throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+    if (index >= offset && index < offset + operationIndex) {
+      const expected = OPERATION_STATE[NON_SUBMIT_PREFIX[index - offset]!];
+      if (checkpoint.state !== expected || checkpoint.stopReason !== null)
+        throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+    }
+  }
+  const latest = snapshot.checkpoints.at(-1);
+  if (!latest || snapshot.sequence !== latest.sequence)
+    throw new Error("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+  if (snapshot.state === "PAUSED") {
+    if (latest.state !== "PAUSED" || latest.stopReason === null)
+      throw new Error("NON_SUBMIT_TRANSITION_RESULT_INVALID");
+    return;
+  }
+  if (snapshot.state !== OPERATION_STATE[operation] || latest.state !== snapshot.state) {
+    throw new Error("NON_SUBMIT_TRANSITION_RESULT_INVALID");
+  }
+  if (latest.stopReason !== null) throw new Error("NON_SUBMIT_TRANSITION_RESULT_INVALID");
+  if (operation === "UPLOAD" && latest.uploadEvidence === null)
+    throw new Error("NON_SUBMIT_UPLOAD_EVIDENCE_REQUIRED");
+  if (operation === "FILL_PREVIEW" && latest.previewDigest === null)
+    throw new Error("NON_SUBMIT_PREVIEW_EVIDENCE_REQUIRED");
+}
+
 /** SQLite-backed operation claims/checkpoints for the synthetic non-submit lane. */
 export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
   constructor(
@@ -183,7 +282,7 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
 
   claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null {
     assertDigest(bindingDigest, "BINDING_DIGEST");
-    if (!["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation)) {
+    if (!NON_SUBMIT_PREFIX.includes(operation)) {
       throw new Error("NON_SUBMIT_OPERATION_FORBIDDEN");
     }
     try {
@@ -198,18 +297,33 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
         }
         const prior = this.sqlite
           .prepare(
-            "SELECT operation,state FROM application_run_operations WHERE run_id=? AND state<>'CLAIMED' ORDER BY created_at,rowid",
+            "SELECT operation,state,effect_json AS effectJson FROM application_run_operations WHERE run_id=? AND state<>'CLAIMED' ORDER BY created_at,rowid",
           )
-          .all(this.runId) as Array<{ operation: RunnerTargetOperation; state: string }>;
-        const expected: Record<string, RunnerTargetOperation | null> = {
-          MAP_FOR_FILL: null,
-          FILL: "MAP_FOR_FILL",
-          UPLOAD: "FILL",
-          VERIFY: "UPLOAD",
-          FILL_PREVIEW: "VERIFY",
-        };
-        const required = expected[operation];
-        if (required && !prior.some((item) => item.operation === required)) return null;
+          .all(this.runId) as PersistedOperation[];
+        if (prior.length > 0) {
+          const snapshots = parsePersistedRows(prior);
+          const priorOperations = prior.map((item) => item.operation);
+          if (
+            priorOperations.some((value, index) => value !== NON_SUBMIT_PREFIX[index]) ||
+            snapshots.some((snapshot) => snapshot.state === "PAUSED" || snapshot.recoveryRequired)
+          )
+            return null;
+          const priorCheckpoints = snapshots.at(-1)?.checkpoints ?? [];
+          if (operation !== NON_SUBMIT_PREFIX[prior.length]) return null;
+          // A completed predecessor is required, not merely a row with the same operation.
+          assertSnapshotHistory(
+            {
+              ...snapshots.at(-1)!,
+              claimedOperations: [...priorOperations],
+            },
+            priorOperations.at(-1)!,
+            priorOperations.slice(0, -1),
+            snapshots.length > 1 ? (snapshots.at(-2)?.checkpoints ?? []) : [],
+          );
+          if (priorCheckpoints.length === 0) return null;
+        } else if (operation !== NON_SUBMIT_PREFIX[0]) {
+          return null;
+        }
         const inProgress = this.sqlite
           .prepare(
             `SELECT 1 FROM application_run_operations
@@ -245,20 +359,17 @@ export class SqliteNonSubmitRunStore implements NonSubmitDurableStore {
     if (claim.bindingDigest !== bindingDigest) throw new Error("NON_SUBMIT_CLAIM_OWNER_REQUIRED");
     const operation = claim.operation;
     if (!operation) return;
-    if (parsed.claimedOperations.at(-1) !== operation)
-      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
-    const required: Partial<Record<RunnerTargetOperation, RunnerTargetOperation>> = {
-      FILL: "MAP_FOR_FILL",
-      UPLOAD: "FILL",
-      VERIFY: "UPLOAD",
-      FILL_PREVIEW: "VERIFY",
-    };
-    if (
-      !["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"].includes(operation) ||
-      (required[operation] && !parsed.claimedOperations.includes(required[operation]!))
-    )
-      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
     this.sqlite.transaction(() => {
+      const prior = this.sqlite
+        .prepare(
+          `SELECT operation,state,effect_json AS effectJson FROM application_run_operations
+           WHERE run_id=? AND state<>'CLAIMED' ORDER BY created_at,rowid`,
+        )
+        .all(this.runId) as PersistedOperation[];
+      const priorSnapshots = parsePersistedRows(prior);
+      const priorOperations = prior.map((item) => item.operation);
+      const previousCheckpoints = priorSnapshots.at(-1)?.checkpoints ?? [];
+      assertSnapshotHistory(parsed, operation, priorOperations, previousCheckpoints);
       const updated = this.sqlite
         .prepare(
           `UPDATE application_run_operations

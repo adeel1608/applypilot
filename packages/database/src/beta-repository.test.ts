@@ -10,11 +10,13 @@ import {
   ApplicationPacketSchema,
   SyntheticApplicationRunner,
   packetDigest,
+  type NonSubmitRunnerCheckpoint,
 } from "@applypilot/application-runner";
 import { extractRequirementEvidence } from "@applypilot/job-importer";
 import { fixtureJob } from "../../../tests/fixture-data";
 import { BetaRepository } from "./beta-repository";
 import { SqliteNonSubmitRunStore } from "./non-submit-run-store";
+import { loadPersistedApplicationPacket } from "./persisted-packet";
 import { R2Repository } from "./r2-repository";
 
 function migratedDatabase(): BetterSqlite3.Database {
@@ -136,6 +138,24 @@ describe("Beta repository", () => {
       documentArtifactId: "document:r2-packet",
       contentDigest: "c".repeat(64),
     });
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet:letter",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "COVER_LETTER",
+      template: "fictional-letter",
+      format: "PDF",
+      fileName: "fictional-r2-letter.pdf",
+      localPath: "documents/fictional-r2-letter.pdf",
+      contentDigest: "d".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    repository.approveDocument({
+      documentArtifactId: "document:r2-packet:letter",
+      contentDigest: "d".repeat(64),
+    });
     const packet = ApplicationPacketSchema.parse({
       id: "packet:r2-current",
       jobId: "job:r2-packet",
@@ -159,8 +179,48 @@ describe("Beta repository", () => {
           stale: false,
           required: true,
         },
+        {
+          id: "document:r2-packet:letter",
+          type: "COVER_LETTER",
+          fileName: "fictional-r2-letter.pdf",
+          digest: "d".repeat(64),
+          approved: true,
+          stale: false,
+          required: false,
+        },
       ],
-      answers: [],
+      answers: [
+        {
+          questionId: "question-z",
+          questionText: "Fictional answer Z",
+          required: true,
+          sensitive: false,
+          value: "z",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:z"],
+        },
+        {
+          questionId: "question-a",
+          questionText: "Fictional answer A",
+          required: false,
+          sensitive: false,
+          value: "a",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:a"],
+        },
+        {
+          questionId: "question-m",
+          questionText: "Fictional answer M",
+          required: true,
+          sensitive: true,
+          value: "m",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:m"],
+        },
+      ],
     });
     expect(
       sqlite.prepare("SELECT id FROM r2_evaluation_versions WHERE id='r2:current'").get(),
@@ -189,6 +249,38 @@ describe("Beta repository", () => {
     expect(() => repository.persistApplicationPacket({ ...packet, id: "packet:r2-stale" })).toThrow(
       "PACKET_R2_BINDING_MISMATCH",
     );
+    const frozenBeforeSupersession = loadPersistedApplicationPacket({
+      sqlite,
+      packetId: "packet:r2-current",
+    });
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet:new",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "CV",
+      template: "fictional",
+      format: "PDF",
+      fileName: "fictional-r2-new.pdf",
+      localPath: "documents/fictional-r2-new.pdf",
+      contentDigest: "a".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    const frozenAfterSupersession = loadPersistedApplicationPacket({
+      sqlite,
+      packetId: "packet:r2-current",
+    });
+    expect(frozenAfterSupersession.packet).toEqual(frozenBeforeSupersession.packet);
+    expect(frozenAfterSupersession.digest).toBe(frozenBeforeSupersession.digest);
+    expect(
+      JSON.parse(
+        sqlite
+          .prepare("SELECT readiness_json FROM application_packets WHERE id='packet:r2-current'")
+          .pluck()
+          .get() as string,
+      ).frozenPacket,
+    ).toEqual(frozenBeforeSupersession.packet);
     const runId = repository.registerApplicationRun({
       packetId: "packet:r2-current",
       targetKind: "SYNTHETIC_LOCAL",
@@ -202,9 +294,27 @@ describe("Beta repository", () => {
       () => new Date(now),
     );
     const bindingDigest = "d".repeat(64);
+    const checkpoint = (
+      sequence: number,
+      state: NonSubmitRunnerCheckpoint["state"],
+      uploadEvidence: NonSubmitRunnerCheckpoint["uploadEvidence"] = null,
+      previewDigest: string | null = null,
+    ): NonSubmitRunnerCheckpoint => ({
+      sequence,
+      state,
+      stopReason: null,
+      occurredAt: now,
+      targetUrl: packet.targetUrl!,
+      formVersion: "fixture-form-v1",
+      adapterVersion: "fixture-adapter-v1",
+      fieldReadBack: [],
+      uploadEvidence,
+      previewDigest,
+    });
     const mapClaim = durable.claim(bindingDigest, "MAP_FOR_FILL");
     expect(mapClaim).toMatchObject({ operation: "MAP_FOR_FILL", bindingDigest });
     expect(durable.claim(bindingDigest, "FILL")).toBeNull();
+    expect(durable.claim(bindingDigest, "FILL_PREVIEW")).toBeNull();
     expect(() => durable.load("f".repeat(64))).toThrow("BINDING_DIGEST_MISMATCH");
     expect(
       () => new SqliteNonSubmitRunStore(sqlite, runId, "f".repeat(64), () => new Date(now)),
@@ -226,20 +336,7 @@ describe("Beta repository", () => {
         state: "MAPPED",
         sequence: 1,
         claimedOperations: ["MAP_FOR_FILL"],
-        checkpoints: [
-          {
-            sequence: 1,
-            state: "MAPPED",
-            stopReason: null,
-            occurredAt: now,
-            targetUrl: packet.targetUrl!,
-            formVersion: "fixture-form-v1",
-            adapterVersion: "fixture-adapter-v1",
-            fieldReadBack: [],
-            uploadEvidence: null,
-            previewDigest: null,
-          },
-        ],
+        checkpoints: [checkpoint(1, "MAPPED")],
       },
       mapClaim!,
     );
@@ -254,20 +351,7 @@ describe("Beta repository", () => {
         state: "FILLED",
         sequence: 2,
         claimedOperations: ["MAP_FOR_FILL", "FILL"],
-        checkpoints: [
-          {
-            sequence: 2,
-            state: "FILLED",
-            stopReason: null,
-            occurredAt: now,
-            targetUrl: packet.targetUrl!,
-            formVersion: "fixture-form-v1",
-            adapterVersion: "fixture-adapter-v1",
-            fieldReadBack: [],
-            uploadEvidence: null,
-            previewDigest: null,
-          },
-        ],
+        checkpoints: [checkpoint(1, "MAPPED"), checkpoint(2, "FILLED")],
       },
       fillClaim!,
     );
@@ -280,18 +364,14 @@ describe("Beta repository", () => {
         sequence: 3,
         claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD"],
         checkpoints: [
-          {
-            sequence: 3,
-            state: "UPLOADED",
-            stopReason: null,
-            occurredAt: now,
-            targetUrl: packet.targetUrl!,
-            formVersion: "fixture-form-v1",
-            adapterVersion: "fixture-adapter-v1",
-            fieldReadBack: [],
-            uploadEvidence: null,
-            previewDigest: null,
-          },
+          checkpoint(1, "MAPPED"),
+          checkpoint(2, "FILLED"),
+          checkpoint(3, "UPLOADED", {
+            documentId: "document:r2-packet",
+            expectedDigest: "c".repeat(64),
+            receivedDigest: "c".repeat(64),
+            acknowledgementId: "ack:fixture",
+          }),
         ],
       },
       uploadClaim!,
@@ -305,24 +385,33 @@ describe("Beta repository", () => {
         sequence: 4,
         claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY"],
         checkpoints: [
-          {
-            sequence: 4,
-            state: "VERIFIED",
-            stopReason: null,
-            occurredAt: now,
-            targetUrl: packet.targetUrl!,
-            formVersion: "fixture-form-v1",
-            adapterVersion: "fixture-adapter-v1",
-            fieldReadBack: [],
-            uploadEvidence: null,
-            previewDigest: null,
-          },
+          checkpoint(1, "MAPPED"),
+          checkpoint(2, "FILLED"),
+          checkpoint(3, "UPLOADED", {
+            documentId: "document:r2-packet",
+            expectedDigest: "c".repeat(64),
+            receivedDigest: "c".repeat(64),
+            acknowledgementId: "ack:fixture",
+          }),
+          checkpoint(4, "VERIFIED"),
         ],
       },
       verifyClaim!,
     );
     const previewClaim = durable.claim(previewBindingDigest, "FILL_PREVIEW");
     expect(previewClaim).toMatchObject({ operation: "FILL_PREVIEW" });
+    expect(() =>
+      durable.save(
+        previewBindingDigest,
+        {
+          state: "FILL_PREVIEW",
+          sequence: 2,
+          claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
+          checkpoints: [checkpoint(2, "FILL_PREVIEW", null, "e".repeat(64))],
+        },
+        previewClaim!,
+      ),
+    ).toThrow("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
     sqlite.exec(`
       CREATE TRIGGER synthetic_preview_persistence_failure
       BEFORE INSERT ON application_run_previews
@@ -330,21 +419,19 @@ describe("Beta repository", () => {
     `);
     const previewSnapshot = {
       state: "FILL_PREVIEW" as const,
-      sequence: 2,
+      sequence: 5,
       claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
       checkpoints: [
-        {
-          sequence: 2,
-          state: "FILL_PREVIEW" as const,
-          stopReason: null,
-          occurredAt: now,
-          targetUrl: packet.targetUrl!,
-          formVersion: "fixture-form-v1",
-          adapterVersion: "fixture-adapter-v1",
-          fieldReadBack: [],
-          uploadEvidence: null,
-          previewDigest: "e".repeat(64),
-        },
+        checkpoint(1, "MAPPED"),
+        checkpoint(2, "FILLED"),
+        checkpoint(3, "UPLOADED", {
+          documentId: "document:r2-packet",
+          expectedDigest: "c".repeat(64),
+          receivedDigest: "c".repeat(64),
+          acknowledgementId: "ack:fixture",
+        }),
+        checkpoint(4, "VERIFIED"),
+        checkpoint(5, "FILL_PREVIEW", null, "e".repeat(64)),
       ],
     };
     expect(() => durable.save(previewBindingDigest, previewSnapshot, previewClaim!)).toThrow(
@@ -384,7 +471,12 @@ describe("Beta repository", () => {
     expect(recoveryClaim).toMatchObject({ operation: "MAP_FOR_FILL" });
     recoveryStore.save(
       recoveryBinding,
-      { state: "MAPPED", sequence: 1, claimedOperations: ["MAP_FOR_FILL"], checkpoints: [] },
+      {
+        state: "MAPPED",
+        sequence: 1,
+        claimedOperations: ["MAP_FOR_FILL"],
+        checkpoints: [checkpoint(1, "MAPPED")],
+      },
       recoveryClaim!,
     );
     const recoveryUploadClaim = recoveryStore.claim(recoveryBinding, "FILL");
@@ -395,7 +487,7 @@ describe("Beta repository", () => {
         state: "FILLED",
         sequence: 2,
         claimedOperations: ["MAP_FOR_FILL", "FILL"],
-        checkpoints: [],
+        checkpoints: [checkpoint(1, "MAPPED"), checkpoint(2, "FILLED")],
       },
       recoveryUploadClaim!,
     );
@@ -417,6 +509,14 @@ describe("Beta repository", () => {
       recoveryReason: "UPLOAD_OUTCOME_UNKNOWN",
       activeOperation: "UPLOAD",
     });
+    expect(
+      new SqliteNonSubmitRunStore(
+        reopenedSqlite,
+        recoveryRunId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).claim(recoveryBinding, "VERIFY"),
+    ).toBeNull();
     reopenedSqlite.close();
     rmSync(databasePath, { force: true });
     rmSync(`${databasePath}-wal`, { force: true });

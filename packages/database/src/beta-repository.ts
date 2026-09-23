@@ -38,6 +38,7 @@ import {
 import { R2ARepository, r2aSemanticDigest } from "./r2a-repository";
 import { ownerCorrectedR2Normalization } from "./r2-corrections";
 import { R2Repository } from "./r2-repository";
+import { mergePacketReadinessJson } from "./packet-envelope";
 
 const EvaluationVersionInputSchema = z.object({
   id: z.string().min(1).optional(),
@@ -336,23 +337,31 @@ export class BetaRepository {
              WHERE document_artifact_id IN (${placeholders}) AND invalidated_at IS NULL`,
           )
           .run(now, ...ids);
-        this.sqlite
+        const packets = this.sqlite
           .prepare(
-            `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
-             WHERE status <> 'INVALIDATED' AND id IN (
+            `SELECT p.id, p.readiness_json AS readinessJson
+             FROM application_packets p
+             WHERE p.status <> 'INVALIDATED' AND p.id IN (
                SELECT packet_id FROM application_packet_documents
                WHERE document_artifact_id IN (${placeholders})
              )`,
           )
-          .run(
-            JSON.stringify({
+          .all(...ids) as Array<{ id: string; readinessJson: string }>;
+        const updatePacket = this.sqlite.prepare(
+          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+           WHERE id = ? AND status <> 'INVALIDATED'`,
+        );
+        for (const packet of packets) {
+          updatePacket.run(
+            mergePacketReadinessJson(packet.readinessJson, {
               status: "REVIEW_REQUIRED",
               blockers: ["DOCUMENT_SUPERSEDED"],
               warnings: [],
             }),
             now,
-            ...ids,
+            packet.id,
           );
+        }
       }
       this.sqlite
         .prepare(
@@ -733,9 +742,15 @@ export class BetaRepository {
                     v.qualification_state AS qualificationState,
                     o.expires_at AS providerExpiresAt
              FROM source_record_verifications v
+             JOIN source_run_checkpoints r ON r.id=v.run_id AND r.status='COMPLETE'
+             JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id
+               AND p.page_digest=v.page_digest AND v.record_index < p.record_count
              JOIN job_versions jv ON jv.id=v.job_version_id
+               AND jv.source_observation_id=v.source_observation_id
              LEFT JOIN source_observations o ON o.id=v.source_observation_id
-             WHERE v.id=? AND v.disposition='ACCEPTED' AND jv.job_id=? AND jv.id=?`,
+               AND o.content_hash=v.content_hash
+             WHERE v.id=? AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+               AND jv.job_id=? AND jv.id=?`,
           )
           .get(verification.verificationId, packet.jobId, packet.jobVersionId) as
           | {
@@ -775,7 +790,8 @@ export class BetaRepository {
         }
       }
       const documentState = this.sqlite.prepare(
-        `SELECT d.content_digest AS contentDigest, d.stale,
+        `SELECT d.job_id AS jobId,d.job_version_id AS jobVersionId,
+                d.profile_version_id AS profileVersionId,d.content_digest AS contentDigest, d.stale,
            EXISTS(SELECT 1 FROM document_approvals a
              WHERE a.document_artifact_id = d.id AND a.content_digest = d.content_digest
                AND a.invalidated_at IS NULL) AS approved
@@ -783,10 +799,20 @@ export class BetaRepository {
       );
       for (const document of packet.documents) {
         const persisted = documentState.get(document.id) as
-          | { contentDigest: string; stale: number; approved: number }
+          | {
+              jobId: string;
+              jobVersionId: string;
+              profileVersionId: string;
+              contentDigest: string;
+              stale: number;
+              approved: number;
+            }
           | undefined;
         if (
           !persisted ||
+          persisted.jobId !== packet.jobId ||
+          persisted.jobVersionId !== packet.jobVersionId ||
+          persisted.profileVersionId !== packet.profileVersionId ||
           persisted.contentDigest !== document.digest ||
           Boolean(persisted.stale) !== document.stale ||
           Boolean(persisted.approved) !== document.approved
@@ -1091,23 +1117,32 @@ export class BetaRepository {
              (SELECT id FROM document_artifacts WHERE job_id = ? AND stale = 1)`,
         )
         .run(now, parsed.reasonCode, parsed.jobId);
-      const packets = this.sqlite
+      const packetsToInvalidate = this.sqlite
         .prepare(
-          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+          `SELECT id, readiness_json AS readinessJson FROM application_packets
            WHERE job_id = ? AND status <> 'INVALIDATED' AND
              (job_version_id <> ? OR profile_version_id <> ?)`,
         )
-        .run(
-          JSON.stringify({
+        .all(parsed.jobId, parsed.currentJobVersionId, parsed.currentProfileVersionId) as Array<{
+        id: string;
+        readinessJson: string;
+      }>;
+      const updatePacket = this.sqlite.prepare(
+        `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+         WHERE id = ? AND status <> 'INVALIDATED'`,
+      );
+      for (const packet of packetsToInvalidate) {
+        updatePacket.run(
+          mergePacketReadinessJson(packet.readinessJson, {
             status: "REVIEW_REQUIRED",
             blockers: [parsed.reasonCode],
             warnings: [],
           }),
           now,
-          parsed.jobId,
-          parsed.currentJobVersionId,
-          parsed.currentProfileVersionId,
-        ).changes;
+          packet.id,
+        );
+      }
+      const packets = packetsToInvalidate.length;
       return { evaluations, documents, packets };
     })();
   }
