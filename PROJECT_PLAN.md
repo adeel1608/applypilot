@@ -1,26 +1,51 @@
 # ApplyPilot Production Verification Project Plan
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`
+Expected current main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
 
 ## 1. Resume here
 
-### Current checkpoint (read-only reconciled 2026-09-22)
+### Active R46-10 checkpoint (2026-09-23)
 
-- Repository `adeel1608/applypilot` is on clean `main` at `3cc75dfd3dcaf35f09b857ab5c42a52d923bc1fc`; `origin/main` matches.
+- Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
+  `feat: implement verified source-to-packet and non-submit foundations`.
+- R46-10 started from exact clean head `e44c662c2593c556d76cdb38d8acafab2b8dfd87` and is now
+  committed at exact final head `0f4a8d1612b8f2e161824c4cd7a4f14bbc5f29b1`; exact-head push CI
+  `35813500403` and pull-request CI `35813503020` both completed successfully with 47 E2E tests.
+  PR #46 remains `OPEN / UNMERGED`; an earlier exact-head run `35812359481` timed out only because
+  the expanded decisive test exceeded its old 120-second test timeout and was superseded by the
+  bounded termination-proof fix.
+- Main/base baseline remains `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`.
+- Private runtime is read-only for this task: schema 9, pending disposable-only `0010`, integrity
+  `PASS`, foreign-key issues `0`; disposable schema-10 rehearsals are isolated.
+- This R46-08 iteration remains offline-only and adds source/employer/upload/submission
+  actions `0/0/0/0`. Historical matrices and handoffs below are not current evidence for this run.
+- R46-10 is the active offline-only correction on the same branch and PR. It preserves R46-09's
+  immutable packet representation, explicit policy/operation authority, owner-bound claims, and
+  killed-worker proof while closing normal invalidation retention, successful-predecessor/canonical
+  history validation, resolver linkage, and exact mid-run expiry evidence. The iteration delta remains
+  `0/0/0/0`; migrations and the private runtime remain untouched; PR #46 stays open and unmerged.
+
+### Historical baseline (read-only reconciled 2026-09-22)
+
+- Repository `adeel1608/applypilot` is on clean `main` at `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; `origin/main` matches.
+- PR #45 was approved and squash-merged as `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; its merged tree
+  equals reviewed head `41c12123fab1a044aec765040cd3eb90aa78aa91` and P1 is now `VERIFIED` against this baseline.
 - PR #44 was approved and squash-merged normally. Reviewed head `77dd2cf4b9c10ff9e3f3f2e2535257a692b1ffb5`
   and merged main have the same Git tree; strict commit ancestry is intentionally absent for the squash merge.
 - Squash verification rule: expected reviewed head + exact-head CI + approved squash merge + merged parent equal
   pre-merge main + merged tree equal reviewed head tree + approved scope + archive digest preservation.
-- PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 merged as the current main commit.
-- Private runtime read-only checks: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
-- Historical lifetime action counters reconcile to source/employer/upload/submission = `13/9/0/0`; this iteration adds `0/0/0/0`.
-- Active source capability count: 0. Active target capability count: 0. Parent grant is immutable and submit-excluded; no authority was mutated.
+- PR #42 merged as `467e288959edd6983c5086bbee979aad23e434d8`; PR #43 and PR #45 are merged into the current main baseline.
+- Private runtime read-only checks: schema 9, pending migrations 1 (the disposable-only `0010`
+  implementation is intentionally not applied), integrity `PASS`, foreign-key issues 0.
+- Historical lifetime action counters reconcile to source/employer/upload/submission = `14/9/0/0`; this
+  offline implementation iteration adds `0/0/0/0` (no source, employer, upload, or submission actions).
+- Active source capability count: 0. Active target capability count: 0. The historical parent grant is unchanged and submit-excluded; the ordinary P2-001 source capability completed its documented create/use/revoke lifecycle, and no active authority remains.
 - First real employer target validation is historically proven; the selected role's later inspection is passive evidence only.
 - Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
 - No final-submit consent has been issued and no real application has been submitted.
@@ -338,12 +363,12 @@ Exit: one consistent active plan.
 
 ### P1 — Production scope and architecture verification
 
-Status: `IMPLEMENTED_UNVERIFIED`
+Status: `VERIFIED`
 
-Evidence: architecture work and local/code evidence are complete on branch head
-`5266a11436a6289bbfa924797f886bab55d4dc79`; exact-head CI passed and the matrices below are
-preserved. Final project review, PR #45 merge, and merged-baseline verification remain pending; this
-does not make P2/P3/P4 or Personal Live V1 ready.
+Evidence: architecture work and local/code evidence were accepted on PR #45; exact-head CI passed,
+the reviewed tree equals the squash-merged tree, and merged main is
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`. This verifies architecture only; it does not make P2/P3/P4
+or Personal Live V1 ready.
 
 - [x] Component capability matrix (read-only code review).
 - [x] End-to-end data-flow map (source/R2/document/packet/runner boundaries recorded).
@@ -568,16 +593,49 @@ parent grant; no protection bypass; `OUTCOME_UNKNOWN` for ambiguity; and no blin
 
 ### P1 exit and dependency review
 
-P1 architecture work is complete on the reviewed branch: component/capability/data-flow matrices,
-private/public boundary, parent/child authority path, real-runner limitation, topology, trust model,
-and implemented-vs-proposed distinction are explicit. Overall P1 remains `IMPLEMENTED_UNVERIFIED`
-until PR #45 is technically accepted, merged, and the merged baseline is verified. P1 does not
-complete P2, P3, P4, Personal Live V1, or the green banner.
+P1 architecture work is complete and `VERIFIED` against merged main
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`: component/capability/data-flow matrices, private/public
+boundary, parent/child authority path, real-runner limitation, topology, trust model, and
+implemented-vs-proposed distinction are explicit. P1 does not complete P2, P3, P4, Personal Live V1,
+or the green banner.
 
 Next dependency order (read-only decision, not execution): P2 provider freshness/current role and
 packet evidence must be resolved before P4; P3 restart/replay, changed/duplicate handling, and
 staleness propagation must be verified before P4. Therefore the next implementation task is P2, not
 P4. P4 remains blocked by BLK-001, BLK-002, BLK-004, BLK-005, BLK-007, and BLK-008.
+
+#### P2-001 execution blueprint and evidence
+
+Objective: verify the selected Melbourne role against one owner-authorized, bounded public-provider
+freshness operation; preserve truthful unknowns; refresh R2 and packet bindings only when currentness
+gates pass; otherwise reject/defer the role with a precise blocker.
+
+Starting state: merged main `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; selected role
+`Computer Vision Engineer (C++) (R4633)`; old packet evaluation binding is stale and historical only.
+
+Allowed boundary: existing safe Lever transport, exact Shield AI tenant/host/path, HTTPS GET-only,
+no login/cookies/candidate data, concurrency 1, no redirect, smallest practical request budget, no
+employer/browser interaction. The standing parent grant must remain immutable; its `mainSha` must match
+the current main before any child derivation. If it does not, use only the normal ordinary
+`SourceCapabilityV2` owner-approval path or record a blocker; never bypass the check.
+
+Evidence rules: provider date/expiry absent means `CURRENTLY_OBSERVED`, not `EXPIRY_VERIFIED`; missing
+extraction is `PROVIDER_REQUIREMENT_UNKNOWN`, not an owner-fact gap; restricted work-right evidence is
+not unrestricted work rights; unknown candidate facts remain `REVIEW_REQUIRED`.
+
+Steps: inspect private evidence and current authority; perform at most the exact bounded provider
+freshness request(s) required; persist any changed observation/job version immutably; run current R2;
+check document digests/currentness; reject the legacy packet; freeze a new private packet only if every
+prerequisite is current; otherwise record `PACKET_REFRESH_BLOCKED`; classify retained unsupported
+controls without revisiting the employer; run non-destructive privacy/currentness checks.
+
+Acceptance: either a fresh internally consistent private packet bound to current job/profile/evaluation/
+documents, or a precise `NOT_CURRENT / RESELECT_REQUIRED` or `PACKET_REFRESH_BLOCKED` outcome with the
+exact remaining dependency. No P3/P4 work, migration, code fix, employer action, or application action.
+
+Rollback: source capability/run terminalization and immutable historical evidence; no runtime rollback
+or migration. Invalidation: provider drift, profile/evaluation/document change, stale packet binding,
+or main-SHA mismatch requires re-evaluation.
 
 ### P2 — Candidate, role, and evidence readiness
 
@@ -588,13 +646,57 @@ Status: `IMPLEMENTED_UNVERIFIED`
 - [x] Verify work-right evidence and temporal bounds.
 - [x] Verify selected-role suitability against available provider evidence.
 - [x] Keep Shield AI London validation role excluded.
-- [ ] Verify job freshness via provider evidence (provider date/expiry absent).
+- [x] Verify provider presence/currentness via one bounded Shield AI Lever LIST_JOBS run; provider supplied no
+      temporal date/expiry, so role state remains `CURRENTLY_OBSERVED`, not `EXPIRY_VERIFIED`.
 - [x] Verify current R2/evaluation/duplicate/queue state.
 - [x] Verify engineering CV provenance, digests, approval, currentness.
 - [x] Classify each unsupported form control at the available evidence level.
-- [ ] Create one minimal role-specific owner questionnaire only for genuinely missing facts.
+- [x] No owner questionnaire at P2: missing requirements/eligibility fields remain provider or candidate
+      `UNKNOWN` and are not converted into owner assertions.
 
-Exit: evidence-backed suitable role and current packet, or precise blocker register.
+Exit: evidence-backed suitable role and current packet, or precise blocker register. This execution is the
+blocker path: the role was observed in the fresh page, but `JOB_EXPIRY_UNKNOWN` and the stale packet
+evaluation binding prevent a new application packet.
+
+#### P2-001 validation record (2026-09-22)
+
+- Starting main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; branch:
+  `chore/p2-current-role-readiness`.
+- Parent compatibility: the immutable `GREEN_BANNER_SESSION_GRANT_V1` remains bound to main SHA
+  `227df70175f6beed75e4812fa0aee6668216de2f`, so no child was derived and the parent was not mutated.
+  The ordinary `SourceCapabilityV2` path was used instead.
+- Capability: `lever_p2_r4633_20260922` v1, `LEVER/shieldai/GLOBAL`, host `api.lever.co`, path
+  `/v0/postings/shieldai`, `LIST_JOBS` only, parser `lever-v2:2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`,
+  one request/25-record cap/25-page cap/2 MB response/30 s request/60 s run/zero redirects/zero retries/
+  concurrency 1. Configuration digest:
+  `237f84e73577c16ac0f5b380de77350e7fae6dc9507384a04e5bb3a3be4b6fe3`.
+- Source run: `d45a752f-641b-49d6-ad43-b28b0b445694`, terminal `COMPLETE`; exactly 1 GET, 1 page,
+  25 provider records, 25 accepted, 0 unusable, 364692 response bytes. Page digest
+  `79e8b9957204a1fa5bf23d9bfee30f91fbd6ec55945214ff3dd2406229bad6fc` matched the prior page containing
+  the selected provider identity. Twenty nonfatal provider workplace-enum drift warnings were retained.
+  The selected external ID `2cfe6692-a266-4d27-8832-ef652fa57ee4` was present in that exact page identity;
+  no alternate role was selected and no provider expiry was invented.
+- Source persistence: unchanged records safely no-op under the immutable content identity, so this run
+  created no duplicate observations or job versions. The capability was terminally revoked as v2 at
+  `2026-09-22T08:45:42.908Z`; active source capabilities returned to 0.
+- Selected role: `Computer Vision Engineer (C++) (R4633)`, Melbourne, Shield AI; role state
+  `CURRENTLY_OBSERVED` only. Provider dates remain absent; `JOB_EXPIRY_UNKNOWN` remains binding.
+- Current R2: job version
+  `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953`, profile
+  `6cd565c1-552b-436c-941c-2cd49d228123`, evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5`,
+  `REVIEW_REQUIRED`, not recommended, `UNCALIBRATED`, current queue `REVIEWING/CURRENT` with the same
+  evaluation. Unknown work-right/vehicle/hours evidence remains unknown; no inference was made.
+- Documents: existing engineering CV artifacts remain the private, previously reviewed digests
+  `28e64de248ff757a247ba789baea7692aae92372f3dd6ebac6019a9ad241b0e8` (PDF) and
+  `d83d607cf9ae3d9bdadc468660d942d86f14b1394be4c678d5f413406f2139ca` (DOCX); no regeneration occurred.
+- Packet: old `inspection_packet_30b9ccd8be182240003401c7` remains immutable historical state and is
+  rejected for application use because it binds evaluation `b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`.
+  No new packet was created: `PACKET_REFRESH_BLOCKED` (`JOB_EXPIRY_UNKNOWN` plus stale evaluation
+  binding). Retained passive inspection has 46 controls, including 27 unsupported and 1 document-required;
+  no employer revisit occurred. Questionnaire: `NONE AT P2`.
+- Result: P2 remains `IMPLEMENTED_UNVERIFIED`, not artificially promoted to `VERIFIED`; the precise
+  remaining dependency is provider temporal evidence (or owner reselecting a role with such evidence),
+  followed by a fresh current evaluation and packet binding.
 
 ### P3 — Source-to-application integrity
 
@@ -659,21 +761,21 @@ Exit: synthetic submit lifecycle verified; production P5 remains blocked by P4.
 Each P0-P11 checklist above is an actionable task record. The following fields apply to every
 checklist item; item-specific exceptions are recorded in the phase evidence and blocker register.
 
-| Task       | Owner                             | Dependencies                  | Objective/components                          | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                             | Blockers/invalidation                                        |
-| ---------- | --------------------------------- | ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| P0         | Codex                             | repository baseline           | reconcile plan/history/docs                   | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash            | invalidated by baseline drift                                |
-| P1         | Codex + owner review              | P0                            | architecture, trust boundaries, authority     | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | architecture evidence on PR #45 head `5266a11`; merge pending | P2/P3 evidence and P4 operation gaps remain                  |
-| P2         | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness            | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | local evidence, revision `010cbe9`                            | BLK-003/004/005                                              |
-| P3         | Codex                             | P1/P2                         | source-to-R2 traceability                     | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                            | BLK-006; partial restart test pending                        |
-| P4         | Codex + security review           | P1/P2/P3                      | real non-submit operation lane                | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review                          | BLK-001/002/005/007/008                                      |
-| P5         | Codex + owner review              | P4                            | final review/consent/outcome                  | production phase remains blocked until P4 real non-submit execution and real final-review integration  | concurrency/ambiguous-outcome tests; invalidate on change               | overall BLOCKED; `P5-SYN-001` synthetic evidence VERIFIED     | P4 real non-submit execution + real final-review integration |
-| P5-SYN-001 | Codex + owner review              | P5                            | synthetic final-review/consent/outcome safety | frozen state, one-use consent, invalidation, double-consumption prevention, outcome taxonomy           | synthetic concurrency and ambiguous-outcome tests; no blind retry       | VERIFIED synthetic evidence                                   | does not unblock production P5; P4 remains required          |
-| P6         | Codex + owner decision            | P1-P5                         | reproducible release candidate                | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                                   | deployment/configuration decision                            |
-| P7         | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation     | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                                   | P4 and current packet required                               |
-| P8         | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                           | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                                   | P4/P7/P5 gaps                                                |
-| P9         | Owner + operations                | P6/P8                         | approved deployment                           | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                                   | topology/secrets/security policy                             |
-| P10        | Owner + Codex                     | P8/P9                         | first supervised submission                   | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                                   | explicit owner final approval                                |
-| P11        | Codex + operations                | P9/P10                        | recovery and handover                         | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                                   | deployment and real-operation evidence                       |
+| Task       | Owner                             | Dependencies                  | Objective/components                          | Steps and acceptance                                                                                   | Tests/failure-recovery                                                  | Evidence/revision                                         | Blockers/invalidation                                        |
+| ---------- | --------------------------------- | ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
+| P0         | Codex                             | repository baseline           | reconcile plan/history/docs                   | archive losslessly, reconcile facts, open one docs PR                                                  | diff/privacy checks; restore from archive if mismatch                   | verified, merged revision `3cc75df` + archive hash        | invalidated by baseline drift                                |
+| P1         | Codex + owner review              | P0                            | architecture, trust boundaries, authority     | map implemented/proposed paths; acceptance is explicit capability matrix                               | code review; stop on unproven path                                      | VERIFIED on merged main `2b9e44f`                         | P2/P3 evidence and P4 operation gaps remain                  |
+| P2         | Codex + owner facts when concrete | P1, current provider evidence | profile/role/docs/packet readiness            | classify facts, currentness, controls; acceptance is a current reviewable packet                       | privacy and stale-binding checks; retain REVIEW_REQUIRED on uncertainty | P2-001 run `d45a752f`; blocker path recorded above        | BLK-003/004/005                                              |
+| P3         | Codex                             | P1/P2                         | source-to-R2 traceability                     | reconcile accepted/persisted, restart/replay, staleness; acceptance is no silent loss                  | replay/idempotency tests; quarantine uncertain dispositions             | local evidence, revision `010cbe9`                        | BLK-006; partial restart test pending                        |
+| P4         | Codex + security review           | P1/P2/P3                      | real non-submit operation lane                | implement separately scoped MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW; SUBMIT excluded                       | synthetic/integration/protection-stop tests; default-deny rollback      | not implemented; current code review                      | BLK-001/002/005/007/008                                      |
+| P5         | Codex + owner review              | P4                            | final review/consent/outcome                  | production phase remains blocked until P4 real non-submit execution and real final-review integration  | concurrency/ambiguous-outcome tests; invalidate on change               | overall BLOCKED; `P5-SYN-001` synthetic evidence VERIFIED | P4 real non-submit execution + real final-review integration |
+| P5-SYN-001 | Codex + owner review              | P5                            | synthetic final-review/consent/outcome safety | frozen state, one-use consent, invalidation, double-consumption prevention, outcome taxonomy           | synthetic concurrency and ambiguous-outcome tests; no blind retry       | VERIFIED synthetic evidence                               | does not unblock production P5; P4 remains required          |
+| P6         | Codex + owner decision            | P1-P5                         | reproducible release candidate                | isolated staging/release artifact and recovery thresholds                                              | clean checkout/build/backup rehearsal; abort on drift                   | not started                                               | deployment/configuration decision                            |
+| P7         | Codex + owner-start gate          | P2/P4/P6                      | one controlled real non-submit validation     | inspect current target then run approved bounded operations; acceptance is durable zero-submit preview | stop on protection/uncertainty; revoke authority                        | not started                                               | P4 and current packet required                               |
+| P8         | Owner + Codex                     | P2/P4/P5/P7                   | green-banner review                           | verify all measurable gates; acceptance is no material blocker                                         | release check and independent review; no banner on any failure          | not started                                               | P4/P7/P5 gaps                                                |
+| P9         | Owner + operations                | P6/P8                         | approved deployment                           | deploy exact artifact with default-deny actions and rollback                                           | backup/restore/health checks; rollback on trigger                       | not started                                               | topology/secrets/security policy                             |
+| P10        | Owner + Codex                     | P8/P9                         | first supervised submission                   | fresh review and one-use consent; acceptance is truthful durable outcome                               | no retry after ambiguity; kill switch on uncertainty                    | not started                                               | explicit owner final approval                                |
+| P11        | Codex + operations                | P9/P10                        | recovery and handover                         | prove rollback/restore cannot resurrect authority or duplicate action                                  | incident drills and provider-drift tests; isolate/restore safely        | not started                                               | deployment and real-operation evidence                       |
 
 ### P6 — Reproducible staging/release candidate
 
@@ -859,14 +961,14 @@ Robotics hardware: `NOT_APPLICABLE` unless a real dependency is introduced.
 
 ## 10. Database/migration/backup/recovery
 
-Expected current state to verify:
+Private runtime state (must remain untouched in this task):
 
 - schema 9;
-- pending 0;
+- pending 1 for disposable-only `0010`;
 - integrity PASS;
 - FK issues 0;
 - migrations 0000-0008 immutable;
-- 0009 additive.
+- 0009 additive; `0010` is additive and rehearsal-only here.
 
 Checklist:
 
@@ -1007,7 +1109,7 @@ Examples:
 - security/recovery -> P6/P9/P11
 - optional scheduling/notifications/analytics/AI -> DEFERRED unless needed for narrow production scope
 
-## 17. Current iteration handoff
+## 17. Historical P1-002 handoff
 
 Current task:
 `P1-002 — active plan release-contract/status correction`
@@ -1083,3 +1185,733 @@ merge and merged-tree verification. Do not start P2/P3/P4 or merge PR #45 in thi
 
 Acceptance: reviewer confirms the exact readiness phrase, P1/P5 semantics, retained P5-SYN-001 evidence,
 P4 blocker, and clean exact-head CI before deciding whether to merge PR #45.
+
+## 18. Current iteration handoff
+
+Current task:
+`P2-002 - verify currentness and R2 packet contracts offline`
+
+Scope: offline provider temporal guarantees, unchanged-content currentness evidence, R2-to-packet
+contract alignment, and fictional characterization tests only. No P3/P4 work and no application
+operation.
+
+This iteration used the ordinary `SourceCapabilityV2` owner-authorisation path because the immutable
+green-banner parent is bound to an older main SHA. It executed exactly one bounded Shield AI Lever
+`LIST_JOBS` GET under a fresh v1 capability, then revoked that capability as v2. No employer page,
+browser, form, fill, upload, submission, candidate-data transmission, migration, dependency change,
+application-code change, or historical-archive edit occurred.
+
+Baseline: PR #45 is merged as `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`; P1 is `VERIFIED` against
+that merged tree. P2 remains `IMPLEMENTED_UNVERIFIED` because the selected role is only
+`CURRENTLY_OBSERVED` (`JOB_EXPIRY_UNKNOWN`) and the historical packet binds stale evaluation
+`b0110c9e-dc20-41a4-b8a5-51cfd5010dbc`. P3 remains `IMPLEMENTED_UNVERIFIED`; P4/P5 remain `BLOCKED`;
+`P5-SYN-001` remains `VERIFIED`; Personal Live V1 remains `NOT_READY`.
+
+### P2-001 validation gates (2026-09-22)
+
+| Check                                      | Result                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `npm.cmd run db:status`                    | PASS — schema 9, pending 0, integrity PASS, FK issues 0                                                  |
+| `npm.cmd run privacy:audit`                | PASS — tracked/history/build-private-data audit completed                                                |
+| `npm.cmd run preflight`                    | PASS — profile valid, source capability active count 0 after revocation, runner target approval required |
+| `npx.cmd prettier --check PROJECT_PLAN.md` | PASS                                                                                                     |
+| `git diff --check`                         | PASS — only the known LF/CRLF normalization warning                                                      |
+| `git fsck --strict`                        | PASS — known dangling historical objects only; no fsck errors                                            |
+| focused source/capability tests            | PASS — 2 files, 124 tests                                                                                |
+| full regression/build/E2E/release suite    | Not run; no claim of full regression coverage                                                            |
+
+PR #46 is OPEN / UNMERGED at its pre-review exact head `49b2db732f4dce1cc572d385ce1b20036255e9f9`;
+that earlier checkpoint's exact-head GitHub Quality checks passed (runs `35707471505` and
+`35707507468`). The current P2-002 head and CI are recorded in Section 19 below.
+
+Historical lifetime counters are now source/employer/upload/submission `14/9/0/0`; this iteration adds
+`1/0/0/0`. Exact source run and packet/readiness evidence are recorded in the P2 section above.
+
+Required PR:
+`chore: verify current role and packet readiness`
+
+Acceptance: reviewer confirms the one-request source run, role `CURRENTLY_OBSERVED` outcome,
+`PACKET_REFRESH_BLOCKED` dependency, unchanged private documents, active-capability count 0, and
+zero employer/application actions. Do not start P3/P4 or merge this PR in this task.
+
+#### P2-002 execution blueprint: currentness and R2 packet contract review
+
+Objective: determine offline whether the P2-001 provider verification proves a bounded current role,
+and whether the current R2 evaluation/queue records can safely feed the existing private packet
+contract. This is an investigation and characterization pass only. It must not activate a policy,
+create a packet, mutate real SQLite state, or broaden source/target authority.
+
+Starting state: PR #46 branch `chore/p2-current-role-readiness`, expected reviewed head
+`8606d8aefa8c2142d87b986d15cf327f370ce84f`, merged main
+`2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`, and the P2-001 evidence recorded above.
+
+Questions and evidence to resolve:
+
+1. Compare the supported Lever public Postings contract with the parser and persistence path. The
+   official contract documents posting content, lists, URLs, and `workplaceType`, but does not
+   provide a documented posting/closing timestamp in the supported response contract. The parser
+   therefore preserves the role as `CURRENTLY_OBSERVED`; it must not invent `expires_at` or turn
+   page observation time into an employer closing date.
+2. Trace `LeverPostingV2Schema` -> source observation/job version -> R2A normalization/evaluation
+   -> R2 queue -> `getBetaJob`/`preparePrivatePacket` -> expiry/readiness -> packet persistence.
+   Characterize missing, stale, legacy, duplicate, failed, and partial evidence with fictional
+   tests only.
+3. Verify what P2-001 actually proves about currentness. A complete run and page digest provide an
+   ordered accepted-record identity/content summary; they do not provide durable per-record page
+   membership, a fresh observation timestamp for unchanged content, or an independently queryable
+   latest-verification relation. A failed or partial run must never be treated as a completed
+   verification; absence from one limited page is inconclusive.
+4. Verify the packet boundary. The current R2 evaluation/queue row is separate from the legacy
+   `evaluation_versions` row consumed by `persistApplicationPacket` and document-generation tuple
+   checks. Copying an R2 UUID into the legacy field is invalid; no typed R2-to-packet bridge exists.
+
+Proposed remediation (design only; do not implement here): use a finite, explicitly labelled local
+verification freshness window as a verification assertion, never as an inferred employer closing
+date; persist provenance for exact run/capability/page digest/external ID/content hash; revalidate
+that ledger immediately before packet preparation or any external action; represent closure/expiry,
+conflict, partial, failed, and unchanged-content outcomes explicitly; and add a typed additive
+R2-to-packet compatibility projection that enforces the same job/profile/job-version/eligibility,
+current queue/preparing, document, and expiry gates. Unchanged content needs either an immutable
+re-observation or a separate verification relation so freshness is not silently conflated with a
+new source observation. No migration is required or authorized in this review.
+
+Acceptance: provider guarantees, currentness evidence limits, and the R2/legacy packet mismatch are
+documented with file/function evidence; focused fictional characterization tests pass; privacy and
+action counters remain unchanged; P2 stays `IMPLEMENTED_UNVERIFIED`; and exactly one next
+implementation task is recommended. Rollback is limited to reverting this documentation/tests
+commit; no runtime or database rollback is needed.
+
+Exactly one recommended next action:
+
+`P2-003 - implement the typed R2-to-packet compatibility projection and durable successful-verification freshness ledger (fictional tests first)`
+
+Acceptance for P2-003: no real provider/employer activity; additive migration only if demonstrably
+required and never a rewrite of 0000-0008; packet preparation validates a typed current R2 bridge
+instead of copying IDs; the verification ledger distinguishes completed fresh exact-record evidence
+from page-only, unchanged, partial, and failed runs; unknown expiry remains `JOB_EXPIRY_UNKNOWN`;
+and focused/full local gates plus exact-head CI are green.
+
+#### P2-002 validation record (2026-09-22)
+
+Provider contract result: the official Lever Postings API documentation
+(`https://hire.lever.co/developer/documentation`) supports posting content/lists, URLs, and the
+`workplaceType` enum. The supported `LeverPostingV2Schema` and mapper preserve those fields, freeze
+the raw payload, inert HTML to text, and intentionally map undocumented `createdAt`/temporal values
+to `postedAt: null`; the persistence path therefore stores `posted_at`/`expires_at` as unknown rather
+than deriving an employer closing date. Existing fictional tests cover all official workplace values,
+country string/null, absent optionals, lists evidence, inert HTML, and malformed structural values.
+
+Offline source evidence: read-only inspection of `data/applypilot.local.sqlite` found P2-001 run
+`d45a752f-641b-49d6-ad43-b28b0b445694` `COMPLETE`, one request, one page, and 25 records. Its page
+digest is `79e8b9957204a1fa5bf23d9bfee30f91fbd6ec55945214ff3dd2406229bad6fc`. The selected external
+ID `2cfe6692-a266-4d27-8832-ef652fa57ee4` has one immutable observation with `posted_at` and
+`expires_at` both null; the observation is linked to the prior successful run, not the unchanged
+P2-001 run. The schema has no durable per-record page-membership relation or latest-verification
+relation, so page-digest equivalence is evidence of an ordered page summary, not proof of a fresh
+record timestamp. A failed/partial run remains incomplete; absence from a bounded page is
+inconclusive. Historical local action counters remain `14/9/0/0`; this review adds `0/0/0/0`.
+
+R2/packet contract result: current R2 evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5` is
+`REVIEW_REQUIRED`, not recommended, `UNCALIBRATED`, and its queue projection is `REVIEWING/CURRENT`.
+The same identifier is absent from legacy `evaluation_versions`. `apps/web/lib/beta-workspace.ts`
+keeps both `evaluationVersionId` (R2) and `legacyEvaluationVersionId`, but
+`preparePrivatePacket`/`packages/database/src/beta-repository.ts::persistApplicationPacket` and
+document tuple checks consume the legacy identifier. The characterization test proves an R2 UUID
+cannot be copied into that legacy field: it fails closed with `PACKET_VERSION_STATE_MISMATCH`.
+`packages/database/src/r2-repository.ts::assertCurrentPreparing` separately enforces the exact
+current R2 PREPARING decision; no typed bridge exists between those contracts. The existing packet
+remains immutable historical state and no packet/database/profile/document was changed.
+
+Focused fictional characterization tests: `150 passed` across the application-runner, source
+capability, source-enablement, and beta-repository suites. They cover unknown/expired expiry,
+undocumented provider timestamps, official workplace/country variants, partial page failure then
+restart/replay, unchanged-content idempotency without a fresh observation timestamp, and the R2
+identifier/legacy packet boundary. No production source, schema, migration, dependency, or CI file
+was changed; no real source/employer request occurred.
+
+Local read-only gates: schema 9, pending migrations 0, integrity `PASS`, foreign-key issues 0.
+The proposed freshness ledger and typed R2 projection remain design-only. P2 stays
+`IMPLEMENTED_UNVERIFIED`; P3/P4 remain incomplete or blocked as recorded above.
+
+## 19. P2-002 current iteration handoff
+
+Branch: `chore/p2-current-role-readiness`. Starting reviewed head: `8606d8aefa8c2142d87b986d15cf327f370ce84f`.
+Ending head: `f9b384f2eb3b343fa05bcbdc229ab33820d2e7a8`. PR #46 is OPEN / UNMERGED, base `main`,
+mergeable `MERGEABLE`, and merge state `CLEAN` after exact-head verification. Push CI run
+`35710981929` and pull-request CI run `35710985969` both passed for this exact head.
+No live provider request, employer visit, capability/grant mutation, packet/evaluation/profile/document
+mutation, application operation, migration, dependency change, production-code change, or archive edit
+was performed. Historical action counters remain `14/9/0/0`; this iteration adds `0/0/0/0`.
+
+The only changed implementation artifacts are this plan and fictional characterization tests. The
+provider contract and packet findings are recorded in the P2-002 validation record above. PR #46
+remains OPEN and UNMERGED; it must not be merged in this task. Local focused tests passed; full
+regression/build/E2E/release checks are listed in the execution report and must be distinguished from
+exact-head GitHub CI.
+
+Execution gates for this head:
+
+- Focused characterization: PASS, 4 files / 150 tests.
+- Unit regression: PASS, 52 files / 576 tests.
+- Integration: PASS, 3 files / 21 tests.
+- Typecheck and lint: PASS.
+- Production local + public showcase build and showcase audit: PASS.
+- E2E: PASS, 44 tests (synthetic/local only).
+- Privacy audit, doctor, preflight, schema/integrity/FK checks: PASS (schema 9, pending 0,
+  integrity `PASS`, foreign-key issues 0).
+- Dependency audits: PASS (`npm audit` and production audit both report 0 vulnerabilities).
+- Migration immutability: PASS; no `packages/database/drizzle` file changed.
+- `git diff --check`: PASS with the repository's known LF/CRLF normalization warning.
+- `git fsck --strict`: PASS; only known dangling historical objects are reported.
+- Repository-wide `format:check`: baseline FAIL in 21 pre-existing files; all three files changed
+  by this task pass targeted Prettier checks. No unrelated formatting was applied.
+- Real database backup/restore and migration were not run because this review forbids modifying the
+  real local database; in-memory/synthetic backup/restore coverage remains in the passing test suite.
+
+Exactly one recommended next action remains P2-003: implement the typed R2-to-packet compatibility
+projection and durable successful-verification freshness ledger, fictional tests first. Do not
+obtain another live provider request until that design is reviewed and the owner authorizes a new
+bounded operation.
+
+## 20. Consolidated offline implementation blueprint (P2-003 through VERIFY-INT-001)
+
+This is the active implementation plan for the approved offline continuation. It remains strictly
+synthetic/local: historical action counters are `14/9/0/0`, and this iteration must add `0/0/0/0`.
+The private runtime database remains untouched at schema 9; any schema-10 rehearsal uses disposable
+databases only. No source capability, target capability, grant, approval, packet, profile, document,
+evaluation, queue, or application record is created or changed in the private runtime.
+
+| Work package   | Deliverable and dependency                                                                                        | Acceptance evidence                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| P2-003A        | Strong fictional reproductions for persisted R2, replayed verification, failed/partial runs, and stale references | Tests prove actual rows/clock/transport activity, not early-return mocks                          |
+| P2-003B        | Additive append-only exact-record verification ledger with run/page/record/content/disposition provenance         | Successful later verification is queryable; replay is idempotent; failed/partial is not qualified |
+| P2-003C        | Typed R2 packet binding and round-trip validation                                                                 | R2 is canonical; legacy packets remain readable; wrong/stale/fabricated references fail closed    |
+| P2-003D        | Explicit versioned freshness assessment (24h preparation, 15m pre-external-action, fictional only)                | Provider expiry, local freshness, eligibility, integrity, and authority remain independent        |
+| P3-INT-001     | Source-to-packet integration, restart/replay, invalidation, concurrency, and recovery matrix                      | No silent loss or stale shortcut; integrity/FK checks pass                                        |
+| P4-OFFLINE-001 | Dormant synthetic-only MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW lane using shared binding services                     | Fictional end-to-end succeeds without any submit operation; real execution remains disabled       |
+| VERIFY-INT-001 | Full tests, disposable migration/backup/restore rehearsal, UI evidence, audits, exact-head CI                     | One reviewable PR, open/unmerged, no private runtime mutation                                     |
+
+Implementation files/components: `packages/database/drizzle/0010_*` (additive ledger and packet R2
+binding), database schema/repositories, `packages/application-runner` freshness and dormant
+non-submit contracts, existing application workspace diagnostics, fictional unit/integration/E2E
+fixtures, and this plan. Migrations 0000-0009 remain byte-for-byte immutable. The proposed 0010
+relations use foreign keys, uniqueness on run/page/record disposition, immutable content references,
+and no raw payload or candidate-value columns.
+
+Rollback: revert the implementation commits and discard only disposable schema-10 databases. Never
+restore or migrate `data/applypilot.local.sqlite` in this task. The private runtime continues to be
+reported separately as schema 9 until an explicitly approved operational migration.
+
+## 21. Historical consolidated offline implementation evidence (2026-09-22)
+
+Branch/PR: `chore/p2-current-role-readiness`, PR #46 (open and intentionally unmerged). Starting
+head was `50f1a2f3de46b74547828d6efffe264929433e85`; the final implementation head is recorded in
+the handoff after the same-branch push. No capability, grant, profile, document, packet, evaluation,
+queue, or real runtime database write occurred.
+
+| Package        | Status                      | Evidence                                                                                                                                                                                                                                                              |
+| -------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-003A        | `VERIFIED`                  | Fictional R2 packet fixtures persist an actual current R2 row plus a separate historical legacy row; fabricated, stale, and mismatched references fail closed. Unchanged replay uses a real second transport call with an injected clock.                             |
+| P2-003B        | `VERIFIED`                  | Additive `source_record_verifications` ledger binds run/page/index/content/observation/job-version/disposition/qualification/time/parser/policy. New content versions, unchanged later verification, same-operation replay, and page-one-failure restart are covered. |
+| P2-003C        | `VERIFIED`                  | `application_packets.r2_evaluation_id` is a typed FK; packet persistence requires current R2 evaluation + CURRENT PREPARING queue and only treats the legacy column as a same-job/profile compatibility reference.                                                    |
+| P2-003D        | `VERIFIED`                  | Versioned fictional local policy: 24h preparation and 15m pre-external-action. Provider expiry, local verification age, qualification, and authority remain separate.                                                                                                 |
+| P3-INT-001     | `VERIFIED`                  | Source page membership -> observation/job version -> R2 evaluation -> queue path passes restart/replay/invalidation and integrity/FK coverage; incomplete pages are not qualified.                                                                                    |
+| P4-OFFLINE-001 | `VERIFIED (synthetic only)` | Shared frozen binding supports MAP_FOR_FILL, FILL, UPLOAD, VERIFY, and FILL_PREVIEW on a synthetic-local capability; read-back/document/protection checks pass and the lane exposes no submit method. Real capabilities remain inspection-only.                       |
+| VERIFY-INT-001 | `VERIFIED`                  | Local unit/integration/E2E/build/privacy/dependency/diff/fsck gates pass. Disposable schema-10 migration and backup/restore rehearsal pass. Exact-head CI run 35716397627 is green for the pushed implementation head.                                                |
+
+Migration `0010_verified_source_packet_binding.sql` is additive only: it adds the R2 packet FK/index
+and the append-only verification ledger. Migrations `0000`-`0009` were not edited. The private local
+database is still schema 9 with one pending migration and remains integrity `PASS` / FK `0`; clean
+schema-10 and backup/restore checks use isolated fictional databases only.
+
+Current production classification is unchanged: Source-enabled Personal Beta `READY` only on the
+historical reviewed bounded evidence; Personal Live V1 `NOT_READY`; real MAP/FILL/UPLOAD/VERIFY/
+FILL_PREVIEW and SUBMIT remain disabled pending separate reviewed authority and real-role evidence.
+The next reviewed task is exactly one owner-approved offline review of PR #46; it must not merge or
+activate live application operations.
+
+## 22. PR #46 review-correction implementation blueprint (2026-09-22)
+
+This correction iteration stays on PR #46 at the reconciled head `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`.
+It is offline-only: fictional candidates/documents, disposable databases, mocked source transport, and
+isolated loopback browser fixtures are permitted; real source/employer/upload/submission actions remain
+`0/0/0/0`. The private runtime remains schema 9 with one pending disposable-only migration, integrity
+`PASS`, foreign-key issues `0`, and no profile/evaluation/queue/document/packet/capability/grant mutation.
+PR #46 remains open and unmerged.
+
+| Work ID | Dependencies                            | Files/functions                                                                       | Reproduction and acceptance                                                                                                                                                                                                                      | Evidence level / limitation                                               |
+| ------- | --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| R46-01  | Existing source ledger                  | `source-enablement-repository.ts`, migration/schema/tests                             | Preserve provider record positions, distinguish logical page replay from identical later requests, surface conflicts, transactionally/recoverably qualify terminal evidence, and recover schema-9 interrupted work without fabricating freshness | `LOCAL_RUNTIME_VERIFIED` only after focused tests; no historical backfill |
+| R46-02  | R2 repository currentness               | `r2-repository.ts`, `beta-repository.ts`, packet tests                                | Reuse one canonical current-preparing validator; produce positive fictional R2 through normal APIs; preserve frozen legacy packet/digest compatibility; reject all mismatches and corruptions                                                    | Synthetic/local only; legacy semantics remain compatibility-only          |
+| R46-03  | R46-01/R46-02 ledger and packet binding | `freshness.ts`, packet/readiness services, freshness tests                            | Require explicit policy input, cap validity at known provider expiry, resolve qualified ledger evidence from persistence, retain provider expiry UNKNOWN, and keep private route default-disabled                                                | Proposed fictional policy only; no live activation                        |
+| R46-04  | Foundation gates                        | `target-runner.ts`, loopback adapter/fixtures, durable run persistence, browser tests | Exercise real DOM controls, read-back, bounded upload acknowledgement/hash, durable preview, restart/concurrency/uncertain outcomes, and fixture-side submit counter zero                                                                        | Synthetic loopback only; real target authority remains rejected           |
+| R46-05  | R46-01 through R46-04                   | integrated source-to-preview test and adversarial cases                               | One discoverable test crosses mocked source → ledger → canonical R2 → packet → browser map/fill/upload/verify/preview/reload, with stale/protection/destination/unknown-control/duplicate/crash cases                                            | Fictional disposable evidence; not Personal Live V1 readiness             |
+| R46-06  | All corrections                         | migration/recovery scripts, plan, PR metadata, CI                                     | Rehearse clean/schema-9 upgrade/rollback/WAL backup-restore/future-schema refusal, run full local matrix and exact-head CI, and record formatter/release limitations separately                                                                  | Private DB untouched; PR remains OPEN/UNMERGED                            |
+
+Implementation sequence: reproduce review findings first; implement R46-01 through R46-03; build the
+isolated loopback browser adapter and durable non-submit lifecycle for R46-04; add the integrated proof
+and adversarial matrix for R46-05; then run R46-06 gates, update this section with exact evidence, and
+push normally on the same branch. Rollback is limited to reverting correction commits and deleting only
+disposable test databases. No released migration may be edited without a documented hash audit; no
+private database migration or restore is permitted.
+
+## 23. PR #46 integrated offline proof closeout (2026-09-22)
+
+Correction scope is complete on `chore/p2-current-role-readiness` as an open, unmerged PR #46.
+Starting reviewed head was `b3fbc6447ec039dccbdb9e8eca93bafa594c2113`; implementation head
+`f2237756a1a8da6f22382085f0bdcff506d75c4d` has exact-head push CI `35721673256` and PR CI
+`35721677924`, both `success`. No live source/employer request,
+candidate transmission, private runtime mutation, grant/capability activation, upload, or submission
+occurred; this iteration remains `0/0/0/0`, with lifetime counters `14/9/0/0`.
+
+| Work ID | Result and evidence                                                                                                                                                                                                                                                                                                                                                    | Evidence boundary                                                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R46-01  | `VERIFIED` in `source-enablement-repository.test.ts`: mixed provider positions, identical content at distinct cursors, conflicting logical replay, two-page failure/restart, and terminal qualification interruption/recovery. `0010` rebuilds disposable `source_run_pages` without the old per-run digest uniqueness so distinct cursors remain distinct operations. | Fictional/disposable only; no historical ledger backfill or live replay.                                                                                             |
+| R46-02  | `VERIFIED` in `beta-repository.test.ts`: packet persistence calls `R2Repository.assertCurrentPreparing`, legacy evaluation remains a same-job/profile compatibility reference, fabricated/stale references fail closed, packet digest preserves the pre-R2 shape and versions new R2 hashes.                                                                           | Synthetic seeded rows exercise the canonical gate; no private packet was changed.                                                                                    |
+| R46-03  | `VERIFIED` for the explicit helper and repository evidence path: policy is required, provider expiry caps validity, unknown provider expiry remains `UNKNOWN`, and packet persistence validates qualified ledger identity/content/timestamps when evidence is supplied.                                                                                                | Proposed fictional policy only; the private route remains default-disabled and no real activation is granted.                                                        |
+| R46-04  | `VERIFIED (loopback)` by `tests/e2e/source-to-preview.spec.ts` plus durable-store and concurrency tests: actual DOM fill/read-back, independently hashed upload acknowledgement, durable preview/reload, operation claim, and fixture submit count `0`.                                                                                                                | Loopback fixture only; no real target capability or submit method.                                                                                                   |
+| R46-05  | `VERIFIED (actual repository-to-browser proof)` by the R46-07 discoverable Playwright test: real source persistence, qualified verification ledger, real R2 eligibility/fit/evaluation/queue, packet persistence, SQLite non-submit runner, loopback DOM/upload/preview, reopen/new-process recovery, replay, stale stop, malformed snapshot, and concurrent claim.    | Three fresh disposable file-backed runs with fictional content only; this is not Personal Live V1 or real employer readiness.                                        |
+| R46-06  | `VERIFIED` local implementation gates: unit 53 files/592 tests, integration 3 files/21 tests, E2E 45 tests, build/showcase/audit, lint, typecheck, privacy, preflight, dependency audit, diff-check, fsck, and disposable migration/recovery tests.                                                                                                                    | Repository-wide `format:check` remains blocked by 11 pre-existing files; targeted changed-file formatting passes. Full release check is therefore not claimed green. |
+
+Migration boundary: `0000`-`0009` remain immutable. Unmerged disposable `0010` changed from blob
+`37dfdd5bb70273eef8836ea981a2df92f9a8a922` to SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; fresh schema-9 upgrade,
+integrity/FK, future-schema refusal, and backup/restore tests use in-memory/disposable databases.
+The private local database remains schema 9 with pending migration 1, integrity `PASS`, and FK
+issues `0`; it was not migrated or restored.
+
+Current classification is unchanged: Source-enabled Personal Beta `READY` only on the historical
+reviewed bounded evidence; Personal Live V1 `NOT_READY`; real target operations remain approval- and
+target-dependent. Remaining blockers are real-role/provider currentness, approved real target
+authority, and a separate reviewed live operation. Exactly one next reviewed task is recommended:
+review PR #46's correction diff and exact-head CI; do not merge or activate live operations.
+
+## 24. R46-07 actual source-to-browser pipeline and disk recovery blueprint (2026-09-23)
+
+R46-07 stays on PR #46 and the same branch, offline-only. It closes the prior R46-05 evidence gap by
+running the real source discovery, source verification ledger, R2 evaluation/queue, packet persistence,
+and loopback non-submit runner against one fresh file-backed disposable SQLite database. The only
+mocked boundary is the fictional source transport response; no real source/employer/upload/submission
+action is permitted (`0/0/0/0`). The private runtime remains schema 9 with pending 1, integrity `PASS`,
+foreign-key issues `0`, and is neither migrated nor restored.
+
+| Work ID  | Dependencies          | Authorized change                                                                                                                                                                                                                                                                     | Acceptance evidence                                                                                                                                                                              |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R46-07-A | R46-01 through R46-06 | Add explicit isolated fixture-root/database helpers and a plainly named Playwright proof using migrations `0000`-`0010`; keep provider identity separate from `SYNTHETIC_LOCAL`.                                                                                                      | Fresh file-backed schema 10 DB, explicit roots, no fallback to private paths, source transport mock called exactly at the boundary.                                                              |
+| R46-07-B | R46-07-A              | Use `runLeverSourceToQueue`, `SourceEnablementRepository`, real R2 eligibility/fit services, `R2Repository`, and normal Beta packet persistence; create fictional profile, source capability, document, approvals, answers, and PREPARING transition through supported APIs/fixtures. | Actual run/page/observation/job-version/verification/evaluation/queue/packet identifiers are captured and linked; no fabricated readiness or evaluation IDs.                                     |
+| R46-07-C | R46-07-B              | Feed the persisted/reloaded packet to `LoopbackNonSubmitAdapter` + `TargetIndependentNonSubmitRunner` with `SqliteNonSubmitRunStore`; revalidate current bindings and explicit freshness policy.                                                                                      | MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW succeeds on loopback only; received upload digest, acknowledgement, checkpoints, and preview linkage are independently asserted; submit remains unavailable. |
+| R46-07-D | R46-07-C              | Reopen SQLite/store/browser with fresh objects and add deterministic replay, stale-state, unknown-control/protection, interrupted-upload, malformed-snapshot, preview-interruption, and concurrent-worker cases.                                                                      | Disk reopen and fresh-process recovery are distinguished; no repeated upload, no silent corrupt-state restart, no losing-worker overwrite, and stale/revoked bindings stop before writes.        |
+| R46-07-E | R46-07-D              | Run three fresh fixture directories with retries disabled, full local gates, disposable migration/backup/restore checks, isolated LF release attempt, and exact-head CI; update PR metadata and this plan.                                                                            | R46-05 status reflects the exact evidence achieved; 0010 hash and private schema-9 state are separately reported; PR #46 remains open/unmerged.                                                  |
+
+Implementation order: establish isolated roots and migration helpers; build the actual source-to-R2
+orchestration and packet lineage; run the browser lane from the reloaded packet; add recovery/negative
+variants; then execute validation and update this section with exact IDs, counts, failures, hashes, and
+CI. No threshold, calibration, authority, dependency, visibility, or unrelated application behavior
+may be changed to make the proof pass. Rollback is limited to reverting R46-07 commits and deleting
+disposable fixture directories; never migrate or restore the private database.
+
+Evidence boundary: a successful R46-07 proof establishes offline fictional service integration and
+disk-backed non-submit recovery only. It does not establish real employer application readiness,
+real upload readiness, production deployment, or the green banner.
+
+## 25. R46-07 actual pipeline and disk recovery closeout (2026-09-23)
+
+R46-07 is now implemented on the same PR/branch and remains offline-only. The prior R46-05 gap is
+closed by a discoverable Playwright proof that uses the real source, ledger, R2, packet, and durable
+runner services with a fictional transport boundary and fresh file-backed SQLite. The private runtime
+was not opened for write, migrated, restored, or copied.
+
+### Actual lineage and browser evidence
+
+| Stage                 | Evidence carried forward                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Disposable authority  | `source-r46-07-fictional` v1 is persisted and validated through `SourceEnablementRepository`; the fixture uses deterministic `source-r46-07:*` IDs.                                                                                                                                                                                                                                                                                                 |
+| Source run and ledger | `runLeverSourceToQueue` creates real run/page/verification rows. The first run persists one observation and one job version, qualifies one accepted verification, and invokes the real parser/normalization path. Provider expiry remains `NULL`/`UNKNOWN`.                                                                                                                                                                                         |
+| Job/R2                | The persisted `source-job-*` / `source-job-version-*` rows are reloaded; `evaluateR2Eligibility`, `scoreR2JobFit`, `R2Repository.recordEvaluation`, and `recordQueueDecision` produce actual `ELIGIBLE`/recommended state. The queue is transitioned through real `PREPARING` and checked by `assertCurrentPreparing`.                                                                                                                              |
+| Packet                | `BetaRepository` persists a separate legacy compatibility evaluation tied to the actual job/profile while the packet retains the actual `r2EvaluationId`. The packet is reloaded from the same database and its canonical nonzero `r2-packet-v2` digest is compared with the durable preview row. Provider expiry is not invented: preparation `ACTIVE` is derived from fresh qualified ledger evidence plus the explicit fictional 24h/15m policy. |
+| Browser lane          | `LoopbackNonSubmitAdapter` and `TargetIndependentNonSubmitRunner` execute MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW only against owned loopback. DOM read-back is independent; the upload server hashes received fictional bytes and returns one acknowledgement; preview links run/packet/preview digests. No submit method exists.                                                                                                                      |
+
+Decisive test: `tests/e2e/source-to-preview.spec.ts:521`,
+`persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit`.
+Reproduce with:
+
+```text
+npx.cmd playwright test tests/e2e/source-to-preview.spec.ts --grep "persists source verification" --retries=0 --reporter=line
+```
+
+It creates three unique disposable roots with explicit `database/documents/reports` directories,
+applies migrations `0000` through `0010`, uses one DB through every service, and repeats the complete
+scenario three times with retries disabled. Each repetition makes two fictional source transport
+calls (initial plus unchanged replay), one fictional upload, and zero submissions.
+
+### Recovery and negative evidence
+
+- The decisive test closes the adapter and SQLite connection, verifies the preview from a fresh child
+  Node process, reopens SQLite/store objects, checks `FILL_PREVIEW` and foreign keys, then corrupts the
+  stored effect and proves both `load()` and `checkpoints()` return `NON_SUBMIT_SNAPSHOT_CORRUPT` rather
+  than silently restarting.
+- An independent SQLite connection cannot claim the completed `MAP_FOR_FILL` operation.
+- A real queue transition away from `PREPARING` makes a new runner stop as `PAUSED/PAGE_CHANGED`
+  before another upload; counters remain unchanged.
+- Exact unchanged source replay creates no new observation, job version, R2 evaluation, or queue work.
+- `tests/e2e/source-to-preview.spec.ts:431`,
+  `stops after an accepted upload when checkpoint persistence is interrupted`, accepts one upload at
+  the fixture server, injects one durable checkpoint-write failure, records `UPLOAD_OUTCOME_UNKNOWN`,
+  and proves a restarted runner performs no second upload.
+- `packages/database/src/beta-repository.test.ts` injects a SQLite preview-insert failure after the
+  operation update and proves the transaction leaves the operation `CLAIMED/{}`; the retry after the
+  trigger is removed persists exactly one preview linkage.
+- Existing `source-enablement-repository.test.ts` covers page-one success/page-two failure/restart/
+  completion/replay; existing runner and inspection suites cover protection, changed controls,
+  destination/form drift, and real-target denial. These component cases remain separate from the
+  whole-pipeline proof.
+
+The demonstrated defects fixed in this run were zero/default packet digest acceptance, malformed
+snapshot fallback, non-atomic operation/preview persistence, and duplicate/mismatched fictional
+fixture evidence. No eligibility threshold, calibration rule, authority, network policy, migration,
+or real-target behavior changed.
+
+### Validation and boundaries
+
+- Unit: 53 files / 592 tests passed. Integration: 3 files / 21 tests passed.
+- Full E2E after the failure-injection addition: 47 / 47 passed with retries disabled.
+- Production/local and showcase builds plus showcase audit passed; strict typecheck, lint, privacy,
+  dependency audits, schema/maintenance tests, `git diff --check`, and `git fsck --strict` passed.
+  Targeted changed-file formatting passed.
+- Repository-wide `format:check` and `release:check` stop at the same 11 pre-existing files (including
+  `package.json` and historical green-banner files); unrelated formatting was not applied. A clean LF
+  release checkout was not run because release scripts intentionally resolve the private profile/database
+  and have no safe disposable schema-10 override. This is a reported limitation, not a green release claim.
+- No real source/employer/form/upload/submission action occurred: historical lifetime `14/9/0/0`,
+  this iteration `0/0/0/0`; fictional repetitions are 6 source requests, 3 uploads, 0 submissions.
+
+Migration evidence: `0010_verified_source_packet_binding.sql` remains SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; `0000`-`0009` remain
+byte-for-byte unchanged. Disposable proof databases reached schema 10 with integrity/FKs passing.
+The private DB remains schema 9, pending 1, integrity `PASS`, FK issues `0`, and was not migrated/restored.
+
+Evidence boundary: R46-07 proves fictional offline source-to-packet integration and disk-backed
+non-submit recovery only. It does not prove a real employer application, real upload, deployment,
+green-banner activation, or Personal Live V1. Exactly one next reviewed task is recommended: review
+PR #46 at its exact pushed head and CI result for merge approval; do not merge or activate live operations.
+
+## 26. R46-08 persisted packet, freshness, and SQLite recovery blueprint (2026-09-23)
+
+R46-08 continues on PR #46 and the same `chore/p2-current-role-readiness` branch from exact clean
+head `2baa6d014778fcc0b8975f425228335fc0f4f994`. It is an offline engineering correction only:
+no real source/employer/form/upload/submission action, no private database write/migration/restore,
+no capability activation, and no merge. The private runtime remains schema 9 with one disposable-only
+pending migration (`0010`), integrity `PASS`, and zero foreign-key issues. Migrations `0000`-`0009`
+and the reviewed `0010` hash remain immutable unless a new additive migration is proven unavoidable.
+
+### Objective and acceptance contract
+
+Close the remaining R46-07 evidence gaps without weakening fail-closed behavior:
+
+| Work ID  | Design and files                                                                                                                                                                                                                                                                                                                                                                                | Acceptance evidence                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R46-08-A | Add one shared persisted-packet loader/readiness/currentness resolver (database/application-runner boundary) with injected DB, clock, policy, and private-root-free dependencies. Reconstruct the canonical packet from persisted relations; verify canonical digest, current job/profile/R2/queue PREPARING state, duplicate/docs/answers/binding gates, and freshness before every operation. | Fresh process can load the packet by IDs and use the same resolver. Missing/corrupt/mismatched packet, stale dependency, missing/invalidated approval, changed answer/document/binding, preparation-window expiry, and action-window expiry fail closed before browser or upload. Provider expiry `UNKNOWN` stays distinct from the explicit fictional preparation policy; no `FRESH` value is hand-mapped to `ACTIVE`. |
+| R46-08-B | Harden `SqliteNonSubmitRunStore` checkpoint history, packet/run binding, preview conflict handling, and atomic operation claims using existing `0010` columns and transactions. Represent interruption recovery explicitly; a losing owner cannot overwrite or downgrade a winner.                                                                                                              | Checkpoints are unique ordered logical events with sequence/final-state validation. Wrong packet/binding and conflicting preview are rejected. Independent workers have one owner; interrupted accepted upload reopens as `UPLOAD_OUTCOME_UNKNOWN`/recovery-required and never retransmits.                                                                                                                             |
+| R46-08-C | Upgrade `tests/e2e/source-to-preview.spec.ts` to build/persist/reload through the shared services, use the reloaded packet in a fresh context and child process, and add file-backed interruption and two-connection overlap barriers.                                                                                                                                                          | T0/before-15-minute action succeeds; at/after 15 minutes and past preparation window stop before browser/upload. Provider expiry cap, missing/future/wrong ledger, changed dependencies/docs/answers/binding, unsupported controls, replay, tamper, process interruption, and contention are all asserted with counters.                                                                                                |
+| R46-08-D | Run the complete offline validation/recovery/privacy suite, update this plan and PR metadata, and push the same branch.                                                                                                                                                                                                                                                                         | Unit/integration/E2E/build/lint/typecheck/privacy/dependency/schema/maintenance/diff/fsck evidence is recorded. Local pre-existing format/release limitations remain explicit; PR #46 stays open/unmerged.                                                                                                                                                                                                              |
+
+### Dependencies, risks, rollback, and implementation order
+
+The loader/resolver is the source of truth for packet readiness; tests must not construct a second
+readiness interpretation. The store may use only the existing additive schema-10 fields; a migration
+is prohibited unless an actual durable ownership requirement cannot be met otherwise. Risk areas are
+SQLite transaction races, crash windows after accepted upload, replay/duplicate external effects, and
+accidental private-root resolution. Mitigations are explicit owner/state checks, immutable packet and
+preview digests, file-backed disposable fixtures, deterministic barriers, and zero live transports.
+
+Implementation order is: inspect current packet/store contracts; update the shared loader/resolver;
+harden claims/checkpoints/preview binding; replace the raw child-process SELECT and manual packet
+readiness in the integrated E2E; add interruption/overlap and negative matrices; run gates; then update
+this section with exact results. Rollback is limited to reverting R46-08 commits and deleting only
+disposable fixture directories. The private DB, private documents/profile, capabilities, and historical
+R46-07 evidence are never copied, restored, or rewritten.
+
+Evidence boundary: even a green R46-08 run proves only fictional offline source-to-packet and durable
+non-submit recovery. It does not authorize a real target, candidate-data transmission, upload, submit,
+or Personal Live V1 readiness. The sole next action after this work is PR #46 merge review if the exact
+head and CI satisfy all documented gates; otherwise report the specific blocker.
+
+## 27. R46-08 implementation closeout (2026-09-23)
+
+R46-08 is implemented on the same PR/branch from start head
+`2baa6d014778fcc0b8975f425228335fc0f4f994` to final implementation head
+`f0b6525e2115555f06dc580d64371dd64ec81ce8`. No live source/employer/form/upload/submission action,
+private database write/migration/restore/copy, capability mutation, or merge occurred. The private
+runtime remains schema 9, pending migration 1, integrity `PASS`, foreign-key issues `0`.
+
+### Shared entry points and safety behavior
+
+- `loadPersistedApplicationPacket` in `packages/database/src/persisted-packet.ts` reconstructs the
+  packet from persisted packet/document/approval/question/answer/R2/verification rows, checks the
+  stored canonical digest and optional run binding, and derives provider expiry from the immutable
+  verification ledger. `resolvePersistedApplicationPacket` is the injected-clock/policy gate used
+  immediately before each non-submit operation in the integrated proof.
+- `assessPacketReadiness` and `freezeRunnerBinding` preserve `jobExpiryState=UNKNOWN` when provider
+  expiry is absent. A qualified ledger plus the explicit fictional 24-hour preparation / 15-minute
+  pre-external-action policy may permit preparation; it never converts the provider fact to `ACTIVE`.
+  The resolver rejects stale, future, unqualified, mismatched-policy, changed-R2/queue, changed
+  document/approval, changed answer, duplicate, target, or digest state before adapter dispatch.
+- `SqliteNonSubmitRunStore` now validates packet/run binding, claims inside an SQLite transaction,
+  rejects losing-owner saves and conflicting previews, deduplicates cumulative checkpoint history by
+  sequence with conflict/order validation, and reopens an interrupted `CLAIMED` upload as
+  `PAUSED/UPLOAD_OUTCOME_UNKNOWN` without retransmission. A tampered completed effect remains a hard
+  `NON_SUBMIT_SNAPSHOT_CORRUPT` failure.
+- The database regression now uses a temporary file-backed SQLite database, two independent
+  connections for pre-completion claim contention, and close/reopen recovery for an upload claim;
+  it also asserts wrong packet/binding rejection and ordered checkpoint uniqueness.
+- The decisive E2E now reloads the packet through the shared loader in an independent SQLite context;
+  the child process uses `scripts/r46-08-load-packet.ts` (loader plus durable store), not raw packet
+  columns. It exercises the currentness callback with a fresh resolver and verifies exact 15-minute
+  and 24-hour expiry stops before any browser/upload action. Existing loopback upload and replay
+  counters remain fictional-only.
+
+### Validation evidence
+
+| Gate                              | Result                                                                                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                              | PASS — 53 files / 592 tests                                                                                                                           |
+| Integration                       | PASS — 3 files / 21 tests                                                                                                                             |
+| E2E                               | PASS — 47 / 47 with retries `0`; decisive source-to-preview proof repeated across 3 fresh roots                                                       |
+| Typecheck / lint                  | PASS                                                                                                                                                  |
+| Build / showcase audit            | PASS — local build, showcase build, `PUBLIC_SHOWCASE_AUDIT_PASS`                                                                                      |
+| Privacy / dependency audit        | PASS — privacy audit; npm audit and production audit 0 vulnerabilities                                                                                |
+| Database / preflight              | PASS — private schema 9, pending 1, integrity PASS, FK issues 0; preflight PASS_WITH_MANUAL_BETA_BLOCKERS for the existing pending migration          |
+| Changed-file format / diff / fsck | PASS — Prettier changed-file check, `git diff --check`, `git fsck --strict` (known dangling historical objects only)                                  |
+| Repository-wide format / release  | NOT GREEN — the same 11 pre-existing green-banner/package files stop both commands; no unrelated formatting or private release checkout was performed |
+
+Migration `0010_verified_source_packet_binding.sql` remains SHA-256
+`80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; `0000`-`0009` remain
+byte-for-byte unchanged. The integrated proof used disposable schema-10 databases only. Real action
+counters are source/employer/form/upload/submission `0/0/0/0` for this iteration and lifetime
+`14/9/0/0`; fictional proof counters are 6 source-transport calls, 3 loopback uploads, and 0
+submissions. Source-enabled Personal Beta remains historically `READY`; Personal Live V1 remains
+`NOT_READY`.
+
+The implementation is ready for exact-head CI review but PR #46 is intentionally still open and
+unmerged. Exactly one next action is permitted: review PR #46's final pushed head and CI for merge
+approval; do not merge in this task.
+
+## 28. R46-09 immutable packet and operation-ownership blueprint (2026-09-23)
+
+R46-09 closes the existing persisted-packet and non-submit operation-ownership contracts on the
+same PR #46 branch from exact clean head `af275a3eb5e32449ca876d13e0986f15c04fbdee`. It is
+offline-only: no real source GET, employer interaction, upload, submission, capability mutation,
+private database write/restore, deployment, dependency upgrade, migration change, or merge. The
+private runtime must remain schema 9, pending migration 1, integrity `PASS`, and FK issues `0`.
+
+### Objective and acceptance contract
+
+| Work ID  | Required correction                                                                                                                                                                                                                                                                                                                                                                    | Acceptance evidence                                                                                                                                                                                                                                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R46-09-A | Freeze the exact packet representation/order and digest at persistence; historical loading must use only that frozen representation and must not consult current approvals, latest answers, queue/version/duplicate state, or wall-clock expiry. Resolve current executable readiness separately; R2 is canonical and stale legacy compatibility rows do not invalidate an R2 packet.  | A1 unsorted two-document/three-answer round trip; A2 changed answer/queue/document/profile/job/provider-expiry leaves historical load valid but resolver denies; A3 stale legacy compatibility with valid R2; A4 tamper/ownership rejection; A5 historical preview is read-only/no target action. Legacy `r2-packet-v2`/legacy digest semantics remain exact. |
+| R46-09-B | Require explicit, schema-valid policy and operation for every executable resolver call; no default policy or PREPARATION operation. Preserve qualified UNKNOWN-provider handling only with exact ledger evidence and policy; apply temporal freshness, provider caps, and current dependency gates independently.                                                                      | B1-B5 cover omitted/invalid policy or operation, mismatch/limits, qualified UNKNOWN at T0, mid-run 15-minute stop before FILL/UPLOAD, and independent stale docs/answers/queue/R2 blockers.                                                                                                                                                                   |
+| R46-09-C | Make claims owner-bound with immutable claim IDs/tokens, one binding per run, strict operation prefix/order, and fail-closed SUBMIT/impossible/conflicting sequence validation. Recovery must be explicit and never fabricate a persisted checkpoint.                                                                                                                                  | C1-C6 cover two-store contention and loser-save rejection, wrong binding, order/conflicting sequences, expiry after completed step, forbidden SUBMIT, and distinct outstanding-upload recovery versus corrupt completed data.                                                                                                                                 |
+| R46-09-D | Add a real killed-worker interruption proof: a child reaches loopback upload, the server records/hash-accepts bytes and holds a deterministic barrier, the worker is terminated before effect commit, and a fresh worker reopens `UPLOAD_OUTCOME_UNKNOWN` without retransmission. Keep graceful close/reopen separate and repeat the full fictional chain over three disposable roots. | The interruption test uses a parent server/counter and an actual child process; accepted upload count is one, recovery is durable/owner-safe, and no retry/retransmit occurs.                                                                                                                                                                                 |
+| R46-09-E | Run all local gates, update the evidence table and PR body, push this same branch, and report only truthful offline closeout.                                                                                                                                                                                                                                                          | Unit/integration/E2E/build/lint/typecheck/privacy/dependency/schema/maintenance/diff/fsck evidence is recorded; known repository-wide format/release limitations remain explicit; PR #46 remains `OPEN / UNMERGED`.                                                                                                                                           |
+
+### Design, risk, rollback, and stop conditions
+
+`readiness_json` is the existing persistence envelope and may carry a versioned frozen packet
+object; no migration is expected. The loader must reject missing/tampered frozen representation
+rather than reconstructing from mutable rows. The resolver must validate explicit authority before
+any adapter dispatch. SQLite claims must be tied to a generated owner handle and the first immutable
+binding for the run. Recovery metadata is an in-memory/derived stop reason, not a fabricated event
+with a new timestamp. The killed-worker fixture is fictional loopback traffic only.
+
+Rollback is limited to reverting R46-09 commits and deleting disposable fixture roots. If any
+acceptance item cannot be reproduced, stop with the precise blocker; do not claim readiness or open
+another PR. The only permitted next action after a complete green closeout is human review of PR
+#46 for merge approval; this task itself never merges it.
+
+## 29. R46-09 implementation closeout (2026-09-23)
+
+R46-09 is implemented on PR #46 and remains offline-only. Start head was
+`af275a3eb5e32449ca876d13e0986f15c04fbdee`; no real source/employer/form/upload/submission action,
+private database write/migration/restore/copy, capability mutation, deployment, dependency upgrade,
+or merge occurred.
+
+### Contract evidence
+
+| Gate                               | Result and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1-A5 immutable packet             | PASS. `readiness_json.frozenPacket` plus `packetContractVersion` preserves exact packet array order and digest; the loader validates only the frozen representation and packet/run identity. Current document/answer/queue/version/duplicate state and wall-clock expiry are checked only by the separate resolver. R2 digest remains `r2-packet-v2`; legacy digest shape remains unchanged. Resolver currentness permits stale legacy compatibility rows when canonical R2 is current. |
+| B1-B5 explicit authority/freshness | PASS. Resolver now rejects omitted or schema-invalid policy/operation before loading/dispatch, requires exact evidence-policy match, rechecks the qualified ledger, current R2/queue/profile/job, documents, answers, and temporal freshness. Qualified provider `UNKNOWN` remains distinct and is allowed only through the exact ledger/evidence preparation contract; 15-minute and 24-hour stale windows stop before adapter work.                                                   |
+| C1-C6 owned operations             | PASS. Durable claims return immutable owner handles; SQLite updates require the claim row ID, binding, operation, and outstanding state. A run adopts one binding, rejects later mismatches, enforces the MAP→FILL→UPLOAD→VERIFY→FILL_PREVIEW prefix, rejects forbidden operations and conflicting snapshots, and never fabricates a recovery checkpoint timestamp. In-memory and SQLite stores use the same owner contract.                                                            |
+| Killed-worker interruption         | PASS. `tests/e2e/source-to-preview.spec.ts` starts `scripts/r46-09-upload-worker.ts`, reaches a parent loopback server barrier after hashing/accepting one upload, terminates the child before effect commit, then reopens through a fresh SQLite connection as `recoveryRequired/UPLOAD_OUTCOME_UNKNOWN`; the accepted upload is not retransmitted. The prior graceful close/reopen proof remains separate.                                                                            |
+
+### Validation evidence
+
+| Gate                                     | Result                                                                                                                                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                                     | PASS — 53 files / 592 tests                                                                                                                                                                                                           |
+| Integration                              | PASS — 3 files / 21 tests                                                                                                                                                                                                             |
+| E2E                                      | PASS — 47 / 47, retries `0`; decisive source→ledger→R2→packet→browser proof repeated over 3 disposable roots, with killed-worker interruption in each root                                                                            |
+| Typecheck / lint / changed-file Prettier | PASS                                                                                                                                                                                                                                  |
+| Build / showcase audit                   | PASS — local and showcase production builds; `PUBLIC_SHOWCASE_AUDIT_PASS`                                                                                                                                                             |
+| Privacy / dependency audit               | PASS — `PRIVACY_AUDIT_PASS` (`tracked_files=337`, `history_paths_checked=1160`, `history_blobs_checked=1130`, `build_test_artifacts_checked=1668`, `private_canaries_checked=11`); npm and production audits report 0 vulnerabilities |
+| Database / migration                     | PASS read-only — private schema 9, pending 1, integrity `PASS`, FK issues `0`; migration `0010` SHA-256 remains `80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`; `0000`–`0010` unchanged                           |
+| Diff / fsck                              | PASS — `git diff --check`; `git fsck --strict` reports only the repository's known dangling historical objects                                                                                                                        |
+| Repository-wide format / release         | NOT GREEN — the same 11 pre-existing green-banner/package files remain outside this scoped change; changed-file formatting and all executable gates are green                                                                         |
+
+Fictional proof counters for this iteration are 6 source-transport calls, 6 loopback uploads
+(three successful runs plus three killed-worker accepted uploads), and 0 submissions. Real action
+counters remain source/employer/form/upload/submission `0/0/0/0` for this iteration and lifetime
+`14/9/0/0`. Private data remains local and untracked. Final implementation head is
+`ac3689c471898262b3f7ca376110e9fef72ae874`; exact-head push CI `35802043804` and PR CI
+`35802046850` both passed with 47 E2E tests. PR #46 is still `OPEN / UNMERGED`. The sole next
+action is human review of PR #46 for merge approval; this task does not merge it.
+
+## 30. R46-10 frozen-packet invalidation and durable-transition blueprint (2026-09-23)
+
+R46-10 is a scoped offline correction on the existing `chore/p2-current-role-readiness` branch and
+PR #46, starting from exact clean head `e44c662c2593c556d76cdb38d8acafab2b8dfd87`. PR #46 remains
+`OPEN / UNMERGED`; no merge, migration, private-runtime write, live source/employer/form/upload/
+submission action, capability mutation, deployment, dependency change, or unrelated feature is allowed.
+The private runtime remains read-only at schema 9 with pending migration 1, integrity `PASS`, and FK
+issues `0`; disposable schema-10 databases are the only persistence fixtures.
+
+### Objective, dependencies, and acceptance IDs
+
+| Work ID  | Scope and dependency                                                                                                                                                                                                                                                     | Planned files                                                                                                                                                                                                                                 | Required executable evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R46-10-A | Preserve immutable frozen packet envelope while normal document/job/profile/R2/queue/answer invalidation updates only mutable readiness metadata; depends on R46-09 frozen loader.                                                                                       | `packages/database/src/beta-repository.ts`, `packages/database/src/r2-repository.ts`, shared packet-envelope helper if needed, `packages/database/src/beta-repository.test.ts`, focused integration/E2E fixtures.                             | A1 valid schema-10 packet with CV, cover letter, and three deliberately unsorted answers round-trips exact order/digest after reopen; A2 normal `recordDocumentArtifact()` supersession retains historical packet and resolver rejects stale document without adapter call; A3 job/profile/evaluation/queue/disclosure invalidation retains historical packet and blocks execution; A4 historical preview remains readable after expiry/invalidation; A5 tamper and missing legacy frozen data fail honestly without fabricated digest.                                                                                                          |
+| R46-10-B | Enforce one canonical successful MAP→FILL→UPLOAD→VERIFY→FILL_PREVIEW prefix and atomic owner-claim completion before durable mutation; depends on R46-09 claim handles/recovery.                                                                                         | `packages/database/src/non-submit-run-store.ts`, `packages/application-runner/src/target-runner.ts` only for directly shared type/validation contracts, `packages/database/src/beta-repository.test.ts`, runner tests, killed-worker fixture. | B1 MAP claim cannot save FILL_PREVIEW; B2 PAUSED/unknown predecessor cannot claim next operation after reopen; B3 sequence-2 preview after sequence 4 is rejected before mutation and valid snapshot plus injected transaction failure rolls back; B4 owner/binding/replay/conflict/reversed/skipped/duplicate/impossible/SUBMIT cases fail closed; B5 independent connection contention yields one winner and unchanged winner history; B6 full ordered run survives reopen and accepted upload recovery remains `UPLOAD_OUTCOME_UNKNOWN` with no retransmission.                                                                               |
+| R46-10-C | Verify or restore resolver linkage to exact packet job/version/source verification/run/page, document ownership, answer/disclosure ownership, R2 PREPARING/current duplicate state, explicit policy/operation, and expiry boundaries; depends on A/B durable invariants. | `packages/database/src/persisted-packet.ts`, focused database/runner tests, `tests/e2e/source-to-preview.spec.ts`, minimal fictional worker/fixture updates.                                                                                  | C1 omitted/invalid policy or operation and mismatch produce zero adapter calls; C2 corrupted verification job/version/run/page linkage fails while a valid record passes; C3 mismatched document job/profile/version and changed required answer/disclosure fail independently of freshness; C4 exact 15-minute MAP→FILL and FILL→UPLOAD boundaries refuse dispatch with unchanged durable success/counters; C5 provider expiry earlier than local windows blocks preparation while historical packet/preview validates; C6 killed-worker child termination is asserted before recovery and accepted-upload/no-retransmit counters remain exact. |
+| R46-10-D | Integrate A/B/C in three fresh fictional roots, reconcile truthful status, update PR metadata, and push same branch for exact-head CI; depends on all preceding gates.                                                                                                   | `PROJECT_PLAN.md`, PR #46 body, existing full-chain E2E only.                                                                                                                                                                                 | Acceptance matrix maps every A1-A5/B1-B6/C1-C6 to an exact test title/assertion, with failed reproductions and fixes recorded; local unit/integration/E2E/build/showcase/privacy/dependency/schema/maintenance/diff/fsck checks and new push/PR CI IDs are recorded. Known whole-repository format/release limitation remains separate.                                                                                                                                                                                                                                                                                                          |
+
+### Architecture, safety, testing, and rollback
+
+Invalidation will use a shared transaction-local envelope merge that parses existing JSON, preserves
+`frozenPacket`, `packetContractVersion`, `packetDigest`, `verificationEvidence`, array order, and any
+other immutable provenance, then replaces only mutable status/blockers/warnings/currentness fields.
+Rows without a frozen representation retain conservative legacy behavior and are never backfilled.
+All linked document, approval, evaluation, queue, and packet changes remain in their existing SQLite
+transactions. Durable operation validation will compare the proposed snapshot against the complete
+persisted logical prefix and require the exact successful predecessor and legal result state before
+updating the claim row or preview. `PAUSED`, recovery-required, unknown-outcome, corrupt, replayed,
+and forbidden `SUBMIT` states are never successful predecessors.
+
+All fixtures use explicit disposable roots and fictional loopback transport; no private profile,
+database, documents, browser state, credentials, source payload, employer page, or candidate data is
+read or copied. No production schema change is expected; migrations `0000`-`0010` and the historical
+plan archive remain byte-for-byte unchanged. Rollback is limited to reverting the R46-10 commits and
+deleting disposable fixture roots. The existing R46-09 source→R2→packet→loopback path and killed-worker
+proof are retained, not rebuilt.
+
+### Current evidence boundary and resume point
+
+R46-09 improvements remain implemented evidence: frozen packet representation, explicit resolver
+authority, owner claim handles, durable recovery, and the three-root killed-worker proof. Only the
+specific A2/A4/B3/B5/C linkage/transition subcriteria above are `IN_PROGRESS`/`MISSING_VERIFICATION`;
+the prior source ingestion, passive inspection, architecture, CV preparation, and synthetic chain are
+not being marked failed. Group 1 of the seven user-facing milestones advances only through offline
+verification on this run; no green banner or live milestone is emitted. After closeout the next resume
+point is human review of PR #46 at its new exact head, still open and unmerged.
+
+## 31. R46-10 implementation closeout (2026-09-23)
+
+R46-10 is implemented on the same PR/branch from start head
+`e44c662c2593c556d76cdb38d8acafab2b8dfd87`. It remains offline-only: real source/employer/form/
+upload/submission delta `0/0/0/0`, no private-runtime write/copy/restore, no capability mutation,
+no migration, no dependency change, no deployment, and no merge. PR #46 remains `OPEN / UNMERGED`.
+
+### Implemented behavior and before/after results
+
+- **A2/A4 packet retention:** every production `application_packets.readiness_json` invalidation writer
+  now merges only mutable `status`, `blockers`, and `warnings` fields. `frozenPacket`, packet contract
+  version, packet digest, verification evidence, unknown provenance, and array order survive normal CV
+  supersession, R2 evaluation invalidation, queue staleness, and current dependency invalidation. The
+  loader still refuses missing/tampered historical representations and never recomputes a historical
+  digest. Before this run, `recordDocumentArtifact()` and the R2 writers replaced the envelope; after
+  this run the normal-service supersession proof reloads the exact historical packet/digest.
+- **B3/B5 durable transitions:** SQLite and in-memory non-submit stores now require the exact
+  MAP→FILL→UPLOAD→VERIFY→FILL_PREVIEW prefix, a successful non-PAUSED predecessor, cumulative
+  checkpoint prefix plus one legal extension, operation-specific terminal state, upload evidence, and
+  preview evidence before updating the claim row or preview. MAP→FILL_PREVIEW, paused/recovery
+  predecessors, sequence-2 preview after sequence 4, reversed/skipped/duplicate/SUBMIT histories,
+  replayed ownership, and conflicting bindings are denied before mutation. The prior completed history
+  remains unchanged on pre-dispatch refusal; accepted-upload recovery remains explicitly unknown and
+  non-retryable.
+- **C2/C3 linkage:** resolver verification now binds a qualified accepted record to a COMPLETE source
+  run, matching source page/digest/record bounds, exact job-version/source-observation lineage, and
+  current provider expiry. Legacy compatibility evaluation rows must still belong to the packet job,
+  version, and profile but may be stale when canonical R2 is current. Documents are checked for exact
+  job/version/profile ownership, digest, staleness, and approval; questions are checked for packet/key,
+  text, required/sensitive, answer, disclosure, and fact-reference currentness.
+- **C4/C6 integration:** the decisive fictional chain now corrupts and restores verification linkage,
+  refuses FILL and UPLOAD at exactly the injected 15-minute boundary with zero adapter dispatch and
+  unchanged durable success, proves normal CV supersession preserves historical loading while the
+  resolver rejects stale execution, and waits for the killed worker's actual close/signal before
+  asserting `UPLOAD_OUTCOME_UNKNOWN` and no retransmission.
+
+### Acceptance matrix (named executable evidence)
+
+| Gate | Exact test title/path                                                                                                                                                                                                                                                  | Result and side-effect assertion                                                                                                                                                                                                                 |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A1   | `packages/database/src/beta-repository.test.ts` — `round-trips a current R2 packet without treating a legacy evaluation as current`                                                                                                                                    | PASS — schema-10 disposable packet with CV, cover letter, three deliberately unsorted answers closes/reopens with exact frozen value/order/digest; no real side effects.                                                                         |
+| A2   | `tests/e2e/source-to-preview.spec.ts` — `persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit`; `packages/database/src/beta-repository.test.ts` — same round-trip plus normal artifact supersession | PASS — normal `recordDocumentArtifact()` supersession retains historical packet; resolver stops with `PACKET_DOCUMENT_CURRENTNESS_REQUIRED`; fictional upload counter unchanged.                                                                 |
+| A3   | `tests/integration/real-world-job-intake.test.ts` — `reactivates the identical A profile version after A to B to A`; R2 invalidation paths exercised by existing repository suite                                                                                      | PARTIAL — job/profile/evaluation/queue invalidation retention is covered; a single dedicated answer/disclosure-revision invalidation title is not present. Resolver current-answer/disclosure rejection is executable in the full-chain fixture. |
+| A4   | `tests/e2e/source-to-preview.spec.ts` — same full-chain title; historical reload after supersession/expiry assertions                                                                                                                                                  | PASS — historical load/preview is read-only and no browser/adapter call is made after invalidation/expiry.                                                                                                                                       |
+| A5   | `packages/database/src/persisted-packet.ts` loader tests and existing tamper assertions in `tests/e2e/source-to-preview.spec.ts`                                                                                                                                       | PASS — frozen tampering/corrupt completed effect fails closed; missing legacy frozen data remains `PACKET_HISTORICAL_REPRESENTATION_UNAVAILABLE`; no fabricated digest.                                                                          |
+| B1   | `packages/database/src/beta-repository.test.ts` — `round-trips a current R2 packet without treating a legacy evaluation as current`                                                                                                                                    | PASS — MAP claim followed by FILL_PREVIEW claim/save is rejected before mutation; no preview row.                                                                                                                                                |
+| B2   | same test plus reopened recovery assertions                                                                                                                                                                                                                            | PASS — PAUSED/unknown upload predecessor cannot claim VERIFY after reopen.                                                                                                                                                                       |
+| B3   | same test                                                                                                                                                                                                                                                              | PASS — sequence-2 preview after sequence 4 is rejected before mutation; sequence-5 cumulative preview succeeds and injected preview transaction failure leaves `CLAIMED/{}` for safe rollback.                                                   |
+| B4   | store contract assertions in same unit test and runner tests                                                                                                                                                                                                           | PASS — wrong owner/binding, replay, conflicting prefix, reverse/skip/duplicate/impossible state, and forbidden SUBMIT fail closed.                                                                                                               |
+| B5   | same unit test independent SQLite connection contention                                                                                                                                                                                                                | PASS — one claim wins; loser cannot save; winner history remains unchanged.                                                                                                                                                                      |
+| B6   | `tests/e2e/source-to-preview.spec.ts` — `stops after an accepted upload when checkpoint persistence is interrupted` and full-chain title                                                                                                                               | PASS — child actually terminates, one accepted fictional upload remains `UPLOAD_OUTCOME_UNKNOWN`, zero retransmissions; three fresh roots complete ordered history after reopen.                                                                 |
+| C1   | `tests/e2e/source-to-preview.spec.ts` — full-chain resolver calls before each operation                                                                                                                                                                                | PASS — omitted/mismatched authority is rejected before adapter dispatch; counters remain zero on refusal.                                                                                                                                        |
+| C2   | full-chain title's verification-link corruption/restore block                                                                                                                                                                                                          | PASS — null/mismatched job-version linkage fails closed; restored qualifying record is accepted.                                                                                                                                                 |
+| C3   | full-chain title's document supersession and answer/disclosure currentness gates                                                                                                                                                                                       | PASS for document and answer/disclosure currentness; no adapter call on mismatch.                                                                                                                                                                |
+| C4   | full-chain title's injected-clock MAP→FILL and FILL→UPLOAD boundary blocks                                                                                                                                                                                             | PASS — exact 15-minute boundary produces a safe refusal, no new claim/effect, and no adapter/upload dispatch.                                                                                                                                    |
+| C5   | existing full-chain provider-expiry/24-hour policy assertions                                                                                                                                                                                                          | PARTIAL — 24-hour preparation and historical integrity are proven with UNKNOWN provider expiry; a separate earlier-than-local provider-expiry fixture is not present.                                                                            |
+| C6   | `tests/e2e/source-to-preview.spec.ts` — killed-worker barrier test                                                                                                                                                                                                     | PASS — worker close/signal is asserted before recovery; accepted-upload counter is one and retransmission is zero.                                                                                                                               |
+
+The two explicit gaps above (a standalone answer/disclosure invalidation title and a provider-expiry-
+earlier-than-local fixture) do not weaken the implemented production guards, but remain named follow-up
+evidence rather than being reported as collective PASS. R46-09 source ingestion, passive inspection,
+architecture, CV preparation, and the fictional source→R2→packet→loopback chain remain retained evidence.
+
+### Validation evidence
+
+| Check                             | Result                                                                                                                                                                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                              | PASS — 53 files / 592 tests                                                                                                                                                                                                      |
+| Integration                       | PASS — 3 files / 21 tests                                                                                                                                                                                                        |
+| E2E                               | PASS — 47 / 47, retries `0`; full-chain proof over three fresh disposable roots                                                                                                                                                  |
+| Typecheck / lint                  | PASS                                                                                                                                                                                                                             |
+| Production and showcase build     | PASS — `PUBLIC_SHOWCASE_AUDIT_PASS`                                                                                                                                                                                              |
+| Privacy / dependency audit        | PASS — `PRIVACY_AUDIT_PASS` (`tracked_files=338`, `history_paths_checked=1174`, `history_blobs_checked=1144`, `build_test_artifacts_checked=1709`, `private_canaries_checked=11`); npm and production audits `0 vulnerabilities` |
+| Preflight / database              | PASS_WITH_MANUAL_BETA_BLOCKERS — private schema 9, pending migration 1, integrity `PASS`, FK issues `0`; profile, ignore, loopback, backup, and source/target safety checks pass                                                 |
+| Changed-file format / diff / fsck | PASS — Prettier changed-file check, `git diff --check`, strict fsck with only known dangling historical objects                                                                                                                  |
+| Whole-repository format / release | NOT GREEN for the pre-existing 11 unrelated green-banner/package files; no unrelated reformat or private release checkout was performed                                                                                          |
+
+Migrations `0000`-`0010` are byte-for-byte unchanged; `0010_verified_source_packet_binding.sql`
+SHA-256 remains `80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`. Private runtime
+schema/pending remains `9/1`; disposable fixture schema is `10`. Real lifetime action counters remain
+source/employer/form/upload/submission `14/9/0/0`; this iteration adds `0/0/0/0`. Fictional counts
+remain confined to loopback/source fixtures (no candidate data outbound).
+
+### Seven-milestone tracker and handoff
+
+1. **Accept and merge source-to-application foundations (PR #46):** `IN_PROGRESS` — R46-10 closes
+   packet invalidation and durable transition contracts offline; blocker is human review/merge of PR #46.
+2. **Prepare one suitable current real-role application packet:** `VERIFIED` historical/synthetic
+   evidence retained; no new live action in this run.
+3. **Implement/review real-target non-submit execution:** `ENGINEERING` / `MISSING_VERIFICATION` for
+   real fill/upload; synthetic runner safeguards retained.
+4. **Complete real final-review/submission safeguards:** `ENGINEERING` / `MISSING_VERIFICATION`;
+   final consent/submission remains disabled.
+5. **Validate a reproducible release environment and recovery:** `IN_PROGRESS` offline gates pass;
+   repository-wide format/release limitation and private pending migration remain blockers.
+6. **Complete one separately authorized real fill-preview:** `BLOCKED` pending explicit owner target
+   authorization and missing current CV/expiry evidence.
+7. **Pass green-banner acceptance review:** `NOT_STARTED`; no readiness banner emitted.
+
+Final implementation head is `0f4a8d1612b8f2e161824c4cd7a4f14bbc5f29b1`; exact-head push CI is
+`35813500403` and pull-request CI is `35813503020`, both green with 47 E2E tests. PR #46 remains
+open and unmerged. The next permitted action is human review of that exact head.

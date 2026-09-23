@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 import { describe, expect, it } from "vitest";
@@ -7,10 +10,14 @@ import {
   ApplicationPacketSchema,
   SyntheticApplicationRunner,
   packetDigest,
+  type NonSubmitRunnerCheckpoint,
 } from "@applypilot/application-runner";
 import { extractRequirementEvidence } from "@applypilot/job-importer";
 import { fixtureJob } from "../../../tests/fixture-data";
 import { BetaRepository } from "./beta-repository";
+import { SqliteNonSubmitRunStore } from "./non-submit-run-store";
+import { loadPersistedApplicationPacket } from "./persisted-packet";
+import { R2Repository } from "./r2-repository";
 
 function migratedDatabase(): BetterSqlite3.Database {
   const sqlite = new BetterSqlite3(":memory:");
@@ -24,7 +31,498 @@ function migratedDatabase(): BetterSqlite3.Database {
   return sqlite;
 }
 
+function migratedR2Database(path = ":memory:"): BetterSqlite3.Database {
+  const sqlite = new BetterSqlite3(path);
+  for (const name of [
+    "0000_applypilot_foundation.sql",
+    "0001_real_world_job_intake.sql",
+    "0002_personal_live_beta_core.sql",
+    "0003_r2a_evidence_normalization.sql",
+    "0004_r2_matching_quality.sql",
+    "0005_r2_matching_quality_hardening.sql",
+    "0006_r2_calibration_qualification.sql",
+    "0007_personal_live_v1_enablement.sql",
+    "0008_real_target_inspection_scope.sql",
+    "0009_green_banner_session_grant.sql",
+    "0010_verified_source_packet_binding.sql",
+  ]) {
+    sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+  }
+  return sqlite;
+}
+
 describe("Beta repository", () => {
+  it("round-trips a current R2 packet without treating a legacy evaluation as current", () => {
+    const databasePath = join(tmpdir(), `applypilot-r46-08-${randomUUID()}.sqlite`);
+    const sqlite = migratedR2Database(databasePath);
+    const now = "2026-09-22T00:00:00.000Z";
+    sqlite
+      .prepare(
+        `INSERT INTO jobs
+          (id,title,company,category,location,employment_type,normalized_json,application_status,
+           date_discovered,created_at,updated_at)
+         VALUES ('job:r2-packet','Fictional Robotics Engineer','Fictional Robotics','Engineering',
+           'Melbourne VIC','FULL_TIME','{}','NEW',?,?,?)`,
+      )
+      .run(now, now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO candidate_profiles (id,active_version_id,created_at,updated_at)
+         VALUES ('profile:r2-packet','profile:r2-packet:v2',?,?)`,
+      )
+      .run(now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO candidate_profile_versions
+         (id,profile_id,version,schema_version,snapshot_json,content_hash,created_at)
+         VALUES ('profile:r2-packet:v2','profile:r2-packet',2,1,'{}',?,?)`,
+      )
+      .run("a".repeat(64), now);
+    sqlite
+      .prepare(
+        `INSERT INTO job_versions
+         (id,job_id,version,normalized_json,content_digest,created_at)
+         VALUES ('job:r2-packet:v1','job:r2-packet',1,'{}',?,?)`,
+      )
+      .run("b".repeat(64), now);
+    sqlite
+      .prepare(
+        `INSERT INTO evaluation_versions
+         (id,job_id,job_version_id,profile_version_id,evaluation_context,eligibility_status,
+          eligibility_reasons_json,fit_score,fit_contributions_json,coverage_json,
+          eligibility_engine_version,fit_engine_version,weight_version,stale,evaluated_at)
+         VALUES ('legacy:r2-packet','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2',
+          'DEMO_PROFILE','ELIGIBLE','[]',40,'[]','{}','legacy-v1','legacy-v1','legacy-v1',1,?)`,
+      )
+      .run(now);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_evaluation_versions
+         (id,job_id,job_version_id,profile_version_id,evidence_contract_version,normalization_version,
+          coverage_version,eligibility_status,eligibility_reasons_json,fit_score,fit_contributions_json,
+          eligibility_engine_version,fit_scorer_version,weight_version,calibration_state,
+          calibration_context_version,calibration_run_id,recommended,coverage_percent,
+          unresolved_unknown_count,unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
+         VALUES ('r2:current','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2','r2-contract-v1',
+          'r2-normalization-v1','r2-coverage-v1','ELIGIBLE','[]',90,'[]','r2-eligibility-v1',
+          'r2-fit-v1','r2-weight-v1','UNCALIBRATED','r2-calibration-context-v1',NULL,1,100,0,0,0,0,?)`,
+      )
+      .run(now);
+    sqlite
+      .prepare(
+        `INSERT INTO r2_queue_decision_versions
+         (id,job_id,version,state,freshness,job_version_id,profile_version_id,r2_evaluation_id,
+          evidence_contract_version,duplicate_resolution_version,coverage_version,actor,reason_code,
+          supersedes_decision_id,created_at)
+         VALUES ('queue:r2-current','job:r2-packet',1,'PREPARING','CURRENT','job:r2-packet:v1',
+          'profile:r2-packet:v2','r2:current','r2-contract-v1',?,'r2-coverage-v1',
+          'OWNER','OWNER_PREPARING',NULL,?)`,
+      )
+      .run(new R2Repository(sqlite).duplicateResolutionVersion("job:r2-packet"), now);
+    const repository = new BetaRepository(sqlite, () => new Date(now));
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "CV",
+      template: "fictional",
+      format: "PDF",
+      fileName: "fictional-r2.pdf",
+      localPath: "documents/fictional-r2.pdf",
+      contentDigest: "c".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    repository.approveDocument({
+      documentArtifactId: "document:r2-packet",
+      contentDigest: "c".repeat(64),
+    });
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet:letter",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "COVER_LETTER",
+      template: "fictional-letter",
+      format: "PDF",
+      fileName: "fictional-r2-letter.pdf",
+      localPath: "documents/fictional-r2-letter.pdf",
+      contentDigest: "d".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    repository.approveDocument({
+      documentArtifactId: "document:r2-packet:letter",
+      contentDigest: "d".repeat(64),
+    });
+    const packet = ApplicationPacketSchema.parse({
+      id: "packet:r2-current",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      evaluationVersionId: "legacy:r2-packet",
+      r2EvaluationId: "r2:current",
+      eligibilityStatus: "ELIGIBLE",
+      targetUrl: "http://127.0.0.1:4123/synthetic-application",
+      targetHost: "127.0.0.1",
+      jobExpiryState: "ACTIVE",
+      duplicateState: "CLEAR",
+      versionsCurrent: true,
+      documents: [
+        {
+          id: "document:r2-packet",
+          type: "CV",
+          fileName: "fictional-r2.pdf",
+          digest: "c".repeat(64),
+          approved: true,
+          stale: false,
+          required: true,
+        },
+        {
+          id: "document:r2-packet:letter",
+          type: "COVER_LETTER",
+          fileName: "fictional-r2-letter.pdf",
+          digest: "d".repeat(64),
+          approved: true,
+          stale: false,
+          required: false,
+        },
+      ],
+      answers: [
+        {
+          questionId: "question-z",
+          questionText: "Fictional answer Z",
+          required: true,
+          sensitive: false,
+          value: "z",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:z"],
+        },
+        {
+          questionId: "question-a",
+          questionText: "Fictional answer A",
+          required: false,
+          sensitive: false,
+          value: "a",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:a"],
+        },
+        {
+          questionId: "question-m",
+          questionText: "Fictional answer M",
+          required: true,
+          sensitive: true,
+          value: "m",
+          truthState: "VERIFIED_ANSWER",
+          disclosureState: "APPROVED",
+          factReferences: ["fictional:m"],
+        },
+      ],
+    });
+    expect(
+      sqlite.prepare("SELECT id FROM r2_evaluation_versions WHERE id='r2:current'").get(),
+    ).toEqual({
+      id: "r2:current",
+    });
+    expect(repository.persistApplicationPacket(packet)).toMatchObject({
+      packetId: "packet:r2-current",
+      status: "READY_TO_APPLY",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT r2_evaluation_id AS id FROM application_packets WHERE id='packet:r2-current'",
+        )
+        .get(),
+    ).toEqual({ id: "r2:current" });
+    expect(() =>
+      repository.persistApplicationPacket({
+        ...packet,
+        id: "packet:r2-fabricated",
+        r2EvaluationId: "r2:nope",
+      }),
+    ).toThrow("PACKET_R2_BINDING_MISMATCH");
+    sqlite.prepare("UPDATE r2_evaluation_versions SET stale=1 WHERE id='r2:current'").run();
+    expect(() => repository.persistApplicationPacket({ ...packet, id: "packet:r2-stale" })).toThrow(
+      "PACKET_R2_BINDING_MISMATCH",
+    );
+    const frozenBeforeSupersession = loadPersistedApplicationPacket({
+      sqlite,
+      packetId: "packet:r2-current",
+    });
+    repository.recordDocumentArtifact({
+      id: "document:r2-packet:new",
+      jobId: "job:r2-packet",
+      jobVersionId: "job:r2-packet:v1",
+      profileVersionId: "profile:r2-packet:v2",
+      type: "CV",
+      template: "fictional",
+      format: "PDF",
+      fileName: "fictional-r2-new.pdf",
+      localPath: "documents/fictional-r2-new.pdf",
+      contentDigest: "a".repeat(64),
+      claimEvidence: ["fictional:evidence"],
+      layoutResult: { pageCount: 1 },
+    });
+    const frozenAfterSupersession = loadPersistedApplicationPacket({
+      sqlite,
+      packetId: "packet:r2-current",
+    });
+    expect(frozenAfterSupersession.packet).toEqual(frozenBeforeSupersession.packet);
+    expect(frozenAfterSupersession.digest).toBe(frozenBeforeSupersession.digest);
+    expect(
+      JSON.parse(
+        sqlite
+          .prepare("SELECT readiness_json FROM application_packets WHERE id='packet:r2-current'")
+          .pluck()
+          .get() as string,
+      ).frozenPacket,
+    ).toEqual(frozenBeforeSupersession.packet);
+    const runId = repository.registerApplicationRun({
+      packetId: "packet:r2-current",
+      targetKind: "SYNTHETIC_LOCAL",
+      targetHost: "127.0.0.1",
+      formVersion: "fixture-form-v1",
+    });
+    const durable = new SqliteNonSubmitRunStore(
+      sqlite,
+      runId,
+      packetDigest(packet),
+      () => new Date(now),
+    );
+    const bindingDigest = "d".repeat(64);
+    const checkpoint = (
+      sequence: number,
+      state: NonSubmitRunnerCheckpoint["state"],
+      uploadEvidence: NonSubmitRunnerCheckpoint["uploadEvidence"] = null,
+      previewDigest: string | null = null,
+    ): NonSubmitRunnerCheckpoint => ({
+      sequence,
+      state,
+      stopReason: null,
+      occurredAt: now,
+      targetUrl: packet.targetUrl!,
+      formVersion: "fixture-form-v1",
+      adapterVersion: "fixture-adapter-v1",
+      fieldReadBack: [],
+      uploadEvidence,
+      previewDigest,
+    });
+    const mapClaim = durable.claim(bindingDigest, "MAP_FOR_FILL");
+    expect(mapClaim).toMatchObject({ operation: "MAP_FOR_FILL", bindingDigest });
+    expect(durable.claim(bindingDigest, "FILL")).toBeNull();
+    expect(durable.claim(bindingDigest, "FILL_PREVIEW")).toBeNull();
+    expect(() => durable.load("f".repeat(64))).toThrow("BINDING_DIGEST_MISMATCH");
+    expect(
+      () => new SqliteNonSubmitRunStore(sqlite, runId, "f".repeat(64), () => new Date(now)),
+    ).toThrow("PACKET_BINDING_MISMATCH");
+    const competingSqlite = new BetterSqlite3(databasePath);
+    competingSqlite.pragma("foreign_keys = ON");
+    expect(
+      new SqliteNonSubmitRunStore(
+        competingSqlite,
+        runId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).claim(bindingDigest, "MAP_FOR_FILL"),
+    ).toBeNull();
+    competingSqlite.close();
+    durable.save(
+      bindingDigest,
+      {
+        state: "MAPPED",
+        sequence: 1,
+        claimedOperations: ["MAP_FOR_FILL"],
+        checkpoints: [checkpoint(1, "MAPPED")],
+      },
+      mapClaim!,
+    );
+    expect(durable.load(bindingDigest)).toMatchObject({ state: "MAPPED", sequence: 1 });
+    expect(durable.checkpoints()).toHaveLength(1);
+    const previewBindingDigest = bindingDigest;
+    const fillClaim = durable.claim(previewBindingDigest, "FILL");
+    expect(fillClaim).toMatchObject({ operation: "FILL" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "FILLED",
+        sequence: 2,
+        claimedOperations: ["MAP_FOR_FILL", "FILL"],
+        checkpoints: [checkpoint(1, "MAPPED"), checkpoint(2, "FILLED")],
+      },
+      fillClaim!,
+    );
+    const uploadClaim = durable.claim(previewBindingDigest, "UPLOAD");
+    expect(uploadClaim).toMatchObject({ operation: "UPLOAD" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "UPLOADED",
+        sequence: 3,
+        claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD"],
+        checkpoints: [
+          checkpoint(1, "MAPPED"),
+          checkpoint(2, "FILLED"),
+          checkpoint(3, "UPLOADED", {
+            documentId: "document:r2-packet",
+            expectedDigest: "c".repeat(64),
+            receivedDigest: "c".repeat(64),
+            acknowledgementId: "ack:fixture",
+          }),
+        ],
+      },
+      uploadClaim!,
+    );
+    const verifyClaim = durable.claim(previewBindingDigest, "VERIFY");
+    expect(verifyClaim).toMatchObject({ operation: "VERIFY" });
+    durable.save(
+      previewBindingDigest,
+      {
+        state: "VERIFIED",
+        sequence: 4,
+        claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY"],
+        checkpoints: [
+          checkpoint(1, "MAPPED"),
+          checkpoint(2, "FILLED"),
+          checkpoint(3, "UPLOADED", {
+            documentId: "document:r2-packet",
+            expectedDigest: "c".repeat(64),
+            receivedDigest: "c".repeat(64),
+            acknowledgementId: "ack:fixture",
+          }),
+          checkpoint(4, "VERIFIED"),
+        ],
+      },
+      verifyClaim!,
+    );
+    const previewClaim = durable.claim(previewBindingDigest, "FILL_PREVIEW");
+    expect(previewClaim).toMatchObject({ operation: "FILL_PREVIEW" });
+    expect(() =>
+      durable.save(
+        previewBindingDigest,
+        {
+          state: "FILL_PREVIEW",
+          sequence: 2,
+          claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
+          checkpoints: [checkpoint(2, "FILL_PREVIEW", null, "e".repeat(64))],
+        },
+        previewClaim!,
+      ),
+    ).toThrow("NON_SUBMIT_CHECKPOINT_HISTORY_INVALID");
+    sqlite.exec(`
+      CREATE TRIGGER synthetic_preview_persistence_failure
+      BEFORE INSERT ON application_run_previews
+      BEGIN SELECT RAISE(ABORT, 'synthetic preview persistence interruption'); END;
+    `);
+    const previewSnapshot = {
+      state: "FILL_PREVIEW" as const,
+      sequence: 5,
+      claimedOperations: ["MAP_FOR_FILL", "FILL", "UPLOAD", "VERIFY", "FILL_PREVIEW"],
+      checkpoints: [
+        checkpoint(1, "MAPPED"),
+        checkpoint(2, "FILLED"),
+        checkpoint(3, "UPLOADED", {
+          documentId: "document:r2-packet",
+          expectedDigest: "c".repeat(64),
+          receivedDigest: "c".repeat(64),
+          acknowledgementId: "ack:fixture",
+        }),
+        checkpoint(4, "VERIFIED"),
+        checkpoint(5, "FILL_PREVIEW", null, "e".repeat(64)),
+      ],
+    };
+    expect(() => durable.save(previewBindingDigest, previewSnapshot, previewClaim!)).toThrow(
+      "synthetic preview persistence interruption",
+    );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT state, effect_json AS effectJson FROM application_run_operations
+           WHERE run_id=? AND binding_digest=? AND operation_key='FILL_PREVIEW'`,
+        )
+        .get(runId, previewBindingDigest),
+    ).toEqual({ state: "CLAIMED", effectJson: "{}" });
+    sqlite.exec("DROP TRIGGER synthetic_preview_persistence_failure");
+    durable.save(previewBindingDigest, previewSnapshot, previewClaim!);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT packet_digest AS packetDigest, preview_digest AS previewDigest FROM application_run_previews WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ packetDigest: packetDigest(packet), previewDigest: "e".repeat(64) });
+    const recoveryRunId = repository.registerApplicationRun({
+      packetId: "packet:r2-current",
+      targetKind: "SYNTHETIC_LOCAL",
+      targetHost: "127.0.0.1",
+      formVersion: "fixture-form-v1",
+    });
+    const recoveryStore = new SqliteNonSubmitRunStore(
+      sqlite,
+      recoveryRunId,
+      packetDigest(packet),
+      () => new Date(now),
+    );
+    const recoveryBinding = "f".repeat(64);
+    const recoveryClaim = recoveryStore.claim(recoveryBinding, "MAP_FOR_FILL");
+    expect(recoveryClaim).toMatchObject({ operation: "MAP_FOR_FILL" });
+    recoveryStore.save(
+      recoveryBinding,
+      {
+        state: "MAPPED",
+        sequence: 1,
+        claimedOperations: ["MAP_FOR_FILL"],
+        checkpoints: [checkpoint(1, "MAPPED")],
+      },
+      recoveryClaim!,
+    );
+    const recoveryUploadClaim = recoveryStore.claim(recoveryBinding, "FILL");
+    expect(recoveryUploadClaim).toMatchObject({ operation: "FILL" });
+    recoveryStore.save(
+      recoveryBinding,
+      {
+        state: "FILLED",
+        sequence: 2,
+        claimedOperations: ["MAP_FOR_FILL", "FILL"],
+        checkpoints: [checkpoint(1, "MAPPED"), checkpoint(2, "FILLED")],
+      },
+      recoveryUploadClaim!,
+    );
+    const recoveryClaimUpload = recoveryStore.claim(recoveryBinding, "UPLOAD");
+    expect(recoveryClaimUpload).toMatchObject({ operation: "UPLOAD" });
+    sqlite.close();
+    const reopenedSqlite = new BetterSqlite3(databasePath);
+    reopenedSqlite.pragma("foreign_keys = ON");
+    expect(
+      new SqliteNonSubmitRunStore(
+        reopenedSqlite,
+        recoveryRunId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).load(recoveryBinding),
+    ).toMatchObject({
+      state: "PAUSED",
+      recoveryRequired: true,
+      recoveryReason: "UPLOAD_OUTCOME_UNKNOWN",
+      activeOperation: "UPLOAD",
+    });
+    expect(
+      new SqliteNonSubmitRunStore(
+        reopenedSqlite,
+        recoveryRunId,
+        packetDigest(packet),
+        () => new Date(now),
+      ).claim(recoveryBinding, "VERIFY"),
+    ).toBeNull();
+    reopenedSqlite.close();
+    rmSync(databasePath, { force: true });
+    rmSync(`${databasePath}-wal`, { force: true });
+    rmSync(`${databasePath}-shm`, { force: true });
+  });
+
   it("supersedes prior artifact approvals without overwriting either version", () => {
     const sqlite = migratedDatabase();
     const job = fixtureJob("job-retail-sales-assistant");
@@ -317,6 +815,13 @@ describe("Beta repository", () => {
       version: 1,
       status: "READY_TO_APPLY",
     });
+    expect(() =>
+      repository.persistApplicationPacket({
+        ...packet,
+        id: "packet:r2-evaluation-cannot-cross-legacy-boundary",
+        evaluationVersionId: "r2-evaluation:fictional-current",
+      }),
+    ).toThrow("PACKET_VERSION_STATE_MISMATCH");
     const runId = repository.registerApplicationRun({
       packetId: packet.id,
       targetKind: "SYNTHETIC_LOCAL",

@@ -429,6 +429,7 @@ function parseLeverPage(
 ): {
   providerRecordCount: number;
   acceptedRecords: LeverPostingRecordV2[];
+  acceptedRecordEntries: { record: LeverPostingRecordV2; recordIndex: number }[];
   safeUnusableDiagnostics: SourceRecordUnusableDiagnostic[];
   providerDriftDiagnostics: SourceProviderDriftDiagnostic[];
   dispositionTokens: string[];
@@ -460,6 +461,9 @@ function parseLeverPage(
     return {
       providerRecordCount: postings.length,
       acceptedRecords,
+      acceptedRecordEntries: outcomes.flatMap((outcome, recordIndex) =>
+        outcome.status === "ACCEPTED" ? [{ record: outcome.record, recordIndex }] : [],
+      ),
       safeUnusableDiagnostics,
       providerDriftDiagnostics,
       dispositionTokens,
@@ -484,6 +488,11 @@ function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): Leve
 export interface LeverPageV2 {
   providerRecordCount: number;
   acceptedRecords: LeverPostingRecordV2[];
+  /** Accepted records retain their original provider slot; this is distinct from accepted-array order. */
+  acceptedRecordEntries?: readonly {
+    record: LeverPostingRecordV2;
+    recordIndex: number;
+  }[];
   unusableRecordCount: number;
   safeUnusableDiagnostics: readonly SourceRecordUnusableDiagnostic[];
   providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
@@ -546,6 +555,7 @@ export async function readLeverPageV2(input: {
   return {
     providerRecordCount: parsedPage.providerRecordCount,
     acceptedRecords: parsedPage.acceptedRecords,
+    acceptedRecordEntries: Object.freeze(parsedPage.acceptedRecordEntries),
     unusableRecordCount: parsedPage.safeUnusableDiagnostics.length,
     safeUnusableDiagnostics: Object.freeze(parsedPage.safeUnusableDiagnostics),
     providerDriftDiagnostics: Object.freeze(parsedPage.providerDriftDiagnostics),

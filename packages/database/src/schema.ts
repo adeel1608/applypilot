@@ -739,6 +739,9 @@ export const applicationPackets = sqliteTable("application_packets", {
     .notNull()
     .references(() => candidateProfileVersions.id),
   evaluationVersionId: text("evaluation_version_id").references(() => evaluationVersions.id),
+  r2EvaluationId: text("r2_evaluation_id").references(() => r2EvaluationVersions.id, {
+    onDelete: "restrict",
+  }),
   targetUrl: text("target_url"),
   targetHost: text("target_host"),
   status: text("status").notNull(),
@@ -828,6 +831,35 @@ export const runnerCheckpoints = sqliteTable("runner_checkpoints", {
   sequence: integer("sequence").notNull(),
   state: text("state").notNull(),
   safeMetadataJson: text("safe_metadata_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const applicationRunOperations = sqliteTable(
+  "application_run_operations",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => applicationRuns.id, { onDelete: "restrict" }),
+    bindingDigest: text("binding_digest").notNull(),
+    operation: text("operation").notNull(),
+    operationKey: text("operation_key").notNull(),
+    state: text("state").notNull(),
+    effectJson: text("effect_json").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [index("application_run_operations_run_idx").on(table.runId, table.operation)],
+);
+
+export const applicationRunPreviews = sqliteTable("application_run_previews", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => applicationRuns.id, { onDelete: "restrict" }),
+  packetDigest: text("packet_digest").notNull(),
+  previewDigest: text("preview_digest").notNull(),
+  snapshotJson: text("snapshot_json").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
@@ -945,6 +977,54 @@ export const sourceRunPages = sqliteTable("source_run_pages", {
   byteCount: integer("byte_count").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+export const sourceRecordVerifications = sqliteTable(
+  "source_record_verifications",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => sourceRunCheckpoints.id, { onDelete: "restrict" }),
+    capabilityVersionId: text("capability_version_id")
+      .notNull()
+      .references(() => sourceCapabilityVersions.id, { onDelete: "restrict" }),
+    pageId: text("page_id")
+      .notNull()
+      .references(() => sourceRunPages.id, { onDelete: "restrict" }),
+    source: text("source").notNull(),
+    tenant: text("tenant"),
+    externalId: text("external_id"),
+    recordIndex: integer("record_index").notNull(),
+    pageDigest: text("page_digest").notNull(),
+    contentHash: text("content_hash"),
+    sourceObservationId: text("source_observation_id").references(() => sourceObservations.id, {
+      onDelete: "restrict",
+    }),
+    jobVersionId: text("job_version_id").references(() => jobVersions.id, {
+      onDelete: "restrict",
+    }),
+    disposition: text("disposition").notNull(),
+    qualificationState: text("qualification_state").notNull(),
+    parserVersion: text("parser_version").notNull(),
+    policyVersion: text("policy_version"),
+    verifiedAt: text("verified_at").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("source_record_verifications_external_idx").on(
+      table.source,
+      table.tenant,
+      table.externalId,
+      table.qualificationState,
+      table.verifiedAt,
+    ),
+    index("source_record_verifications_content_idx").on(
+      table.contentHash,
+      table.qualificationState,
+      table.verifiedAt,
+    ),
+  ],
+);
 
 export const sourceObservationPayloads = sqliteTable("source_observation_payloads", {
   observationId: text("observation_id").primaryKey(),
@@ -1132,12 +1212,15 @@ export const schema = {
   applicationEventsV2,
   applicationRuns,
   runnerCheckpoints,
+  applicationRunOperations,
+  applicationRunPreviews,
   finalActionConsents,
   capabilityConfigs,
   discoveryRuns,
   sourceCapabilityVersions,
   sourceRunCheckpoints,
   sourceRunPages,
+  sourceRecordVerifications,
   sourceObservationPayloads,
   runnerTargetCapabilityVersions,
   runnerRunBindings,

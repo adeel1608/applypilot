@@ -224,6 +224,17 @@ async function main(): Promise<void> {
         ),
       );
     }
+    if (version < 10) {
+      sqlite.exec(
+        readFileSync(
+          new URL(
+            "../packages/database/drizzle/0010_verified_source_packet_binding.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+    }
     const migratedSnapshot = sqlite
       .prepare(
         `SELECT id, job_id, source_id, external_id, source_url, payload_hash, discovered_at, fetched_at
