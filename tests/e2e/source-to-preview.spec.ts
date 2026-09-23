@@ -902,14 +902,14 @@ test("persists source verification through canonical R2 and packet services to a
       await waitForBarrier();
       expect(counts.uploads).toBe(1);
       const workerClosed = new Promise<void>((resolve) => worker.once("close", () => resolve()));
-      worker.kill();
-      await writeFile(releasePath, "release");
+      worker.kill("SIGKILL");
       if (worker.exitCode === null) {
         await Promise.race([
           workerClosed,
           new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
         ]);
       }
+      await writeFile(releasePath, "release");
       const recoverySqlite = new BetterSqlite3(fixture.databasePath);
       recoverySqlite.pragma("foreign_keys = ON");
       expect(
