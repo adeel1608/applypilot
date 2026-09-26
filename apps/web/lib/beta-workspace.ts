@@ -243,10 +243,22 @@ export interface BetaJobDetail {
   packet: null | {
     id: string;
     version: number;
+    r2EvaluationId: string | null;
     status: string;
     blockers: string[];
     warnings: string[];
     createdAt: string;
+  };
+  verification: {
+    state: "FRESH" | "STALE" | "UNKNOWN" | "BLOCKED" | "NOT_AVAILABLE";
+    reasonCode: string;
+    providerExpiry: "UNKNOWN" | "KNOWN" | "EXPIRED";
+    verifiedAt: string | null;
+    runId: string | null;
+    pageId: string | null;
+    contentHash: string | null;
+    policyVersion: string | null;
+    qualificationState: "PAGE_PERSISTED" | "QUALIFIED" | null;
   };
 }
 
@@ -424,6 +436,20 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
   const sqlite = betaSqlite();
   if (!sqlite) return null;
   const hasR2 = new R2Repository(sqlite).available();
+  const hasVerificationLedger = Boolean(
+    sqlite
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+      )
+      .get(),
+  );
+  const hasR2PacketBinding = Boolean(
+    sqlite
+      .prepare(
+        "SELECT 1 FROM pragma_table_info('application_packets') WHERE name='r2_evaluation_id'",
+      )
+      .get(),
+  );
   const row = sqlite
     .prepare(
       hasR2
@@ -537,15 +563,78 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
   const r2aNormalization = r2aRead.normalization;
   const packetRow = sqlite
     .prepare(
-      `SELECT id, version, status, readiness_json AS readinessJson, created_at AS createdAt
+      `SELECT id, version, ${hasR2PacketBinding ? "r2_evaluation_id" : "NULL"} AS r2EvaluationId,
+          status, readiness_json AS readinessJson, created_at AS createdAt
        FROM application_packets WHERE job_id = ? ORDER BY version DESC LIMIT 1`,
     )
     .get(jobId) as
-    | { id: string; version: number; status: string; readinessJson: string; createdAt: string }
+    | {
+        id: string;
+        version: number;
+        r2EvaluationId: string | null;
+        status: string;
+        readinessJson: string;
+        createdAt: string;
+      }
     | undefined;
   const readiness = packetRow
     ? parseJson<{ blockers?: string[]; warnings?: string[] }>(packetRow.readinessJson, {})
     : null;
+  const verificationRow = hasVerificationLedger
+    ? (sqlite
+        .prepare(
+          `SELECT v.qualification_state AS qualificationState, v.verified_at AS verifiedAt,
+             v.run_id AS runId, v.page_id AS pageId, v.content_hash AS contentHash,
+             v.policy_version AS policyVersion, o.expires_at AS providerExpiresAt
+           FROM source_record_verifications v
+           LEFT JOIN source_observations o ON o.id = v.source_observation_id
+           JOIN job_versions jv ON jv.id = v.job_version_id
+           WHERE jv.job_id = ? AND v.disposition='ACCEPTED'
+           ORDER BY v.verified_at DESC, v.rowid DESC LIMIT 1`,
+        )
+        .get(jobId) as
+        | {
+            qualificationState: "PAGE_PERSISTED" | "QUALIFIED";
+            verifiedAt: string;
+            runId: string;
+            pageId: string;
+            contentHash: string | null;
+            policyVersion: string | null;
+            providerExpiresAt: string | null;
+          }
+        | undefined)
+    : undefined;
+  const verification = verificationRow
+    ? {
+        // The proposed 24h/15m local policy is intentionally not enabled for
+        // private runtime data. The UI reports evidence and provider expiry,
+        // while readiness continues to require the established gates.
+        state: "UNKNOWN" as const,
+        reasonCode: "LOCAL_FRESHNESS_POLICY_NOT_ENABLED",
+        providerExpiry:
+          verificationRow.providerExpiresAt === null
+            ? ("UNKNOWN" as const)
+            : Date.parse(verificationRow.providerExpiresAt) <= Date.now()
+              ? ("EXPIRED" as const)
+              : ("KNOWN" as const),
+        verifiedAt: verificationRow.verifiedAt,
+        runId: verificationRow.runId,
+        pageId: verificationRow.pageId,
+        contentHash: verificationRow.contentHash,
+        policyVersion: verificationRow.policyVersion,
+        qualificationState: verificationRow.qualificationState,
+      }
+    : {
+        state: "NOT_AVAILABLE" as const,
+        reasonCode: "VERIFICATION_LEDGER_NOT_AVAILABLE",
+        providerExpiry: "UNKNOWN" as const,
+        verifiedAt: null,
+        runId: null,
+        pageId: null,
+        contentHash: null,
+        policyVersion: null,
+        qualificationState: null,
+      };
   const duplicateCandidates = hasR2
     ? (
         sqlite
@@ -674,12 +763,14 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
       ? {
           id: packetRow.id,
           version: packetRow.version,
+          r2EvaluationId: packetRow.r2EvaluationId,
           status: packetRow.status,
           blockers: readiness?.blockers ?? [],
           warnings: readiness?.warnings ?? [],
           createdAt: packetRow.createdAt,
         }
       : null,
+    verification,
   };
 }
 
@@ -1239,6 +1330,7 @@ export async function preparePrivatePacket(
     jobVersionId: detail.jobVersionId,
     profileVersionId: profileVersion.profileVersionId,
     evaluationVersionId: detail.legacyEvaluationVersionId,
+    r2EvaluationId: detail.evaluationVersionId,
     eligibilityStatus: detail.eligibilityStatus,
     targetUrl: null,
     targetHost: null,

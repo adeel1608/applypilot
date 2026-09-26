@@ -26,6 +26,7 @@ import {
 } from "@applypilot/job-normalizer";
 
 import { ownerCorrectedR2Normalization, r2CorrectionValueDigest } from "./r2-corrections";
+import { mergePacketReadinessJson } from "./packet-envelope";
 
 export const R2_DUPLICATE_DETECTOR_VERSION = "r2-duplicate-1";
 export const R2_CORRECTION_APPLICABILITY_VERSION = "r2-correction-applicability-1";
@@ -489,20 +490,27 @@ export class R2Repository {
              (SELECT id FROM document_artifacts WHERE job_id = ? AND stale = 1)`,
         )
         .run(now, jobId);
-      this.sqlite
+      const packets = this.sqlite
         .prepare(
-          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+          `SELECT id, readiness_json AS readinessJson FROM application_packets
            WHERE job_id = ? AND status <> 'INVALIDATED'`,
         )
-        .run(
-          JSON.stringify({
+        .all(jobId) as Array<{ id: string; readinessJson: string }>;
+      const updatePacket = this.sqlite.prepare(
+        `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+         WHERE id = ? AND status <> 'INVALIDATED'`,
+      );
+      for (const packet of packets) {
+        updatePacket.run(
+          mergePacketReadinessJson(packet.readinessJson, {
             status: "REVIEW_REQUIRED",
             blockers: ["R2_EVALUATION_CHANGED"],
             warnings: [],
           }),
           now,
-          jobId,
+          packet.id,
         );
+      }
       this.audit("r2.evaluation.completed", "job", jobId, {
         eligibilityStatus: input.eligibility.status,
         recommended: input.fit.recommended,
@@ -798,16 +806,28 @@ export class R2Repository {
       )
       .run(reasonCode, this.now().toISOString(), jobId);
     if (changed > 0) {
-      this.sqlite
+      const packets = this.sqlite
         .prepare(
-          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+          `SELECT id, readiness_json AS readinessJson FROM application_packets
            WHERE job_id = ? AND status <> 'INVALIDATED'`,
         )
-        .run(
-          JSON.stringify({ status: "REVIEW_REQUIRED", blockers: [reasonCode], warnings: [] }),
-          this.now().toISOString(),
-          jobId,
+        .all(jobId) as Array<{ id: string; readinessJson: string }>;
+      const now = this.now().toISOString();
+      const updatePacket = this.sqlite.prepare(
+        `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+         WHERE id = ? AND status <> 'INVALIDATED'`,
+      );
+      for (const packet of packets) {
+        updatePacket.run(
+          mergePacketReadinessJson(packet.readinessJson, {
+            status: "REVIEW_REQUIRED",
+            blockers: [reasonCode],
+            warnings: [],
+          }),
+          now,
+          packet.id,
         );
+      }
     }
     if (writeAudit && changed > 0) {
       this.audit("r2.queue.stale", "job", jobId, { reasonCode, count: changed });

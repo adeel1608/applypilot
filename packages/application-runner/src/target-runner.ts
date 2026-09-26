@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
@@ -33,6 +33,8 @@ export const RunnerTargetOperationSchema = z.enum([
   "MAP_FOR_FILL",
   "FILL",
   "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
   "SUBMIT",
 ]);
 export type RunnerTargetOperation = z.infer<typeof RunnerTargetOperationSchema>;
@@ -99,6 +101,21 @@ function hasExactOperations(
 
 export function targetCapabilitySupportsApplication(capability: RunnerTargetCapability): boolean {
   return hasExactOperations(capability.allowedOperations, applicationOperations);
+}
+
+const nonSubmitOperations: RunnerTargetOperation[] = [
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
+];
+
+export function targetCapabilitySupportsNonSubmit(capability: RunnerTargetCapability): boolean {
+  return (
+    capability.targetKind === "SYNTHETIC_LOCAL" &&
+    hasExactOperations(capability.allowedOperations, nonSubmitOperations)
+  );
 }
 
 export const RunnerTargetCapabilitySchema = z
@@ -497,7 +514,10 @@ export function freezeRunnerBinding(
 ): FrozenRunnerBinding {
   const packet = ApplicationPacketSchema.parse(packetInput);
   const capability = RunnerTargetCapabilitySchema.parse(capabilityInput);
-  if (!targetCapabilitySupportsApplication(capability)) {
+  if (
+    !targetCapabilitySupportsApplication(capability) &&
+    !targetCapabilitySupportsNonSubmit(capability)
+  ) {
     throw new Error("TARGET_OPERATION_SCOPE_INVALID");
   }
   if (!packet.targetUrl) throw new Error("APPLICATION_DESTINATION_INVALID");
@@ -510,7 +530,7 @@ export function freezeRunnerBinding(
   if (target.hash || target.origin !== origin.origin || !pathAllowed) {
     throw new Error("TARGET_CAPABILITY_MISMATCH");
   }
-  const readiness = assessPacketReadiness(packet);
+  const readiness = assessPacketReadiness(packet, { allowUnknownProviderExpiry: true });
   const unresolvedCount = readiness.blockers.length;
   return FrozenRunnerBindingSchema.parse({
     packetId: packet.id,
@@ -566,6 +586,29 @@ export const TargetObservationSchema = z
     adapterVersion: z.string().min(1).max(100),
     documentDigests: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(20),
     protectionSignals: z.array(RunnerProtectionSignalSchema).max(1),
+    fieldReadBack: z
+      .array(
+        z.object({
+          questionId: z.string().min(1),
+          value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
+        }),
+      )
+      .max(100)
+      .default([]),
+    uploadEvidence: z
+      .object({
+        documentId: z.string().min(1),
+        expectedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+        receivedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+        acknowledgementId: z.string().min(1),
+      })
+      .nullable()
+      .default(null),
+    previewDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 
@@ -824,6 +867,356 @@ export class TargetIndependentApplicationRunner {
       occurredAt: this.now().toISOString(),
     };
     this.checkpoints.push(checkpoint);
+    return checkpoint;
+  }
+}
+
+export const NonSubmitRunnerStateSchema = z.enum([
+  "PREPARED",
+  "OPENED",
+  "MAPPED",
+  "FILLED",
+  "UPLOADED",
+  "VERIFIED",
+  "FILL_PREVIEW",
+  "PAUSED",
+]);
+export type NonSubmitRunnerState = z.infer<typeof NonSubmitRunnerStateSchema>;
+
+export interface NonSubmitTargetAdapter {
+  readonly targetKind: "SYNTHETIC_LOCAL";
+  map(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  fill(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  upload(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  verify(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+  fillPreview(packet: ApplicationPacket, binding: FrozenRunnerBinding): Promise<TargetObservation>;
+}
+
+export interface NonSubmitDurableSnapshot {
+  state: NonSubmitRunnerState;
+  sequence: number;
+  checkpoints: NonSubmitRunnerCheckpoint[];
+  claimedOperations: string[];
+  activeOperation?: RunnerTargetOperation | null;
+  recoveryRequired?: boolean;
+  recoveryReason?: SyntheticStopReason | null;
+}
+
+export interface NonSubmitClaimHandle {
+  claimId: string;
+  bindingDigest: string;
+  operation: RunnerTargetOperation;
+}
+
+export interface NonSubmitDurableStore {
+  load(bindingDigest: string): NonSubmitDurableSnapshot | null;
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null;
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void;
+}
+
+const nonSubmitOperationPrefix: RunnerTargetOperation[] = [
+  "MAP_FOR_FILL",
+  "FILL",
+  "UPLOAD",
+  "VERIFY",
+  "FILL_PREVIEW",
+];
+const nonSubmitOperationState: Record<RunnerTargetOperation, NonSubmitRunnerState> = {
+  MAP_FOR_FILL: "MAPPED",
+  FILL: "FILLED",
+  UPLOAD: "UPLOADED",
+  VERIFY: "VERIFIED",
+  FILL_PREVIEW: "FILL_PREVIEW",
+  OPEN_AND_INSPECT_ONLY: "OPENED",
+  SUBMIT: "PAUSED",
+};
+
+export class InMemoryNonSubmitDurableStore implements NonSubmitDurableStore {
+  private readonly snapshots = new Map<string, NonSubmitDurableSnapshot>();
+  private readonly claims = new Map<string, NonSubmitClaimHandle>();
+
+  load(bindingDigest: string): NonSubmitDurableSnapshot | null {
+    const value = this.snapshots.get(bindingDigest);
+    return value ? structuredClone(value) : null;
+  }
+
+  claim(bindingDigest: string, operation: RunnerTargetOperation): NonSubmitClaimHandle | null {
+    const snapshot = this.snapshots.get(bindingDigest) ?? {
+      state: "PREPARED",
+      sequence: 0,
+      checkpoints: [],
+      claimedOperations: [],
+      activeOperation: null,
+    };
+    if (!nonSubmitOperationPrefix.includes(operation)) return null;
+    const operationIndex = nonSubmitOperationPrefix.indexOf(operation);
+    if (
+      snapshot.state === "PAUSED" ||
+      snapshot.recoveryRequired ||
+      snapshot.claimedOperations.length !== operationIndex ||
+      snapshot.claimedOperations.some(
+        (value, index) => value !== nonSubmitOperationPrefix[index],
+      ) ||
+      (operationIndex > 0 &&
+        snapshot.state !== nonSubmitOperationState[nonSubmitOperationPrefix[operationIndex - 1]!])
+    )
+      return null;
+    if (snapshot.claimedOperations.includes(operation) || snapshot.activeOperation) return null;
+    snapshot.activeOperation = operation;
+    snapshot.claimedOperations.push(operation);
+    this.snapshots.set(bindingDigest, snapshot);
+    const handle = { claimId: randomUUID(), bindingDigest, operation };
+    this.claims.set(bindingDigest, handle);
+    return handle;
+  }
+
+  save(
+    bindingDigest: string,
+    snapshot: NonSubmitDurableSnapshot,
+    claim: NonSubmitClaimHandle,
+  ): void {
+    const owner = this.claims.get(bindingDigest);
+    if (
+      !owner ||
+      owner.claimId !== claim.claimId ||
+      claim.bindingDigest !== bindingDigest ||
+      claim.operation !== snapshot.claimedOperations.at(-1)
+    ) {
+      throw new Error("NON_SUBMIT_CLAIM_OWNER_REQUIRED");
+    }
+    const operationIndex = nonSubmitOperationPrefix.indexOf(claim.operation);
+    if (
+      operationIndex < 0 ||
+      snapshot.claimedOperations.length !== operationIndex + 1 ||
+      snapshot.claimedOperations.some(
+        (value, index) => value !== nonSubmitOperationPrefix[index],
+      ) ||
+      (snapshot.state !== "PAUSED" && snapshot.state !== nonSubmitOperationState[claim.operation])
+    ) {
+      throw new Error("NON_SUBMIT_OPERATION_SEQUENCE_INVALID");
+    }
+    if (snapshot.state !== "PAUSED") {
+      const latest = snapshot.checkpoints.at(-1);
+      if (!latest || latest.state !== snapshot.state || latest.stopReason !== null)
+        throw new Error("NON_SUBMIT_TRANSITION_RESULT_INVALID");
+      if (claim.operation === "UPLOAD" && latest.uploadEvidence === null)
+        throw new Error("NON_SUBMIT_UPLOAD_EVIDENCE_REQUIRED");
+      if (claim.operation === "FILL_PREVIEW" && latest.previewDigest === null)
+        throw new Error("NON_SUBMIT_PREVIEW_EVIDENCE_REQUIRED");
+    }
+    this.snapshots.set(bindingDigest, structuredClone({ ...snapshot, activeOperation: null }));
+    this.claims.delete(bindingDigest);
+  }
+}
+
+export interface NonSubmitRunnerCheckpoint {
+  sequence: number;
+  state: NonSubmitRunnerState;
+  stopReason: SyntheticStopReason | null;
+  occurredAt: string;
+  targetUrl: string;
+  formVersion: string;
+  adapterVersion: string;
+  fieldReadBack: ReadonlyArray<{ questionId: string; value: string | number | boolean | null }>;
+  uploadEvidence: TargetObservation["uploadEvidence"];
+  previewDigest: string | null;
+}
+
+export class TargetIndependentNonSubmitRunner {
+  private state: NonSubmitRunnerState = "PREPARED";
+  private sequence = 0;
+  private readonly checkpoints: NonSubmitRunnerCheckpoint[] = [];
+  private readonly claimedOperations: string[] = [];
+  private readonly bindingDigest: string;
+  private activeClaim: NonSubmitClaimHandle | null = null;
+  private recoveryRequired = false;
+  private recoveryReason: SyntheticStopReason | null = null;
+
+  constructor(
+    private readonly packet: ApplicationPacket,
+    private readonly capability: RunnerTargetCapability,
+    private readonly binding: FrozenRunnerBinding,
+    private readonly adapter: NonSubmitTargetAdapter,
+    private readonly currentBinding: () => FrozenRunnerBinding,
+    private readonly now: () => Date = () => new Date(),
+    private readonly durableStore?: NonSubmitDurableStore,
+  ) {
+    ApplicationPacketSchema.parse(packet);
+    RunnerTargetCapabilitySchema.parse(capability);
+    FrozenRunnerBindingSchema.parse(binding);
+    this.bindingDigest = runnerBindingDigest(binding);
+    const recovered = this.durableStore?.load(this.bindingDigest);
+    if (recovered) {
+      this.state = recovered.state;
+      this.sequence = recovered.sequence;
+      this.checkpoints.push(...recovered.checkpoints);
+      this.claimedOperations.push(...recovered.claimedOperations);
+      this.recoveryRequired = recovered.recoveryRequired === true;
+      this.recoveryReason = recovered.recoveryReason ?? null;
+      return;
+    }
+    if (
+      adapter.targetKind !== capability.targetKind ||
+      !targetCapabilitySupportsNonSubmit(capability) ||
+      runnerTargetReadiness(capability, now()).status !== "TARGET_ENABLED"
+    ) {
+      this.pause("TARGET_APPROVAL_REQUIRED");
+    } else if (
+      binding.unresolvedCount > 0 ||
+      assessPacketReadiness(packet, { allowUnknownProviderExpiry: true }).blockers.length > 0
+    ) {
+      this.pause("PACKET_NOT_READY");
+    } else {
+      this.record("PREPARED", null);
+    }
+  }
+
+  async map(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("PREPARED");
+    return this.observe("MAPPED", "MAP_FOR_FILL", () =>
+      this.adapter.map(this.packet, this.binding),
+    );
+  }
+
+  async fill(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("MAPPED");
+    return this.observe("FILLED", "FILL", () => this.adapter.fill(this.packet, this.binding));
+  }
+
+  async upload(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("FILLED");
+    return this.observe("UPLOADED", "UPLOAD", () => this.adapter.upload(this.packet, this.binding));
+  }
+
+  async verify(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("UPLOADED");
+    return this.observe("VERIFIED", "VERIFY", () => this.adapter.verify(this.packet, this.binding));
+  }
+
+  async fillPreview(): Promise<NonSubmitRunnerCheckpoint> {
+    this.assertState("VERIFIED");
+    return this.observe("FILL_PREVIEW", "FILL_PREVIEW", () =>
+      this.adapter.fillPreview(this.packet, this.binding),
+    );
+  }
+
+  snapshot() {
+    return {
+      state: this.state,
+      checkpoints: this.checkpoints.map((checkpoint) => ({ ...checkpoint })),
+      claimedOperations: [...this.claimedOperations],
+      recoveryRequired: this.recoveryRequired,
+      recoveryReason: this.recoveryReason,
+      submitEnabled: false as const,
+    };
+  }
+
+  private async observe(
+    state: Exclude<NonSubmitRunnerState, "PREPARED" | "OPENED" | "PAUSED">,
+    operationName: RunnerTargetOperation,
+    operation: () => Promise<TargetObservation>,
+  ): Promise<NonSubmitRunnerCheckpoint> {
+    if (!this.bindingsCurrent()) return this.pause("PAGE_CHANGED");
+    if (this.claimedOperations.includes(operationName)) {
+      return this.pause("OPERATION_REPLAYED");
+    }
+    if (this.durableStore) {
+      const claim = this.durableStore.claim(this.bindingDigest, operationName);
+      if (!claim) {
+        return this.record(
+          "PAUSED",
+          operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "OPERATION_IN_PROGRESS",
+          undefined,
+          false,
+        );
+      }
+      this.activeClaim = claim;
+    }
+    this.claimedOperations.push(operationName);
+    try {
+      const observation = TargetObservationSchema.parse(await operation());
+      const signal = observation.protectionSignals[0];
+      if (signal) return this.pause(SyntheticStopReasonSchema.parse(signal));
+      if (observation.targetUrl !== this.binding.targetUrl)
+        return this.pause("DESTINATION_CHANGED");
+      if (
+        observation.formVersion !== this.binding.formVersion ||
+        observation.adapterVersion !== this.binding.adapterVersion
+      ) {
+        return this.pause("FORM_CHANGED");
+      }
+      if (state === "UPLOADED") {
+        const expected = this.packet.documents.map(({ digest }) => digest).sort();
+        if (canonical([...observation.documentDigests].sort()) !== canonical(expected)) {
+          return this.pause("DOCUMENT_DIGEST_CHANGED");
+        }
+      }
+      return this.record(state, null, observation);
+    } catch {
+      return this.pause(operationName === "UPLOAD" ? "UPLOAD_OUTCOME_UNKNOWN" : "PAGE_CHANGED");
+    }
+  }
+
+  private bindingsCurrent(): boolean {
+    try {
+      return (
+        runnerTargetReadiness(this.capability, this.now()).status === "TARGET_ENABLED" &&
+        canonical(FrozenRunnerBindingSchema.parse(this.currentBinding())) ===
+          canonical(this.binding)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private assertState(expected: NonSubmitRunnerState): void {
+    if (this.state === "PAUSED") throw new Error("RUN_PAUSED");
+    if (this.state !== expected) throw new Error(`RUN_STATE_REQUIRED:${expected}`);
+  }
+
+  private pause(reason: SyntheticStopReason): NonSubmitRunnerCheckpoint {
+    this.state = "PAUSED";
+    return this.record("PAUSED", reason);
+  }
+
+  private record(
+    state: NonSubmitRunnerState,
+    stopReason: SyntheticStopReason | null,
+    observation?: TargetObservation,
+    persist = true,
+  ) {
+    this.state = state;
+    const checkpoint: NonSubmitRunnerCheckpoint = {
+      sequence: ++this.sequence,
+      state,
+      stopReason,
+      occurredAt: this.now().toISOString(),
+      targetUrl: this.binding.targetUrl,
+      formVersion: this.binding.formVersion,
+      adapterVersion: this.binding.adapterVersion,
+      fieldReadBack: observation?.fieldReadBack ?? [],
+      uploadEvidence: observation?.uploadEvidence ?? null,
+      previewDigest: observation?.previewDigest ?? null,
+    };
+    this.checkpoints.push(checkpoint);
+    if (persist) {
+      if (this.durableStore && this.activeClaim)
+        this.durableStore.save(
+          this.bindingDigest,
+          {
+            state: this.state,
+            sequence: this.sequence,
+            checkpoints: this.checkpoints,
+            claimedOperations: this.claimedOperations,
+          },
+          this.activeClaim,
+        );
+      this.activeClaim = null;
+    }
     return checkpoint;
   }
 }

@@ -9,6 +9,8 @@ import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit } from "@applypilot/fi
 import { JobSchema } from "@applypilot/job-model";
 import {
   SourceCapabilityV2Schema,
+  SourceRunBudget,
+  readLeverPageV2,
   sourceCapabilityDigest,
   type SourceCapabilityV2,
   type SecureSourceTransportDependencies,
@@ -34,6 +36,7 @@ function database() {
     "0007_personal_live_v1_enablement.sql",
     "0008_real_target_inspection_scope.sql",
     "0009_green_banner_session_grant.sql",
+    "0010_verified_source_packet_binding.sql",
   ])
     sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
   return sqlite;
@@ -861,6 +864,21 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(first.records.map(({ externalId }) => externalId)).toEqual(
       values.slice(0, 24).map(({ id }) => id),
     );
+    expect(
+      sqlite
+        .prepare(
+          `SELECT record_index AS recordIndex,disposition,external_id AS externalId
+           FROM source_record_verifications WHERE run_id=? ORDER BY record_index,disposition`,
+        )
+        .all(first.runId),
+    ).toEqual([
+      ...values.slice(0, 24).map(({ id }, recordIndex) => ({
+        recordIndex,
+        disposition: "ACCEPTED",
+        externalId: id,
+      })),
+      { recordIndex: 24, disposition: "UNUSABLE", externalId: null },
+    ]);
     expect(first.queuedJobIds).toHaveLength(24);
     expect(pipeline.evaluated).toHaveLength(24);
     expect(pipeline.queued).toHaveLength(24);
@@ -1599,6 +1617,13 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
       count: 0,
     });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE disposition='ACCEPTED' AND qualification_state='PAGE_PERSISTED'",
+        )
+        .get(),
+    ).toEqual({ count: 2 });
 
     const restarted = await runLeverSourceToQueue({
       capability: approved,
@@ -1612,6 +1637,20 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(restarted.queuedJobIds).toHaveLength(3);
     expect(pipeline.evaluated).toHaveLength(3);
     expect(pipeline.queued).toHaveLength(3);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE qualification_state='QUALIFIED'",
+        )
+        .get(),
+    ).toEqual({ count: 3 });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE run_id = ? AND qualification_state='QUALIFIED'",
+        )
+        .get(restarted.runId),
+    ).toEqual({ count: 3 });
     const stableCounts = {
       observations: (
         sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
@@ -1658,6 +1697,9 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(replayed).toMatchObject({ status: "COMPLETE", queuedJobIds: [] });
     expect(pipeline.evaluated).toHaveLength(3);
     expect(pipeline.queued).toHaveLength(3);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_record_verifications").get(),
+    ).toEqual({ count: 8 });
     expect({
       observations: (
         sqlite.prepare("SELECT count(*) AS count FROM source_observations").get() as {
@@ -1758,6 +1800,257 @@ describe("offline source-to-R2 queue persistence", () => {
         )
         .get(),
     ).toEqual({ count: 1 });
+    sqlite.close();
+  });
+
+  it("accounts identical content at distinct cursors as distinct page operations", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `cursor:${++id}`,
+    );
+    const approved = capability({ requestBudget: 3, recordCap: 2, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    const originalPersistPage = repository.persistPage.bind(repository);
+    let conflictChecked = false;
+    vi.spyOn(repository, "persistPage").mockImplementation((input) => {
+      originalPersistPage(input);
+      if (!conflictChecked) {
+        conflictChecked = true;
+        expect(() =>
+          originalPersistPage({
+            ...input,
+            page: { ...input.page, pageDigest: "f".repeat(64) },
+          }),
+        ).toThrow("SOURCE_PAGE_REPLAY_CONFLICT");
+      }
+    });
+    const body = Buffer.from(JSON.stringify([posting(1)]));
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ url, pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: new URL(url).searchParams.get("skip") === "2" ? Buffer.from("[]") : body,
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result).toMatchObject({ status: "COMPLETE", requestCount: 2, pageCount: 2 });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE run_id=? AND disposition='ACCEPTED'",
+        )
+        .get(result.runId),
+    ).toEqual({ count: 2 });
+    sqlite.close();
+  });
+
+  it("rolls back terminal completion on qualification interruption and reconciles safely", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `qualification:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const runId = repository.start({
+      capability: approved,
+      capabilityDigest: sourceCapabilityDigest(approved),
+      operation: "LIST_JOBS",
+      startedAt: instant.toISOString(),
+    });
+    const budget = new SourceRunBudget(approved, instant);
+    const page = await readLeverPageV2({
+      capability: approved,
+      budget,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1)])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+    });
+    repository.persistPage({
+      runId,
+      capability: approved,
+      page,
+      budget,
+      observedAt: instant.toISOString(),
+    });
+    const interrupted = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `interrupted:${++id}`,
+      {
+        beforeQualification: () => {
+          throw new Error("QUALIFICATION_INTERRUPTED");
+        },
+      },
+    );
+    expect(() =>
+      interrupted.complete({ runId, budget, completedAt: instant.toISOString() }),
+    ).toThrow("QUALIFICATION_INTERRUPTED");
+    expect(
+      sqlite.prepare("SELECT status FROM source_run_checkpoints WHERE id=?").get(runId),
+    ).toEqual({
+      status: "RUNNING",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT qualification_state AS state,verified_at AS verifiedAt FROM source_record_verifications WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ state: "PAGE_PERSISTED", verifiedAt: instant.toISOString() });
+    repository.complete({ runId, budget, completedAt: instant.toISOString() });
+    expect(repository.reconcileCompletedRun(runId)).toBe(0);
+    expect(
+      sqlite.prepare("SELECT status FROM source_run_checkpoints WHERE id=?").get(runId),
+    ).toEqual({
+      status: "COMPLETE",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT qualification_state AS state FROM source_record_verifications WHERE run_id=?",
+        )
+        .get(runId),
+    ).toEqual({ state: "QUALIFIED" });
+    sqlite.close();
+  });
+
+  it("does not treat an unchanged replay as a fresh provider observation", async () => {
+    const sqlite = database();
+    let id = 0;
+    let current = instant;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => current,
+      () => `unchanged:${++id}`,
+    );
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    const body = Buffer.from(JSON.stringify([posting(1)]));
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body,
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const run = () =>
+      runLeverSourceToQueue({
+        capability: approved,
+        repository,
+        now: () => current,
+        dependencies,
+        evaluateJob: async (jobId) => `evaluation:${jobId}`,
+        queueJob: () => undefined,
+      });
+    await run();
+    const first = sqlite
+      .prepare(
+        `SELECT observed_at AS observedAt, content_hash AS contentHash
+         FROM source_observations WHERE external_id='fictional-1'`,
+      )
+      .get() as { observedAt: string; contentHash: string };
+    current = new Date(instant.getTime() + 24 * 60 * 60 * 1000);
+    await run();
+    expect(dependencies.request).toHaveBeenCalledTimes(2);
+    expect(dependencies.resolveHost).toHaveBeenCalledTimes(2);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT observed_at AS observedAt, content_hash AS contentHash
+           FROM source_observations WHERE external_id='fictional-1'`,
+        )
+        .get(),
+    ).toEqual(first);
+    expect(first.contentHash).toHaveLength(64);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE disposition='ACCEPTED' AND qualification_state='QUALIFIED'",
+        )
+        .get(),
+    ).toEqual({ count: 2 });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("does not duplicate verification when the same page is replayed inside one run", async () => {
+    const sqlite = database();
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `same-run:${++id}`,
+    );
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    repository.persistCapabilityVersion(approved);
+    const originalPersistPage = repository.persistPage.bind(repository);
+    let replayed = false;
+    const persisted = vi.spyOn(repository, "persistPage").mockImplementation((input) => {
+      originalPersistPage(input);
+      if (!replayed) {
+        replayed = true;
+        originalPersistPage(input);
+      }
+    });
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([posting(1)])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result.status).toBe("COMPLETE");
+    expect(persisted).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_record_verifications").get(),
+    ).toEqual({ count: 1 });
+    expect(
+      sqlite.prepare("SELECT qualification_state AS state FROM source_record_verifications").get(),
+    ).toEqual({ state: "QUALIFIED" });
     sqlite.close();
   });
 

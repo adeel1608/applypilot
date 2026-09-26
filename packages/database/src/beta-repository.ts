@@ -6,7 +6,10 @@ import { z } from "zod";
 import {
   ApplicationPacketSchema,
   SyntheticStopReasonSchema,
+  VerificationEvidenceSchema,
+  assessVerificationFreshness,
   assessPacketReadiness,
+  packetDigest,
   type ApplicationPacket,
   type FinalActionConsent,
   type RunnerCheckpoint,
@@ -35,6 +38,7 @@ import {
 import { R2ARepository, r2aSemanticDigest } from "./r2a-repository";
 import { ownerCorrectedR2Normalization } from "./r2-corrections";
 import { R2Repository } from "./r2-repository";
+import { mergePacketReadinessJson } from "./packet-envelope";
 
 const EvaluationVersionInputSchema = z.object({
   id: z.string().min(1).optional(),
@@ -333,23 +337,31 @@ export class BetaRepository {
              WHERE document_artifact_id IN (${placeholders}) AND invalidated_at IS NULL`,
           )
           .run(now, ...ids);
-        this.sqlite
+        const packets = this.sqlite
           .prepare(
-            `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
-             WHERE status <> 'INVALIDATED' AND id IN (
+            `SELECT p.id, p.readiness_json AS readinessJson
+             FROM application_packets p
+             WHERE p.status <> 'INVALIDATED' AND p.id IN (
                SELECT packet_id FROM application_packet_documents
                WHERE document_artifact_id IN (${placeholders})
              )`,
           )
-          .run(
-            JSON.stringify({
+          .all(...ids) as Array<{ id: string; readinessJson: string }>;
+        const updatePacket = this.sqlite.prepare(
+          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+           WHERE id = ? AND status <> 'INVALIDATED'`,
+        );
+        for (const packet of packets) {
+          updatePacket.run(
+            mergePacketReadinessJson(packet.readinessJson, {
               status: "REVIEW_REQUIRED",
               blockers: ["DOCUMENT_SUPERSEDED"],
               warnings: [],
             }),
             now,
-            ...ids,
+            packet.id,
           );
+        }
       }
       this.sqlite
         .prepare(
@@ -630,7 +642,9 @@ export class BetaRepository {
     status: ReturnType<typeof assessPacketReadiness>["status"];
   } {
     const packet = ApplicationPacketSchema.parse(input);
-    const readiness = assessPacketReadiness(packet);
+    const readiness = assessPacketReadiness(packet, {
+      allowUnknownProviderExpiry: true,
+    });
     return this.sqlite.transaction(() => {
       const versionState = this.sqlite
         .prepare(
@@ -656,21 +670,128 @@ export class BetaRepository {
             evaluationStale: number;
           }
         | undefined;
+      let r2BindingCurrent = false;
+      if (packet.r2EvaluationId) {
+        if (!new R2Repository(this.sqlite, this.now, this.id).available()) {
+          throw new Error("PACKET_R2_SCHEMA_REQUIRED");
+        }
+        try {
+          // Keep one canonical currentness gate for queue, evaluation, profile,
+          // evidence/coverage versions, duplicate resolution, eligibility, and
+          // recommendation. Packet persistence must not maintain a weaker copy.
+          new R2Repository(this.sqlite, this.now, this.id).assertCurrentPreparing(
+            packet.jobId,
+            packet.r2EvaluationId,
+          );
+        } catch {
+          throw new Error("PACKET_R2_BINDING_MISMATCH");
+        }
+        const r2State = this.sqlite
+          .prepare(
+            `SELECT e.job_id AS jobId,e.job_version_id AS jobVersionId,
+                    e.profile_version_id AS profileVersionId,e.eligibility_status AS eligibilityStatus
+             FROM r2_evaluation_versions e WHERE e.id=?`,
+          )
+          .get(packet.r2EvaluationId) as
+          | {
+              jobId: string;
+              jobVersionId: string;
+              profileVersionId: string;
+              eligibilityStatus: string;
+            }
+          | undefined;
+        if (
+          !r2State ||
+          r2State.jobId !== packet.jobId ||
+          r2State.jobVersionId !== packet.jobVersionId ||
+          r2State.profileVersionId !== packet.profileVersionId ||
+          r2State.eligibilityStatus !== packet.eligibilityStatus ||
+          packet.duplicateState !== "CLEAR"
+        ) {
+          throw new Error("PACKET_R2_BINDING_MISMATCH");
+        }
+        // Keep the legacy column as an explicit compatibility reference only:
+        // it must point to a real evaluation for the same job/profile, but it
+        // is not treated as the source of currentness for an R2 packet.
+        r2BindingCurrent = Boolean(
+          versionState &&
+            versionState.evaluationJobId === packet.jobId &&
+            versionState.evaluationProfileVersionId === packet.profileVersionId,
+        );
+      }
       const versionsActuallyCurrent = Boolean(
-        versionState &&
-          versionState.currentJobVersionId === packet.jobVersionId &&
-          versionState.currentProfileVersionId === packet.profileVersionId &&
-          versionState.evaluationJobId === packet.jobId &&
-          versionState.evaluationJobVersionId === packet.jobVersionId &&
-          versionState.evaluationProfileVersionId === packet.profileVersionId &&
-          versionState.evaluationEligibilityStatus === packet.eligibilityStatus &&
-          !versionState.evaluationStale,
+        packet.r2EvaluationId
+          ? r2BindingCurrent
+          : versionState &&
+              versionState.currentJobVersionId === packet.jobVersionId &&
+              versionState.currentProfileVersionId === packet.profileVersionId &&
+              versionState.evaluationJobId === packet.jobId &&
+              versionState.evaluationJobVersionId === packet.jobVersionId &&
+              versionState.evaluationProfileVersionId === packet.profileVersionId &&
+              versionState.evaluationEligibilityStatus === packet.eligibilityStatus &&
+              !versionState.evaluationStale,
       );
       if (packet.versionsCurrent !== versionsActuallyCurrent) {
         throw new Error("PACKET_VERSION_STATE_MISMATCH");
       }
+      if (packet.verificationEvidence) {
+        const verification = VerificationEvidenceSchema.parse(packet.verificationEvidence);
+        const ledger = this.sqlite
+          .prepare(
+            `SELECT v.id, v.verified_at AS verifiedAt, v.content_hash AS contentHash,
+                    v.qualification_state AS qualificationState,
+                    o.expires_at AS providerExpiresAt
+             FROM source_record_verifications v
+             JOIN source_run_checkpoints r ON r.id=v.run_id AND r.status='COMPLETE'
+             JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id
+               AND p.page_digest=v.page_digest AND v.record_index < p.record_count
+             JOIN job_versions jv ON jv.id=v.job_version_id
+               AND jv.source_observation_id=v.source_observation_id
+             LEFT JOIN source_observations o ON o.id=v.source_observation_id
+               AND o.content_hash=v.content_hash
+             WHERE v.id=? AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+               AND jv.job_id=? AND jv.id=?`,
+          )
+          .get(verification.verificationId, packet.jobId, packet.jobVersionId) as
+          | {
+              id: string;
+              verifiedAt: string;
+              contentHash: string | null;
+              qualificationState: string;
+              providerExpiresAt: string | null;
+            }
+          | undefined;
+        if (
+          !ledger ||
+          ledger.qualificationState !== "QUALIFIED" ||
+          ledger.contentHash !== verification.contentHash ||
+          ledger.verifiedAt !== verification.verifiedAt
+        ) {
+          throw new Error("PACKET_VERIFICATION_EVIDENCE_MISMATCH");
+        }
+        const freshness = assessVerificationFreshness({
+          verifiedAt: verification.verifiedAt,
+          evidenceQualified: true,
+          providerExpiresAt: ledger.providerExpiresAt,
+          operation: verification.operation,
+          policy: {
+            version: verification.policyVersion,
+            preparationMaxAgeMs: verification.preparationMaxAgeMs,
+            preExternalActionMaxAgeMs: verification.preExternalActionMaxAgeMs,
+          },
+          now: this.now(),
+        });
+        if (
+          freshness.state !== "FRESH" ||
+          freshness.validUntil !== verification.validUntil ||
+          freshness.policyVersion !== verification.policyVersion
+        ) {
+          throw new Error("PACKET_VERIFICATION_FRESHNESS_INVALID");
+        }
+      }
       const documentState = this.sqlite.prepare(
-        `SELECT d.content_digest AS contentDigest, d.stale,
+        `SELECT d.job_id AS jobId,d.job_version_id AS jobVersionId,
+                d.profile_version_id AS profileVersionId,d.content_digest AS contentDigest, d.stale,
            EXISTS(SELECT 1 FROM document_approvals a
              WHERE a.document_artifact_id = d.id AND a.content_digest = d.content_digest
                AND a.invalidated_at IS NULL) AS approved
@@ -678,10 +799,20 @@ export class BetaRepository {
       );
       for (const document of packet.documents) {
         const persisted = documentState.get(document.id) as
-          | { contentDigest: string; stale: number; approved: number }
+          | {
+              jobId: string;
+              jobVersionId: string;
+              profileVersionId: string;
+              contentDigest: string;
+              stale: number;
+              approved: number;
+            }
           | undefined;
         if (
           !persisted ||
+          persisted.jobId !== packet.jobId ||
+          persisted.jobVersionId !== packet.jobVersionId ||
+          persisted.profileVersionId !== packet.profileVersionId ||
           persisted.contentDigest !== document.digest ||
           Boolean(persisted.stale) !== document.stale ||
           Boolean(persisted.approved) !== document.approved
@@ -696,27 +827,74 @@ export class BetaRepository {
         .get(packet.jobId) as { version: number };
       const version = versionRow.version + 1;
       const now = this.now().toISOString();
-      this.sqlite
-        .prepare(
-          `INSERT INTO application_packets
-            (id, job_id, job_version_id, profile_version_id, evaluation_version_id,
-             target_url, target_host, status, readiness_json, version, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          packet.id,
-          packet.jobId,
-          packet.jobVersionId,
-          packet.profileVersionId,
-          packet.evaluationVersionId,
-          packet.targetUrl,
-          packet.targetHost,
-          readiness.status,
-          JSON.stringify(readiness),
-          version,
-          now,
-          now,
-        );
+      const hasR2PacketBinding = Boolean(
+        this.sqlite
+          .prepare(
+            "SELECT 1 FROM pragma_table_info('application_packets') WHERE name='r2_evaluation_id'",
+          )
+          .get(),
+      );
+      if (packet.r2EvaluationId && !hasR2PacketBinding) {
+        throw new Error("PACKET_R2_SCHEMA_REQUIRED");
+      }
+      if (hasR2PacketBinding) {
+        this.sqlite
+          .prepare(
+            `INSERT INTO application_packets
+              (id, job_id, job_version_id, profile_version_id, evaluation_version_id, r2_evaluation_id,
+               target_url, target_host, status, readiness_json, version, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            packet.id,
+            packet.jobId,
+            packet.jobVersionId,
+            packet.profileVersionId,
+            packet.evaluationVersionId,
+            packet.r2EvaluationId,
+            packet.targetUrl,
+            packet.targetHost,
+            readiness.status,
+            JSON.stringify({
+              ...readiness,
+              packetDigest: packetDigest(packet),
+              packetContractVersion: packet.r2EvaluationId ? "r2-packet-v2" : "legacy-packet-v1",
+              frozenPacket: packet,
+              verificationEvidence: packet.verificationEvidence ?? null,
+            }),
+            version,
+            now,
+            now,
+          );
+      } else {
+        this.sqlite
+          .prepare(
+            `INSERT INTO application_packets
+              (id, job_id, job_version_id, profile_version_id, evaluation_version_id,
+               target_url, target_host, status, readiness_json, version, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            packet.id,
+            packet.jobId,
+            packet.jobVersionId,
+            packet.profileVersionId,
+            packet.evaluationVersionId,
+            packet.targetUrl,
+            packet.targetHost,
+            readiness.status,
+            JSON.stringify({
+              ...readiness,
+              packetDigest: packetDigest(packet),
+              packetContractVersion: "legacy-packet-v1",
+              frozenPacket: packet,
+              verificationEvidence: packet.verificationEvidence ?? null,
+            }),
+            version,
+            now,
+            now,
+          );
+      }
       const insertDocument = this.sqlite.prepare(
         `INSERT INTO application_packet_documents (packet_id, document_artifact_id, required)
          VALUES (?, ?, ?)`,
@@ -939,23 +1117,32 @@ export class BetaRepository {
              (SELECT id FROM document_artifacts WHERE job_id = ? AND stale = 1)`,
         )
         .run(now, parsed.reasonCode, parsed.jobId);
-      const packets = this.sqlite
+      const packetsToInvalidate = this.sqlite
         .prepare(
-          `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+          `SELECT id, readiness_json AS readinessJson FROM application_packets
            WHERE job_id = ? AND status <> 'INVALIDATED' AND
              (job_version_id <> ? OR profile_version_id <> ?)`,
         )
-        .run(
-          JSON.stringify({
+        .all(parsed.jobId, parsed.currentJobVersionId, parsed.currentProfileVersionId) as Array<{
+        id: string;
+        readinessJson: string;
+      }>;
+      const updatePacket = this.sqlite.prepare(
+        `UPDATE application_packets SET status = 'INVALIDATED', readiness_json = ?, updated_at = ?
+         WHERE id = ? AND status <> 'INVALIDATED'`,
+      );
+      for (const packet of packetsToInvalidate) {
+        updatePacket.run(
+          mergePacketReadinessJson(packet.readinessJson, {
             status: "REVIEW_REQUIRED",
             blockers: [parsed.reasonCode],
             warnings: [],
           }),
           now,
-          parsed.jobId,
-          parsed.currentJobVersionId,
-          parsed.currentProfileVersionId,
-        ).changes;
+          packet.id,
+        );
+      }
+      const packets = packetsToInvalidate.length;
       return { evaluations, documents, packets };
     })();
   }
