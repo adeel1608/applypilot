@@ -2039,3 +2039,106 @@ Engineering/release work completed:
   R2 re-evaluation, document generation, or packet generation occurred. Action delta remains 0/0/0/0;
   historical totals remain 14/9/0/0. Milestone 2 is still IN PROGRESS pending one later bounded fresh
   source run and current R2/document/packet reconciliation; Personal Live V1 remains NOT_READY.
+
+## 34. M2 live-readiness closure evidence (2026-09-27)
+
+This evidence-only continuation starts from the exact PR #47 squash merge on `main` and records one
+owner-authorized bounded Shield AI Lever refresh. No application/runtime code, migration, dependency,
+policy, target capability, document, packet, employer interaction, upload, or submission was added.
+The evidence branch is `chore/m2-live-readiness-evidence`; the only intended change is this safe
+metadata section.
+
+### PR #47 merge and private baseline
+
+- Reviewed base: `c0b303292fbfcf580173fd967594f3cab4f8feab`.
+- Reviewed head: `a95c61c88c6d9ec9d9603c4b110923bbd393a6eb`.
+- Reviewed tree: `33881cf1854c3c5377761b2ca370de0c1334f806`.
+- Exact-head push/PR CI remained successful (`36275413359`, `36275426932`); the PR was open,
+  non-draft, clean/mergeable, with no new commits, requested changes, or unresolved threads.
+- Normal squash merge produced `ace3faba83cf4efcb6fdcb0247a1b27a16e9292e`; its parent is the reviewed
+  base and its tree is exactly `33881cf1854c3c5377761b2ca370de0c1334f806`.
+- Refreshed local `main` equals `origin/main` at the merge SHA and was clean before the evidence
+  branch was created. PR #47 is `MERGED`.
+- Fresh rollback backup: `backup-2026-09-26T22-50-59.384Z-cbed8558`, verified schema 10, integrity
+  PASS, and foreign-key issues 0.
+- Pre-source and post-source private runtime: schema 10, pending migrations 0, integrity PASS,
+  foreign-key issues 0; private profile VALID; active source capabilities 0; active real-target
+  capabilities 0; no in-progress application operation.
+
+### One bounded source refresh
+
+The normal `SourceCapabilityV2` and production source orchestration path dispatched exactly one
+unauthenticated GET for `LEVER / shieldai / GLOBAL` at host `api.lever.co`, path
+`/v0/postings/shieldai`, operation `LIST_JOBS`. Limits were request budget 1, one page, record/page
+cap 25, response cap 2,000,000 bytes, timeout 30 seconds, run timeout 60 seconds, concurrency 1,
+retries 0, and redirects 0. No candidate data, cookies, or credentials were sent.
+
+- Capability: `m2_source_shieldai_ace3faba83cf4efcb6fdcb0247a1b27a16e9292e_1790463324757`, version 1,
+  parser `lever-v2:ace3faba83cf4efcb6fdcb0247a1b27a16e9292e`, policy `m2-live-readiness-v1`,
+  digest `ed047ca1f0be5a6e9c6b6186f655cab09e2fa60aeecba772e9cf16bd5c4e3314`.
+- Run `5e50dbf7-6250-4830-b187-4e763dc84fbb` completed normally: request 1, retries 0, redirects 0,
+  page 1, provider records 25, accepted 25, unusable 0, response bytes 359257.
+- Persisted page `346999bb-0ef7-4bb0-8a5d-84e2a2c33bed` has digest
+  `dfaa3d75eb5067fad1df50c7caaef2b85fcb79248701832dcb996e82e05e28c1`. All 25 accepted rows are
+  qualified in the schema-10 verification ledger. Two unchanged-content observations and two job
+  versions were newly created; the remaining 23 records reused existing immutable lineage without
+  duplicate observations or job versions.
+- The explicit cross-lineage audit found zero mismatches across capability, run, source, tenant,
+  external ID, content hash, parser, and policy joins. Provider expiry is absent for all 25 records,
+  so `providerExpiresAt` remains `null` and expiry state remains `UNKNOWN`.
+- The capability was immediately revoked through the immutable version workflow; active source
+  capability count returned to 0. No stale Green Banner parent was reused.
+
+### Current R2 and owner-selected-role result
+
+All 25 accepted records were reconciled through the current R2 path. Each has a current evaluation
+and queue decision: eligibility `REVIEW_REQUIRED`, `recommended=false`, calibration `UNCALIBRATED`,
+queue `REVIEWING`, freshness `CURRENT`, and no unresolved duplicate candidate state. Aggregate
+unresolved counts are unknown 140, condition 1, conflict 0. No role was promoted to PREPARING.
+
+The previously owner-selected R4633 external ID `2cfe6692-a266-4d27-8832-ef652fa57ee4` was not
+present in this one-page result. Its currentness therefore remains unestablished and the exact M2
+classification is `R4633_NOT_OBSERVED_IN_ONE_PAGE`. The page contained one safe Melbourne match,
+`Business Development Associate (R5964)` at Shield AI, but it is `REVIEW_REQUIRED`, not recommended,
+and remains `UNCALIBRATED`; no alternative role was selected on the owner's behalf. There is no
+current recommended shortlist from this page.
+
+### Documents, packet, and external readiness
+
+Because R4633 was absent and no current recommended role was available, document reconciliation and
+packet preparation were not attempted. No document or packet IDs/digests were created or changed;
+historical private artifacts remain local and ignored. No target authority was created and no
+pre-external-action check was consumed. Employer visits, form interactions, uploads, and submissions
+remain zero.
+
+### Validation and counters
+
+- `profile:validate`, `doctor`, `db:status`, `preflight`, and `privacy:audit`: PASS.
+- `git diff --check` and `git fsck --strict`: PASS (only known dangling historical objects reported).
+- `release:check:fixture`: FAIL at its repository-wide `format:check` step because the existing
+  baseline still reports nine unrelated files (`apps/web/lib/beta-workspace.ts`, `package.json`,
+  `packages/application-runner/src/freshness.ts`, `packages/database/src/beta-repository.ts`,
+  `packages/database/src/verification-ledger.test.ts`, `PROJECT_PLAN.md`,
+  `scripts/preflight-summary.ts`, `scripts/release-check-fixture.ts`, and `scripts/start-e2e-server.ts`).
+  No unrelated runtime reformat was performed; this is recorded as a release-gate limitation, not
+  evidence of a private-data or database failure.
+- Real action counters: start `14/9/0/0`, task delta `+1/+0/+0/+0`, end `15/9/0/0` for
+  source/employer/form-upload/submission. Candidate data outbound was NONE.
+- Migrations `0000`-`0010` remain immutable; no migration was added.
+
+### Seven-milestone tracker after this evidence run
+
+1. Foundations: `COMPLETE / MERGED` (PR #47).
+2. Current real role + fresh current packet: `IN PROGRESS` — `R4633_NOT_OBSERVED_IN_ONE_PAGE`.
+3. Real-target MAP/FILL/UPLOAD/VERIFY: `ENGINEERING / MISSING LIVE VERIFICATION`.
+4. Final-review/submission safeguards: `BLOCKED BY REAL NON-SUBMIT INTEGRATION`.
+5. Reproducible release: `FIXTURE CANDIDATE PROVEN / PRODUCTION LIVE READINESS INCOMPLETE`.
+6. Authorized real fill-preview: `BLOCKED`.
+7. Green-banner review: `NOT_STARTED`.
+
+Source-enabled Personal Beta remains READY from the previously reviewed bounded ingestion evidence;
+Personal Live V1 remains `NOT_READY`. Future hardening item retained without a fix PR:
+`VERIFICATION_READER_REDUNDANT_CAPABILITY_IDENTITY_JOIN` (the live audit itself passed). The exact
+next task is one separately authorized bounded source refresh that covers the owner-selected R4633
+role, proves current R2 suitability/recommendation, and only then revisits current document and
+packet gates; it must still perform no employer interaction.
