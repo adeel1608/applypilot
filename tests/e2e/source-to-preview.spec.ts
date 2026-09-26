@@ -553,7 +553,7 @@ test("stops after an accepted upload when checkpoint persistence is interrupted"
 
 test.describe.configure({ retries: 0 });
 
-test("persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit", async ({
+test("persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit, including answer and disclosure revisions", async ({
   browser,
 }) => {
   test.setTimeout(300_000);
@@ -993,6 +993,15 @@ test("persists source verification through canonical R2 and packet services to a
       sqlite
         .prepare("UPDATE application_answer_versions SET answer_json=? WHERE id=?")
         .run(JSON.stringify("changed-fictional-answer"), answerLink.answerId);
+      const historicalAfterAnswerRevision = loadPersistedApplicationPacket({
+        sqlite,
+        packetId: packet.id,
+        expectedDigest: persistedPacketDigest,
+        runId,
+        now: fixedNow,
+      });
+      expect(historicalAfterAnswerRevision.digest).toBe(persistedPacketDigest);
+      expect(historicalAfterAnswerRevision.packet.answers[0]?.value).toBe("fictional-value");
       expect(() =>
         resolvePersistedApplicationPacket({
           sqlite,

@@ -36,6 +36,34 @@ describe("verification freshness policy", () => {
     expect(result.providerExpiry).toBe("KNOWN");
   });
 
+  it("caps both local windows at an earlier provider expiry", () => {
+    const providerExpiry = new Date(t0.getTime() + 10 * 60 * 1000).toISOString();
+    for (const operation of ["PREPARATION", "PRE_EXTERNAL_ACTION"] as const) {
+      const beforeExpiry = assessVerificationFreshness({
+        verifiedAt: t0.toISOString(),
+        evidenceQualified: true,
+        providerExpiresAt: providerExpiry,
+        operation,
+        policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        now: new Date(t0.getTime() + 9 * 60 * 1000),
+      });
+      expect(beforeExpiry).toMatchObject({
+        state: "FRESH",
+        providerExpiry: "KNOWN",
+        validUntil: providerExpiry,
+      });
+      const result = assessVerificationFreshness({
+        verifiedAt: t0.toISOString(),
+        evidenceQualified: true,
+        providerExpiresAt: providerExpiry,
+        operation,
+        policy: PROPOSED_LOCAL_VERIFICATION_POLICY,
+        now: new Date(t0.getTime() + 10 * 60 * 1000),
+      });
+      expect(result).toMatchObject({ state: "BLOCKED", reasonCode: "PROVIDER_EXPIRED" });
+    }
+  });
+
   it.each([
     [
       "missing evidence",
