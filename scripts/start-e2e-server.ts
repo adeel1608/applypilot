@@ -52,7 +52,7 @@ try {
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
   );
-  const now = "2026-09-08T00:00:00.000Z";
+  const now = new Date().toISOString();
   const profile = CandidateProfileSchema.parse({ ...testProfile, profileId: "profile:e2e" });
   const pdf = Buffer.from("%PDF-1.4\nfictional e2e preview\n");
   const docx = Buffer.from("PKfictional e2e download");
@@ -197,6 +197,10 @@ Documents
     const suffix = input.jobId.replace("job-e2e-preparing", "preparing") || "preparing";
     const observationId = `observation:e2e:${suffix}`;
     const jobVersionId = `job-version:e2e:${suffix}`;
+    const capabilityVersionId = `capability:e2e:${suffix}`;
+    const runId = `run:e2e:${suffix}`;
+    const pageId = `page:e2e:${suffix}`;
+    const verificationId = `verification:e2e:${suffix}`;
     const legacyEvaluationId = `evaluation:legacy:e2e:${suffix}`;
     const r2EvaluationId = `evaluation:r2:e2e:${suffix}`;
     const fixture = {
@@ -217,6 +221,9 @@ Documents
       description: `Fictional isolated ${suffix} workflow used only for local E2E validation.`,
       sourceMetadata: { fixture: true, liveNetworkUsed: false },
     };
+    const observationContentDigest = createHash("sha256")
+      .update(`${sourceText}:${input.jobId}`)
+      .digest("hex");
     sqlite
       .prepare(
         `INSERT INTO jobs
@@ -245,13 +252,7 @@ Documents
          VALUES (?,?,NULL,'UNKNOWN',NULL,NULL,NULL,'USER_SUPPLIED_CONTENT',?,?,?,NULL,NULL,
            '3.1.0',NULL,NULL,NULL)`,
       )
-      .run(
-        observationId,
-        input.jobId,
-        createHash("sha256").update(`${sourceText}:${input.jobId}`).digest("hex"),
-        `fixture:${suffix}`,
-        now,
-      );
+      .run(observationId, input.jobId, observationContentDigest, `fixture:${suffix}`, now);
     sqlite
       .prepare(
         `INSERT INTO job_versions
@@ -274,6 +275,67 @@ Documents
         explicitLocation: "Hobart TAS 7000",
       }),
     );
+    sqlite
+      .prepare(
+        `INSERT INTO source_capability_versions
+          (id,capability_id,version,predecessor_id,source,alias,tenant,region,allowed_host,
+           allowed_path_prefix,allowed_operations_json,approval_state,approval_reference,approved_at,
+           policy_version,policy_reviewed_at,policy_expires_at,capability_expires_at,request_budget,
+           record_cap,page_size_cap,response_byte_limit,request_timeout_ms,run_timeout_ms,max_redirects,
+           max_retries,max_concurrency,parser_version,configuration_digest,created_at)
+         VALUES (?,?,1,NULL,'LEVER','E2E fixture',?, 'GLOBAL','fixture.invalid','/v0/postings',
+           '["LIST_JOBS"]','APPROVED','e2e-fixture',?,'fixture-policy',?,?,?,1,25,25,2000000,30000,
+           60000,0,0,1,'3.1.0',?,?)`,
+      )
+      .run(
+        capabilityVersionId,
+        capabilityVersionId,
+        `tenant-${suffix}`,
+        now,
+        now,
+        now,
+        now,
+        observationContentDigest,
+        now,
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO source_run_checkpoints
+          (id,capability_version_id,capability_digest,operation,status,current_cursor,next_cursor,
+           seen_page_digests_json,request_count,page_count,record_count,byte_count,retry_count,
+           redirect_count,owner_started_at,completed_at,created_at,updated_at)
+         VALUES (?,?,?,'LIST_JOBS','COMPLETE',NULL,NULL,'[]',1,1,1,100,0,0,?,?,?,?)`,
+      )
+      .run(runId, capabilityVersionId, observationContentDigest, now, now, now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO source_run_pages
+          (id,run_id,page_number,cursor,next_cursor,page_digest,request_count,record_count,byte_count,created_at)
+         VALUES (?,?,1,'skip=0',NULL,?,1,1,100,?)`,
+      )
+      .run(pageId, runId, observationContentDigest, now);
+    sqlite
+      .prepare(
+        `INSERT INTO source_record_verifications
+          (id,run_id,capability_version_id,page_id,source,tenant,external_id,record_index,
+           page_digest,content_hash,source_observation_id,job_version_id,disposition,
+           qualification_state,parser_version,policy_version,verified_at,created_at)
+         VALUES (?,?,?,?,'LEVER',?, ?,0,?,?,?,?, 'ACCEPTED','QUALIFIED','3.1.0','fixture-policy',?,?)`,
+      )
+      .run(
+        verificationId,
+        runId,
+        capabilityVersionId,
+        pageId,
+        `tenant-${suffix}`,
+        input.jobId,
+        observationContentDigest,
+        observationContentDigest,
+        observationId,
+        jobVersionId,
+        now,
+        now,
+      );
     new BetaRepository(sqlite, () => new Date(now)).recordEvaluationVersion({
       id: legacyEvaluationId,
       jobId: input.jobId,

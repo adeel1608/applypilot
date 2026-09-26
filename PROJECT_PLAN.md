@@ -1934,3 +1934,108 @@ application behavior change was made. The existing schema-9 private runtime rema
 fixture remains schema 10. Focused evidence passed: freshness `9/9`, beta repository `3/3`, and the
 decisive three-root E2E `1/1`. Full local gates and new exact-head push/PR CI are required before
 handoff; PR #46 remains OPEN/UNMERGED.
+
+## 33. M2/M5 private readiness and release-gate blueprint (2026-09-26)
+
+This run starts from merged main `c0b303292fbfcf580173fd967594f3cab4f8feab` after PR #46
+and runs on `feat/m2-private-readiness-release-gates`. The private database has been safely
+backed up and upgraded from schema 9 to schema 10 before application-code edits; no live source,
+employer, upload, submission, capability, grant, candidate-fact, document, or packet action is
+authorized. The real action delta remains `0/0/0/0` and historical totals remain `14/9/0/0`.
+
+### Objective and current gap
+
+Production `preparePrivatePacket()` currently builds packets without `verificationEvidence`, while
+the schema-10 UI reports `LOCAL_FRESHNESS_POLICY_NOT_ENABLED`. The goal is to make one explicit,
+versioned PREPARATION freshness policy consume the latest exact qualified verification for the
+current job version without inventing provider expiry or enabling PRE_EXTERNAL_ACTION.
+
+### M2M5 work packages
+
+- **M2M5-A/B/C — private operational evidence:** retain backup IDs, restore rehearsal evidence,
+  migration 0010 verification, schema/integrity/FK checks, immutable/history counts, and proof that
+  `source_record_verifications` remains empty until a later live refresh.
+- **M2M5-D/E — preparation wiring:** add a repository-level exact-verification lookup and route the
+  normal private packet-preparation path through an explicit PREPARATION policy (`24h` preparation,
+  `15m` pre-external-action). Preserve `providerExpiresAt = null` and `jobExpiryState = UNKNOWN`;
+  require COMPLETE run/page, ACCEPTED + QUALIFIED record, exact job/version/content lineage, current
+  R2 PREPARING state, current approved documents, and current answer/disclosure ownership.
+- **M2M5-F — regression matrix:** prove unknown provider expiry, exact 24-hour boundary, future/
+  partial/page-only/mismatched evidence, provider-expiry cap, replay, stale R2/queue/recommendation/
+  duplicate gates, document and answer revisions, legacy packets, schema-9 messaging, and schema-10
+  success using disposable fixtures only.
+- **M2M5-G/H — release advancement:** classify all repository format blockers, fix only safe active
+  files, add a narrowly validated fictional clean-checkout release path if required, and run the
+  complete quality/privacy/schema/backup/restore/diff/fsck suite without private data in CI.
+- **M2M5-I — handoff:** update this plan and PR metadata with separate private operational and
+  engineering evidence, open exactly one PR, require exact-head CI, and leave it OPEN/UNMERGED.
+
+### Proposed files and data flow
+
+Expected code changes are limited to `apps/web/lib/beta-workspace.ts`, a shared database verification
+query/helper, focused application/database tests, release-fixture scripts/configuration if needed,
+and this plan/PR metadata. Data flows from current R2/job/profile/document state to the exact
+qualified verification lookup, through `assessVerificationFreshness`, into the existing canonical
+`persistApplicationPacket()` envelope. No direct SQL packet fabrication or private packet generation
+is permitted.
+
+### Risks, privacy, rollback, and acceptance
+
+Risks are stale or cross-job evidence, unknown provider expiry, accidental private writes, and
+release-fixture paths leaking into production. Zod/schema validation, exact lineage joins, explicit
+policy injection, disposable roots, ignored private paths, and no-live-network tests mitigate them.
+Rollback is a normal code revert plus the verified schema-9 backup anchor; no ad-hoc SQL repair is
+allowed. Acceptance requires private schema 10/pending 0/integrity PASS/FK 0, unchanged historical
+counts, zero fabricated verification rows, current preparation evidence wired through normal service
+code, all named regression gates, safe formatting/release classification, exact-head CI, and PR
+OPEN/UNMERGED. Milestone 1 remains COMPLETE; Milestone 2 advances only to `IN PROGRESS` until a
+later bounded fresh source run produces current role/R2/document/packet evidence; Personal Live V1
+remains NOT_READY.
+
+### Exact implementation sequence
+
+1. Characterize the current preparation gap with a disposable schema-10 regression.
+2. Implement the exact-verification repository query and explicit PREPARATION policy wiring.
+3. Add the F1–F20 disposable regression matrix and truthful readiness presentation.
+4. Classify/fix only safe release-format blockers and implement a confined fictional release path if
+   necessary.
+5. Run focused then full gates, update this plan/PR body, push the same branch, and stop before any
+   live source or employer action and before merging the new PR.
+
+### Actual M2/M5 closeout evidence (2026-09-27)
+
+Private operational work completed before application-code edits:
+
+- Baseline main was `c0b303292fbfcf580173fd967594f3cab4f8feab`; private runtime was schema 9,
+  pending 1, integrity PASS, foreign-key issues 0. Migration `0010_verified_source_packet_binding.sql`
+  matched the reviewed SHA-256 `80238AFCB90DA2732175E836FEA2E29CD4B5B2BDD3F2B93A983ABC69EC751AA7`.
+- Backup `backup-2026-09-26T21-36-06.113Z-ca22040b` was verified as schema 9/integrity PASS/FK 0;
+  a second automatic migration backup `backup-2026-09-26T21-37-17.580Z-50c36b96` was created by the
+  approved migration path. A disposable ignored restore rehearsal matched schema, integrity, FK, and
+  safe table-count invariants; no private authority, packet, document, event, or action state changed.
+- Migration 0010 completed with schema 10, pending 0, integrity PASS, FK 0. Historical counts remained
+  jobs 102, job versions 112, source observations 109, R2 evaluations 110, queue decisions 108,
+  packets 4, documents 6, source checkpoints 11, and application events 4. The new verification
+  ledger remains empty (0); no historical row was fabricated or backfilled as fresh evidence.
+
+Engineering/release work completed:
+
+- `BetaRepository.getLatestQualifiedVerification()` now requires exact job/version/observation/content
+  lineage, COMPLETE run, persisted page, matching page digest/record binding, ACCEPTED disposition, and
+  QUALIFIED state. `preparePrivatePacket()` consumes that query through the explicit
+  `private-preparation-verification-v1` policy (24-hour PREPARATION window and 15-minute
+  PRE_EXTERNAL_ACTION window), freezes verification evidence, and preserves absent provider expiry as
+  UNKNOWN. The private job surface reports truthful FRESH/STALE/BLOCKED/NOT_AVAILABLE evidence state.
+- E2E fixtures now include a fictional qualified verification lineage so the owner PREPARING transition
+  and packet-success test exercises the production path without private data or live network traffic.
+- Repository-wide Prettier is green after semantics-neutral formatting of active source/tests/config;
+  migrations 0000-0010 and historical archives were not rewritten. `release:check:fixture` provisions
+  an ignored schema-10 fictional DB, uses `data/profile.example.json` only, never reads
+  `data/profile.private.json`, and passed format/lint/typecheck/unit/integration/build/showcase/E2E,
+  privacy, dependency, schema, release, diff, and fsck gates. The run was intentionally made before the
+  final commit, so its release summary reported a dirty worktree; it is repeated after commit for the
+  clean-checkout evidence.
+- No live source request, employer interaction, upload, submission, capability/grant mutation, private
+  R2 re-evaluation, document generation, or packet generation occurred. Action delta remains 0/0/0/0;
+  historical totals remain 14/9/0/0. Milestone 2 is still IN PROGRESS pending one later bounded fresh
+  source run and current R2/document/packet reconciliation; Personal Live V1 remains NOT_READY.

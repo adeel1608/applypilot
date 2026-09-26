@@ -19,10 +19,17 @@ export const VerificationFreshnessPolicySchema = z
 
 export type VerificationFreshnessPolicy = z.infer<typeof VerificationFreshnessPolicySchema>;
 
-export const PROPOSED_LOCAL_VERIFICATION_POLICY: VerificationFreshnessPolicy = {
-  version: "local-verification-proposal-v1",
+/** Production packet-preparation policy. It does not authorize external actions. */
+export const PRIVATE_PREPARATION_VERIFICATION_POLICY: VerificationFreshnessPolicy = {
+  version: "private-preparation-verification-v1",
   preparationMaxAgeMs: 24 * 60 * 60 * 1000,
   preExternalActionMaxAgeMs: 15 * 60 * 1000,
+};
+
+/** Retained compatibility identity for existing synthetic fixtures. */
+export const PROPOSED_LOCAL_VERIFICATION_POLICY: VerificationFreshnessPolicy = {
+  ...PRIVATE_PREPARATION_VERIFICATION_POLICY,
+  version: "local-verification-proposal-v1",
 };
 
 export const VerificationFreshnessOperationSchema = z.enum(["PREPARATION", "PRE_EXTERNAL_ACTION"]);
