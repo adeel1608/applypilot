@@ -6,6 +6,8 @@ import { join } from "node:path";
 
 import {
   ApplicationPacketSchema,
+  PRIVATE_PREPARATION_VERIFICATION_POLICY,
+  assessVerificationFreshness,
   deriveDuplicatePacketState,
   deriveJobExpiryState,
   type ApplicationPacket,
@@ -27,6 +29,7 @@ import {
 } from "@applypilot/fit-scorer";
 import { normalizeAustralianLocation } from "@applypilot/job-importer";
 import {
+  BetaRepository,
   R2ARepository,
   R2Repository,
   assertCurrentDocumentGenerationTuple,
@@ -580,50 +583,31 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
   const readiness = packetRow
     ? parseJson<{ blockers?: string[]; warnings?: string[] }>(packetRow.readinessJson, {})
     : null;
-  const verificationRow = hasVerificationLedger
-    ? (sqlite
-        .prepare(
-          `SELECT v.qualification_state AS qualificationState, v.verified_at AS verifiedAt,
-             v.run_id AS runId, v.page_id AS pageId, v.content_hash AS contentHash,
-             v.policy_version AS policyVersion, o.expires_at AS providerExpiresAt
-           FROM source_record_verifications v
-           LEFT JOIN source_observations o ON o.id = v.source_observation_id
-           JOIN job_versions jv ON jv.id = v.job_version_id
-           WHERE jv.job_id = ? AND v.disposition='ACCEPTED'
-           ORDER BY v.verified_at DESC, v.rowid DESC LIMIT 1`,
-        )
-        .get(jobId) as
-        | {
-            qualificationState: "PAGE_PERSISTED" | "QUALIFIED";
-            verifiedAt: string;
-            runId: string;
-            pageId: string;
-            contentHash: string | null;
-            policyVersion: string | null;
-            providerExpiresAt: string | null;
-          }
-        | undefined)
-    : undefined;
+  const verificationRow =
+    hasVerificationLedger && row.jobVersionId
+      ? new BetaRepository(sqlite).getLatestQualifiedVerification(jobId, row.jobVersionId)
+      : null;
   const verification = verificationRow
-    ? {
-        // The proposed 24h/15m local policy is intentionally not enabled for
-        // private runtime data. The UI reports evidence and provider expiry,
-        // while readiness continues to require the established gates.
-        state: "UNKNOWN" as const,
-        reasonCode: "LOCAL_FRESHNESS_POLICY_NOT_ENABLED",
-        providerExpiry:
-          verificationRow.providerExpiresAt === null
-            ? ("UNKNOWN" as const)
-            : Date.parse(verificationRow.providerExpiresAt) <= Date.now()
-              ? ("EXPIRED" as const)
-              : ("KNOWN" as const),
-        verifiedAt: verificationRow.verifiedAt,
-        runId: verificationRow.runId,
-        pageId: verificationRow.pageId,
-        contentHash: verificationRow.contentHash,
-        policyVersion: verificationRow.policyVersion,
-        qualificationState: verificationRow.qualificationState,
-      }
+    ? (() => {
+        const freshness = assessVerificationFreshness({
+          verifiedAt: verificationRow.verifiedAt,
+          evidenceQualified: true,
+          providerExpiresAt: verificationRow.providerExpiresAt,
+          operation: "PREPARATION",
+          policy: PRIVATE_PREPARATION_VERIFICATION_POLICY,
+        });
+        return {
+          state: freshness.state,
+          reasonCode: freshness.reasonCode,
+          providerExpiry: freshness.providerExpiry,
+          verifiedAt: verificationRow.verifiedAt,
+          runId: verificationRow.runId,
+          pageId: verificationRow.pageId,
+          contentHash: verificationRow.contentHash,
+          policyVersion: freshness.policyVersion,
+          qualificationState: "QUALIFIED" as const,
+        };
+      })()
     : {
         state: "NOT_AVAILABLE" as const,
         reasonCode: "VERIFICATION_LEDGER_NOT_AVAILABLE",
@@ -1299,6 +1283,26 @@ export async function preparePrivatePacket(
     if (!detail.evaluationVersionId) throw new Error("R2_QUEUE_CURRENT_PREPARING_REQUIRED");
     r2.assertCurrentPreparing(jobId, detail.evaluationVersionId);
   }
+  const hasVerificationLedger = Boolean(
+    sqlite
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_record_verifications'",
+      )
+      .get(),
+  );
+  if (!hasVerificationLedger) throw new Error("PREPARATION_VERIFICATION_LEDGER_REQUIRED");
+  const verification = beta.getLatestQualifiedVerification(jobId, detail.jobVersionId);
+  if (!verification) throw new Error("PREPARATION_VERIFICATION_REQUIRED");
+  const freshness = assessVerificationFreshness({
+    verifiedAt: verification.verifiedAt,
+    evidenceQualified: true,
+    providerExpiresAt: verification.providerExpiresAt,
+    operation: "PREPARATION",
+    policy: PRIVATE_PREPARATION_VERIFICATION_POLICY,
+  });
+  if (freshness.state !== "FRESH" || !freshness.validUntil) {
+    throw new Error(`PREPARATION_VERIFICATION_${freshness.reasonCode}`);
+  }
   const resolution = await candidateProfileProvider.resolve("REAL_IMPORTED_JOB");
   if (resolution.state !== "PRIVATE_LOCAL_PROFILE") throw new Error("PRIVATE_PROFILE_REQUIRED");
   const profileVersion = assertCurrentDocumentGenerationTuple({
@@ -1310,12 +1314,7 @@ export async function preparePrivatePacket(
   const currentDocuments = detail.documents.filter(
     ({ stale, approved, format }) => !stale && approved && format === "PDF",
   );
-  const expiry = detail.sourceObservationId
-    ? (sqlite
-        .prepare("SELECT expires_at AS expiresAt FROM source_observations WHERE id = ?")
-        .get(detail.sourceObservationId) as { expiresAt: string | null } | undefined)
-    : undefined;
-  const jobExpiryState = deriveJobExpiryState(expiry?.expiresAt);
+  const jobExpiryState = deriveJobExpiryState(verification.providerExpiresAt);
   const duplicateRows = sqlite
     .prepare(
       `SELECT DISTINCT c.state FROM duplicate_clusters c
@@ -1335,6 +1334,17 @@ export async function preparePrivatePacket(
     targetUrl: null,
     targetHost: null,
     jobExpiryState,
+    verificationEvidence: {
+      verificationId: verification.verificationId,
+      verifiedAt: verification.verifiedAt,
+      providerExpiresAt: verification.providerExpiresAt,
+      policyVersion: PRIVATE_PREPARATION_VERIFICATION_POLICY.version,
+      preparationMaxAgeMs: PRIVATE_PREPARATION_VERIFICATION_POLICY.preparationMaxAgeMs,
+      preExternalActionMaxAgeMs: PRIVATE_PREPARATION_VERIFICATION_POLICY.preExternalActionMaxAgeMs,
+      validUntil: freshness.validUntil,
+      operation: "PREPARATION",
+      contentHash: verification.contentHash,
+    },
     duplicateState,
     versionsCurrent: !detail.evaluationStale,
     documents: currentDocuments.map((document) => ({

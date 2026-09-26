@@ -22,7 +22,10 @@ import { validatePrivateProfileAtPath } from "./validate-private-profile";
 
 async function main(): Promise<void> {
   const root = repositoryRoot();
-  const profile = await validatePrivateProfileAtPath(join(root, "data", "profile.private.json"));
+  const fixtureMode = process.argv.includes("--fixture");
+  const profile = await validatePrivateProfileAtPath(
+    join(root, "data", fixtureMode ? "profile.example.json" : "profile.private.json"),
+  );
   const source = await operationalSourceReadiness(root);
   const sourceBeta = await sourceEnabledBetaReleaseReadiness(root);
   const databasePresent = existsSync(localDatabasePath());
@@ -65,6 +68,7 @@ async function main(): Promise<void> {
   if (!runtime.directory.includes(join("data", "private", "runtime"))) {
     failures.push("PRIVATE_RUNTIME_ROOT_INVALID");
   }
+  console.log(`PREFLIGHT_MODE mode=${fixtureMode ? "FIXTURE" : "PRIVATE"}`);
   console.log(`PREFLIGHT_PROFILE state=${profile.state}`);
   console.log(
     `PREFLIGHT_DATABASE state=${databasePresent ? "PRESENT" : "ABSENT"} schema_version=${databaseSchema} pending_migrations=${schemaStatus.pendingMigrations} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
