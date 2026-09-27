@@ -2858,13 +2858,13 @@ No source request was issued for this inventory. The following five persisted re
 only by current canonical recommendation, score descending, then local job ID; all remain
 `REVIEW_REQUIRED`, not recommended, and have no known hard duplicate block:
 
-| Local job | Title | Company | Source | Evaluation | Score | Coverage | Safe blockers | Fresh verification |
-| --- | --- | --- | --- | --- | ---: | ---: | --- | --- |
-| `source-job-55154d347bb155f29fbd0d33c8b590e5` | Electronics Failure Analysis Engineer (R5258) | Shield AI | LEVER | REVIEW_REQUIRED | 19 | 41 | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD` | Required |
-| `source-job-201826e25c62cd256bbc97f29953d7c8` | Business Development & Sales Lead - UK | Lever ninth bounded smoke | LEVER | REVIEW_REQUIRED | 11 | 35 | same safe blocker set | Existing local verification |
-| `source-job-700bc5aa369fab8a0ef0f5561349e2c6` | Engineer II, Systems Test (R5038) | Shield AI | LEVER | REVIEW_REQUIRED | 11 | 41 | same safe blocker set | Required |
-| `source-job-8f9afb0591988fd865142ee43324f800` | Lead Program Finance Analyst (R5625) | Shield AI | LEVER | REVIEW_REQUIRED | 11 | 41 | same safe blocker set | Required |
-| `source-job-8a8a7782984c21481af28e7586a4d616` | Field Solutions Engineer (R5632) | Shield AI | LEVER | REVIEW_REQUIRED | 8 | 29 | same safe blocker set | Required |
+| Local job                                     | Title                                         | Company                   | Source | Evaluation      | Score | Coverage | Safe blockers                                                                                                                         | Fresh verification          |
+| --------------------------------------------- | --------------------------------------------- | ------------------------- | ------ | --------------- | ----: | -------: | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `source-job-55154d347bb155f29fbd0d33c8b590e5` | Electronics Failure Analysis Engineer (R5258) | Shield AI                 | LEVER  | REVIEW_REQUIRED |    19 |       41 | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD` | Required                    |
+| `source-job-201826e25c62cd256bbc97f29953d7c8` | Business Development & Sales Lead - UK        | Lever ninth bounded smoke | LEVER  | REVIEW_REQUIRED |    11 |       35 | same safe blocker set                                                                                                                 | Existing local verification |
+| `source-job-700bc5aa369fab8a0ef0f5561349e2c6` | Engineer II, Systems Test (R5038)             | Shield AI                 | LEVER  | REVIEW_REQUIRED |    11 |       41 | same safe blocker set                                                                                                                 | Required                    |
+| `source-job-8f9afb0591988fd865142ee43324f800` | Lead Program Finance Analyst (R5625)          | Shield AI                 | LEVER  | REVIEW_REQUIRED |    11 |       41 | same safe blocker set                                                                                                                 | Required                    |
+| `source-job-8a8a7782984c21481af28e7586a4d616` | Field Solutions Engineer (R5632)              | Shield AI                 | LEVER  | REVIEW_REQUIRED |     8 |       29 | same safe blocker set                                                                                                                 | Required                    |
 
 ### Post-operation health, safety, and readiness
 
@@ -2879,7 +2879,7 @@ only by current canonical recommendation, score descending, then local job ID; a
 - Post-operation validation passed: focused migration/provenance/R2A tests `6 files / 64`, unit
   `56 files / 611`, integration `3 files / 21`, typecheck, lint, local and showcase builds,
   showcase audit, privacy audit, both npm audits (`0` vulnerabilities), Playwright E2E `47 passed
-  (5.5m)`, `git diff --check`, and `git fsck --strict` (known dangling historical objects only).
+(5.5m)`, `git diff --check`, and `git fsck --strict` (known dangling historical objects only).
   Repository-wide `format:check` remains a pre-existing baseline failure across 45 tracked files;
   no application files were reformatted during this data/evidence-only operation.
 - Evidence branch: `chore/m2-r4633-schema11-real-reconciliation`; evidence-only commit/PR is still
