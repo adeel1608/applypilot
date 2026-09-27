@@ -52,6 +52,7 @@ export function buildR2GoldenInput(fixture: R2GoldenCase): R2GoldenExecutableInp
   const fields: R2JobFieldEvidence[] = [];
   const requirements = [...matched.requirements];
   let unknownFamilies: R2JobFieldEvidence["family"][] = [];
+  let partialFamilies: R2JobFieldEvidence["family"][] = [];
   let conflicts: R2ANormalization["conflicts"] = [];
   let bindings: R2EvaluationBindings = { ...currentR2Bindings };
   const commute = { distanceKm: null as number | null, durationMinutes: null as number | null };
@@ -152,7 +153,6 @@ export function buildR2GoldenInput(fixture: R2GoldenCase): R2GoldenExecutableInp
     }
     case "SPARSE_COVERAGE":
       unknownFamilies = [
-        "GEOGRAPHY",
         "HOURS",
         "SCHEDULE",
         "EXPERIENCE",
@@ -162,6 +162,7 @@ export function buildR2GoldenInput(fixture: R2GoldenCase): R2GoldenExecutableInp
         "WORK_RIGHTS",
         "VEHICLE",
       ];
+      partialFamilies = ["GEOGRAPHY"];
       break;
     case "UNKNOWN_WORK_RIGHTS":
       requirements.push(
@@ -227,7 +228,13 @@ export function buildR2GoldenInput(fixture: R2GoldenCase): R2GoldenExecutableInp
 
   return {
     profile,
-    normalization: r2TestNormalization({ fields, requirements, unknownFamilies, conflicts }),
+    normalization: r2TestNormalization({
+      fields,
+      requirements,
+      unknownFamilies,
+      partialFamilies,
+      conflicts,
+    }),
     bindings,
     commute,
   };

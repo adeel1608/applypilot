@@ -147,7 +147,21 @@ export class BetaRepository {
          JOIN source_observations o ON o.id=v.source_observation_id
            AND o.content_hash=v.content_hash
            AND o.source=v.source AND o.tenant=v.tenant AND o.external_id=v.external_id
-           AND o.parser_version=v.parser_version AND o.policy_version=v.policy_version
+           AND (
+             o.run_id IS NULL OR EXISTS (
+               SELECT 1
+               FROM source_run_checkpoints historicalRun
+               JOIN source_capability_versions historicalCapability
+                 ON historicalCapability.id=historicalRun.capability_version_id
+                AND historicalCapability.source=o.source
+                AND historicalCapability.tenant=o.tenant
+                AND historicalCapability.configuration_digest=historicalRun.capability_digest
+                AND historicalCapability.parser_version=o.parser_version
+                AND historicalCapability.policy_version=o.policy_version
+               WHERE historicalRun.id=o.run_id
+                 AND historicalRun.status='COMPLETE'
+             )
+           )
          WHERE v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
          ORDER BY v.verified_at DESC,v.rowid DESC LIMIT 1`,
       )

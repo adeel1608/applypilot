@@ -19,7 +19,7 @@ import {
   type R2CalibrationState,
 } from "./calibration";
 
-export const R2_FIT_SCORER_VERSION = "2.0.0";
+export const R2_FIT_SCORER_VERSION = "2.1.0";
 export const R2_FIT_WEIGHT_VERSION = "r2-weights-1";
 export const R2_RECOMMENDATION_THRESHOLD = 50;
 export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-2";
@@ -449,6 +449,8 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
   if (!input.eligibility.current) recommendationBlockers.push("EVALUATION_BINDING_STALE");
   if (input.eligibility.unresolvedMaterialUnknowns > 0)
     recommendationBlockers.push("MATERIAL_UNKNOWN");
+  if (input.eligibility.partialMaterialFamilyCount > 0)
+    recommendationBlockers.push("MATERIAL_SCOPE_PARTIAL");
   if (input.eligibility.unresolvedMaterialConditions > 0)
     recommendationBlockers.push("MATERIAL_CONDITIONAL");
   if (input.eligibility.unresolvedMaterialConflicts > 0)

@@ -56,6 +56,17 @@ describe("safe R2 readiness summary", () => {
         .run("b".repeat(64), "2026-09-10T00:00:00.000Z");
       sqlite
         .prepare(
+          `INSERT INTO job_normalization_coverage
+             (id,job_version_id,family,coverage_state,evidence_count,evidence_ids_json,
+              unparsed_spans_json,parser_version,created_at)
+           VALUES
+             ('coverage:summary:geo','job-version:summary','GEOGRAPHY','PARTIAL',1,'["geo"]','[]','3.1.0',?),
+             ('coverage:summary:skills','job-version:summary','SKILLS','COMPLETE',1,'["skill"]','[]','3.1.0',?),
+             ('coverage:summary:experience','job-version:summary','EXPERIENCE','UNKNOWN',0,'[]','[]','3.1.0',?)`,
+        )
+        .run("2026-09-10T00:00:00.000Z", "2026-09-10T00:00:00.000Z", "2026-09-10T00:00:00.000Z");
+      sqlite
+        .prepare(
           `INSERT INTO r2_evaluation_versions
            (id,job_id,job_version_id,profile_version_id,evidence_contract_version,normalization_version,
             coverage_version,eligibility_status,eligibility_reasons_json,fit_score,fit_contributions_json,
@@ -112,11 +123,27 @@ describe("safe R2 readiness summary", () => {
         recommended: false,
         calibrationState: "UNCALIBRATED",
         ownerQuestionIds: ["OWNER_FACT_R2_CANDIDATE_WORK_RIGHTS_UNVERIFIED"],
+        observedMaterialFamilyCount: 2,
+        resolvedObservedMaterialFamilyCount: 1,
+        partialMaterialFamilyCount: 1,
+        unobservedMaterialFamilyCount: 8,
+        partialMaterialFamilies: ["GEOGRAPHY"],
+        unobservedMaterialFamilies: [
+          "CERTIFICATIONS",
+          "EDUCATION",
+          "EXPERIENCE",
+          "HOURS",
+          "LICENCES",
+          "SCHEDULE",
+          "VEHICLE",
+          "WORK_RIGHTS",
+        ],
       });
       expect(summary?.recommendationBlockers).toEqual(
         expect.arrayContaining([
           "ELIGIBILITY_NOT_ELIGIBLE",
           "MATERIAL_UNKNOWN",
+          "MATERIAL_SCOPE_PARTIAL",
           "MATERIAL_CONDITIONAL",
           "EXTRACTION_COVERAGE_INSUFFICIENT",
           "SCORE_BELOW_THRESHOLD",

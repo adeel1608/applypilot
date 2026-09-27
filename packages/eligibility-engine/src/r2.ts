@@ -15,7 +15,7 @@ import { normalizeText, VerificationStatus } from "@applypilot/shared";
 
 import type { EvaluationEvidenceClass } from "./types";
 
-export const R2_ELIGIBILITY_ENGINE_VERSION = "2.0.0";
+export const R2_ELIGIBILITY_ENGINE_VERSION = "2.1.0";
 export const R2_MINIMUM_EXTRACTION_COVERAGE = 60;
 
 export interface R2EvaluationBindings {
@@ -55,6 +55,12 @@ export interface R2EligibilityResult {
   unresolvedMaterialUnknowns: number;
   unresolvedMaterialConditions: number;
   unresolvedMaterialConflicts: number;
+  observedMaterialFamilyCount: number;
+  resolvedObservedMaterialFamilyCount: number;
+  partialMaterialFamilyCount: number;
+  unobservedMaterialFamilyCount: number;
+  unobservedMaterialFamilies: JobFieldFamily[];
+  partialMaterialFamilies: JobFieldFamily[];
   current: boolean;
   disclaimer: "NOT_LEGAL_ADVICE";
 }
@@ -78,6 +84,18 @@ function currentUsableState(state: R2JobFieldEvidence["state"]): boolean {
 
 function requirementIsMaterial(requirement: R2RequirementEvidence): boolean {
   return requirement.modality === "REQUIRED" || requirement.modality === "CONDITIONAL";
+}
+
+function isUnobservedMaterialScope(coverage: R2ANormalization["coverage"][number]): boolean {
+  return (
+    coverage.state === "UNKNOWN" &&
+    coverage.evidenceIds.length === 0 &&
+    coverage.unparsedSpans.length === 0
+  );
+}
+
+function isResolvedMaterialScope(coverage: R2ANormalization["coverage"][number]): boolean {
+  return coverage.state === "COMPLETE";
 }
 
 function normalizedIncludes(left: string, right: string): boolean {
@@ -227,28 +245,64 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     );
   }
 
-  const knownCoverage = normalization.coverage.filter(({ state }) => state !== "UNKNOWN").length;
-  const coveragePercent = Math.round((knownCoverage / normalization.coverage.length) * 100);
-  if (coveragePercent < R2_MINIMUM_EXTRACTION_COVERAGE) {
+  const coverageByFamily = new Map(
+    normalization.coverage.map((coverage) => [coverage.family, coverage]),
+  );
+  const materialCoverage = [...materialCoverageFamilies].map(
+    (family) =>
+      coverageByFamily.get(family) ?? {
+        family,
+        state: "UNKNOWN" as const,
+        evidenceIds: [],
+        unparsedSpans: [],
+        parserVersion: normalization.parserVersion,
+      },
+  );
+  const unobservedMaterialFamilies = materialCoverage
+    .filter(isUnobservedMaterialScope)
+    .map(({ family }) => family);
+  const partialMaterialFamilies = materialCoverage
+    .filter(
+      (coverage) => !isUnobservedMaterialScope(coverage) && !isResolvedMaterialScope(coverage),
+    )
+    .map(({ family }) => family);
+  const resolvedObservedMaterialFamilyCount =
+    materialCoverage.filter(isResolvedMaterialScope).length;
+  const observedMaterialFamilyCount =
+    resolvedObservedMaterialFamilyCount + partialMaterialFamilies.length;
+  const coveragePercent =
+    observedMaterialFamilyCount === 0
+      ? 0
+      : Math.round((resolvedObservedMaterialFamilyCount / observedMaterialFamilyCount) * 100);
+  if (observedMaterialFamilyCount === 0) {
+    add(
+      "R2_NO_MATERIAL_EMPLOYER_SCOPE_OBSERVED",
+      "REVIEW",
+      "EMPLOYER_REQUIREMENT",
+      [],
+      [],
+      "The complete source did not expose supported material employer scope; absence was not treated as satisfaction.",
+    );
+  } else if (coveragePercent < R2_MINIMUM_EXTRACTION_COVERAGE) {
     add(
       "R2_EXTRACTION_COVERAGE_INSUFFICIENT",
       "REVIEW",
       "EMPLOYER_REQUIREMENT",
-      normalization.coverage.flatMap(({ evidenceIds }) => evidenceIds),
+      materialCoverage.flatMap(({ evidenceIds }) => evidenceIds),
       [],
-      "Material extraction coverage is below the approved review threshold.",
+      "Resolved coverage of observed material employer scope is below the approved review threshold.",
     );
   }
 
-  for (const coverage of normalization.coverage) {
-    if (coverage.state === "UNKNOWN" && materialCoverageFamilies.has(coverage.family)) {
+  for (const coverage of materialCoverage) {
+    if (partialMaterialFamilies.includes(coverage.family)) {
       add(
-        `R2_MATERIAL_${coverage.family}_UNKNOWN`,
+        "R2_MATERIAL_SCOPE_PARTIAL",
         "REVIEW",
         "EMPLOYER_REQUIREMENT",
         coverage.evidenceIds,
         [],
-        `Material ${coverage.family.toLocaleLowerCase("en-AU").replaceAll("_", " ")} evidence is unknown.`,
+        `Material ${coverage.family.toLocaleLowerCase("en-AU").replaceAll("_", " ")} source scope is observed but unresolved.`,
       );
     }
   }
@@ -699,6 +753,12 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     unresolvedMaterialUnknowns,
     unresolvedMaterialConditions,
     unresolvedMaterialConflicts,
+    observedMaterialFamilyCount,
+    resolvedObservedMaterialFamilyCount,
+    partialMaterialFamilyCount: partialMaterialFamilies.length,
+    unobservedMaterialFamilyCount: unobservedMaterialFamilies.length,
+    unobservedMaterialFamilies,
+    partialMaterialFamilies,
     current,
     disclaimer: "NOT_LEGAL_ADVICE",
   };

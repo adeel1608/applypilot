@@ -313,6 +313,7 @@ export class R2Repository {
         input.eligibility.unresolvedMaterialUnknowns > 0 ||
         input.eligibility.unresolvedMaterialConditions > 0 ||
         input.eligibility.unresolvedMaterialConflicts > 0 ||
+        input.eligibility.partialMaterialFamilyCount > 0 ||
         input.eligibility.coveragePercent < R2_MINIMUM_EXTRACTION_COVERAGE ||
         input.fit.recommendationBlockers.length > 0)
     ) {

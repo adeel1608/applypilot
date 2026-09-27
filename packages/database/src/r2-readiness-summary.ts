@@ -13,6 +13,7 @@ type StoredReason = {
 
 export interface R2ReadinessSummary {
   jobId: string;
+  jobVersionId: string | null;
   evaluationId: string | null;
   eligibilityStatus: string | null;
   stale: boolean;
@@ -30,7 +31,26 @@ export interface R2ReadinessSummary {
   duplicateState: "CLEAR" | "UNRESOLVED" | "NONE";
   calibrationState: string | null;
   ownerQuestionIds: string[];
+  observedMaterialFamilyCount: number;
+  resolvedObservedMaterialFamilyCount: number;
+  partialMaterialFamilyCount: number;
+  unobservedMaterialFamilyCount: number;
+  unobservedMaterialFamilies: string[];
+  partialMaterialFamilies: string[];
 }
+
+const MATERIAL_FAMILIES = new Set([
+  "GEOGRAPHY",
+  "HOURS",
+  "SCHEDULE",
+  "SKILLS",
+  "EXPERIENCE",
+  "EDUCATION",
+  "LICENCES",
+  "CERTIFICATIONS",
+  "WORK_RIGHTS",
+  "VEHICLE",
+]);
 
 function safeReasons(value: string | null): StoredReason[] {
   if (!value) return [];
@@ -54,7 +74,78 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-function summaryFromRow(row: Record<string, unknown>): R2ReadinessSummary {
+function coverageSummary(
+  sqlite: BetterSqlite3.Database | undefined,
+  jobVersionId: string | null,
+): Pick<
+  R2ReadinessSummary,
+  | "observedMaterialFamilyCount"
+  | "resolvedObservedMaterialFamilyCount"
+  | "partialMaterialFamilyCount"
+  | "unobservedMaterialFamilyCount"
+  | "unobservedMaterialFamilies"
+  | "partialMaterialFamilies"
+> {
+  const empty = {
+    observedMaterialFamilyCount: 0,
+    resolvedObservedMaterialFamilyCount: 0,
+    partialMaterialFamilyCount: 0,
+    unobservedMaterialFamilyCount: 0,
+    unobservedMaterialFamilies: [],
+    partialMaterialFamilies: [],
+  };
+  if (!sqlite || !jobVersionId) return empty;
+  const rows = sqlite
+    .prepare(
+      `SELECT family,coverage_state AS state,evidence_count AS evidenceCount,
+              unparsed_spans_json AS unparsedSpansJson
+       FROM job_normalization_coverage WHERE job_version_id=?`,
+    )
+    .all(jobVersionId) as Array<{
+    family: string;
+    state: string;
+    evidenceCount: number;
+    unparsedSpansJson: string;
+  }>;
+  const byFamily = new Map(rows.map((row) => [row.family, row]));
+  const unobserved: string[] = [];
+  const partial: string[] = [];
+  let resolved = 0;
+  for (const family of MATERIAL_FAMILIES) {
+    const row = byFamily.get(family);
+    if (!row) {
+      unobserved.push(family);
+      continue;
+    }
+    let unparsedCount = 0;
+    try {
+      const parsed: unknown = JSON.parse(row.unparsedSpansJson);
+      unparsedCount = Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      unparsedCount = 1;
+    }
+    if (row.state === "COMPLETE") {
+      resolved += 1;
+    } else if (row.state === "UNKNOWN" && row.evidenceCount === 0 && unparsedCount === 0) {
+      unobserved.push(row.family);
+    } else {
+      partial.push(row.family);
+    }
+  }
+  return {
+    observedMaterialFamilyCount: resolved + partial.length,
+    resolvedObservedMaterialFamilyCount: resolved,
+    partialMaterialFamilyCount: partial.length,
+    unobservedMaterialFamilyCount: unobserved.length,
+    unobservedMaterialFamilies: unobserved.sort(),
+    partialMaterialFamilies: partial.sort(),
+  };
+}
+
+function summaryFromRow(
+  row: Record<string, unknown>,
+  sqlite?: BetterSqlite3.Database,
+): R2ReadinessSummary {
   const reasons = safeReasons(typeof row.reasons === "string" ? row.reasons : null);
   const blockers: string[] = [];
   if (row.eligibilityStatus !== "ELIGIBLE") blockers.push("ELIGIBILITY_NOT_ELIGIBLE");
@@ -62,6 +153,12 @@ function summaryFromRow(row: Record<string, unknown>): R2ReadinessSummary {
   if (Number(row.unknownCount) > 0) blockers.push("MATERIAL_UNKNOWN");
   if (Number(row.conditionCount) > 0) blockers.push("MATERIAL_CONDITIONAL");
   if (Number(row.conflictCount) > 0) blockers.push("MATERIAL_CONFLICT");
+  const scope = coverageSummary(
+    sqlite,
+    typeof row.jobVersionId === "string" ? row.jobVersionId : null,
+  );
+  if (scope.partialMaterialFamilyCount > 0) blockers.push("MATERIAL_SCOPE_PARTIAL");
+  if (scope.observedMaterialFamilyCount === 0) blockers.push("NO_MATERIAL_EMPLOYER_SCOPE_OBSERVED");
   if (Number(row.coveragePercent) < R2_MINIMUM_EXTRACTION_COVERAGE)
     blockers.push("EXTRACTION_COVERAGE_INSUFFICIENT");
   if (Number(row.fitScore) < R2_RECOMMENDATION_THRESHOLD) blockers.push("SCORE_BELOW_THRESHOLD");
@@ -84,6 +181,7 @@ function summaryFromRow(row: Record<string, unknown>): R2ReadinessSummary {
   ];
   return {
     jobId: String(row.jobId),
+    jobVersionId: typeof row.jobVersionId === "string" ? row.jobVersionId : null,
     evaluationId: typeof row.evaluationId === "string" ? row.evaluationId : null,
     eligibilityStatus: typeof row.eligibilityStatus === "string" ? row.eligibilityStatus : null,
     stale: Boolean(row.stale),
@@ -106,11 +204,12 @@ function summaryFromRow(row: Record<string, unknown>): R2ReadinessSummary {
           : "NONE",
     calibrationState: typeof row.calibrationState === "string" ? row.calibrationState : null,
     ownerQuestionIds,
+    ...scope,
   };
 }
 
 const readinessSelect = `
-  SELECT e.job_id AS jobId,e.id AS evaluationId,e.eligibility_status AS eligibilityStatus,
+  SELECT e.job_id AS jobId,e.job_version_id AS jobVersionId,e.id AS evaluationId,e.eligibility_status AS eligibilityStatus,
          e.eligibility_reasons_json AS reasons,e.fit_score AS fitScore,e.recommended,
          e.coverage_percent AS coveragePercent,e.unresolved_unknown_count AS unknownCount,
          e.unresolved_condition_count AS conditionCount,e.unresolved_conflict_count AS conflictCount,
@@ -136,7 +235,7 @@ export function readR2ReadinessSummary(
   const rows = jobId
     ? sqlite.prepare(`${readinessSelect} AND e.job_id=?`).all(jobId)
     : sqlite.prepare(readinessSelect).all();
-  return (rows as Array<Record<string, unknown>>).map(summaryFromRow);
+  return (rows as Array<Record<string, unknown>>).map((row) => summaryFromRow(row, sqlite));
 }
 
 export function aggregateR2BlockerReasonCounts(

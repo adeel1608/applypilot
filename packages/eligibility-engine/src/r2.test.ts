@@ -27,6 +27,118 @@ function evaluate(
 }
 
 describe("R2 eligibility", () => {
+  it("does not turn silent material families into blockers or satisfaction", () => {
+    const observedLocation = r2FieldEvidence("location-observed", "GEOGRAPHY", {
+      kind: "LOCATION",
+      value: {
+        rawLabel: "Melbourne VIC",
+        locality: "Melbourne",
+        suburb: null,
+        stateOrTerritory: "VIC",
+        postcode: null,
+        countryCode: "AU",
+        workplaceType: "UNKNOWN",
+        remoteScope: "UNKNOWN",
+      },
+    });
+    const result = evaluate(r2TestNormalization({ fields: [observedLocation] }));
+    expect(result.status).toBe("ELIGIBLE");
+    expect(result.reasons.map(({ code }) => code)).not.toContain("R2_MATERIAL_WORK_RIGHTS_UNKNOWN");
+    expect(result.reasons.map(({ code }) => code)).not.toContain("R2_MATERIAL_VEHICLE_UNKNOWN");
+    expect(result.observedMaterialFamilyCount).toBe(1);
+    expect(result.resolvedObservedMaterialFamilyCount).toBe(1);
+    expect(result.unobservedMaterialFamilies).toContain("WORK_RIGHTS");
+    expect(result.unobservedMaterialFamilies).toContain("VEHICLE");
+  });
+
+  it("reports a complete source with no material scope as conservative review", () => {
+    const result = evaluate(r2TestNormalization({}));
+    expect(result.status).toBe("REVIEW_REQUIRED");
+    expect(result.coveragePercent).toBe(0);
+    expect(result.observedMaterialFamilyCount).toBe(0);
+    expect(result.unobservedMaterialFamilyCount).toBe(10);
+    expect(result.reasons.map(({ code }) => code)).toContain(
+      "R2_NO_MATERIAL_EMPLOYER_SCOPE_OBSERVED",
+    );
+    expect(result.reasons.map(({ code }) => code)).not.toContain("R2_MATERIAL_SKILLS_UNKNOWN");
+  });
+
+  it("keeps observed partial material scope review-required and out of resolved coverage", () => {
+    const skill = r2RequirementEvidence("partial-skill", "SKILLS", "SKILL", {
+      kind: "TEXT",
+      value: "Fictional robotics skill",
+    });
+    const normalization = r2TestNormalization({ requirements: [skill] });
+    const partial = {
+      ...normalization,
+      coverage: normalization.coverage.map((coverage) =>
+        coverage.family === "SKILLS" ? { ...coverage, state: "PARTIAL" as const } : coverage,
+      ),
+    };
+    const result = evaluate(partial);
+    expect(result.status).toBe("REVIEW_REQUIRED");
+    expect(result.coveragePercent).toBe(0);
+    expect(result.observedMaterialFamilyCount).toBe(1);
+    expect(result.resolvedObservedMaterialFamilyCount).toBe(0);
+    expect(result.partialMaterialFamilies).toEqual(["SKILLS"]);
+    expect(result.reasons.map(({ code }) => code)).toContain("R2_MATERIAL_SCOPE_PARTIAL");
+  });
+
+  it("counts mixed complete and partial material families conservatively", () => {
+    const skill = r2RequirementEvidence("complete-skill", "SKILLS", "SKILL", {
+      kind: "TEXT",
+      value: "Fictional robotics skill",
+    });
+    const experience = r2RequirementEvidence("partial-experience", "EXPERIENCE", "EXPERIENCE", {
+      kind: "EXPERIENCE",
+      value: {
+        domain: "Fictional engineering",
+        minimum: 2,
+        maximum: null,
+        unit: "YEAR",
+        recency: null,
+        alternatives: [],
+        condition: null,
+      },
+    });
+    const normalization = r2TestNormalization({ requirements: [skill, experience] });
+    const partial = {
+      ...normalization,
+      coverage: normalization.coverage.map((coverage) =>
+        coverage.family === "EXPERIENCE" ? { ...coverage, state: "PARTIAL" as const } : coverage,
+      ),
+    };
+    const result = evaluate(partial);
+    expect(result.observedMaterialFamilyCount).toBe(2);
+    expect(result.resolvedObservedMaterialFamilyCount).toBe(1);
+    expect(result.partialMaterialFamilyCount).toBe(1);
+    expect(result.coveragePercent).toBe(50);
+    expect(result.reasons.map(({ code }) => code)).toContain("R2_EXTRACTION_COVERAGE_INSUFFICIENT");
+  });
+
+  it("does not make preferred-only or negated source text mandatory", () => {
+    const preferred = r2RequirementEvidence(
+      "preferred-skill",
+      "SKILLS",
+      "SKILL",
+      { kind: "TEXT", value: "Optional fictional skill" },
+      { modality: "PREFERRED" },
+    );
+    const negated = r2RequirementEvidence(
+      "negated-skill",
+      "SKILLS",
+      "SKILL",
+      { kind: "TEXT", value: "No fictional skill required" },
+      { modality: "NEGATED" },
+    );
+    const result = evaluate(r2TestNormalization({ requirements: [preferred, negated] }));
+    expect(result.status).toBe("ELIGIBLE");
+    expect(result.reasons.map(({ code }) => code)).not.toContain("R2_MATERIAL_REQUIREMENT_UNKNOWN");
+    expect(result.reasons.map(({ code }) => code)).not.toContain(
+      "R2_MANDATORY_CAPABILITY_UNCONFIRMED",
+    );
+  });
+
   it("keeps valid and unrestricted Australian work rights distinct", () => {
     const valid = r2RequirementEvidence("rights-valid", "WORK_RIGHTS", "WORK_RIGHTS", {
       kind: "WORK_RIGHTS",

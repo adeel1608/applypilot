@@ -2386,3 +2386,158 @@ orchestration and was removed before the evidence branch commit; it is not track
   R4633 revalidation. Do not issue another live request until that fix is reviewed.
 - The evidence branch is `chore/m2-r4633-currentness-evidence`; it changes documentation only and
   will open one PR titled `docs: record R4633 exact currentness evidence`, left open and unmerged.
+
+## 38. M2 R2 scope semantics and immutable provenance engineering blueprint (2026-09-27)
+
+This implementation branch starts from the exact PR #50 squash merge
+`506fdbdc24c1271b962ce9d244eb1c69736490ac`. It is offline-only: no live source request, DNS/TCP/TLS
+probe, employer interaction, target authority, candidate-fact mutation, production private-database
+write, upload, or submission is permitted. The real private schema-10 database remains read-only.
+
+### Current state and separated blockers
+
+1. **Immutable observation versus fresh verification provenance.** The exact R4633 GET_JOB produced a
+   current qualified verification while safely reusing an immutable observation/job version. The
+   reader incorrectly compared the observation's historical parser/policy to the fresh verification's
+   parser/policy, making valid evidence unreadable. The fix must validate the two provenance chains
+   independently and preserve all immutable rows.
+2. **Observed employer scope versus source silence.** R2 currently treats every material UNKNOWN as
+   a review blocker and counts PARTIAL families as fully known. The implementation must distinguish
+   unobserved source scope (no evidence and no unparsed spans) from observed unresolved material scope
+   (PARTIAL or future UNKNOWN with material evidence), without converting silence into satisfaction.
+3. **Residual score/matching defect.** If the corrected semantics still leave R4633 at score zero or
+   REVIEW_REQUIRED, the copy-only rehearsal must classify the cause and reproduce only a generic,
+   policy-consistent parser/normalizer/matcher defect. No role-specific alias, threshold reduction,
+   candidate-fact invention, or semantic AI matching is allowed.
+
+### Proposed files, data flow, and contracts
+
+- `packages/database/src/beta-repository.ts` and verification tests: current verification chain and
+  independent historical observation chain, with fail-closed corruption cases.
+- `packages/eligibility-engine/src/r2.ts`, types, and tests: observed-scope classification,
+  conservative source-silence handling, explicit sparse-source review, and strict partial handling.
+- `packages/job-importer/src/r2a-normalization.ts` and tests only if a generic structured-scope
+  mapping defect is reproduced in fictional input.
+- `packages/fit-scorer` only if a generic evidence-backed scoring defect is reproduced; bump scorer
+  version only when scorer semantics change.
+- `packages/database/src/r2-readiness-summary.ts` and CLI tests: safe observed/partial/unobserved
+  counts and family names without candidate values or source excerpts.
+- `PROJECT_PLAN.md`, `docs/JOB_NORMALIZATION.md`, `docs/ELIGIBILITY_ENGINE.md`, and
+  `docs/R2_MATCHING_QUALITY_PLAN.md`: durable semantic and provenance documentation.
+- Synthetic tests and disposable-copy scripts: no real private DB writes and no live network.
+
+The preferred coverage contract is resolved observed material families divided by observed material
+families. Zero observed material families reports coverage 0 plus a conservative
+`R2_NO_MATERIAL_EMPLOYER_SCOPE_OBSERVED` diagnostic; PARTIAL families never count as resolved.
+UNOBSERVED is neither NOT_REQUIRED nor satisfied and does not itself create owner questions or a
+source-stage blocker. Explicit requirements, observed partial scope, hard mismatches, conflicts,
+conditions, and candidate evidence rules remain strict.
+
+### Versioning, privacy, rollback, and acceptance
+
+- Bump `R2_ELIGIBILITY_ENGINE_VERSION` (target `2.1.0`) for changed decision semantics. Do not
+  change threshold 50, fit weights, candidate facts, or calibration state. Do not bump the fit scorer
+  unless its source semantics change.
+- No migration is expected; migrations `0000`-`0010` remain immutable. A fresh ignored rehearsal
+  copy will be created under `data/private/rehearsals/<task-id>/` from the approved backup and checked
+  for schema 10, pending 0, integrity PASS, FK 0, ignored status, and matching safe counts.
+- Rollback is a normal branch revert; no SQL repair or production private-database restore is needed.
+  Candidate values, CV text, source excerpts, cookies, sessions, and raw payloads are never logged or
+  committed.
+- Acceptance requires: PR #50 exact merge; independent provenance reuse acceptance plus negative
+  matrix; all source-silence/partial/explicit-requirement R2 regressions; revised coverage and safe
+  diagnostics; real R4633 read-only characterization; copy-only reader and before/after R2 metrics;
+  copy-only PREPARING/packet rehearsal only if every canonical gate passes; full local gates; one
+  open exact-head implementation PR; and real action delta `0/0/0/0` with lifetime counters
+  `16/9/0/0`.
+
+### Exact implementation sequence
+
+1. Revalidate the merged main and private read-only baseline; inspect existing schemas and tests.
+2. Add the provenance regression and negative cases before changing the reader.
+3. Implement independent current-verification and historical-observation lineage checks.
+4. Add failing-before coverage/eligibility tests, then implement observed-scope semantics and bump
+   the eligibility engine version.
+5. Extend safe readiness diagnostics and documentation.
+6. Characterize R4633 using metadata only; create a new disposable rehearsal copy and re-evaluate
+   through production R2 APIs without PREPARING unless all gates pass.
+7. If score remains zero, investigate only a reproducible generic parser/normalizer/matcher defect;
+   otherwise preserve the conservative review result.
+8. Run focused suites, then format/lint/typecheck/unit/integration/E2E/build/showcase/privacy/audit/
+   release/diff/fsck gates. Record exact results and unfinished blockers.
+9. Commit the coherent implementation and plan evidence, push this branch, open exactly one PR titled
+   `fix: reconcile source provenance reuse and R2 observed-scope coverage`, and leave it open and
+   unmerged for human review.
+
+## 39. M2 R2 scope / provenance implementation evidence (2026-09-27)
+
+### Merge and branch
+
+- PR #50 was verified and squash-merged as `506fdbdc24c1271b962ce9d244eb1c69736490ac` from the
+  exact approved head `65c9a91e9dd9074fb52c25c12d102d455bc12c64`; local `main` and `origin/main`
+  matched that merge before this branch was created.
+- This implementation branch is `feat/m2-r2-scope-provenance-reuse`; it remains offline-only and
+  has no source/employer/upload/submission action delta (`0/0/0/0`). Lifetime counters remain
+  `16/9/0/0`.
+
+### Implemented scope
+
+- Qualified verification lookup now validates current verification and historical observation
+  provenance as independent immutable chains. Historical run completion, capability digest,
+  source/tenant, parser, and policy are required for reused source observations; current run,
+  page, capability, job version, content hash, parser, policy, and external identity remain
+  independently bound. Corruption/replay tests fail closed.
+- R2 eligibility engine `2.1.0` distinguishes material `COMPLETE`, `PARTIAL`, and `UNOBSERVED`
+  scope. Source silence (no evidence and no unparsed spans) is neither `NOT_REQUIRED` nor
+  satisfied, does not create an owner question, and does not by itself block at source stage.
+  Observed partial scope remains review-blocking; resolved coverage is calculated only across
+  observed material families and zero observed scope reports a conservative diagnostic.
+- Fit scoring `2.1.0`, repository recommendation invariants, and safe readiness summaries expose
+  partial/unobserved counts and family names without excerpts or candidate values. Missing coverage
+  rows fail closed as unobserved.
+- Fictional Lever structured-description and inert `lists[]` regression proves list requirements
+  reach R2A with bounded source pointers and no retained HTML execution path. Raw provider payloads
+  remain immutable; no role-specific alias or threshold change was made.
+- A reproducible generic R2A defect was found and fixed: structured description spans used raw JSON
+  coordinates for evidence but inert-text coordinates for coverage, falsely making fully parsed
+  hours/schedule scope `PARTIAL`. Structured provenance now matches by immutable source path while
+  ordinary visible-text spans retain exact coordinate matching; no parser authority or source
+  network behavior changed.
+
+### Offline rehearsal evidence
+
+- A fresh ignored copy under `data/private/rehearsals/m2-r2-scope-provenance-20260927-final/` was
+  opened and checked before mutation: schema 10, integrity `PASS`, foreign-key issues `0`.
+- The R4633 copy-only characterization reused verification
+  `57db0589-c403-4056-95cc-d53b2632079c` and observation/job-version provenance without any network
+  call. Before/after safe counts were R2 evaluations `112 -> 113`, queue decisions `110 -> 111`,
+  packets `4 -> 4`, documents `6 -> 6`; post-integrity remained `PASS` and FK issues `0`.
+- Under the corrected contract the role remains `REVIEW_REQUIRED`, score `0`, recommended `false`,
+  coverage `0`, observed material families `1`, resolved `0`, partial `1` (`GEOGRAPHY`), and
+  unobserved `9`. No PREPARING transition, document generation, packet creation, or external action
+  was attempted. The production private database was not written.
+
+### Validation so far
+
+- Focused provenance/R2 suites: `7` files, `134` tests passed; structured R2A normalization suite:
+  `65` tests passed; the corrected source-to-preview E2E regression passed.
+- Full unit suite: `56` files, `609` tests passed. Integration suite: `3` files, `21` tests passed.
+- Full Playwright E2E: `47` tests passed. Production web build, showcase build, and public showcase
+  audit passed.
+- `npm run typecheck`, `npm run lint`, `git diff --check`, and `git fsck --strict` passed. Strict
+  fsck reports only the repository's known dangling historical blobs/trees.
+- `npm run release:check:fixture` passed with disposable schema 10, pending migrations `0`,
+  integrity `PASS`, FK issues `0`, private profile read `0`, privacy audit pass, and both npm
+  vulnerability audits at `0` vulnerabilities. Private preflight passed with source-enabled beta
+  `READY`, active source capabilities `0`, and Personal Live V1 `NOT_READY`.
+- Local `npm run format:check` still reports the repository's known Windows line-ending warnings in
+  unrelated baseline files; the release fixture's `prettier --end-of-line auto` gate passed and no
+  broad reformat was authorized.
+
+### Remaining release boundary
+
+No migration was added; migrations `0000`-`0010` remain immutable. The real private database
+remained read-only at schema 10/pending 0/integrity PASS/FK 0. Source-enabled Personal Beta
+remains `READY`; Personal Live V1 remains `NOT_READY`. The next step is to commit this coherent
+change, push the same branch, open one PR titled `fix: reconcile source provenance reuse and R2
+observed-scope coverage`, verify exact-head CI, and leave it open and unmerged for human review.

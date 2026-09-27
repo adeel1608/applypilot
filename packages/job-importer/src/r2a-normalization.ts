@@ -1785,9 +1785,13 @@ export function normalizeR2AJobEvidence(input: {
   });
 
   const parsedRangesByFamily = new Map<JobFieldFamily, Set<string>>();
+  const spanKey = (span: Pick<Span, "sourcePath" | "start" | "end">): string =>
+    span.sourcePath.startsWith("structured.")
+      ? span.sourcePath
+      : `${span.sourcePath}:${span.start}:${span.end}`;
   for (const item of [...resolvedFields, ...resolvedRequirements]) {
     const ranges = parsedRangesByFamily.get(item.family) ?? new Set<string>();
-    ranges.add(`${item.source.sourcePath}:${item.source.start}:${item.source.end}`);
+    ranges.add(spanKey(item.source));
     parsedRangesByFamily.set(item.family, ranges);
   }
   const coverage = familyValues.map((family) => {
@@ -1812,9 +1816,11 @@ export function normalizeR2AJobEvidence(input: {
     );
     const parsed = parsedRangesByFamily.get(family) ?? new Set<string>();
     const unparsedSpans = scopeSpans
-      .filter((span) => !parsed.has(`${span.sourcePath}:${span.start}:${span.end}`))
+      .filter((span) => !parsed.has(spanKey(span)))
       .map((span) => pointer(source, span));
-    const credibleCompleteScope = sectionItems.length > 0;
+    const credibleCompleteScope =
+      sectionItems.length > 0 ||
+      (isCanonicalStructuredSource && structuredDescriptionSpans.length > 0);
     return {
       family,
       state:

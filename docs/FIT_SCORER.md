@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the compatibility scorer and verified-only R2 scorer 2.0.0 / `r2-weights-1` are implemented and hardened on unmerged PR #13. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, owner approval, and final exact-head review. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.1.0 / `r2-weights-1` are implemented and hardened on the current offline provenance branch. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, and owner approval. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
@@ -21,7 +21,7 @@ Weights are transparent constants, not learned judgments. They are an ordering a
 
 ## R2 verified-only contract
 
-R2B binds every positive or negative preference contribution to a current verified candidate fact and current supported job evidence. `UNKNOWN`, unverified, stale, unresolved conditional, and conflicting evidence yields no preference points in either direction and remains a visible coverage gap. In particular, `UNVERIFIED`, `USER_CONFIRMATION_REQUIRED`, or `UNKNOWN` `maximumCommuteKm` contributes zero positive and zero negative fit points. Legal status and sensitive/protected identity fields never contribute. Recommendation requires current `ELIGIBLE` status; current job/evidence, candidate-profile, and evaluation versions; no unresolved material conflict or material conditional/unknown blocker; sufficient extraction coverage; and the score threshold. Score can never clear `REVIEW_REQUIRED`.
+R2B binds every positive or negative preference contribution to a current verified candidate fact and current supported job evidence. `UNKNOWN`, unverified, stale, unresolved conditional, and conflicting evidence yields no preference points in either direction and remains a visible coverage gap. In particular, `UNVERIFIED`, `USER_CONFIRMATION_REQUIRED`, or `UNKNOWN` `maximumCommuteKm` contributes zero positive and zero negative fit points. Legal status and sensitive/protected identity fields never contribute. Recommendation requires current `ELIGIBLE` status; current job/evidence, candidate-profile, and evaluation versions; no unresolved material conflict, partial material source scope, or material conditional/unknown blocker; sufficient extraction coverage; and the score threshold. Score can never clear `REVIEW_REQUIRED`.
 
 Every contribution stores a stable reason code, signed points, field/evidence IDs, evidence class, scorer/weight version, and safe explanation template. Missing evidence is not a mismatch. The UI shows coverage and uncertainty beside the score and never calls it a percentage match.
 

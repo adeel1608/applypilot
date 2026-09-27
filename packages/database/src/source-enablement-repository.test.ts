@@ -395,6 +395,23 @@ describe("offline source-to-R2 queue persistence", () => {
         .prepare("SELECT count(DISTINCT job_version_id) count FROM job_normalization_coverage")
         .get(),
     ).toEqual({ count: 3 });
+    const normalizedVersion = sqlite
+      .prepare("SELECT id FROM job_versions ORDER BY rowid LIMIT 1")
+      .get() as { id: string };
+    const normalization = new R2ARepository(sqlite).getNormalization(normalizedVersion.id);
+    expect(normalization).not.toBeNull();
+    expect(normalization!.requirementEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          family: "EXPERIENCE",
+          modality: "REQUIRED",
+          source: expect.objectContaining({ sourcePath: expect.stringContaining("structured") }),
+        }),
+      ]),
+    );
+    expect(
+      normalization!.requirementEvidence.some(({ source }) => /<li|<p>/i.test(source.excerpt)),
+    ).toBe(false);
     expect(repository.recovery(result.runId)).toMatchObject({
       status: "COMPLETE",
       recordCount: 3,

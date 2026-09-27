@@ -35,3 +35,18 @@ The cross-source helper and production persistence use explicit application targ
 ## Unknown fields
 
 Null, `UNKNOWN`, and empty arrays have distinct meanings. Normalizers must not fabricate precision. Material unknown work-right, vehicle, schedule, licence, document, or requirement evidence routes to eligibility or preparation review. Raw source text remains local and available for future re-normalization as parsers improve.
+
+## Observed employer scope
+
+Coverage is provenance-aware. A material family is `UNOBSERVED` when the completed source
+contains no evidence and no unparsed spans for that family; this is source silence, not
+`NOT_REQUIRED`, satisfaction, or a candidate fact. Unobserved families do not create owner
+questions or a source-stage blocker by themselves. A family is `PARTIAL` when material source
+scope was observed but not fully resolved, including an explicit or ambiguous requirement; it
+remains review-blocking until resolved. Only `COMPLETE` observed families contribute to resolved
+coverage. New source or target evidence may later introduce requirements, so a sparse source must
+never be treated as proof that a requirement is absent.
+
+Lever structured descriptions and inert `lists[]` content are carried into R2A through bounded
+source pointers. HTML is converted to inert text for extraction and is never rendered or executed;
+the immutable raw provider snapshot remains separate from normalized evidence.

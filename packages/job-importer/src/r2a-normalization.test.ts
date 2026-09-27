@@ -418,6 +418,41 @@ describe("R2A evidence normalization", () => {
     ).toBe(true);
   });
 
+  it("qualifies fully parsed structured list scope without executing provider HTML", () => {
+    const structured = {
+      description:
+        "<h2>Requirements</h2><ul><li>Customer service experience required.</li><li>Communication skills required.</li></ul><h2>Hours</h2><p>18 hours per week</p><h2>Roster</h2><p>Fixed Monday-Friday 09:00-13:00 AEST</p>",
+      requirementTexts: ["Customer service experience required.", "Communication skills required."],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      structured,
+      sourceObservationId: "observation:structured-list-scope",
+    });
+    expect(result.coverage.find(({ family }) => family === "EXPERIENCE")).toMatchObject({
+      state: "COMPLETE",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "SKILLS")).toMatchObject({
+      state: "COMPLETE",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "HOURS")).toMatchObject({
+      state: "COMPLETE",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "SCHEDULE")).toMatchObject({
+      state: "COMPLETE",
+      unparsedSpans: [],
+    });
+    expect(
+      result.requirementEvidence.some(({ normalizedValue }) =>
+        /<li|<ul>/i.test(JSON.stringify(normalizedValue)),
+      ),
+    ).toBe(false);
+  });
+
   it("parses Australian full state names and does not conflict location alternatives", () => {
     const geelong = normalizeR2AJobEvidence({
       sourceText: "Location: Geelong Victoria 3220",
