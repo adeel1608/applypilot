@@ -3129,3 +3129,46 @@ only by current canonical recommendation, score descending, then local job ID; a
   passed. Repository-wide `format:check` remains the known 45-file baseline failure. Local E2E
   was not rerun because the identical configured web-server startup timeout was already observed;
   exact-head GitHub browser quality passed.
+
+## 50. M2 owner-approved bounded Shield AI LIST_JOBS run (2026-09-27)
+
+### Approval and execution boundary
+
+- The owner explicitly approved capability `m2_source_shieldai_ace3faba83cf_1790463324757` version
+  `3`, predecessor `2`, approval reference `owner.m2-source-discovery.lever_shieldai.v3`, with
+  exact LEVER/Shield AI/GLOBAL host/path, LIST_JOBS-only operation, one-request/25-record caps,
+  zero retries/redirects, and zero candidate fields outbound.
+- A canonical private backup was created before source writes:
+  `backup-2026-09-27T09-44-14.321Z-64f16f87`, schema `11`, integrity `PASS`.
+- The approved v3 capability was loaded from the ignored private allowlist, persisted through the
+  production `SourceEnablementRepository`, and executed through the production Lever runner. No
+  employer endpoint or application runner was involved.
+
+### Run result and immutable replay
+
+- Run `58796b51-f83f-4130-9ee2-6fa65d064d20` completed `LIST_JOBS` with exactly `1` request,
+  `1` page, `25` provider records, `25` accepted records, `0` unusable records, `359257` bytes,
+  `0` retries, `0` redirects, and no stop code. Provider emitted only safe workplace enum-drift
+  diagnostics for 23 records; the run remained complete under the accepted non-critical drift
+  policy.
+- All 25 accepted records were qualified and linked to existing immutable source observations and
+  job versions; unchanged replay created `0` duplicate observations and `0` new job versions.
+  Existing current R2 evaluations remained `REVIEW_REQUIRED`, nonrecommended, and were not
+  rewritten; no PREPARING, document, or packet action occurred.
+- The only Melbourne record in this bounded page was a nonrecommended Business Development
+  Associate role with score `4`, coverage `35`, and `REVIEW_REQUIRED` status. Historical
+  smoke-labelled records were excluded. No engineering role passed the canonical current R2
+  gates, so no GET_JOB/detail request was authorized or attempted.
+
+### Revocation, health, and action counts
+
+- The normal immutable workflow revoked v3 as version `4`; the ignored allowlist now contains only
+  the revoked v4 for this capability family. Active source capabilities returned to `0`.
+- Post-run health: schema `11`, pending `0`, integrity `PASS`, FK `0`, active source/target
+  capabilities `0/0`, active runs/pending operations `0/0`. Lifetime counters are now
+  source/employer/form/upload/submission `17/9/0/0`; deltas are `1/0/0/0/0`.
+- No candidate data, credentials, cookies, raw payloads, or private documents were tracked or
+  exposed. Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`.
+- This section records execution evidence only; PR #54 remains OPEN/UNMERGED for review and no
+  application code or migration changed. Next owner gate is required before any further source
+  request, detail request, or employer interaction.
