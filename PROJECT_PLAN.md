@@ -2897,3 +2897,104 @@ only by current canonical recommendation, score descending, then local job ID; a
 - Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
 - Remaining blockers: R4633 A + F fit/eligibility gates, no current approved packet, no target
   approval/validation, and no authorization for any employer interaction.
+
+## 46. M2 fresh role discovery / current-packet candidate blueprint (2026-09-27)
+
+### Current state and objective
+
+- PR #52 is approved for squash merge; after merge, this branch starts from synchronized
+  `main` and performs one bounded fresh source-discovery cycle using only already-approved,
+  policy-valid real tenants represented in the private runtime.
+- Objective: discover current real roles, normalize/dedupe/evaluate them through the production
+  R2 pipeline, optionally detail-verify at most one deterministic candidate (with one final
+  fallback detail at most), and stop at the safe local document/packet owner boundary if every
+  canonical gate passes. A truthful no-candidate closeout is equally successful.
+
+### Assumptions, constraints, and safety
+
+- No employer application endpoint, MAP, FILL, UPLOAD, VERIFY, FILL_PREVIEW, SUBMIT, target
+  capability, candidate-data transmission, or candidate-value logging is permitted.
+- Discovery budget is at most 3 LIST/DISCOVERY HTTP requests, at most 2 exact GET_JOB requests,
+  5 total source requests, concurrency 1, retries 0, and provider redirect policy unchanged.
+- No tenant may be invented, newly approved, or broadened. Fixtures/smoke/demo/test tenants are
+  excluded from selection. Threshold `50`, `r2-weights-1`, parser/normalization `3.2.0`, and
+  evidence contract `3.1.0` remain unchanged.
+
+### Architecture / data flow
+
+1. Verify merge identity, synchronized clean main, schema-11 health, counters, active authority,
+   current profile, and source provenance integrity; take a fresh canonical private backup before
+   any production source write.
+2. Inventory source capabilities and allowlist metadata read-only, separating real tenants from
+   fixtures and requiring `LIST_JOBS` authority with current policy/capability validity.
+3. Execute the production source runner only; persist immutable run/page/observation provenance,
+   normalize/dedupe, evaluate and queue locally, then revoke each ephemeral source capability.
+4. Select at most one exact detail candidate by deterministic production metrics. Reconcile only
+   local current documents/packet if every canonical R2/currentness gate passes; otherwise remain
+   REVIEWING and report safe A-H blockers.
+5. Verify active capabilities/runs, schema/integrity/FKs, action counters, privacy, migration
+   immutability, audits, tests, diff-check, and fsck. Record evidence only in this plan on the
+   feature branch and open one unmerged review PR.
+
+### Risks, rollback, and acceptance
+
+- Risks are stale/invalid authority, provider drift, partial runs, duplicate/currentness errors,
+  and accidental private-data exposure. The runner must fail closed and retain safe diagnostics.
+- Rollback is via the fresh canonical backup and immutable capability revocation; no migration or
+  historical observation rewrite is authorized.
+- Acceptance requires either one truthful current packet/document owner boundary or a safe,
+  evidence-backed `SOURCE_DISCOVERY_APPROVAL_REQUIRED` / no-current-candidate result, with source
+  delta <=5 and employer/form/upload/submission delta exactly `0/0/0/0`.
+
+### Planned files and validation
+
+- Expected tracked change: this `PROJECT_PLAN.md` evidence section only; no private DB, backup,
+  payload, profile, document, secret, cookie, or session may be tracked.
+- Run focused source/provenance/R2A tests plus unit, integration, E2E/release fixture, typecheck,
+  lint, build, privacy/dependency audits, schema health, migration immutability, `git diff --check`,
+  and `git fsck --strict`; distinguish the known repository-wide format baseline if it remains.
+
+## 47. M2 fresh discovery authority closeout (2026-09-27)
+
+### Merge, branch, and preflight
+
+- PR #52 was revalidated at its approved base/head/tree and squash-merged as
+  `380c3ca2409db1c52211f5fd873730c1420108e1`; parent
+  `293c7975df2843bea406d2d964729c69d40577b7`; merged tree
+  `26567ece90b7f9bd3c2b1fd0562020e1ce3f5c7a`.
+- Local `main` and `origin/main` were synchronized at that merge, then the evidence branch
+  `feat/m2-fresh-role-discovery-current-packet` was created from the clean merge.
+- Real private preflight passed: schema `11`, pending migrations `0`, integrity `PASS`, foreign
+  key issues `0`, valid private profile, active source capabilities `0`, active target capabilities
+  `0`, no active source run or pending external operation, Source-enabled Personal Beta `READY`,
+  and Personal Live V1 `NOT_READY`. Baseline lifetime counters remained source/employer/form/upload/
+  submission `16/9/0/0`.
+
+### Authority inventory and safe stop
+
+- Read-only inventory found `11` configured private allowlist capabilities and `23` persisted
+  capability versions. Every configured/persisted discovery authority was either revoked or past
+  its policy/capability expiry at the execution time (`2026-09-27T18:41:22.688+10:00`); no real
+  tenant had simultaneously valid APPROVED `LIST_JOBS` authority.
+- The only provider/tenant identity present was LEVER / `shieldai` / GLOBAL with the existing
+  `api.lever.co` postings path. Historical aliases labelled smoke, verification, or bounded
+  checks were treated as fixture/test/history authority and excluded from candidate selection;
+  no tenant was invented, newly approved, or broadened.
+- Result: classification `SOURCE_DISCOVERY_APPROVAL_REQUIRED`. No LIST/DISCOVERY request, detail
+  request, source capability, source run, backup write, normalization, evaluation, queue,
+  document, or packet mutation was attempted. A fresh backup was not required because the
+  production source pipeline was never entered and the real DB remained read-only.
+- Source action delta is `0`; employer/form/upload/submission delta is `0/0/0/0`. Existing
+  provenance, immutable observations, profile, documents, packets, and migrations were preserved.
+
+### Validation and remaining work
+
+- `npm.cmd run preflight`, `npm.cmd run db:status`, `git diff --check`, and `git fsck --strict`
+  passed (fsck reports only known dangling historical objects). No application-code defect was
+  discovered and no role-pass, threshold, weight, parser, or authority change was made.
+- The seven-milestone tracker remains: Foundations `COMPLETE / MERGED`; current real role + fresh
+  packet `BLOCKED — SOURCE_DISCOVERY_APPROVAL_REQUIRED`; real MAP/FILL/UPLOAD/VERIFY `ENGINEERING`;
+  final-review/submission safeguards `BLOCKED`; reproducible release `COMPLETE`; controlled
+  fill-preview `BLOCKED`; final readiness / Green-banner review `NOT_STARTED`.
+- Next task: owner must provide a fresh approved, policy-valid real source tenant/capability for
+  bounded `LIST_JOBS` discovery; do not perform network discovery until that authority exists.
