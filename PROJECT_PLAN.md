@@ -2550,7 +2550,7 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
   `OPEN / UNMERGED`, base `main`, and GitHub reports it `MERGEABLE`. The final correction head and
   exact-head CI are recorded in section 42 and the final PR handoff after the correction push.
 - The earlier handoff push and pull-request quality checks both passed (workflow runs
-  `36294257403` and `36294265873`). The PR body records the safe evidence and offline boundary.
+  `36294478213` and `36294481544`). The PR body records the safe evidence and offline boundary.
 - No live source request, DNS/TCP/TLS probe, employer interaction, upload, submission, target
   authority, candidate-fact mutation, or production private-database write occurred. Keep PR #51
   unmerged for human review; Source-enabled Personal Beta remains `READY` and Personal Live V1
@@ -2634,8 +2634,8 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
   `64343ed2d70305022e8fd7e558f000eb7e1c527f`; branch remains
   `feat/m2-r2-scope-provenance-reuse`; PR remains `OPEN / UNMERGED / MERGEABLE`.
 - Implementation checkpoint before this correction was `3aab28386b77f81de2d3122efcce660e10d26d9a`;
-  the handoff/documentation checkpoint was `64343ed2d70305022e8fd7e558f000eb7e1c527f`. The
-  final correction head is recorded in the final PR handoff after the last push.
+  the handoff/documentation checkpoint was `64343ed2d70305022e8fd7e558f000eb7e1c527f`; the
+  final correction head is `f630e8404829cf3837228ebedfdfe0bcfaa64a2f`.
 - Offline boundary held: no source request, DNS/TCP/TLS probe, employer interaction, candidate-data
   transmission, target capability, MAP, FILL, UPLOAD, VERIFY, FILL_PREVIEW, or SUBMIT. Correction
   delta and lifetime counters remain `0/0/0/0` and `16/9/0/0`.
@@ -2705,8 +2705,9 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
   validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T15:39:40.218+10:00`, approximately
   `67,454` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
 - Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. Threshold
-  remains `50`; weight version remains `r2-weights-1`. The PR body and final exact-head CI are
-  updated after the final push. Seven-milestone tracker remains: Foundations `COMPLETE / MERGED`;
+  remains `50`; weight version remains `r2-weights-1`. Final exact-head push CI is `36299774334`
+  (`SUCCESS`) and final exact-head PR CI is `36299776808` (`SUCCESS`); the PR body was updated
+  with the same handoff. Seven-milestone tracker remains: Foundations `COMPLETE / MERGED`;
   current real role + fresh packet `IN PROGRESS`; real MAP/FILL/UPLOAD/VERIFY `ENGINEERING`;
   final-review safeguards `BLOCKED BY REAL NON-SUBMIT INTEGRATION`; reproducible release
   `COMPLETE`; controlled fill-preview `BLOCKED`; green-banner review `NOT_STARTED`.
