@@ -2297,3 +2297,92 @@ Source-enabled Personal Beta remains READY from prior reviewed evidence; Persona
 `NOT_READY`. The next task is one separately authorized bounded R4633 `GET_JOB` refresh through
 the merged runner, with one request/one record, then safe verification/R2 currentness diagnostics;
 no employer interaction, upload, or submission.
+
+## 37. M2 exact R4633 currentness / packet closure (2026-09-27)
+
+This evidence-only closeout records the owner-authorized operation from the exact PR #49 squash
+merge. The operational boundary was one exact Shield AI Lever `GET_JOB` request; no list fallback,
+second request, employer interaction, candidate-data transmission, target authority, document
+generation, upload, or submission was allowed. The temporary harness imported the merged production
+orchestration and was removed before the evidence branch commit; it is not tracked.
+
+### Merge, backup, and private baseline
+
+- PR #49 reviewed base/head/tree were `74d44b93eba3f047e83463959ab2fc95d08efa28`,
+  `2f72a18cca7b582ddea1926cb84f857a81c25223`, and
+  `b6202684bee678c24106651706bbdaad938a0ddf`; push `36281399534` and PR `36281416372` were
+  successful. The approved squash merge is `47afcdfd8f5aba4114037ae9097604625adc8e36`, with
+  parent `74d44b93eba3f047e83463959ab2fc95d08efa28` and merged tree
+  `b6202684bee678c24106651706bbdaad938a0ddf`. Local `main` and `origin/main` matched before the
+  evidence branch was created.
+- Fresh backup `backup-2026-09-27T00-17-59.038Z-b8743a54` completed with schema 10 and integrity
+  PASS. Pre-operation safe counts were jobs 104, job versions 114, observations 111, source runs
+  12, source pages 7, verification rows 25, R2 evaluations 112, queue decisions 110, packets 4,
+  documents 6, and audit events 379.
+- Private runtime and post-operation checks remain schema 10, pending migrations 0, integrity PASS,
+  foreign-key issues 0, profile VALID, no in-progress application operation, no active source run,
+  no pending external operation, active source capabilities 0, and active target capabilities 0.
+
+### Exact source operation and durable result
+
+- Capability `source_r4633_a027ca7664d644d3c0ddf3e73bb4646e`, version 1, used exact parser
+  `lever-v2:47afcdfd8f5aba4114037ae9097604625adc8e36`, policy `m2-r4633-get-job-v1`, and digest
+  `87f9f769e3d3894660ba1c96351c2bc6906a56b468e75b63fdf8ad32e5b03334`. It allowed only
+  `GET_JOB`, with request/record/page caps 1, response cap 2,000,000 bytes, timeout 30 seconds,
+  run timeout 60 seconds, concurrency 1, retries 0, and redirects 0. It was immediately revoked
+  through the immutable version workflow; normal preflight reports active source capabilities 0.
+- Run `37703806-6b98-4af1-83a3-80e852704354` reached terminal `COMPLETE` after exactly one
+  request, one page, one record, 10,732 response bytes, zero retries, and zero redirects. Page
+  `f5c2fc64-9fa0-407d-a144-6b4fe7c1556d` used cursor `GET_JOB:2cfe6692-a266-4d27-8832-ef652fa57ee4`,
+  no next cursor, and digest `fce7d260f1cb0392ac81f3ca37bad0f07cf95a5e0eeb73af222c28a8bb408d08`.
+  Accepted records: 1; unusable records: 0; candidate data outbound: NONE.
+- R4633 was found and matched the historical external identity. Current normalized content hash
+  matched the historical hash, so currentness is `UNCHANGED_CONTENT` with no changed material
+  dimensions. Provider expiry was absent and remains `UNKNOWN`/`null`.
+
+### Verification, R2, and packet gate
+
+- Verification `57db0589-c403-4056-95cc-d53b2632079c` is `QUALIFIED`; observation
+  `source-observation-d0b965003a92fe3fb300de054b24f8bd73b8123bbcc90a1e46832ed39cdde130` and job
+  version `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953`
+  were persisted. The strengthened provenance reader did not return the current evidence because
+  the reused historical observation retains the prior parser/policy provenance while the current
+  verification records the merged parser/policy. This is a genuine offline code defect; no SQL
+  repair was performed and no second source request is permitted. It is recorded as a blocker for
+  the next reviewed engineering task.
+- Current R2 evaluation `a95c2f2f-8175-4602-92c2-667f04a099b5` is `REVIEW_REQUIRED`, score 0,
+  threshold 50, `recommended=false`, coverage 18, unknown 9, conditions 0, conflicts 0, queue
+  `REVIEWING`/`CURRENT`, duplicate `CLEAR`, calibration `UNCALIBRATED`, and ownerQuestionIds empty.
+  Blockers are `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`,
+  `EXTRACTION_COVERAGE_INSUFFICIENT`, and `SCORE_BELOW_THRESHOLD`; safe reason counts are
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT=1`,
+  `R2_MATERIAL_CERTIFICATIONS_UNKNOWN=1`, `R2_MATERIAL_EDUCATION_UNKNOWN=1`,
+  `R2_MATERIAL_EXPERIENCE_UNKNOWN=1`, `R2_MATERIAL_HOURS_UNKNOWN=1`,
+  `R2_MATERIAL_LICENCES_UNKNOWN=1`, `R2_MATERIAL_SCHEDULE_UNKNOWN=1`,
+  `R2_MATERIAL_SKILLS_UNKNOWN=1`, `R2_MATERIAL_VEHICLE_UNKNOWN=1`, and
+  `R2_MATERIAL_WORK_RIGHTS_UNKNOWN=1`. No owner answers were requested or inferred.
+- Existing private current-bound CV artifacts remain available (DOCX and approved PDF), but the
+  canonical suitability gate failed. No PREPARING transition, new document, packet, or
+  `PRE_EXTERNAL_ACTION` check was attempted. The exact no-packet classification is
+  `R4633_R2_REVIEW_REQUIRED`, with the separate current-parser/policy provenance-reader defect
+  retained as an engineering blocker. Target authority is NONE and employer interaction is NONE.
+
+### Validation, counters, and next dependency
+
+- `doctor`, `db:status`, `preflight`, `privacy:audit`, and the safe R2 readiness summary passed or
+  reported the values above. Migrations `0000`-`0010` remain unchanged; no migration was added and
+  no private database repair was performed. Final evidence-branch release, diff, and fsck results
+  are recorded with the closeout commit.
+- Historical counters were source/employer/upload/submission `15/9/0/0`; this run delta is
+  `+1/+0/+0/+0`, ending `16/9/0/0`. No employer form, upload, or submission action occurred.
+- Milestone 2 remains `IN PROGRESS`, because canonical R2 suitability and the strengthened
+  provenance-reader gate did not pass. Foundations remain `COMPLETE / MERGED`; real-target
+  MAP/FILL/UPLOAD/VERIFY remain `ENGINEERING / MISSING LIVE VERIFICATION`; final-review safeguards
+  remain blocked by real non-submit integration; reproducible fixture release remains complete;
+  authorized fill-preview is blocked; and green-banner review is not started. Source-enabled
+  Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`.
+- Exactly one next task is recommended: implement and synthetically test the offline current
+  observation parser/policy provenance-reuse fix, then request a separately reviewed one-request
+  R4633 revalidation. Do not issue another live request until that fix is reviewed.
+- The evidence branch is `chore/m2-r4633-currentness-evidence`; it changes documentation only and
+  will open one PR titled `docs: record R4633 exact currentness evidence`, left open and unmerged.
