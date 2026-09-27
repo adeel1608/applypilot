@@ -2767,3 +2767,133 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
 - The prior correction head/CI in section 42 is historical only. Live exact head/tree and exact-head
   CI are maintained in the PR body/external handoff: the tracked plan does not claim self-resulting
   SHA metadata.
+
+## 45. PR #51 merge and real schema-11 R4633 reconciliation evidence (2026-09-27)
+
+### Merge and synchronized main
+
+- PR #51 exact pre-merge state was verified unchanged: base
+  `506fdbdc24c1271b962ce9d244eb1c69736490ac`, head
+  `e96bab4bd9e56ec5ddda04442fc69ef2fbfc4970`, tree
+  `42895a4410c7f70b0eb434b5f4a3af933a976562`, OPEN/UNMERGED, MERGEABLE/CLEAN, exact-head push CI
+  `36301733254` SUCCESS, exact-head PR CI `36301730665` SUCCESS, no reviews, and zero unresolved
+  threads. No later commit existed.
+- Authorized squash merge completed at `2026-09-27T07:10:36Z`: merge commit
+  `293c7975df2843bea406d2d964729c69d40577b7`, parent
+  `506fdbdc24c1271b962ce9d244eb1c69736490ac`, merged tree
+  `42895a4410c7f70b0eb434b5f4a3af933a976562`.
+- Local `main` and `origin/main` both point to `293c7975df2843bea406d2d964729c69d40577b7`;
+  work then continued on `chore/m2-r4633-schema11-real-reconciliation`.
+- Migration 0011 and parser/normalization `3.2.0` are present in the merged tree. Migrations
+  `0000`-`0010` were unchanged; the working-tree migration diff against the merge is empty.
+  Migration 0011 SHA-256 is `7a719fcec9a8b1d844c774a109100f703dfaa05f7cd785806a811a3856d99fe4`.
+
+### Real private DB baseline, backup, and rehearsal
+
+- Pre-migration real DB: schema `10`, pending `1`, integrity `PASS`, foreign-key issues `0`;
+  active source capabilities `0`, active target capabilities `0`; action counters source/employer/
+  upload/submission `16/9/0/0`.
+- Fresh canonical backup: `backup-2026-09-27T07-14-27.755Z-307bf5af`; manifest and database
+  opened successfully, schema `10`, integrity `PASS`, foreign-key issues `0`, and safe table-count
+  comparison matched the live pre-migration DB.
+- Disposable restore/migration rehearsal from that backup passed: restored schema `10`, integrity
+  `PASS`, foreign-key issues `0`; canonical migration flow then produced schema `11`, pending `0`,
+  integrity `PASS`, foreign-key issues `0`, `source_derivation_bindings` with expected columns/
+  constraints/index, and coverage `1938` (`114` job versions x `17`). Historical source
+  observations, verifications, payloads, and job versions were unchanged in the rehearsal.
+- Canonical migration created its own verified production safety backup
+  `backup-2026-09-27T07-16-42.856Z-c8538794` before writing the real DB.
+
+### Real migration and provenance reconciliation
+
+- Migration 0011 applied exactly once to the real private DB via the canonical migration script:
+  schema `11`, pending `0`, integrity `PASS`, foreign-key issues `0`, jobs `104`, job versions
+  `114` before rederivation, R2A field evidence `822`, requirement evidence `1116`, coverage
+  `1938`.
+- Historical `source_observations` (`111`), `source_record_verifications` (`26`),
+  `source_observation_payloads` (`110`), `job_source_records`, and all `114` pre-existing job
+  versions matched the verified pre-migration backup. No immutable observation, verification, or
+  historical job version was rewritten.
+- R4633 verification `57db0589-c403-4056-95cc-d53b2632079c` was recalculated at execution time
+  `2026-09-27T07:17:03.044Z` / rederivation `2026-09-27T07:19:00.943Z`. Its verifiedAt is
+  `2026-09-27T00:23:54.465Z` and preparation validUntil is
+  `2026-09-28T00:23:54.465Z`: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
+- Conditional GET_JOB was **not used**. Real source delta remained `0`; no network action occurred.
+- Parent job version: `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953`.
+  Source observation: `source-observation-d0b965003a92fe3fb300de054b24f8bd73b8123bbcc90a1e46832ed39cdde130`.
+  Derived job version: `fed43c6f-6cb4-4f99-a5f6-2900e80a8582`.
+- Parser `3.2.0`, normalization `3.2.0`, evidence contract `3.1.0`.
+- Derivation binding: `r2a-derivation-cd935d2d506590ce9570a5fb0d1372b6`; digest
+  `6538d8c7cd18f62600c20b3c051972ec5bb10c2e5b32a206a99e4c3679ca1117`.
+- Idempotency proof: first rederivation `created=true`; immediate replay returned `created=false`
+  with the same derived job version, binding, and digest. Counts changed only as expected:
+  job versions `114 -> 115`, bindings `0 -> 1`, observations `111 -> 111`.
+
+### Real R2 result and canonical branch
+
+- Real R2 evaluation `fe99819a-fd6e-4c5c-8b8d-40480c01e16d` and queue decision
+  `fe51bf5c-d7ca-49ef-a2b6-86515e9178b7` version `2` were recorded against the derived version
+  and active profile version `6cd565c1-552b-436c-941c-2cd49d228123`.
+- Eligibility: `REVIEW_REQUIRED`; current `true`; reason codes
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`.
+- Fit: score `0`, threshold `50`, recommended `false`; blockers
+  `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`,
+  `SCORE_BELOW_THRESHOLD`.
+- Contributions: count `0`, codes `[]`, point total `0`; coverage `0`.
+- Observed/resolved/partial/unobserved material families: `1/0/1/9`; partial `GEOGRAPHY`;
+  unobserved `HOURS`, `SCHEDULE`, `SKILLS`, `EXPERIENCE`, `EDUCATION`, `LICENCES`,
+  `CERTIFICATIONS`, `WORK_RIGHTS`, `VEHICLE`.
+- Unknown/condition/conflict counts: `0/0/0`; duplicate state `CLEAR`; queue `REVIEWING/CURRENT`;
+  calibration `UNCALIBRATED`.
+- Active A-H causes: **A + F** (partial material extraction/scope and score below threshold).
+  B, C, D, E, G, and H were not reproduced.
+- Canonical branch: **FAIL-GATES**. R4633 classified as
+  `R4633_REAL_RECONCILED_NOT_PACKET_READY`.
+- PREPARING: not entered. Documents: no generation, approval, or mutation. Packet: not created or
+  mutated. Target authority remains `NONE`.
+
+### Optional read-only local inventory
+
+No source request was issued for this inventory. The following five persisted records were sorted
+only by current canonical recommendation, score descending, then local job ID; all remain
+`REVIEW_REQUIRED`, not recommended, and have no known hard duplicate block:
+
+| Local job                                     | Title                                         | Company                   | Source | Evaluation      | Score | Coverage | Safe blockers                                                                                                                         | Fresh verification          |
+| --------------------------------------------- | --------------------------------------------- | ------------------------- | ------ | --------------- | ----: | -------: | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `source-job-55154d347bb155f29fbd0d33c8b590e5` | Electronics Failure Analysis Engineer (R5258) | Shield AI                 | LEVER  | REVIEW_REQUIRED |    19 |       41 | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD` | Required                    |
+| `source-job-201826e25c62cd256bbc97f29953d7c8` | Business Development & Sales Lead - UK        | Lever ninth bounded smoke | LEVER  | REVIEW_REQUIRED |    11 |       35 | same safe blocker set                                                                                                                 | Existing local verification |
+| `source-job-700bc5aa369fab8a0ef0f5561349e2c6` | Engineer II, Systems Test (R5038)             | Shield AI                 | LEVER  | REVIEW_REQUIRED |    11 |       41 | same safe blocker set                                                                                                                 | Required                    |
+| `source-job-8f9afb0591988fd865142ee43324f800` | Lead Program Finance Analyst (R5625)          | Shield AI                 | LEVER  | REVIEW_REQUIRED |    11 |       41 | same safe blocker set                                                                                                                 | Required                    |
+| `source-job-8a8a7782984c21481af28e7586a4d616` | Field Solutions Engineer (R5632)              | Shield AI                 | LEVER  | REVIEW_REQUIRED |     8 |       29 | same safe blocker set                                                                                                                 | Required                    |
+
+### Post-operation health, safety, and readiness
+
+- Post-operation real DB: schema `11`, pending `0`, integrity `PASS`, foreign-key issues `0`;
+  active source capabilities `0`, active target capabilities `0`; no active source run or pending
+  external operation.
+- Real action delta source/employer/form/upload/submission: `0/0/0/0`; lifetime counters remain
+  `16/9/0/0`.
+- Privacy, doctor, preflight, profile validation, schema/integrity/FK, migration immutability,
+  and safe metadata audits passed. No raw payload, candidate value, profile, CV, secret, cookie,
+  or private database file was tracked or added.
+- Post-operation validation passed: focused migration/provenance/R2A tests `6 files / 64`, unit
+  `56 files / 611`, integration `3 files / 21`, typecheck, lint, local and showcase builds,
+  showcase audit, privacy audit, both npm audits (`0` vulnerabilities), Playwright E2E `47 passed
+(5.5m)`, `git diff --check`, and `git fsck --strict` (known dangling historical objects only).
+  Repository-wide `format:check` remains a pre-existing baseline failure across 45 tracked files;
+  no application files were reformatted during this data/evidence-only operation.
+- Evidence branch: `chore/m2-r4633-schema11-real-reconciliation`; initial evidence commit
+  `d9c75bad3723a6f7994f2912a85b2ade0934ed7b`, formatting correction `85bc1543d83776d09d1d735dd6dbc125c20d23e9`.
+  Evidence PR #52 is `https://github.com/adeel1608/applypilot/pull/52`, base
+  `293c7975df2843bea406d2d964729c69d40577b7`, handoff head
+  `85bc1543d83776d09d1d735dd6dbc125c20d23e9`, push CI `36303685674` SUCCESS, PR CI
+  `36303688309` SUCCESS, OPEN/UNMERGED/CLEAN. Any resulting plan-only SHA is kept in the PR body
+  because a tracked file cannot contain its own final SHA. No application-code defect was found.
+- Seven-milestone tracker: Foundations `COMPLETE`; Current real role + fresh current packet
+  `IN PROGRESS / R4633 RECONCILED NOT PACKET-READY`; Real-target MAP/FILL/UPLOAD/VERIFY
+  `ENGINEERING / NO LIVE VALIDATION`; Final-review/submission safeguards `BLOCKED`;
+  Reproducible release `COMPLETE`; Controlled real fill-preview `BLOCKED`; Final readiness /
+  Green-banner review `NOT STARTED`.
+- Source-enabled Personal Beta: `READY`. Personal Live V1: `NOT_READY`.
+- Remaining blockers: R4633 A + F fit/eligibility gates, no current approved packet, no target
+  approval/validation, and no authorization for any employer interaction.
