@@ -2386,3 +2386,384 @@ orchestration and was removed before the evidence branch commit; it is not track
   R4633 revalidation. Do not issue another live request until that fix is reviewed.
 - The evidence branch is `chore/m2-r4633-currentness-evidence`; it changes documentation only and
   will open one PR titled `docs: record R4633 exact currentness evidence`, left open and unmerged.
+
+## 38. M2 R2 scope semantics and immutable provenance engineering blueprint (2026-09-27)
+
+This implementation branch starts from the exact PR #50 squash merge
+`506fdbdc24c1271b962ce9d244eb1c69736490ac`. It is offline-only: no live source request, DNS/TCP/TLS
+probe, employer interaction, target authority, candidate-fact mutation, production private-database
+write, upload, or submission is permitted. The real private schema-10 database remains read-only.
+
+### Current state and separated blockers
+
+1. **Immutable observation versus fresh verification provenance.** The exact R4633 GET_JOB produced a
+   current qualified verification while safely reusing an immutable observation/job version. The
+   reader incorrectly compared the observation's historical parser/policy to the fresh verification's
+   parser/policy, making valid evidence unreadable. The fix must validate the two provenance chains
+   independently and preserve all immutable rows.
+2. **Observed employer scope versus source silence.** R2 currently treats every material UNKNOWN as
+   a review blocker and counts PARTIAL families as fully known. The implementation must distinguish
+   unobserved source scope (no evidence and no unparsed spans) from observed unresolved material scope
+   (PARTIAL or future UNKNOWN with material evidence), without converting silence into satisfaction.
+3. **Residual score/matching defect.** If the corrected semantics still leave R4633 at score zero or
+   REVIEW_REQUIRED, the copy-only rehearsal must classify the cause and reproduce only a generic,
+   policy-consistent parser/normalizer/matcher defect. No role-specific alias, threshold reduction,
+   candidate-fact invention, or semantic AI matching is allowed.
+
+### Proposed files, data flow, and contracts
+
+- `packages/database/src/beta-repository.ts` and verification tests: current verification chain and
+  independent historical observation chain, with fail-closed corruption cases.
+- `packages/eligibility-engine/src/r2.ts`, types, and tests: observed-scope classification,
+  conservative source-silence handling, explicit sparse-source review, and strict partial handling.
+- `packages/job-importer/src/r2a-normalization.ts` and tests only if a generic structured-scope
+  mapping defect is reproduced in fictional input.
+- `packages/fit-scorer` only if a generic evidence-backed scoring defect is reproduced; bump scorer
+  version only when scorer semantics change.
+- `packages/database/src/r2-readiness-summary.ts` and CLI tests: safe observed/partial/unobserved
+  counts and family names without candidate values or source excerpts.
+- `PROJECT_PLAN.md`, `docs/JOB_NORMALIZATION.md`, `docs/ELIGIBILITY_ENGINE.md`, and
+  `docs/R2_MATCHING_QUALITY_PLAN.md`: durable semantic and provenance documentation.
+- Synthetic tests and disposable-copy scripts: no real private DB writes and no live network.
+
+The preferred coverage contract is resolved observed material families divided by observed material
+families. Zero observed material families reports coverage 0 plus a conservative
+`R2_NO_MATERIAL_EMPLOYER_SCOPE_OBSERVED` diagnostic; PARTIAL families never count as resolved.
+UNOBSERVED is neither NOT_REQUIRED nor satisfied and does not itself create owner questions or a
+source-stage blocker. Explicit requirements, observed partial scope, hard mismatches, conflicts,
+conditions, and candidate evidence rules remain strict.
+
+### Versioning, privacy, rollback, and acceptance
+
+- Bump `R2_ELIGIBILITY_ENGINE_VERSION` (target `2.1.0`) for changed decision semantics. Do not
+  change threshold 50, fit weights, candidate facts, or calibration state. Do not bump the fit scorer
+  unless its source semantics change.
+- No migration is expected; migrations `0000`-`0010` remain immutable. A fresh ignored rehearsal
+  copy will be created under `data/private/rehearsals/<task-id>/` from the approved backup and checked
+  for schema 10, pending 0, integrity PASS, FK 0, ignored status, and matching safe counts.
+- Rollback is a normal branch revert; no SQL repair or production private-database restore is needed.
+  Candidate values, CV text, source excerpts, cookies, sessions, and raw payloads are never logged or
+  committed.
+- Acceptance requires: PR #50 exact merge; independent provenance reuse acceptance plus negative
+  matrix; all source-silence/partial/explicit-requirement R2 regressions; revised coverage and safe
+  diagnostics; real R4633 read-only characterization; copy-only reader and before/after R2 metrics;
+  copy-only PREPARING/packet rehearsal only if every canonical gate passes; full local gates; one
+  open exact-head implementation PR; and real action delta `0/0/0/0` with lifetime counters
+  `16/9/0/0`.
+
+### Exact implementation sequence
+
+1. Revalidate the merged main and private read-only baseline; inspect existing schemas and tests.
+2. Add the provenance regression and negative cases before changing the reader.
+3. Implement independent current-verification and historical-observation lineage checks.
+4. Add failing-before coverage/eligibility tests, then implement observed-scope semantics and bump
+   the eligibility engine version.
+5. Extend safe readiness diagnostics and documentation.
+6. Characterize R4633 using metadata only; create a new disposable rehearsal copy and re-evaluate
+   through production R2 APIs without PREPARING unless all gates pass.
+7. If score remains zero, investigate only a reproducible generic parser/normalizer/matcher defect;
+   otherwise preserve the conservative review result.
+8. Run focused suites, then format/lint/typecheck/unit/integration/E2E/build/showcase/privacy/audit/
+   release/diff/fsck gates. Record exact results and unfinished blockers.
+9. Commit the coherent implementation and plan evidence, push this branch, open exactly one PR titled
+   `fix: reconcile source provenance reuse and R2 observed-scope coverage`, and leave it open and
+   unmerged for human review.
+
+## 39. M2 R2 scope / provenance implementation evidence (2026-09-27)
+
+### Merge and branch
+
+- PR #50 was verified and squash-merged as `506fdbdc24c1271b962ce9d244eb1c69736490ac` from the
+  exact approved head `65c9a91e9dd9074fb52c25c12d102d455bc12c64`; local `main` and `origin/main`
+  matched that merge before this branch was created.
+- This implementation branch is `feat/m2-r2-scope-provenance-reuse`; it remains offline-only and
+  has no source/employer/upload/submission action delta (`0/0/0/0`). Lifetime counters remain
+  `16/9/0/0`.
+
+### Implemented scope
+
+- Qualified verification lookup now validates current verification and historical observation
+  provenance as independent immutable chains. Historical run completion, capability digest,
+  source/tenant, parser, and policy are required for reused source observations; current run,
+  page, capability, job version, content hash, parser, policy, and external identity remain
+  independently bound. Corruption/replay tests fail closed.
+- R2 eligibility engine `2.1.0` distinguishes material `COMPLETE`, `PARTIAL`, and `UNOBSERVED`
+  scope. Source silence (no evidence and no unparsed spans) is neither `NOT_REQUIRED` nor
+  satisfied, does not create an owner question, and does not by itself block at source stage.
+  Observed partial scope remains review-blocking; resolved coverage is calculated only across
+  observed material families and zero observed scope reports a conservative diagnostic.
+- Fit scoring `2.1.0`, repository recommendation invariants, and safe readiness summaries expose
+  partial/unobserved counts and family names without excerpts or candidate values. Missing coverage
+  rows fail closed as unobserved.
+- Fictional Lever structured-description and inert `lists[]` regression proves list requirements
+  reach R2A with bounded source pointers and no retained HTML execution path. Raw provider payloads
+  remain immutable; no role-specific alias or threshold change was made.
+- A reproducible generic R2A defect was found and fixed: structured description spans used raw JSON
+  coordinates for evidence but inert-text coordinates for coverage, falsely making fully parsed
+  hours/schedule scope `PARTIAL`. Structured provenance now matches by immutable source path while
+  ordinary visible-text spans retain exact coordinate matching; no parser authority or source
+  network behavior changed.
+
+### Offline rehearsal evidence
+
+- A fresh ignored copy under `data/private/rehearsals/m2-r2-scope-provenance-20260927-final/` was
+  opened and checked before mutation: schema 10, integrity `PASS`, foreign-key issues `0`.
+- The R4633 copy-only characterization reused verification
+  `57db0589-c403-4056-95cc-d53b2632079c` and observation/job-version provenance without any network
+  call. Before/after safe counts were R2 evaluations `112 -> 113`, queue decisions `110 -> 111`,
+  packets `4 -> 4`, documents `6 -> 6`; post-integrity remained `PASS` and FK issues `0`.
+- Under the corrected contract the role remains `REVIEW_REQUIRED`, score `0`, recommended `false`,
+  coverage `0`, observed material families `1`, resolved `0`, partial `1` (`GEOGRAPHY`), and
+  unobserved `9`. No PREPARING transition, document generation, packet creation, or external action
+  was attempted. The production private database was not written.
+
+### Validation so far
+
+- Focused provenance/R2 suites: `7` files, `134` tests passed; structured R2A normalization suite:
+  `65` tests passed; the corrected source-to-preview E2E regression passed.
+- Full unit suite: `56` files, `609` tests passed. Integration suite: `3` files, `21` tests passed.
+- Full Playwright E2E: `47` tests passed. Production web build, showcase build, and public showcase
+  audit passed.
+- `npm run typecheck`, `npm run lint`, `git diff --check`, and `git fsck --strict` passed. Strict
+  fsck reports only the repository's known dangling historical blobs/trees.
+- `npm run release:check:fixture` passed with disposable schema 10, pending migrations `0`,
+  integrity `PASS`, FK issues `0`, private profile read `0`, privacy audit pass, and both npm
+  vulnerability audits at `0` vulnerabilities. Private preflight passed with source-enabled beta
+  `READY`, active source capabilities `0`, and Personal Live V1 `NOT_READY`.
+- Local `npm run format:check` still reports the repository's known Windows line-ending warnings in
+  unrelated baseline files; the release fixture's `prettier --end-of-line auto` gate passed and no
+  broad reformat was authorized.
+
+### Remaining release boundary
+
+No migration was added; migrations `0000`-`0010` remain immutable. The real private database
+remained read-only at schema 10/pending 0/integrity PASS/FK 0. Source-enabled Personal Beta
+remains `READY`; Personal Live V1 remains `NOT_READY`. The next step is to commit this coherent
+change, push the same branch, open one PR titled `fix: reconcile source provenance reuse and R2
+observed-scope coverage`, verify exact-head CI, and leave it open and unmerged for human review.
+
+## 40. PR #51 review handoff (2026-09-27)
+
+- The implementation checkpoint was `3aab28386b77f81de2d3122efcce660e10d26d9a`; a subsequent
+  plan-only handoff commit moved the review head to `64343ed2d70305022e8fd7e558f000eb7e1c527f`.
+- PR #51, titled `fix: reconcile source provenance reuse and R2 observed-scope coverage`, remains
+  `OPEN / UNMERGED`, base `main`, and GitHub reports it `MERGEABLE`. The final correction head and
+  exact-head CI are recorded in section 42 and the final PR handoff after the correction push.
+- The earlier handoff push and pull-request quality checks both passed (workflow runs
+  `36294478213` and `36294481544`). The PR body records the safe evidence and offline boundary.
+- No live source request, DNS/TCP/TLS probe, employer interaction, upload, submission, target
+  authority, candidate-fact mutation, or production private-database write occurred. Keep PR #51
+  unmerged for human review; Source-enabled Personal Beta remains `READY` and Personal Live V1
+  remains `NOT_READY`.
+
+## 41. PR #51 strict provenance / R2A rederivation correction blueprint (2026-09-27)
+
+### Current state and objective
+
+- Same branch/PR: `feat/m2-r2-scope-provenance-reuse`; PR #51 remains open and unmerged at the
+  reviewed handoff head `64343ed2d70305022e8fd7e558f000eb7e1c527f`.
+- This correction is offline-only. The real private database is read-only; no source, employer,
+  upload, submission, candidate-data, or capability action is authorized. Action delta must remain
+  `0/0/0/0`; lifetime counters remain `16/9/0/0`.
+- Close three review findings: fail closed on NULL historical observation runs; version the changed
+  R2A parser/normalizer semantics; and provide an immutable, exact-payload local rederivation path
+  for unchanged provider content without rewriting observations, job versions, or verifications.
+
+### Architecture and data flow
+
+1. `getLatestQualifiedVerification()` will require an independently valid historical observation
+   creation run/capability/parser/policy chain. Current verification lineage remains independently
+   bound; parser/policy versions may differ between the two valid chains.
+2. R2A parser and normalization versions will move to the next minor version required by the
+   changed structured-source coverage semantics. The evidence serialization contract remains at
+   its current version only if tests prove it is backward-compatible and the reason is documented.
+3. A disposable-copy-only rederivation API will load one immutable observation payload, verify its
+   digest and source/tenant/external identity, parse it through the current deterministic Lever
+   reader/mapping path, normalize it, and persist a new immutable job-version/evidence projection.
+   An additive schema relation (migration 0011) will bind verification, source observation/content,
+   parent and derived job versions, parser/normalization versions, and a deterministic derivation
+   digest if existing schema cannot represent that authority without ambiguity.
+4. Provider verification authority and local parser derivation authority remain separate. A derived
+   job version is preparation-eligible only through an exact binding to the still-qualified
+   verification and immutable content; no second provider request or verification timestamp is
+   created.
+
+### Proposed files, safety, and tests
+
+- `packages/database/src/beta-repository.ts` and verification tests: remove the NULL-run escape
+  hatch and add the full provenance corruption matrix.
+- `packages/job-model/src/r2a.ts`, importer/docs/tests: explicit parser/normalization identity and
+  unchanged-content version regressions.
+- `packages/database/src/source-enablement-repository.ts`, `r2a-repository.ts`, schema, and an
+  additive migration only if required: exact-payload immutable rederivation and binding validation.
+- `packages/database/src/index.test.ts`, source-enablement tests, and disposable rehearsal helpers:
+  migration/schema health, wrong payload/identity/digest/verification fail-closed cases, and no
+  network transport from rederivation.
+- `PROJECT_PLAN.md` and PR body: final exact head, CI, offline boundary, metadata-only R4633
+  rehearsal, freshness, and seven-milestone tracker.
+
+### Rollback and acceptance
+
+- Migrations `0000`-`0010` remain byte-for-byte unchanged. If migration `0011` is necessary it is
+  additive, validated only on fresh/disposable copies, and never applied to the real private DB.
+- Existing immutable observations, historical job versions, verifications, and payloads are never
+  updated or backfilled. A normal branch revert is the rollback; disposable rehearsal copies may be
+  deleted/recreated without touching private production state.
+- Acceptance requires strict current/historical provenance, explicit R2A versioning, synthetic
+  unchanged-content stale-normalization proof, exact-payload rederivation with immutable binding,
+  conservative R2 metrics, full local gates, updated handoff, exact-head CI green, and PR #51 left
+  open/unmerged for human review.
+
+### Exact implementation sequence
+
+1. Revalidate branch/PR/base/head, migrations, private read-only metadata, payload digest, and
+   verification freshness.
+2. Add failing NULL-run/provenance and stale-normalization tests; implement strict reader/version
+   changes.
+3. Implement the smallest generic immutable rederivation/binding model and focused negative tests.
+4. Rehearse R4633 only on a fresh ignored disposable copy; report metadata and safe before/after
+   R2 metrics, never raw payload or excerpts and never PREPARING unless every canonical gate passes.
+5. Run focused/full quality, privacy, schema, migration, release, diff, and fsck gates; update this
+   plan and PR body with true final head/CI and remaining blockers.
+
+## 42. PR #51 strict provenance / R2A rederivation correction evidence (2026-09-27)
+
+### Baseline and scope
+
+- Starting PR #51 base: `506fdbdc24c1271b962ce9d244eb1c69736490ac`; starting review head:
+  `64343ed2d70305022e8fd7e558f000eb7e1c527f`; branch remains
+  `feat/m2-r2-scope-provenance-reuse`; PR remains `OPEN / UNMERGED / MERGEABLE`.
+- Implementation checkpoint before this correction was `3aab28386b77f81de2d3122efcce660e10d26d9a`;
+  the handoff/documentation checkpoint was `64343ed2d70305022e8fd7e558f000eb7e1c527f`; the
+  final correction head is `f630e8404829cf3837228ebedfdfe0bcfaa64a2f`.
+- Offline boundary held: no source request, DNS/TCP/TLS probe, employer interaction, candidate-data
+  transmission, target capability, MAP, FILL, UPLOAD, VERIFY, FILL_PREVIEW, or SUBMIT. Correction
+  delta and lifetime counters remain `0/0/0/0` and `16/9/0/0`.
+
+### Strict provenance correction
+
+- `getLatestQualifiedVerification()` now requires `source_observations.run_id IS NOT NULL` and a
+  complete historical run whose capability digest, source, tenant, parser, and policy match the
+  immutable observation. A NULL historical run fails closed; no historical row was backfilled.
+- Current verification remains independently bound to its complete run, capability digest, parser,
+  policy, page/digest/index, exact source/tenant/external/content identity, and job version.
+  A valid fresh current parser/policy may differ from the historical observation parser/policy.
+- Synthetic matrix covers NULL run, incomplete historical run, historical capability digest/parser/
+  policy corruption, current capability/parser/policy corruption, page corruption, wrong job
+  version, PAGE_PERSISTED, source/tenant/external/content mismatch, and valid parser-mismatch reuse.
+
+### R2A identity and immutable derivation
+
+- Old parser/normalization identity: `3.1.0`; new parser and normalization identity: `3.2.0`.
+  Evidence contract remains `3.1.0` because no serialized evidence shape or column contract changed;
+  migration 0011 persists the separate contract/normalization identities for new rows.
+- Historical 3.1.0 normalization remains identifiable and immutable. Synthetic unchanged-content
+  replay proves reuse alone does not relabel old output.
+- Additive `0011_immutable_r2a_derivation_bindings.sql` is required because migrations 0000-0010
+  cannot express a durable verification-to-derived-version authority relation. It binds exact
+  verification, observation/content, parent/derived job versions, parser/normalization versions,
+  and deterministic derivation digest with restrictive foreign keys and uniqueness. Migrations
+  0000-0010 remain byte-for-byte unchanged. Migration tests cover fresh schema 11, health, and
+  legacy schema compatibility; 0011 was not applied to the real private database.
+- `readLeverPostingV2FromPayload()` shares the current deterministic inert Lever schema/mapping
+  path and performs no transport. Re-derivation verifies payload digest and source/tenant/external
+  identity, creates only a new immutable local job/evidence projection, and never creates a second
+  provider verification or rewrites the observation/job history.
+
+### Disposable R4633 rehearsal
+
+- Real payload presence/digest check passed using metadata only: observation
+  `source-observation-d0b965003a92fe3fb300de054b24f8bd73b8123bbcc90a1e46832ed39cdde130`, stored
+  payload digest matched its content hash; raw payload/excerpts were not printed.
+- Fresh ignored copy: `data/private/rehearsals/m2-pr51-r2a-rederive-20260927/applypilot.sqlite`;
+  schema `11`, pending `0`, integrity `PASS`, foreign keys `0`, ignored and untracked.
+- Qualified verification reader on copy returned `57db0589-c403-4056-95cc-d53b2632079c`.
+  Historical job version/parser/normalization: `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953` / `3.1.0` / `3.1.0`.
+  Derived job version/parser/normalization: `5356578a-cf6e-462b-b9c0-26d9e65ca6bd` / `3.2.0` / `3.2.0`.
+  Binding digest: `9c815b10e176d5756f1ca4eab8eaabb04915e1ab9d4dacacb0b652b50434af04`.
+- Safe R2 BEFORE and AFTER metrics were both `REVIEW_REQUIRED`, score `0`, threshold `50`,
+  recommended `false`, coverage `0`, unknown `0`, conditions `0`, conflicts `0`, observed `1`,
+  resolved `0`, partial `1` (`GEOGRAPHY`), unobserved `9` (`HOURS`, `SCHEDULE`, `SKILLS`,
+  `EXPERIENCE`, `EDUCATION`, `LICENCES`, `CERTIFICATIONS`, `WORK_RIGHTS`, `VEHICLE`). Reasons:
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`. The canonical remaining
+  blocker is **A: observed PARTIAL material extraction**, not a role-pass optimization.
+- COPY queue remained `REVIEWING`; COPY PREPARING, document, and packet actions were not attempted.
+
+### Validation and readiness
+
+- Unit: `56` files / `611` passed. Integration: `3` files / `21` passed. Full Playwright E2E:
+  `47` passed in the final single-worker release-fixture run. The strict-provenance E2E fixture now
+  carries its historical run binding, and the evidence UI assertion tracks parser `3.2.0` with
+  evidence contract `3.1.0` / normalization `3.2.0`. Typecheck, full lint, production web build,
+  showcase build, showcase audit, privacy audit, dependency audits (`0` vulnerabilities), release
+  fixture, EOL-auto format, `git diff --check`, and `git fsck --strict` passed. Fsck reports only
+  known dangling historical objects.
+- Disposable schema/pending/integrity/FK: `11/0/PASS/0`. Real private DB remained read-only:
+  schema `10`, pending `1` (disposable-only 0011), integrity `PASS`, FK `0`; source capabilities
+  configured `11`, active `0`; target capabilities active `0`.
+- Verification freshness at final closeout: verifiedAt `2026-09-27T00:23:54.465Z`, preparation
+  validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T06:29:55Z`, approximately
+  `64,439` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
+- Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. Threshold
+  remains `50`; weight version remains `r2-weights-1`. The prior correction checkpoint recorded
+  push/PR CI `36299774334` / `36299776808`; live exact head/tree and CI are maintained in the PR
+  body and external handoff because a tracked file cannot contain its own resulting SHA. Seven-
+  milestone tracker remains: Foundations `COMPLETE / MERGED`;
+  current real role + fresh packet `IN PROGRESS`; real MAP/FILL/UPLOAD/VERIFY `ENGINEERING`;
+  final-review safeguards `BLOCKED BY REAL NON-SUBMIT INTEGRATION`; reproducible release
+  `COMPLETE`; controlled fill-preview `BLOCKED`; green-banner review `NOT_STARTED`.
+
+## 43. PR #51 final audit / fit-blocker handoff correction blueprint (2026-09-27)
+
+### Objective and constraints
+
+- Keep PR #51 on `feat/m2-r2-scope-provenance-reuse` open and unmerged; do not redesign the
+  accepted strict provenance/R2A architecture.
+- Remain offline-only: no source/employer/network actions, candidate-data transmission, document or
+  packet mutation, real-DB writes, or migration 0011 application to the real private database.
+- Correct only safe disposable rehearsal diagnostics so production fit blockers are reported
+  alongside eligibility blockers, then refresh the external PR handoff with the true live head/CI.
+
+### Required implementation and validation
+
+1. Extend `scripts/r2a-rederive-rehearsal.ts` to report production eligibility reason codes,
+   fit recommendation blockers, contribution count/codes/points, coverage and safe scope counts,
+   queue state/freshness, and calibration state without private text or payloads.
+2. Re-run the existing ignored schema-11 R4633 rehearsal and classify every active A-H blocker;
+   do not enter PREPARING or create documents/packets because canonical gates remain unmet.
+3. Preserve threshold `50`, weight version `r2-weights-1`, parser/normalization `3.2.0`, evidence
+   contract `3.1.0`, migration immutability, and the real action delta `0/0/0/0`.
+4. Replace self-stale tracked wording with historical checkpoint wording; keep live exact head/tree
+   and exact-head CI in the PR body/external handoff. Run focused/full validation, commit, push,
+   wait for exact-head push/PR CI, update the PR body, and leave PR #51 unmerged.
+
+### Acceptance
+
+- BEFORE and AFTER rehearsal output includes fit blockers and contributions from the production scorer;
+  `SCORE_BELOW_THRESHOLD` is reported when score `0` is below threshold `50`.
+- PROJECT_PLAN does not claim that its containing commit is itself the live exact head.
+- PR #51 remains open, unmerged, mergeable, and exact-head CI green.
+
+## 44. PR #51 final audit correction evidence (2026-09-27)
+
+- The accepted provenance/R2A architecture was not weakened. Parser/normalization remain `3.2.0`,
+  evidence contract `3.1.0`, threshold `50`, and weight version `r2-weights-1`.
+- `scripts/r2a-rederive-rehearsal.ts` now reports production eligibility reasons, fit recommendation
+  blockers, contribution count/codes/points, safe scope counts/families, queue state/freshness, and
+  calibration state without private values, excerpts, or payloads.
+- R4633 rehearsal rerun on ignored `data/private/rehearsals/m2-pr51-r2a-rederive-20260927/applypilot.sqlite`:
+  schema `11`, pending `0`, integrity `PASS`, FK `0`, Git-ignored; replay returned `created=false`
+  with one immutable derivation binding. BEFORE and AFTER were both `REVIEW_REQUIRED`, score `0`,
+  threshold `50`, recommended `false`, coverage `0`, eligibility reasons
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT` and `R2_MATERIAL_SCOPE_PARTIAL`, fit blockers
+  `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, and
+  `SCORE_BELOW_THRESHOLD`, contribution count `0`, observed `1`, resolved `0`, partial `1`
+  (`GEOGRAPHY`), unobserved `9` (`HOURS`, `SCHEDULE`, `SKILLS`, `EXPERIENCE`, `EDUCATION`,
+  `LICENCES`, `CERTIFICATIONS`, `WORK_RIGHTS`, `VEHICLE`), queue `REVIEWING/CURRENT`, calibration
+  `UNCALIBRATED`.
+- Active blocker classification is **A + F**: observed partial material extraction and score below
+  threshold despite the exact current production scorer. No B, C, D, E, G, or H cause was reproduced.
+  No PREPARING, document, packet, or real-DB action was attempted.
+- The prior correction head/CI in section 42 is historical only. Live exact head/tree and exact-head
+  CI are maintained in the PR body/external handoff: the tracked plan does not claim self-resulting
+  SHA metadata.

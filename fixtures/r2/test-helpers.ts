@@ -74,11 +74,13 @@ export function r2TestNormalization(input: {
   fields?: R2JobFieldEvidence[];
   requirements?: R2RequirementEvidence[];
   unknownFamilies?: R2JobFieldEvidence["family"][];
+  partialFamilies?: R2JobFieldEvidence["family"][];
   conflicts?: R2ANormalization["conflicts"];
 }): R2ANormalization {
   const fields = input.fields ?? [];
   const requirements = input.requirements ?? [];
   const unknown = new Set(input.unknownFamilies ?? []);
+  const partial = new Set(input.partialFamilies ?? []);
   return R2ANormalizationSchema.parse({
     sourceObservationId: "observation-r2-fixture",
     sourceLength: sourceText.length,
@@ -90,7 +92,16 @@ export function r2TestNormalization(input: {
     conflicts: input.conflicts ?? [],
     coverage: JobFieldFamilySchema.options.map((family) => ({
       family,
-      state: unknown.has(family) ? "UNKNOWN" : "PARTIAL",
+      state: unknown.has(family)
+        ? "UNKNOWN"
+        : partial.has(family)
+          ? "PARTIAL"
+          : [
+                ...fields.filter((item) => item.family === family),
+                ...requirements.filter((item) => item.family === family),
+              ].length > 0
+            ? "COMPLETE"
+            : "UNKNOWN",
       evidenceIds: [
         ...fields.filter((item) => item.family === family).map(({ id }) => id),
         ...requirements.filter((item) => item.family === family).map(({ id }) => id),

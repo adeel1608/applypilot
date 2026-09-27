@@ -443,6 +443,8 @@ export const jobNormalizationCoverage = sqliteTable("job_normalization_coverage"
   evidenceIdsJson: text("evidence_ids_json").notNull(),
   unparsedSpansJson: text("unparsed_spans_json").notNull(),
   parserVersion: text("parser_version").notNull(),
+  evidenceContractVersion: text("evidence_contract_version"),
+  normalizationVersion: text("normalization_version"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -1030,6 +1032,27 @@ export const sourceObservationPayloads = sqliteTable("source_observation_payload
   observationId: text("observation_id").primaryKey(),
   payloadJson: text("payload_json").notNull(),
   contentDigest: text("content_digest").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const sourceDerivationBindings = sqliteTable("source_derivation_bindings", {
+  id: text("id").primaryKey(),
+  verificationId: text("verification_id")
+    .notNull()
+    .references(() => sourceRecordVerifications.id, { onDelete: "restrict" }),
+  sourceObservationId: text("source_observation_id")
+    .notNull()
+    .references(() => sourceObservations.id, { onDelete: "restrict" }),
+  contentHash: text("content_hash").notNull(),
+  parentJobVersionId: text("parent_job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  derivedJobVersionId: text("derived_job_version_id")
+    .notNull()
+    .references(() => jobVersions.id, { onDelete: "restrict" }),
+  parserVersion: text("parser_version").notNull(),
+  normalizationVersion: text("normalization_version").notNull(),
+  derivationDigest: text("derivation_digest").notNull(),
   createdAt: text("created_at").notNull(),
 });
 

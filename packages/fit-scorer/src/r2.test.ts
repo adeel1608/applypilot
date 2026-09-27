@@ -111,6 +111,29 @@ describe("R2 fit scoring", () => {
     expect(result.recommendationBlockers).toContain("ELIGIBILITY_NOT_ELIGIBLE");
   });
 
+  it("blocks recommendation when observed material scope is partial", () => {
+    const skill = r2RequirementEvidence("partial-skill-fit", "SKILLS", "SKILL", {
+      kind: "TEXT",
+      value: "Fictional robotics skill",
+    });
+    const base = r2TestNormalization({ requirements: [skill] });
+    const normalization = {
+      ...base,
+      coverage: base.coverage.map((coverage) =>
+        coverage.family === "SKILLS" ? { ...coverage, state: "PARTIAL" as const } : coverage,
+      ),
+    };
+    const eligibility = eligible(normalization);
+    const result = score({
+      profile: testProfile,
+      normalization,
+      eligibility,
+      recommendationThreshold: 0,
+    });
+    expect(result.recommendationBlockers).toContain("MATERIAL_SCOPE_PARTIAL");
+    expect(result.recommended).toBe(false);
+  });
+
   it("keeps commute time and distance independent", () => {
     const commute = r2FieldEvidence(
       "commute-time",

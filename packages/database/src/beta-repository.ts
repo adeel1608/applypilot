@@ -27,6 +27,8 @@ import {
   JobSchema,
   RequirementEvidenceSchema,
   R2ANormalizationSchema,
+  R2A_NORMALIZATION_VERSION,
+  R2A_PARSER_VERSION,
   SourceObservationSchema,
   type Job,
   type JobFieldEvidence,
@@ -88,6 +90,28 @@ export interface QualifiedVerificationEvidence {
   sourcePolicyVersion: string | null;
 }
 
+export function immutableR2ADerivationDigest(input: {
+  verificationId: string;
+  sourceObservationId: string;
+  contentHash: string;
+  parentJobVersionId: string;
+  derivedJobVersionId: string;
+  parserVersion: string;
+  normalizationVersion: string;
+}): string {
+  return digest(
+    [
+      input.verificationId,
+      input.sourceObservationId,
+      input.contentHash,
+      input.parentJobVersionId,
+      input.derivedJobVersionId,
+      input.parserVersion,
+      input.normalizationVersion,
+    ].join("\n"),
+  );
+}
+
 const DocumentArtifactInputSchema = z.object({
   id: z.string().min(1).optional(),
   jobId: z.string().min(1),
@@ -125,13 +149,25 @@ export class BetaRepository {
     jobId: string,
     jobVersionId: string,
   ): QualifiedVerificationEvidence | null {
+    const hasDerivationBindings = Boolean(
+      this.sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_derivation_bindings'",
+        )
+        .get(),
+    );
     const row = this.sqlite
       .prepare(
-        `SELECT v.id AS verificationId,jv.job_id AS jobId,v.job_version_id AS jobVersionId,
+        `SELECT v.id AS verificationId,jv.job_id AS jobId,jv.id AS jobVersionId,
+                v.job_version_id AS providerJobVersionId,
                 v.source_observation_id AS sourceObservationId,v.run_id AS runId,
                 v.page_id AS pageId,v.content_hash AS contentHash,v.verified_at AS verifiedAt,
                 o.expires_at AS providerExpiresAt,v.parser_version AS parserVersion,
-                v.policy_version AS sourcePolicyVersion
+                v.policy_version AS sourcePolicyVersion${
+                  hasDerivationBindings
+                    ? ", b.id AS derivationBindingId, b.derivation_digest AS derivationDigest"
+                    : ", NULL AS derivationBindingId, NULL AS derivationDigest"
+                }
          FROM source_record_verifications v
          JOIN source_run_checkpoints r ON r.id=v.run_id AND r.status='COMPLETE'
            AND r.capability_version_id=v.capability_version_id
@@ -142,17 +178,73 @@ export class BetaRepository {
            AND c.policy_version=v.policy_version
          JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id
            AND p.page_digest=v.page_digest AND v.record_index < p.record_count
-         JOIN job_versions jv ON jv.id=v.job_version_id
-           AND jv.job_id=? AND jv.id=? AND jv.source_observation_id=v.source_observation_id
+         JOIN job_versions jv ON jv.job_id=? AND jv.id=?
+           AND jv.source_observation_id=v.source_observation_id
          JOIN source_observations o ON o.id=v.source_observation_id
            AND o.content_hash=v.content_hash
            AND o.source=v.source AND o.tenant=v.tenant AND o.external_id=v.external_id
-           AND o.parser_version=v.parser_version AND o.policy_version=v.policy_version
+           AND o.run_id IS NOT NULL AND EXISTS (
+               SELECT 1
+               FROM source_run_checkpoints historicalRun
+               JOIN source_capability_versions historicalCapability
+                 ON historicalCapability.id=historicalRun.capability_version_id
+                AND historicalCapability.source=o.source
+                AND historicalCapability.tenant=o.tenant
+                AND historicalCapability.configuration_digest=historicalRun.capability_digest
+                AND historicalCapability.parser_version=o.parser_version
+                AND historicalCapability.policy_version=o.policy_version
+               WHERE historicalRun.id=o.run_id
+                 AND historicalRun.status='COMPLETE'
+             )
+         ${
+           hasDerivationBindings
+             ? `LEFT JOIN source_derivation_bindings b
+                 ON b.verification_id=v.id
+                AND b.source_observation_id=v.source_observation_id
+                AND b.content_hash=v.content_hash
+                AND b.parent_job_version_id=v.job_version_id
+                AND b.derived_job_version_id=jv.id
+                AND b.parser_version=?
+                AND b.normalization_version=?`
+             : ""
+         }
          WHERE v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
+           AND (
+             v.job_version_id=?
+             ${hasDerivationBindings ? "OR b.id IS NOT NULL" : ""}
+           )
          ORDER BY v.verified_at DESC,v.rowid DESC LIMIT 1`,
       )
-      .get(jobId, jobVersionId) as QualifiedVerificationEvidence | undefined;
-    return row ?? null;
+      .get(
+        ...(hasDerivationBindings
+          ? [jobId, jobVersionId, R2A_PARSER_VERSION, R2A_NORMALIZATION_VERSION, jobVersionId]
+          : [jobId, jobVersionId, jobVersionId]),
+      ) as
+      | (QualifiedVerificationEvidence & {
+          providerJobVersionId: string;
+          derivationBindingId: string | null;
+          derivationDigest: string | null;
+        })
+      | undefined;
+    if (!row) return null;
+    if (row.derivationBindingId) {
+      if (
+        !row.derivationDigest ||
+        row.derivationDigest !==
+          immutableR2ADerivationDigest({
+            verificationId: row.verificationId,
+            sourceObservationId: row.sourceObservationId,
+            contentHash: row.contentHash,
+            parentJobVersionId: row.providerJobVersionId,
+            derivedJobVersionId: row.jobVersionId,
+            parserVersion: R2A_PARSER_VERSION,
+            normalizationVersion: R2A_NORMALIZATION_VERSION,
+          })
+      ) {
+        return null;
+      }
+    }
+    return row;
   }
 
   recordSourceObservation(

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type BetterSqlite3 from "better-sqlite3";
 import {
+  R2A_EVIDENCE_CONTRACT_VERSION,
+  R2A_PARSER_VERSION,
   R2ANormalizationSchema,
   R2JobFieldEvidenceSchema,
   R2NormalizedValueSchema,
@@ -271,11 +273,21 @@ export class R2ARepository {
         }
       }
 
+      const versionedCoverage = (
+        this.sqlite.prepare("PRAGMA table_info(job_normalization_coverage)").all() as Array<{
+          name: string;
+        }>
+      ).some(({ name }) => name === "evidence_contract_version");
       const insertCoverage = this.sqlite.prepare(
-        `INSERT INTO job_normalization_coverage
-          (id, job_version_id, family, coverage_state, evidence_count, evidence_ids_json,
-           unparsed_spans_json, parser_version, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        versionedCoverage
+          ? `INSERT INTO job_normalization_coverage
+              (id, job_version_id, family, coverage_state, evidence_count, evidence_ids_json,
+               unparsed_spans_json, parser_version, evidence_contract_version, normalization_version, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          : `INSERT INTO job_normalization_coverage
+              (id, job_version_id, family, coverage_state, evidence_count, evidence_ids_json,
+               unparsed_spans_json, parser_version, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const coverage of normalization.coverage) {
         const persistedEvidenceIds = coverage.evidenceIds.map(
@@ -290,6 +302,9 @@ export class R2ARepository {
           JSON.stringify(persistedEvidenceIds),
           JSON.stringify(coverage.unparsedSpans),
           coverage.parserVersion,
+          ...(versionedCoverage
+            ? [normalization.evidenceContractVersion, normalization.normalizationVersion]
+            : []),
           createdAt,
         );
       }
@@ -450,11 +465,23 @@ export class R2ARepository {
         conflictSetId: row.conflictSetId,
       }),
     );
+    const versionedCoverage = (
+      this.sqlite.prepare("PRAGMA table_info(job_normalization_coverage)").all() as Array<{
+        name: string;
+      }>
+    ).some(({ name }) => name === "evidence_contract_version");
     const coverageRows = this.sqlite
       .prepare(
-        `SELECT family, coverage_state AS coverageState, evidence_ids_json AS evidenceIdsJson,
-                unparsed_spans_json AS unparsedSpansJson, parser_version AS parserVersion
-         FROM job_normalization_coverage WHERE job_version_id = ? ORDER BY family`,
+        versionedCoverage
+          ? `SELECT family, coverage_state AS coverageState, evidence_ids_json AS evidenceIdsJson,
+                    unparsed_spans_json AS unparsedSpansJson, parser_version AS parserVersion,
+                    evidence_contract_version AS evidenceContractVersion,
+                    normalization_version AS normalizationVersion
+             FROM job_normalization_coverage WHERE job_version_id = ? ORDER BY family`
+          : `SELECT family, coverage_state AS coverageState, evidence_ids_json AS evidenceIdsJson,
+                    unparsed_spans_json AS unparsedSpansJson, parser_version AS parserVersion,
+                    NULL AS evidenceContractVersion, NULL AS normalizationVersion
+             FROM job_normalization_coverage WHERE job_version_id = ? ORDER BY family`,
       )
       .all(jobVersionId) as Array<{
       family: string;
@@ -462,6 +489,8 @@ export class R2ARepository {
       evidenceIdsJson: string;
       unparsedSpansJson: string;
       parserVersion: string;
+      evidenceContractVersion: string | null;
+      normalizationVersion: string | null;
     }>;
     if (coverageRows.length === 0) return null;
     const conflictGroups = new Map<string, string[]>();
@@ -482,12 +511,16 @@ export class R2ARepository {
       ),
     );
     const parserVersion = coverageRows[0]?.parserVersion ?? "3.0.0";
+    const evidenceContractVersion =
+      coverageRows[0]?.evidenceContractVersion ??
+      (parserVersion === R2A_PARSER_VERSION ? R2A_EVIDENCE_CONTRACT_VERSION : parserVersion);
+    const normalizationVersion = coverageRows[0]?.normalizationVersion ?? parserVersion;
     const normalization = R2ANormalizationSchema.parse({
       sourceObservationId: version.sourceObservationId,
       sourceLength,
       parserVersion,
-      evidenceContractVersion: parserVersion,
-      normalizationVersion: parserVersion,
+      evidenceContractVersion,
+      normalizationVersion,
       fieldEvidence,
       requirementEvidence,
       conflicts: [...conflictGroups].map(([id, evidenceIds]) => ({

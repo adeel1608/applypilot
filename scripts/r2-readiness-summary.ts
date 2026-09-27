@@ -29,6 +29,12 @@ try {
         duplicateState: summary.duplicateState,
         calibrationState: summary.calibrationState,
         ownerQuestionIds: summary.ownerQuestionIds,
+        observedMaterialFamilyCount: summary.observedMaterialFamilyCount,
+        resolvedObservedMaterialFamilyCount: summary.resolvedObservedMaterialFamilyCount,
+        partialMaterialFamilyCount: summary.partialMaterialFamilyCount,
+        unobservedMaterialFamilyCount: summary.unobservedMaterialFamilyCount,
+        unobservedMaterialFamilies: summary.unobservedMaterialFamilies,
+        partialMaterialFamilies: summary.partialMaterialFamilies,
       }),
     );
   }

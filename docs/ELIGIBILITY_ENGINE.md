@@ -1,6 +1,6 @@
 # Eligibility Engine
 
-Status: deterministic Beta compatibility rules and R2 eligibility engine 2.0.0 are implemented and hardened. R2 consumes current R2A 3.1.0 evidence and is pending final exact-head review in unmerged PR #13. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: deterministic Beta compatibility rules and R2 eligibility engine 2.1.0 are implemented and hardened. R2 consumes current R2A 3.2.0 evidence (serialized evidence contract 3.1.0) and preserves conservative source-scope semantics. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Contract
 
@@ -25,6 +25,16 @@ A missing mandatory licence/qualification is a blocker only when negative truth 
 R2B makes class semantics strict: verified legal/employer-required conflicts may block; material unknown/conditional/conflicting evidence requires review; employer preferences do not block; candidate preferences cannot label the candidate legally or employer-ineligible. A fit score never overrides blocker, review, stale, conflict, or low-coverage state. Work-right results are explicitly not legal advice.
 
 A legal-hours blocker additionally requires an exact-unit fortnight value and a verified, deterministically applicable time basis. `CURRENT` and teaching/break/visa-period assertions require both `asOf` and `validThrough`, in order, with the evaluation date inside that interval; an ordered `DATE_WINDOW` must also be active. Missing, partial, future, expired, unverified, or unresolved applicability yields `REVIEW_REQUIRED`, never a legal conclusion. Weekly evidence never becomes fortnightly evidence.
+
+### Source-scope semantics
+
+R2 distinguishes source silence from observed uncertainty. A material family with no evidence and
+no unparsed spans is `UNOBSERVED`: it is neither `NOT_REQUIRED` nor satisfied, but it does not by
+itself create an owner question or blocker. A family with observed material scope that remains
+unresolved is `PARTIAL`; it produces `REVIEW_REQUIRED` and cannot count as resolved coverage. The
+coverage percentage is resolved observed families divided by observed families, with zero observed
+families reported as zero plus a conservative no-scope diagnostic. Explicit requirements, hard
+mismatches, conflicts, conditions, candidate evidence rules, and stale bindings remain strict.
 
 ## Testing matrix
 

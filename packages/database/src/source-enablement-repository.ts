@@ -24,11 +24,13 @@ import {
   type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
 } from "@applypilot/job-sources";
+import { readLeverPostingV2FromPayload } from "@applypilot/job-sources";
 import { ParsedJobFieldsSchema, normalizeR2AJobEvidence } from "@applypilot/job-importer";
-import { JobSchema } from "@applypilot/job-model";
+import { JobSchema, R2A_NORMALIZATION_VERSION, R2A_PARSER_VERSION } from "@applypilot/job-model";
 import { ObservationIdentitySchema, type ObservationIdentity } from "@applypilot/job-normalizer";
 
 import { normalizeImportedJob } from "./job-import-repository";
+import { BetaRepository, immutableR2ADerivationDigest } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
 import { R2Repository } from "./r2-repository";
 
@@ -137,6 +139,17 @@ export interface PersistedSourcePageResult {
   duplicateObservationCount: number;
 }
 
+export interface R2ADerivationResult {
+  verificationId: string;
+  sourceObservationId: string;
+  parentJobVersionId: string;
+  derivedJobVersionId: string;
+  parserVersion: string;
+  normalizationVersion: string;
+  derivationDigest: string;
+  created: boolean;
+}
+
 export class SourceEnablementRepository implements SourceRunSink {
   constructor(
     private readonly sqlite: BetterSqlite3.Database,
@@ -153,6 +166,293 @@ export class SourceEnablementRepository implements SourceRunSink {
         )
         .get(),
     );
+  }
+
+  /**
+   * Re-derive current local R2A evidence from one immutable, already persisted
+   * Lever payload. This path is transport-free and never creates a provider
+   * verification row or mutates historical observations/job versions.
+   */
+  rederiveLeverObservation(input: { verificationId: string; now?: string }): R2ADerivationResult {
+    const bindingTable = Boolean(
+      this.sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_derivation_bindings'",
+        )
+        .get(),
+    );
+    if (!bindingTable) throw new Error("R2A_DERIVATION_SCHEMA_REQUIRED");
+    const row = this.sqlite
+      .prepare(
+        [
+          "SELECT v.id AS verificationId,v.job_version_id AS parentJobVersionId,",
+          "v.source_observation_id AS sourceObservationId,v.content_hash AS contentHash,",
+          "v.source,v.tenant,v.external_id AS externalId,v.disposition,",
+          "v.qualification_state AS qualificationState,o.job_id AS jobId,o.run_id AS observationRunId,",
+          "o.content_hash AS observationContentHash,o.source AS observationSource,o.tenant AS observationTenant,",
+          "o.external_id AS observationExternalId,p.payload_json AS payloadJson,p.content_digest AS payloadDigest,",
+          "c.capability_id AS capabilityId,c.version,",
+          "c.source AS capabilitySource,c.alias,c.tenant AS capabilityTenant,c.region,",
+          "c.allowed_host AS allowedHost,c.allowed_path_prefix AS allowedPathPrefix,",
+          "c.allowed_operations_json AS allowedOperationsJson,c.approval_state AS approvalState,",
+          "c.approval_reference AS approvalReference,c.approved_at AS approvedAt,",
+          "c.policy_version AS policyVersion,c.policy_reviewed_at AS policyReviewedAt,",
+          "c.policy_expires_at AS policyExpiresAt,c.capability_expires_at AS capabilityExpiresAt,",
+          "c.request_budget AS requestBudget,c.record_cap AS recordCap,c.page_size_cap AS pageSizeCap,",
+          "c.response_byte_limit AS responseByteLimit,c.request_timeout_ms AS requestTimeoutMs,",
+          "c.run_timeout_ms AS runTimeoutMs,c.max_redirects AS maxRedirects,c.max_retries AS maxRetries,",
+          "c.max_concurrency AS maxConcurrency,c.parser_version AS sourceParserVersion,",
+          "c.created_at AS capabilityCreatedAt,",
+          "c.revoked_at AS revokedAt,c.revocation_reason AS revocationReason",
+          "FROM source_record_verifications v",
+          "JOIN source_observations o ON o.id=v.source_observation_id",
+          "JOIN source_observation_payloads p ON p.observation_id=o.id",
+          "JOIN source_capability_versions c ON c.id=v.capability_version_id",
+          "WHERE v.id=?",
+        ].join(" "),
+      )
+      .get(input.verificationId) as
+      | (Record<string, unknown> & {
+          verificationId: string;
+          parentJobVersionId: string;
+          sourceObservationId: string;
+          contentHash: string;
+          source: string;
+          tenant: string | null;
+          externalId: string | null;
+          disposition: string;
+          qualificationState: string;
+          jobId: string;
+          observationRunId: string | null;
+          observationContentHash: string;
+          observationSource: string;
+          observationTenant: string | null;
+          observationExternalId: string | null;
+          payloadJson: string;
+          payloadDigest: string;
+          capabilityId: string;
+          version: number;
+          capabilitySource: string;
+          alias: string;
+          capabilityTenant: string;
+          region: string;
+          allowedHost: string;
+          allowedPathPrefix: string;
+          allowedOperationsJson: string;
+          approvalState: string;
+          approvalReference: string | null;
+          approvedAt: string | null;
+          policyVersion: string;
+          policyReviewedAt: string;
+          policyExpiresAt: string;
+          capabilityExpiresAt: string;
+          requestBudget: number;
+          recordCap: number;
+          pageSizeCap: number;
+          responseByteLimit: number;
+          requestTimeoutMs: number;
+          runTimeoutMs: number;
+          maxRedirects: number;
+          maxRetries: number;
+          maxConcurrency: number;
+          sourceParserVersion: string;
+          capabilityCreatedAt: string;
+          revokedAt: string | null;
+          revocationReason: string | null;
+        })
+      | undefined;
+    if (!row) throw new Error("R2A_VERIFICATION_NOT_FOUND");
+    if (row.disposition !== "ACCEPTED" || row.qualificationState !== "QUALIFIED") {
+      throw new Error("R2A_VERIFICATION_NOT_QUALIFIED");
+    }
+    if (
+      !row.observationRunId ||
+      row.source !== row.observationSource ||
+      row.tenant !== row.observationTenant ||
+      row.externalId !== row.observationExternalId ||
+      row.contentHash !== row.observationContentHash ||
+      row.payloadDigest !== row.observationContentHash ||
+      sha256(row.payloadJson) !== row.payloadDigest
+    ) {
+      throw new Error("R2A_IMMUTABLE_PAYLOAD_IDENTITY_MISMATCH");
+    }
+    const qualified = new BetaRepository(this.sqlite, this.now).getLatestQualifiedVerification(
+      row.jobId,
+      row.parentJobVersionId,
+    );
+    if (!qualified || qualified.verificationId !== row.verificationId) {
+      throw new Error("R2A_VERIFICATION_NOT_CURRENT");
+    }
+    const capability = SourceCapabilityV2Schema.parse({
+      schemaVersion: 2,
+      capabilityId: row.capabilityId,
+      version: row.version,
+      predecessorVersion: null,
+      source: row.capabilitySource,
+      alias: row.alias,
+      tenant: row.capabilityTenant,
+      region: row.region,
+      allowedHost: row.allowedHost,
+      allowedPathPrefix: row.allowedPathPrefix,
+      allowedOperations: JSON.parse(row.allowedOperationsJson),
+      approvalState: row.approvalState,
+      approvalReference: row.approvalReference,
+      approvedAt: row.approvedAt,
+      policyVersion: row.policyVersion,
+      policyReviewedAt: row.policyReviewedAt,
+      policyExpiresAt: row.policyExpiresAt,
+      capabilityExpiresAt: row.capabilityExpiresAt,
+      requestBudget: row.requestBudget,
+      recordCap: row.recordCap,
+      pageSizeCap: row.pageSizeCap,
+      responseByteLimit: row.responseByteLimit,
+      requestTimeoutMs: row.requestTimeoutMs,
+      runTimeoutMs: row.runTimeoutMs,
+      maxRedirects: row.maxRedirects,
+      maxRetries: row.maxRetries,
+      maxConcurrency: row.maxConcurrency,
+      parserVersion: row.sourceParserVersion,
+      createdAt: row.capabilityCreatedAt,
+      updatedAt: row.capabilityCreatedAt,
+      revokedAt: row.revokedAt,
+      revocationReason: row.revocationReason,
+    });
+    const existing = this.sqlite
+      .prepare(
+        "SELECT source_observation_id AS sourceObservationId,parent_job_version_id AS parentJobVersionId,derived_job_version_id AS derivedJobVersionId,derivation_digest AS derivationDigest FROM source_derivation_bindings WHERE verification_id=? AND source_observation_id=? AND parser_version=? AND normalization_version=?",
+      )
+      .get(
+        row.verificationId,
+        row.sourceObservationId,
+        R2A_PARSER_VERSION,
+        R2A_NORMALIZATION_VERSION,
+      ) as
+      | {
+          sourceObservationId: string;
+          parentJobVersionId: string;
+          derivedJobVersionId: string;
+          derivationDigest: string;
+        }
+      | undefined;
+    if (existing) {
+      const expected = immutableR2ADerivationDigest({
+        verificationId: row.verificationId,
+        sourceObservationId: row.sourceObservationId,
+        contentHash: row.contentHash,
+        parentJobVersionId: row.parentJobVersionId,
+        derivedJobVersionId: existing.derivedJobVersionId,
+        parserVersion: R2A_PARSER_VERSION,
+        normalizationVersion: R2A_NORMALIZATION_VERSION,
+      });
+      if (
+        existing.sourceObservationId !== row.sourceObservationId ||
+        existing.parentJobVersionId !== row.parentJobVersionId ||
+        existing.derivationDigest !== expected
+      ) {
+        throw new Error("R2A_DERIVATION_BINDING_CONFLICT");
+      }
+      return {
+        verificationId: row.verificationId,
+        sourceObservationId: row.sourceObservationId,
+        parentJobVersionId: row.parentJobVersionId,
+        derivedJobVersionId: existing.derivedJobVersionId,
+        parserVersion: R2A_PARSER_VERSION,
+        normalizationVersion: R2A_NORMALIZATION_VERSION,
+        derivationDigest: expected,
+        created: false,
+      };
+    }
+    const record = readLeverPostingV2FromPayload({
+      payload: JSON.parse(row.payloadJson),
+      capability,
+    });
+    if (record.externalId !== row.externalId || record.contentDigest !== row.contentHash) {
+      throw new Error("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
+    }
+    const location = record.location ?? record.allLocations[0] ?? null;
+    if (!location || !record.description.trim())
+      throw new Error("SOURCE_RECORD_REQUIRED_FIELD_MISSING");
+    const structured = structuredLeverRecord(record, capability);
+    const fields = ParsedJobFieldsSchema.parse({
+      externalId: record.externalId,
+      sourceUrl: record.sourceUrl,
+      applicationUrl: record.applicationUrl,
+      requisitionId: null,
+      title: record.title,
+      company: capability.alias,
+      location,
+      category:
+        [record.department, record.team].find(
+          (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
+        ) ?? null,
+      description: record.description,
+      salaryText: null,
+      employmentType: employmentType(record.commitment),
+      requirements: evidenceLines(record, "REQUIREMENTS"),
+      responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
+      datePosted: record.postedAt,
+      coverLetterRequired: null,
+    });
+    const job = normalizeImportedJob(
+      fields,
+      "LEVER",
+      {
+        importId: "R2A_REDERIVATION:" + row.verificationId,
+        recordId: row.sourceObservationId,
+        parserVersion: capability.parserVersion,
+        acquisitionMethod: "APPROVED_SOURCE_FETCH",
+        contentHash: record.contentDigest,
+        now: input.now ?? this.now().toISOString(),
+        editedFields: [],
+      },
+      row.jobId,
+    );
+    const normalization = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      sourceObservationId: row.sourceObservationId,
+      structured,
+      explicitLocation: location,
+    });
+    const derived = new BetaRepository(this.sqlite, this.now).recordJobVersion({
+      job,
+      sourceObservationId: row.sourceObservationId,
+      r2aNormalization: normalization,
+    });
+    const derivationDigest = immutableR2ADerivationDigest({
+      verificationId: row.verificationId,
+      sourceObservationId: row.sourceObservationId,
+      contentHash: row.contentHash,
+      parentJobVersionId: row.parentJobVersionId,
+      derivedJobVersionId: derived.id,
+      parserVersion: R2A_PARSER_VERSION,
+      normalizationVersion: R2A_NORMALIZATION_VERSION,
+    });
+    this.sqlite
+      .prepare(
+        "INSERT INTO source_derivation_bindings (id,verification_id,source_observation_id,content_hash,parent_job_version_id,derived_job_version_id,parser_version,normalization_version,derivation_digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        "r2a-derivation-" + sha256(derivationDigest).slice(0, 32),
+        row.verificationId,
+        row.sourceObservationId,
+        row.contentHash,
+        row.parentJobVersionId,
+        derived.id,
+        R2A_PARSER_VERSION,
+        R2A_NORMALIZATION_VERSION,
+        derivationDigest,
+        input.now ?? this.now().toISOString(),
+      );
+    return {
+      verificationId: row.verificationId,
+      sourceObservationId: row.sourceObservationId,
+      parentJobVersionId: row.parentJobVersionId,
+      derivedJobVersionId: derived.id,
+      parserVersion: R2A_PARSER_VERSION,
+      normalizationVersion: R2A_NORMALIZATION_VERSION,
+      derivationDigest,
+      created: derived.created,
+    };
   }
 
   persistCapabilityVersion(input: SourceCapabilityV2): { id: string; created: boolean } {

@@ -666,6 +666,24 @@ describe("R2 persistence", () => {
         jobVersionId: "job-version-current",
         profileVersionId: "profile-version-current",
         normalization,
+        eligibility: {
+          ...result.eligibility,
+          status: "ELIGIBLE",
+          partialMaterialFamilyCount: 1,
+        },
+        fit: {
+          ...result.fit,
+          recommended: true,
+          recommendationBlockers: [],
+        },
+      }),
+    ).toThrow("R2_RECOMMENDATION_INVARIANT_VIOLATION");
+    expect(() =>
+      repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
         eligibility: { ...result.eligibility, current: false },
         fit: { ...result.fit, recommended: true, recommendationBlockers: [] },
       }),
@@ -699,7 +717,7 @@ describe("R2 persistence", () => {
     const gate = qualifiedCalibrationGate();
     const runId = repository.recordCalibrationRun({
       corpusVersion: "r2-golden-2",
-      scorerVersion: "2.0.0",
+      scorerVersion: "2.1.0",
       weightVersion: "r2-weights-1",
       gate,
       evidenceVersion: "r2-private-calibration-evidence-1",
@@ -770,7 +788,7 @@ describe("R2 persistence", () => {
           (id,scorer_version,weight_version,corpus_version,fictional_case_count,
            private_reviewed_count,role_family_count,status_count,ordinal_agreement_basis_points,
            top_k,top_k_utility_basis_points,state,created_at)
-         VALUES ('count-only-calibrated','2.0.0','r2-weights-1','r2-golden-2',12,30,4,3,
+         VALUES ('count-only-calibrated','2.1.0','r2-weights-1','r2-golden-2',12,30,4,3,
            10000,5,10000,'CALIBRATED',?)`,
       )
       .run(now);

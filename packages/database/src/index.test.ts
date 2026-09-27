@@ -123,6 +123,7 @@ describe("database foundation", () => {
       "0008_real_target_inspection_scope.sql",
       "0009_green_banner_session_grant.sql",
       "0010_verified_source_packet_binding.sql",
+      "0011_immutable_r2a_derivation_bindings.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -155,13 +156,14 @@ describe("database foundation", () => {
         "source_run_checkpoints",
         "source_run_pages",
         "source_observation_payloads",
+        "source_derivation_bindings",
         "runner_target_capability_versions",
         "runner_run_bindings",
         "runner_recovery_events",
         "runner_inspection_bindings",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(10);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(11);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

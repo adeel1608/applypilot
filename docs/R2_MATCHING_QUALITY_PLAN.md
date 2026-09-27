@@ -2,6 +2,32 @@
 
 Status: `R2A_READY`; `R2B_READY`; `R2C_READY`; `R2D_SOFTWARE_READY`; calibration remains `UNCALIBRATED` pending approved private performance thresholds, all safety gates, and owner approval. The implementation is on `feat/r2-matching-quality` pending exact-head CI and human review of one unmerged PR.
 
+## M2 R2 scope and provenance closeout — 2026-09-27
+
+The current offline implementation keeps immutable source observations independent from fresh
+verification provenance. A reused observation is accepted only when its own historical run is
+complete, its run digest matches the historical capability configuration, and its parser/policy
+chain matches that historical capability. The current verification separately binds the current
+run, capability, page, job version, parser, policy, content hash, and external identity. This
+allows a valid fresh verification to reuse unchanged source content without rewriting history;
+corrupting either chain fails closed.
+
+R2 eligibility engine `2.1.0` now classifies material families as `COMPLETE`, `PARTIAL`, or
+`UNOBSERVED`. `UNOBSERVED` means no evidence and no unparsed spans in the completed source and is
+not a requirement absence, satisfaction, or owner fact. `PARTIAL` means material employer scope
+was observed but not fully resolved and remains review-blocking. Resolved coverage is computed only
+over observed material families; zero observed families reports zero coverage and a conservative
+no-scope diagnostic. The fit scorer and repository recommendation invariant reject partial scope.
+The readiness summary exposes only family names and counts, never excerpts or candidate values.
+
+Structured Lever descriptions and inert `lists[]` content are covered by fictional regression
+fixtures and flow into R2A evidence with bounded source pointers. Provider HTML is converted to
+inert text only; it is never rendered or executed, and raw provider snapshots remain immutable.
+The R4633 disposable-copy characterization remains `REVIEW_REQUIRED`: one observed geography
+family is partial, the remaining material families are unobserved, coverage is zero under the new
+contract, and no packet or PREPARING transition is attempted. The real private database remains
+read-only and no second live request is authorized.
+
 ## PR #13 final blocker correction - 2026-09-10
 
 The job detail page now exposes an explicit nonce-protected owner action to enter `PREPARING`. Local packet preparation stays a separate action and is disabled until the latest queue decision is exact `CURRENT PREPARING` for an eligible, recommended, current evaluation with no unresolved duplicate. Fictional browser coverage executes the complete eligible/recommended -> PREPARING -> review-required local packet flow and verifies that absent, stale, nonrecommended, and duplicate-blocked readiness stays fail-closed. This grants no employer destination, upload, or submission authority.
@@ -320,3 +346,13 @@ Two PR #10 review carryovers are separately classified and are not counted as R2
 4. Implement R2C, then R2D. R1 may consume R2 evidence later but cannot relax it.
 
 Implementation outcome: **R2A — evidence model and normalization** is implemented and verified on its unmerged review branch. The next implementation decision is a separate human gate; R2B, R2C, R2D, and R1 activation remain unauthorised. This R2A result made no source call or application action.
+
+## PR #51 strict provenance and R2A rederivation correction (2026-09-27)
+
+The PR #51 correction keeps the serialized R2A evidence contract at `3.1.0` while bumping the
+parser and normalization semantics to `3.2.0`. Historical normalization remains identifiable and
+immutable. Qualified preparation now requires a non-null, independently valid historical source-run
+chain. Unchanged provider content can be re-read only from its exact persisted immutable payload on
+a disposable database and is bound to the still-qualified verification through additive migration
+0011; no provider request or second verification is created. R2 threshold `50` and weights
+`r2-weights-1` are unchanged.
