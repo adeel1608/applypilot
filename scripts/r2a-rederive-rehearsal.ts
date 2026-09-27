@@ -4,7 +4,11 @@ import BetterSqlite3 from "better-sqlite3";
 
 import { CandidateProfileSchema } from "@applypilot/candidate-profile";
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
-import { R2_UNREVIEWED_CALIBRATION_CONTEXT, scoreR2JobFit } from "@applypilot/fit-scorer";
+import {
+  R2_RECOMMENDATION_THRESHOLD,
+  R2_UNREVIEWED_CALIBRATION_CONTEXT,
+  scoreR2JobFit,
+} from "@applypilot/fit-scorer";
 import { JobSchema } from "@applypilot/job-model";
 import { R2ARepository, R2Repository, SourceEnablementRepository } from "@applypilot/database";
 
@@ -47,6 +51,13 @@ try {
     .get() as { id: string; snapshotJson: string } | undefined;
   if (!profileVersion) throw new Error("R2A_PROFILE_VERSION_NOT_FOUND");
   const profile = CandidateProfileSchema.parse(JSON.parse(profileVersion.snapshotJson));
+  const safeQueue = () =>
+    sqlite
+      .prepare(
+        `SELECT state,freshness FROM r2_queue_decision_versions
+         WHERE job_id=? ORDER BY version DESC LIMIT 1`,
+      )
+      .get(jobRow.jobId) as { state: string; freshness: string } | undefined;
   const safeMetrics = (normalization: typeof oldNormalization, evaluationId: string) => {
     const eligibility = evaluateR2Eligibility({
       profile,
@@ -75,8 +86,14 @@ try {
     return {
       eligibility: eligibility.status,
       score: fit.score,
-      threshold: 50,
+      threshold: R2_RECOMMENDATION_THRESHOLD,
       recommended: fit.recommended,
+      eligibilityReasons: eligibility.reasons.map(({ code }) => code),
+      fitRecommendationBlockers: fit.recommendationBlockers,
+      contributionCount: fit.contributions.length,
+      contributionCodes: fit.contributions.map(({ code }) => code),
+      contributionPoints: fit.contributions.map(({ code, points }) => ({ code, points })),
+      contributionPointTotal: fit.contributions.reduce((total, { points }) => total + points, 0),
       coverage: eligibility.coveragePercent,
       unknown: eligibility.unresolvedMaterialUnknowns,
       conditions: eligibility.unresolvedMaterialConditions,
@@ -87,7 +104,11 @@ try {
       unobserved: eligibility.unobservedMaterialFamilyCount,
       partialFamilies: eligibility.partialMaterialFamilies,
       unobservedFamilies: eligibility.unobservedMaterialFamilies,
-      reasons: eligibility.reasons.map(({ code }) => code),
+      conditionCount: eligibility.unresolvedMaterialConditions,
+      conflictCount: eligibility.unresolvedMaterialConflicts,
+      unknownCount: eligibility.unresolvedMaterialUnknowns,
+      queue: safeQueue() ?? null,
+      calibrationState: fit.calibrationState,
     };
   };
   const beforeMetrics = safeMetrics(oldNormalization, "before");
@@ -95,7 +116,6 @@ try {
   const derived = repository.rederiveLeverObservation({ verificationId });
   const newNormalization = new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId);
   if (!newNormalization) throw new Error("R2A_NEW_NORMALIZATION_NOT_FOUND");
-  const afterMetrics = safeMetrics(newNormalization, derived.derivedJobVersionId);
   const evaluationId = "rehearsal-r2-after";
   const afterEligibility = evaluateR2Eligibility({
     profile,
@@ -139,6 +159,7 @@ try {
     actor: "SYSTEM",
     reasonCode: "R2A_REDERIVATION_REHEARSAL",
   });
+  const afterMetrics = safeMetrics(newNormalization, derived.derivedJobVersionId);
   console.log(
     JSON.stringify({
       verificationId: verification.id,

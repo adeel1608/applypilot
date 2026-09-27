@@ -2705,9 +2705,65 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
   validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T06:29:55Z`, approximately
   `64,439` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
 - Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. Threshold
-  remains `50`; weight version remains `r2-weights-1`. Final exact-head push CI is `36299774334`
-  (`SUCCESS`) and final exact-head PR CI is `36299776808` (`SUCCESS`); the PR body was updated
-  with the same handoff. Seven-milestone tracker remains: Foundations `COMPLETE / MERGED`;
+  remains `50`; weight version remains `r2-weights-1`. The prior correction checkpoint recorded
+  push/PR CI `36299774334` / `36299776808`; live exact head/tree and CI are maintained in the PR
+  body and external handoff because a tracked file cannot contain its own resulting SHA. Seven-
+  milestone tracker remains: Foundations `COMPLETE / MERGED`;
   current real role + fresh packet `IN PROGRESS`; real MAP/FILL/UPLOAD/VERIFY `ENGINEERING`;
   final-review safeguards `BLOCKED BY REAL NON-SUBMIT INTEGRATION`; reproducible release
   `COMPLETE`; controlled fill-preview `BLOCKED`; green-banner review `NOT_STARTED`.
+
+## 43. PR #51 final audit / fit-blocker handoff correction blueprint (2026-09-27)
+
+### Objective and constraints
+
+- Keep PR #51 on `feat/m2-r2-scope-provenance-reuse` open and unmerged; do not redesign the
+  accepted strict provenance/R2A architecture.
+- Remain offline-only: no source/employer/network actions, candidate-data transmission, document or
+  packet mutation, real-DB writes, or migration 0011 application to the real private database.
+- Correct only safe disposable rehearsal diagnostics so production fit blockers are reported
+  alongside eligibility blockers, then refresh the external PR handoff with the true live head/CI.
+
+### Required implementation and validation
+
+1. Extend `scripts/r2a-rederive-rehearsal.ts` to report production eligibility reason codes,
+   fit recommendation blockers, contribution count/codes/points, coverage and safe scope counts,
+   queue state/freshness, and calibration state without private text or payloads.
+2. Re-run the existing ignored schema-11 R4633 rehearsal and classify every active A-H blocker;
+   do not enter PREPARING or create documents/packets because canonical gates remain unmet.
+3. Preserve threshold `50`, weight version `r2-weights-1`, parser/normalization `3.2.0`, evidence
+   contract `3.1.0`, migration immutability, and the real action delta `0/0/0/0`.
+4. Replace self-stale tracked wording with historical checkpoint wording; keep live exact head/tree
+   and exact-head CI in the PR body/external handoff. Run focused/full validation, commit, push,
+   wait for exact-head push/PR CI, update the PR body, and leave PR #51 unmerged.
+
+### Acceptance
+
+- BEFORE and AFTER rehearsal output includes fit blockers and contributions from the production scorer;
+  `SCORE_BELOW_THRESHOLD` is reported when score `0` is below threshold `50`.
+- PROJECT_PLAN does not claim that its containing commit is itself the live exact head.
+- PR #51 remains open, unmerged, mergeable, and exact-head CI green.
+
+## 44. PR #51 final audit correction evidence (2026-09-27)
+
+- The accepted provenance/R2A architecture was not weakened. Parser/normalization remain `3.2.0`,
+  evidence contract `3.1.0`, threshold `50`, and weight version `r2-weights-1`.
+- `scripts/r2a-rederive-rehearsal.ts` now reports production eligibility reasons, fit recommendation
+  blockers, contribution count/codes/points, safe scope counts/families, queue state/freshness, and
+  calibration state without private values, excerpts, or payloads.
+- R4633 rehearsal rerun on ignored `data/private/rehearsals/m2-pr51-r2a-rederive-20260927/applypilot.sqlite`:
+  schema `11`, pending `0`, integrity `PASS`, FK `0`, Git-ignored; replay returned `created=false`
+  with one immutable derivation binding. BEFORE and AFTER were both `REVIEW_REQUIRED`, score `0`,
+  threshold `50`, recommended `false`, coverage `0`, eligibility reasons
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT` and `R2_MATERIAL_SCOPE_PARTIAL`, fit blockers
+  `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, and
+  `SCORE_BELOW_THRESHOLD`, contribution count `0`, observed `1`, resolved `0`, partial `1`
+  (`GEOGRAPHY`), unobserved `9` (`HOURS`, `SCHEDULE`, `SKILLS`, `EXPERIENCE`, `EDUCATION`,
+  `LICENCES`, `CERTIFICATIONS`, `WORK_RIGHTS`, `VEHICLE`), queue `REVIEWING/CURRENT`, calibration
+  `UNCALIBRATED`.
+- Active blocker classification is **A + F**: observed partial material extraction and score below
+  threshold despite the exact current production scorer. No B, C, D, E, G, or H cause was reproduced.
+  No PREPARING, document, packet, or real-DB action was attempted.
+- The prior correction head/CI in section 42 is historical only. Live exact head/tree and exact-head
+  CI are maintained in the PR body/external handoff: the tracked plan does not claim self-resulting
+  SHA metadata.
