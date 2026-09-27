@@ -2882,8 +2882,13 @@ only by current canonical recommendation, score descending, then local job ID; a
 (5.5m)`, `git diff --check`, and `git fsck --strict` (known dangling historical objects only).
   Repository-wide `format:check` remains a pre-existing baseline failure across 45 tracked files;
   no application files were reformatted during this data/evidence-only operation.
-- Evidence branch: `chore/m2-r4633-schema11-real-reconciliation`; evidence-only commit/PR is still
-  required after this plan update. No application-code defect was found.
+- Evidence branch: `chore/m2-r4633-schema11-real-reconciliation`; initial evidence commit
+  `d9c75bad3723a6f7994f2912a85b2ade0934ed7b`, formatting correction `85bc1543d83776d09d1d735dd6dbc125c20d23e9`.
+  Evidence PR #52 is `https://github.com/adeel1608/applypilot/pull/52`, base
+  `293c7975df2843bea406d2d964729c69d40577b7`, handoff head
+  `85bc1543d83776d09d1d735dd6dbc125c20d23e9`, push CI `36303685674` SUCCESS, PR CI
+  `36303688309` SUCCESS, OPEN/UNMERGED/CLEAN. Any resulting plan-only SHA is kept in the PR body
+  because a tracked file cannot contain its own final SHA. No application-code defect was found.
 - Seven-milestone tracker: Foundations `COMPLETE`; Current real role + fresh current packet
   `IN PROGRESS / R4633 RECONCILED NOT PACKET-READY`; Real-target MAP/FILL/UPLOAD/VERIFY
   `ENGINEERING / NO LIVE VALIDATION`; Final-review/submission safeguards `BLOCKED`;
