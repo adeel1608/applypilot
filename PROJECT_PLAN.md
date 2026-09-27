@@ -2701,9 +2701,9 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
 - Disposable schema/pending/integrity/FK: `11/0/PASS/0`. Real private DB remained read-only:
   schema `10`, pending `1` (disposable-only 0011), integrity `PASS`, FK `0`; source capabilities
   configured `11`, active `0`; target capabilities active `0`.
-- Verification freshness at closeout: verifiedAt `2026-09-27T00:23:54.465Z`, preparation
-  validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T15:39:40.218+10:00`, approximately
-  `67,454` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
+- Verification freshness at final closeout: verifiedAt `2026-09-27T00:23:54.465Z`, preparation
+  validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T06:29:55Z`, approximately
+  `64,439` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
 - Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. Threshold
   remains `50`; weight version remains `r2-weights-1`. Final exact-head push CI is `36299774334`
   (`SUCCESS`) and final exact-head PR CI is `36299776808` (`SUCCESS`); the PR body was updated
