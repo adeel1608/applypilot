@@ -9,6 +9,7 @@ const privateRoot = join(root, "data", "private");
 const migrationRoot = join(root, "packages", "database", "drizzle");
 const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
 const tsxEntry = resolve(root, "node_modules", "tsx", "dist", "cli.mjs");
+const prettierEntry = resolve(root, "node_modules", "prettier", "bin", "prettier.cjs");
 const migrationFiles = [
   "0000_applypilot_foundation.sql",
   "0001_real_world_job_intake.sql",
@@ -38,6 +39,18 @@ function runNpm(args: string[], env: NodeJS.ProcessEnv): void {
 
 function runTsx(args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(process.execPath, [tsxEntry, ...args], {
+    cwd: root,
+    env,
+    stdio: "inherit",
+  });
+}
+
+function runPrettierCheck(env: NodeJS.ProcessEnv): void {
+  // Git's Windows autocrlf checkout can materialize tracked LF files as CRLF.
+  // Prettier's structural check remains strict; `auto` only accepts the
+  // checkout's existing line-ending convention so fixture release evidence
+  // is reproducible locally and on the LF-based CI checkout.
+  execFileSync(process.execPath, [prettierEntry, "--check", ".", "--end-of-line", "auto"], {
     cwd: root,
     env,
     stdio: "inherit",
@@ -83,7 +96,7 @@ try {
   runNpm(["run", "doctor"], env);
   runNpm(["run", "db:status"], env);
   runTsx(["scripts/preflight-summary.ts", "--fixture"], fixtureReadinessEnv);
-  runNpm(["run", "format:check"], qualityEnv);
+  runPrettierCheck(qualityEnv);
   runNpm(["run", "lint"], qualityEnv);
   runNpm(["run", "typecheck"], qualityEnv);
   runNpm(["test"], qualityEnv);

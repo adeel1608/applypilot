@@ -19,7 +19,11 @@ import { testProfile } from "../../../tests/fixture-data";
 
 import { R2ARepository } from "./r2a-repository";
 import { R2Repository } from "./r2-repository";
-import { SourceEnablementRepository, runLeverSourceToQueue } from "./source-enablement-repository";
+import {
+  SourceEnablementRepository,
+  runLeverDetailToQueue,
+  runLeverSourceToQueue,
+} from "./source-enablement-repository";
 
 const instant = new Date("2026-09-10T00:00:00.000Z");
 
@@ -175,7 +179,7 @@ function fixturePipeline(
         .get(jobId) as { normalizedJson: string; jobVersionId: string };
       const normalization = new R2ARepository(sqlite).getNormalization(current.jobVersionId);
       if (!normalization) throw new Error("TEST_NORMALIZATION_REQUIRED");
-      const evaluationId = `evaluation:restart:${jobId}`;
+      const evaluationId = `evaluation:restart:${jobId}:${evaluated.length}`;
       const eligibility = evaluateR2Eligibility({
         profile,
         normalization,
@@ -2140,6 +2144,123 @@ describe("offline source-to-R2 queue persistence", () => {
         .prepare("SELECT count(*) count FROM r2_duplicate_candidates WHERE state='LINKED'")
         .get(),
     ).toEqual({ count: 0 });
+    sqlite.close();
+  });
+
+  it("persists exact GET_JOB detail runs and replays unchanged content without duplicate lineage", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const approved = capability({
+      allowedOperations: ["GET_JOB"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `detail:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    let payload: unknown = posting(99);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ url, pinnedAddress }) => {
+        expect(url.pathname).toBe("/v0/postings/fictional/fictional-99");
+        expect(url.searchParams.toString()).toBe("mode=json");
+        return {
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify(payload)),
+          connectedAddress: pinnedAddress,
+        };
+      }),
+    };
+    const pipeline = fixturePipeline(sqlite, profile, () => `r2:detail:${++id}`);
+    const first = await runLeverDetailToQueue({
+      capability: approved,
+      repository,
+      externalId: "fictional-99",
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(first).toMatchObject({
+      operation: "GET_JOB",
+      status: "COMPLETE",
+      terminalState: "COMPLETE",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+      acceptedRecordCount: 1,
+    });
+    expect(first.queuedJobIds).toEqual([expect.stringMatching(/^source-job-/)]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT operation,status,current_cursor,next_cursor,record_count FROM source_run_checkpoints",
+        )
+        .get(),
+    ).toMatchObject({
+      operation: "GET_JOB",
+      status: "COMPLETE",
+      current_cursor: "GET_JOB:fictional-99",
+      next_cursor: null,
+      record_count: 1,
+    });
+    expect(
+      sqlite.prepare("SELECT qualification_state FROM source_record_verifications").get(),
+    ).toEqual({
+      qualification_state: "QUALIFIED",
+    });
+    payload = posting(99);
+    const replay = await runLeverDetailToQueue({
+      capability: approved,
+      repository,
+      externalId: "fictional-99",
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(replay.terminalState).toBe("COMPLETE");
+    expect(pipeline.evaluated).toHaveLength(1);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 1,
+    });
+    payload = { ...posting(99), descriptionPlain: "Changed fictional evidence." };
+    const changed = await runLeverDetailToQueue({
+      capability: approved,
+      repository,
+      externalId: "fictional-99",
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(changed.terminalState).toBe("COMPLETE");
+    expect(pipeline.evaluated).toHaveLength(2);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 3,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE qualification_state='QUALIFIED'",
+        )
+        .get(),
+    ).toEqual({ count: 3 });
     sqlite.close();
   });
 });

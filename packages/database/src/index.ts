@@ -10,6 +10,7 @@ export * from "./document-consistency";
 export * from "./beta-repository";
 export * from "./r2a-repository";
 export * from "./r2-repository";
+export * from "./r2-readiness-summary";
 export * from "./r2-corrections";
 export * from "./source-enablement-repository";
 export * from "./runner-enablement-repository";

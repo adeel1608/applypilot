@@ -567,14 +567,14 @@ export async function readLeverPageV2(input: {
   };
 }
 
-export async function readLeverDetailV2(input: {
+export async function readLeverDetailV2WithMetadata(input: {
   capability: SourceCapabilityV2;
   budget: SourceRunBudget;
   externalId: string;
   now?: () => Date;
   signal?: AbortSignal;
   dependencies?: SecureSourceTransportDependencies;
-}): Promise<LeverPostingRecordV2> {
+}): Promise<{ record: LeverPostingRecordV2; byteCount: number; requestCount: number }> {
   const capability = SourceCapabilityV2Schema.parse(input.capability);
   if (capability.source !== "LEVER") throw new SecureSourceError("SOURCE_MISMATCH");
   const externalId = z
@@ -596,5 +596,20 @@ export async function readLeverDetailV2(input: {
     signal: input.signal,
     dependencies: input.dependencies,
   });
-  return parseLeverPosting(response.body, capability);
+  return {
+    record: parseLeverPosting(response.body, capability),
+    byteCount: response.byteCount,
+    requestCount: response.requestCount,
+  };
+}
+
+export async function readLeverDetailV2(input: {
+  capability: SourceCapabilityV2;
+  budget: SourceRunBudget;
+  externalId: string;
+  now?: () => Date;
+  signal?: AbortSignal;
+  dependencies?: SecureSourceTransportDependencies;
+}): Promise<LeverPostingRecordV2> {
+  return (await readLeverDetailV2WithMetadata(input)).record;
 }

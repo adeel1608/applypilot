@@ -2142,3 +2142,158 @@ Personal Live V1 remains `NOT_READY`. Future hardening item retained without a f
 next task is one separately authorized bounded source refresh that covers the owner-selected R4633
 role, proves current R2 suitability/recommendation, and only then revisits current document and
 packet gates; it must still perform no employer interaction.
+
+## 35. M2 exact-role source-detail engineering blueprint (2026-09-27)
+
+This implementation branch starts from the merged PR #48 main baseline
+`74d44b93eba3f047e83463959ab2fc95d08efa28`. It addresses the remaining technical gap identified by
+the latest bounded evidence: the owner-selected Lever posting R4633 was not present in the generic
+first page, while the next operational run needs a durable, exact-posting `GET_JOB` path. This is an
+offline engineering task only. Real source requests, DNS/TCP/TLS probes, employer visits, target
+authority, documents, packets, uploads, submissions, candidate-fact changes, and R2 overrides remain
+forbidden; lifetime real counters must remain `15/9/0/0`.
+
+### Objective and current gap
+
+Extend the closed source-operation contract from the current durable `LIST_JOBS` orchestration to a
+typed `GET_JOB` operation that uses the existing hardened `readLeverDetailV2()` parser/transport,
+persists one exact posting through the same immutable observation/version and schema-10 verification
+ledger, and reconciles current R2/queue state only after terminal `COMPLETE`. The reader must enforce
+capability/run/source/tenant/external/content lineage at read time, not only rely on writer metadata.
+The release fixture's Windows formatting discrepancy must also be diagnosed and corrected narrowly,
+without broad ignore rules, migration/history rewrites, or private-data access.
+
+### Proposed files and data flow
+
+- `packages/job-sources/src/source-runner.ts` and tests: closed operation union, durable detail runner,
+  exact-ID result model, and safe terminal/recovery behavior.
+- `packages/database/src/source-enablement-repository.ts` and tests: detail-page envelope persistence,
+  one-record verification, immutable replay/change behavior, and `runLeverDetailToQueue()` orchestration.
+- `packages/database/src/beta-repository.ts` and verification tests: capability/source/tenant/external/
+  parser/policy joins enforced by the qualified-verification reader.
+- `packages/database/src/r2-readiness-summary.ts` (or equivalent) and tests/CLI: read-only blocker
+  counts and owner-question classification with no candidate values.
+- `scripts/release-check-fixture.ts` and narrowly scoped fixture configuration only if the root cause
+  proves environmental; no broad `prettierignore` or migration changes.
+- `PROJECT_PLAN.md`: implementation evidence, exact validation results, and remaining blocker.
+
+The detail path will construct the exact `/v0/postings/{tenant}/{externalId}?mode=json` URL through the
+existing secure transport, start a `GET_JOB` run, persist one deterministic detail envelope in the
+existing `source_run_pages` schema (`page_number=1`, `record_count=1`, non-pagination cursor identity),
+write `PAGE_PERSISTED` verification, mark it `QUALIFIED` only after terminal `COMPLETE`, and invoke
+the existing R2/queue callbacks only for a complete run. Identical content reuses the immutable
+observation/job-version and current evaluation/queue; changed content creates one new observation/
+version and normal current R2 work. No PREPARING transition is automatic.
+
+### Risks, privacy, rollback, and acceptance
+
+Risks are accidental live dispatch, confused list/detail replay identity, cross-lineage evidence,
+partial-run qualification, duplicate R2 work, and release-check environment drift. Typed operation
+schemas, capability checks, exact external-ID validation, bounded transport, disposable fixtures,
+read-only diagnostics, and strict provenance joins mitigate them. No migration is expected; migrations
+`0000`-`0010` remain immutable and the private schema-10 database is not modified. Rollback is a
+normal branch revert with no private DB repair. Acceptance requires: GET_JOB security and failure
+matrix, durable COMPLETE/PAGE_PERSISTED recovery, unchanged/changed idempotency, provenance corruption
+tests, safe R2 blocker/question summaries, clean-checkout fixture diagnosis, full local gates, exact
+head CI, one open implementation PR, and real action delta `0/0/0/0`.
+
+### Exact implementation and validation sequence
+
+1. Inspect and preserve the merged PR #48 baseline; update this blueprint before code edits.
+2. Add the typed detail operation and source runner using the existing secure parser/transport.
+3. Add repository detail persistence, verification qualification/recovery, R2/queue orchestration,
+   and read-time provenance enforcement with synthetic corruption/replay tests.
+4. Add safe private-Diagnostic/owner-question classification support without reading or printing
+   candidate values.
+5. Diagnose the fixture formatting discrepancy from a clean disposable checkout and apply only a
+   narrow semantics-neutral fix if proven necessary.
+6. Run focused tests, then format/lint/typecheck/unit/integration/E2E/build/showcase/privacy/audit/
+   release/diff/fsck gates; record exact results and unfinished work.
+7. Commit only the coherent implementation plus plan evidence, push this branch, open one PR titled
+   `feat: add exact-role source refresh and R2 readiness diagnostics`, verify exact-head CI, and leave
+   the implementation PR open and unmerged.
+
+## 36. M2 exact-role source-detail engineering closeout (2026-09-27)
+
+### PR #48 merge and branch baseline
+
+PR #48 was revalidated as the approved documentation-only change before merge: base
+`ace3faba83cf4efcb6fdcb0247a1b27a16e9292e`, head
+`706ed195cf148e6da583e7e595b89b604a0d6651`, tree
+`bc11df5a40e69d549ac2f9bee34e7f7bb2a06c67`, and the only changed path was
+`PROJECT_PLAN.md`. Push check `36278373562` and PR check `36278382890` were successful; the PR
+was open, non-draft, clean, and had no requested changes or unresolved review threads. It was
+squash-merged without a force push as `74d44b93eba3f047e83463959ab2fc95d08efa28`, whose parent
+is `ace3faba83cf4efcb6fdcb0247a1b27a16e9292e` and whose tree is the same
+`bc11df5a40e69d549ac2f9bee34e7f7bb2a06c67` reviewed for PR #48. Local `main` and `origin/main`
+were refreshed to that exact merge. The implementation branch is
+`feat/m2-exact-role-source-detail`, created from that clean main.
+
+### Implemented contracts
+
+- `SourceOperation` now carries the closed `LIST_JOBS | GET_JOB` union. Existing list discovery
+  keeps its prior pagination and budget behavior.
+- `runLeverDetailSourceDiscovery()` uses the existing hardened Lever detail parser and secure
+  transport, validates a bounded external ID and exact response identity, starts a durable
+  `GET_JOB` run, consumes at most one request/page, and returns explicit `COMPLETE`, `NOT_FOUND`,
+  `STOPPED`, `SOURCE_RECORD_UNUSABLE`, or `PERSISTENCE_FAILED` terminal semantics. It has no
+  retry, redirect, employer, upload, submit, or candidate-data path.
+- `SourceEnablementRepository.persistDetail()` reuses immutable observation/job-version and
+  verification-ledger persistence. Detail provenance uses `GET_JOB:<externalId>` as a non-list
+  cursor, page one, one provider record, and a deterministic detail digest. `PAGE_PERSISTED` is
+  qualified only after `COMPLETE`; safe reconciliation can qualify only a terminal complete run.
+  `runLeverDetailToQueue()` invokes R2 work only after completion and never enters PREPARING or
+  creates documents/packets.
+- Exact replay creates a fresh verification but reuses unchanged observations, job versions,
+  evaluations, and current queue state; changed detail content creates a new immutable observation
+  and version and normal current R2 work.
+- `getLatestQualifiedVerification()` now enforces run/capability/version, page/run/digest/index,
+  job-version/observation, source/tenant/external ID, content hash, parser, and policy joins at
+  read time. Corruption tests cover those lineage dimensions and fail closed.
+- `r2-readiness-summary` is read-only and emits only safe statuses, counts, reason codes, queue and
+  calibration state, and stable owner-question IDs. Source-evidence unknowns never become owner
+  questions; no candidate values or evidence excerpts are printed. `UNCALIBRATED` is reported but
+  is not invented as a recommendation blocker.
+
+### Fixture and release-gate result
+
+The local release discrepancy was reproduced as a Windows `core.autocrlf` checkout line-ending
+difference, not a committed formatting defect. The fixture release check now invokes the pinned
+Prettier binary with `--end-of-line auto`, preserving strict structural formatting while accepting
+the checkout's line-ending convention; no broad ignore rule, migration, or unrelated runtime
+reformat was used. The synthetic E2E database fixture was also corrected to carry complete fictional
+LEVER source/tenant/external/parser/policy provenance required by the strengthened reader. A clean
+disposable fixture run now passes.
+
+### Validation and safety evidence
+
+- Focused detail/provenance/diagnostic suites: 4 files, 29 tests passed.
+- Full unit suite: 56 files, 601 tests passed.
+- Integration suite: 3 files, 21 tests passed.
+- Production web build, showcase build, and public showcase audit: PASS.
+- Full Playwright E2E: 47 tests passed.
+- Privacy audit: PASS (`tracked_files=341`, history and build/private canaries checked).
+- `npm audit` and production dependency audit: 0 vulnerabilities.
+- `release:check:fixture`: PASS with schema 10, pending migrations 0, integrity PASS, FK issues 0,
+  no private profile read, and disposable fictional runtime only.
+- Private read-only preflight: PASS; profile valid, schema 10/pending 0/integrity PASS/FK 0,
+  active source capabilities 0, source-enabled beta READY, and no new target authority.
+- `git diff --check`: PASS. `git fsck --strict`: PASS with only known dangling historical objects.
+- Migrations `0000`-`0010` are unchanged; no migration was added. The private database was not
+  mutated by this task. Real-action delta is `0/0/0/0`; lifetime counters remain `15/9/0/0`.
+
+### Milestones and remaining work
+
+1. Foundations: `COMPLETE / MERGED`.
+2. Current real role + fresh packet: `IN PROGRESS` — exact R4633 refresh path is engineered but
+   not live-verified in this task.
+3. Real-target MAP/FILL/UPLOAD/VERIFY: `ENGINEERING / MISSING LIVE VERIFICATION`.
+4. Final-review/submission safeguards: `BLOCKED BY REAL NON-SUBMIT INTEGRATION`.
+5. Reproducible release: `COMPLETE / FIXTURE RELEASE GREEN`.
+6. Authorized real fill-preview: `BLOCKED`.
+7. Green-banner review: `NOT_STARTED`.
+
+Source-enabled Personal Beta remains READY from prior reviewed evidence; Personal Live V1 remains
+`NOT_READY`. The next task is one separately authorized bounded R4633 `GET_JOB` refresh through
+the merged runner, with one request/one record, then safe verification/R2 currentness diagnostics;
+no employer interaction, upload, or submission.

@@ -249,10 +249,18 @@ Documents
           (id,job_id,source_record_id,source,tenant,external_id,source_url,acquisition_method,
            content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
            policy_version,run_id,supersedes_observation_id)
-         VALUES (?,?,NULL,'UNKNOWN',NULL,NULL,NULL,'USER_SUPPLIED_CONTENT',?,?,?,NULL,NULL,
-           '3.1.0',NULL,NULL,NULL)`,
+         VALUES (?,?,NULL,'LEVER',?,?,NULL,'APPROVED_SOURCE_FETCH',?,?,?,NULL,NULL,
+           '3.1.0','fixture-policy',NULL,NULL)`,
       )
-      .run(observationId, input.jobId, observationContentDigest, `fixture:${suffix}`, now);
+      .run(
+        observationId,
+        input.jobId,
+        `tenant-${suffix}`,
+        input.jobId,
+        observationContentDigest,
+        `fixture:${suffix}`,
+        now,
+      );
     sqlite
       .prepare(
         `INSERT INTO job_versions
