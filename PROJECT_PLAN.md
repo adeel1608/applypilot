@@ -3113,3 +3113,19 @@ only by current canonical recommendation, score descending, then local job ID; a
 - Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. The only
   remaining gate is a fresh explicit owner approval of the exact proposal outside Git, followed by
   the separate owner-started `/sources` action.
+
+### Evidence PR and validation closeout
+
+- Evidence branch: `chore/m2-source-approval-proposal`; initial evidence head
+  `3edfad8b6559a85d9e29fa85302ab4566eb8fb8e`; tree
+  `b02e512391e9a02a03eb340c9732c45397946f6d`; tracked change is `PROJECT_PLAN.md` only.
+- Evidence PR #54 is `https://github.com/adeel1608/applypilot/pull/54`, base
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, head
+  `3edfad8b6559a85d9e29fa85302ab4566eb8fb8e`, OPEN/UNMERGED/MERGEABLE/CLEAN. Push workflow
+  `36309509797` and PR workflow `36309523064` completed SUCCESS for that exact head.
+- Focused source/readiness/database tests passed `3 files / 136`; unit `56 / 611`; integration
+  `3 / 21`; typecheck, lint, production/local and showcase builds, showcase audit, privacy audit,
+  dependency audit (`0` vulnerabilities), preflight, `git diff --check`, and `git fsck --strict`
+  passed. Repository-wide `format:check` remains the known 45-file baseline failure. Local E2E
+  was not rerun because the identical configured web-server startup timeout was already observed;
+  exact-head GitHub browser quality passed.
