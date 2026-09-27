@@ -5,8 +5,8 @@ test("shows the fictional R2A evidence contract separately from evaluation", asy
 
   const layer = page.getByTestId("r2a-evidence-layer");
   await expect(layer).toBeVisible();
-  await expect(layer.getByText("Parser 3.1.0")).toBeVisible();
-  await expect(layer.getByText(/Evidence 3\.1\.0.*normalization 3\.1\.0/)).toBeVisible();
+  await expect(layer.getByText("Parser 3.2.0")).toBeVisible();
+  await expect(layer.getByText(/Evidence 3\.1\.0.*normalization 3\.2\.0/)).toBeVisible();
   await expect(layer.getByText(/GEOGRAPHY: PARTIAL/)).toBeVisible();
   await expect(layer.getByText(/WORK RIGHTS: PARTIAL/)).toBeVisible();
   await expect(layer.getByText(/R2B consumes only the current version/)).toBeVisible();

@@ -2544,14 +2544,169 @@ observed-scope coverage`, verify exact-head CI, and leave it open and unmerged f
 
 ## 40. PR #51 review handoff (2026-09-27)
 
-- The implementation was committed as `3aab28386b77f81de2d3122efcce660e10d26d9a` and pushed on
-  `feat/m2-r2-scope-provenance-reuse`.
-- PR #51, titled `fix: reconcile source provenance reuse and R2 observed-scope coverage`, is
-  `OPEN / UNMERGED`, base `main`, exact head `3aab28386b77f81de2d3122efcce660e10d26d9a`, and
-  GitHub reports it `MERGEABLE`.
-- Exact-head push and pull-request quality checks both passed (workflow runs
+- The implementation checkpoint was `3aab28386b77f81de2d3122efcce660e10d26d9a`; a subsequent
+  plan-only handoff commit moved the review head to `64343ed2d70305022e8fd7e558f000eb7e1c527f`.
+- PR #51, titled `fix: reconcile source provenance reuse and R2 observed-scope coverage`, remains
+  `OPEN / UNMERGED`, base `main`, and GitHub reports it `MERGEABLE`. The final correction head and
+  exact-head CI are recorded in section 42 and the final PR handoff after the correction push.
+- The earlier handoff push and pull-request quality checks both passed (workflow runs
   `36294257403` and `36294265873`). The PR body records the safe evidence and offline boundary.
 - No live source request, DNS/TCP/TLS probe, employer interaction, upload, submission, target
   authority, candidate-fact mutation, or production private-database write occurred. Keep PR #51
   unmerged for human review; Source-enabled Personal Beta remains `READY` and Personal Live V1
   remains `NOT_READY`.
+
+## 41. PR #51 strict provenance / R2A rederivation correction blueprint (2026-09-27)
+
+### Current state and objective
+
+- Same branch/PR: `feat/m2-r2-scope-provenance-reuse`; PR #51 remains open and unmerged at the
+  reviewed handoff head `64343ed2d70305022e8fd7e558f000eb7e1c527f`.
+- This correction is offline-only. The real private database is read-only; no source, employer,
+  upload, submission, candidate-data, or capability action is authorized. Action delta must remain
+  `0/0/0/0`; lifetime counters remain `16/9/0/0`.
+- Close three review findings: fail closed on NULL historical observation runs; version the changed
+  R2A parser/normalizer semantics; and provide an immutable, exact-payload local rederivation path
+  for unchanged provider content without rewriting observations, job versions, or verifications.
+
+### Architecture and data flow
+
+1. `getLatestQualifiedVerification()` will require an independently valid historical observation
+   creation run/capability/parser/policy chain. Current verification lineage remains independently
+   bound; parser/policy versions may differ between the two valid chains.
+2. R2A parser and normalization versions will move to the next minor version required by the
+   changed structured-source coverage semantics. The evidence serialization contract remains at
+   its current version only if tests prove it is backward-compatible and the reason is documented.
+3. A disposable-copy-only rederivation API will load one immutable observation payload, verify its
+   digest and source/tenant/external identity, parse it through the current deterministic Lever
+   reader/mapping path, normalize it, and persist a new immutable job-version/evidence projection.
+   An additive schema relation (migration 0011) will bind verification, source observation/content,
+   parent and derived job versions, parser/normalization versions, and a deterministic derivation
+   digest if existing schema cannot represent that authority without ambiguity.
+4. Provider verification authority and local parser derivation authority remain separate. A derived
+   job version is preparation-eligible only through an exact binding to the still-qualified
+   verification and immutable content; no second provider request or verification timestamp is
+   created.
+
+### Proposed files, safety, and tests
+
+- `packages/database/src/beta-repository.ts` and verification tests: remove the NULL-run escape
+  hatch and add the full provenance corruption matrix.
+- `packages/job-model/src/r2a.ts`, importer/docs/tests: explicit parser/normalization identity and
+  unchanged-content version regressions.
+- `packages/database/src/source-enablement-repository.ts`, `r2a-repository.ts`, schema, and an
+  additive migration only if required: exact-payload immutable rederivation and binding validation.
+- `packages/database/src/index.test.ts`, source-enablement tests, and disposable rehearsal helpers:
+  migration/schema health, wrong payload/identity/digest/verification fail-closed cases, and no
+  network transport from rederivation.
+- `PROJECT_PLAN.md` and PR body: final exact head, CI, offline boundary, metadata-only R4633
+  rehearsal, freshness, and seven-milestone tracker.
+
+### Rollback and acceptance
+
+- Migrations `0000`-`0010` remain byte-for-byte unchanged. If migration `0011` is necessary it is
+  additive, validated only on fresh/disposable copies, and never applied to the real private DB.
+- Existing immutable observations, historical job versions, verifications, and payloads are never
+  updated or backfilled. A normal branch revert is the rollback; disposable rehearsal copies may be
+  deleted/recreated without touching private production state.
+- Acceptance requires strict current/historical provenance, explicit R2A versioning, synthetic
+  unchanged-content stale-normalization proof, exact-payload rederivation with immutable binding,
+  conservative R2 metrics, full local gates, updated handoff, exact-head CI green, and PR #51 left
+  open/unmerged for human review.
+
+### Exact implementation sequence
+
+1. Revalidate branch/PR/base/head, migrations, private read-only metadata, payload digest, and
+   verification freshness.
+2. Add failing NULL-run/provenance and stale-normalization tests; implement strict reader/version
+   changes.
+3. Implement the smallest generic immutable rederivation/binding model and focused negative tests.
+4. Rehearse R4633 only on a fresh ignored disposable copy; report metadata and safe before/after
+   R2 metrics, never raw payload or excerpts and never PREPARING unless every canonical gate passes.
+5. Run focused/full quality, privacy, schema, migration, release, diff, and fsck gates; update this
+   plan and PR body with true final head/CI and remaining blockers.
+
+## 42. PR #51 strict provenance / R2A rederivation correction evidence (2026-09-27)
+
+### Baseline and scope
+
+- Starting PR #51 base: `506fdbdc24c1271b962ce9d244eb1c69736490ac`; starting review head:
+  `64343ed2d70305022e8fd7e558f000eb7e1c527f`; branch remains
+  `feat/m2-r2-scope-provenance-reuse`; PR remains `OPEN / UNMERGED / MERGEABLE`.
+- Implementation checkpoint before this correction was `3aab28386b77f81de2d3122efcce660e10d26d9a`;
+  the handoff/documentation checkpoint was `64343ed2d70305022e8fd7e558f000eb7e1c527f`. The
+  final correction head is recorded in the final PR handoff after the last push.
+- Offline boundary held: no source request, DNS/TCP/TLS probe, employer interaction, candidate-data
+  transmission, target capability, MAP, FILL, UPLOAD, VERIFY, FILL_PREVIEW, or SUBMIT. Correction
+  delta and lifetime counters remain `0/0/0/0` and `16/9/0/0`.
+
+### Strict provenance correction
+
+- `getLatestQualifiedVerification()` now requires `source_observations.run_id IS NOT NULL` and a
+  complete historical run whose capability digest, source, tenant, parser, and policy match the
+  immutable observation. A NULL historical run fails closed; no historical row was backfilled.
+- Current verification remains independently bound to its complete run, capability digest, parser,
+  policy, page/digest/index, exact source/tenant/external/content identity, and job version.
+  A valid fresh current parser/policy may differ from the historical observation parser/policy.
+- Synthetic matrix covers NULL run, incomplete historical run, historical capability digest/parser/
+  policy corruption, current capability/parser/policy corruption, page corruption, wrong job
+  version, PAGE_PERSISTED, source/tenant/external/content mismatch, and valid parser-mismatch reuse.
+
+### R2A identity and immutable derivation
+
+- Old parser/normalization identity: `3.1.0`; new parser and normalization identity: `3.2.0`.
+  Evidence contract remains `3.1.0` because no serialized evidence shape or column contract changed;
+  migration 0011 persists the separate contract/normalization identities for new rows.
+- Historical 3.1.0 normalization remains identifiable and immutable. Synthetic unchanged-content
+  replay proves reuse alone does not relabel old output.
+- Additive `0011_immutable_r2a_derivation_bindings.sql` is required because migrations 0000-0010
+  cannot express a durable verification-to-derived-version authority relation. It binds exact
+  verification, observation/content, parent/derived job versions, parser/normalization versions,
+  and deterministic derivation digest with restrictive foreign keys and uniqueness. Migrations
+  0000-0010 remain byte-for-byte unchanged. Migration tests cover fresh schema 11, health, and
+  legacy schema compatibility; 0011 was not applied to the real private database.
+- `readLeverPostingV2FromPayload()` shares the current deterministic inert Lever schema/mapping
+  path and performs no transport. Re-derivation verifies payload digest and source/tenant/external
+  identity, creates only a new immutable local job/evidence projection, and never creates a second
+  provider verification or rewrites the observation/job history.
+
+### Disposable R4633 rehearsal
+
+- Real payload presence/digest check passed using metadata only: observation
+  `source-observation-d0b965003a92fe3fb300de054b24f8bd73b8123bbcc90a1e46832ed39cdde130`, stored
+  payload digest matched its content hash; raw payload/excerpts were not printed.
+- Fresh ignored copy: `data/private/rehearsals/m2-pr51-r2a-rederive-20260927/applypilot.sqlite`;
+  schema `11`, pending `0`, integrity `PASS`, foreign keys `0`, ignored and untracked.
+- Qualified verification reader on copy returned `57db0589-c403-4056-95cc-d53b2632079c`.
+  Historical job version/parser/normalization: `source-job-version-b34532ce88c17481a34be569a9ccd0cabea49926efc2018caf1c650580936953` / `3.1.0` / `3.1.0`.
+  Derived job version/parser/normalization: `5356578a-cf6e-462b-b9c0-26d9e65ca6bd` / `3.2.0` / `3.2.0`.
+  Binding digest: `9c815b10e176d5756f1ca4eab8eaabb04915e1ab9d4dacacb0b652b50434af04`.
+- Safe R2 BEFORE and AFTER metrics were both `REVIEW_REQUIRED`, score `0`, threshold `50`,
+  recommended `false`, coverage `0`, unknown `0`, conditions `0`, conflicts `0`, observed `1`,
+  resolved `0`, partial `1` (`GEOGRAPHY`), unobserved `9` (`HOURS`, `SCHEDULE`, `SKILLS`,
+  `EXPERIENCE`, `EDUCATION`, `LICENCES`, `CERTIFICATIONS`, `WORK_RIGHTS`, `VEHICLE`). Reasons:
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`. The canonical remaining
+  blocker is **A: observed PARTIAL material extraction**, not a role-pass optimization.
+- COPY queue remained `REVIEWING`; COPY PREPARING, document, and packet actions were not attempted.
+
+### Validation and readiness
+
+- Unit: `56` files / `611` passed. Integration: `3` files / `21` passed. Full Playwright E2E:
+  `47` passed in the final single-worker release-fixture run. The strict-provenance E2E fixture now
+  carries its historical run binding, and the evidence UI assertion tracks parser `3.2.0` with
+  evidence contract `3.1.0` / normalization `3.2.0`. Typecheck, full lint, production web build,
+  showcase build, showcase audit, privacy audit, dependency audits (`0` vulnerabilities), release
+  fixture, EOL-auto format, `git diff --check`, and `git fsck --strict` passed. Fsck reports only
+  known dangling historical objects.
+- Disposable schema/pending/integrity/FK: `11/0/PASS/0`. Real private DB remained read-only:
+  schema `10`, pending `1` (disposable-only 0011), integrity `PASS`, FK `0`; source capabilities
+  configured `11`, active `0`; target capabilities active `0`.
+- Verification freshness at closeout: verifiedAt `2026-09-27T00:23:54.465Z`, preparation
+  validUntil `2026-09-28T00:23:54.465Z`, closeout `2026-09-27T15:39:40.218+10:00`, approximately
+  `67,454` seconds remaining: `EXISTING_VERIFICATION_STILL_PREPARATION_FRESH`.
+- Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. Threshold
+  remains `50`; weight version remains `r2-weights-1`. The PR body and final exact-head CI are
+  updated after the final push. Seven-milestone tracker remains: Foundations `COMPLETE / MERGED`;
+  current real role + fresh packet `IN PROGRESS`; real MAP/FILL/UPLOAD/VERIFY `ENGINEERING`;
+  final-review safeguards `BLOCKED BY REAL NON-SUBMIT INTEGRATION`; reproducible release
+  `COMPLETE`; controlled fill-preview `BLOCKED`; green-banner review `NOT_STARTED`.

@@ -297,6 +297,24 @@ describe("qualified verification lookup", () => {
     }
   });
 
+  it("fails closed when the historical observation has no creation run", () => {
+    const sqlite = migratedDatabase();
+    try {
+      seedQualifiedVerification(sqlite);
+      sqlite
+        .prepare("UPDATE source_observations SET run_id=NULL WHERE id='observation:verification'")
+        .run();
+      expect(
+        new BetaRepository(sqlite).getLatestQualifiedVerification(
+          "job:verification",
+          "job-version:verification",
+        ),
+      ).toBeNull();
+    } finally {
+      sqlite.close();
+    }
+  });
+
   it("fails closed when capability, source, tenant, external, parser, or policy lineage drifts", () => {
     const cases: Array<{
       name: string;

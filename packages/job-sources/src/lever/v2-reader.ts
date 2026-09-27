@@ -485,6 +485,18 @@ function parseLeverPosting(input: unknown, capability: SourceCapabilityV2): Leve
   }
 }
 
+/**
+ * Deterministically re-read an already persisted immutable Lever payload.
+ * This performs no transport access and intentionally shares the exact
+ * schema/inert mapping path used by the live reader.
+ */
+export function readLeverPostingV2FromPayload(input: {
+  payload: unknown;
+  capability: SourceCapabilityV2;
+}): LeverPostingRecordV2 {
+  return parseLeverPosting(input.payload, SourceCapabilityV2Schema.parse(input.capability));
+}
+
 export interface LeverPageV2 {
   providerRecordCount: number;
   acceptedRecords: LeverPostingRecordV2[];

@@ -22,6 +22,7 @@ const migrationFiles = [
   "0008_real_target_inspection_scope.sql",
   "0009_green_banner_session_grant.sql",
   "0010_verified_source_packet_binding.sql",
+  "0011_immutable_r2a_derivation_bindings.sql",
 ];
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv): void {

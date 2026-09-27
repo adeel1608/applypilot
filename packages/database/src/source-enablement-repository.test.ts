@@ -18,6 +18,7 @@ import {
 import { testProfile } from "../../../tests/fixture-data";
 
 import { R2ARepository } from "./r2a-repository";
+import { BetaRepository } from "./beta-repository";
 import { R2Repository } from "./r2-repository";
 import {
   SourceEnablementRepository,
@@ -41,6 +42,7 @@ function database() {
     "0008_real_target_inspection_scope.sql",
     "0009_green_banner_session_grant.sql",
     "0010_verified_source_packet_binding.sql",
+    "0011_immutable_r2a_derivation_bindings.sql",
   ])
     sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
   return sqlite;
@@ -2278,6 +2280,97 @@ describe("offline source-to-R2 queue persistence", () => {
         )
         .get(),
     ).toEqual({ count: 3 });
+    sqlite.close();
+  });
+
+  it("re-derives unchanged immutable content with a new R2A identity and exact binding", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const approved = capability({
+      allowedOperations: ["GET_JOB"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `rederive:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from(JSON.stringify(posting(100))),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const pipeline = fixturePipeline(sqlite, profile, () => `r2:rederive:${++id}`);
+    await runLeverDetailToQueue({
+      capability: approved,
+      repository,
+      externalId: "fictional-100",
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    const verification = sqlite
+      .prepare("SELECT id,job_version_id AS jobVersionId FROM source_record_verifications")
+      .get() as { id: string; jobVersionId: string };
+    sqlite.prepare("UPDATE job_normalization_coverage SET parser_version='3.1.0'").run();
+    sqlite.prepare("UPDATE job_field_evidence_v2 SET extractor_version='3.1.0'").run();
+    sqlite.prepare("UPDATE requirement_evidence_v2 SET extractor_version='3.1.0'").run();
+    const old = new R2ARepository(sqlite).getNormalization(verification.jobVersionId)!;
+    expect(old.parserVersion).toBe("3.1.0");
+    const derived = repository.rederiveLeverObservation({ verificationId: verification.id });
+    expect(derived.parserVersion).toBe("3.2.0");
+    expect(derived.normalizationVersion).toBe("3.2.0");
+    expect(derived.parentJobVersionId).toBe(verification.jobVersionId);
+    expect(
+      new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
+    ).toBe("3.2.0");
+    const jobId = (
+      sqlite
+        .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
+        .get(verification.jobVersionId) as { jobId: string }
+    ).jobId;
+    expect(
+      new BetaRepository(sqlite).getLatestQualifiedVerification(jobId, derived.derivedJobVersionId)
+        ?.jobVersionId,
+    ).toBe(derived.derivedJobVersionId);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_derivation_bindings").get(),
+    ).toEqual({
+      count: 1,
+    });
+    sqlite.prepare("UPDATE source_observation_payloads SET content_digest=?").run("f".repeat(64));
+    expect(() => repository.rederiveLeverObservation({ verificationId: verification.id })).toThrow(
+      "R2A_IMMUTABLE_PAYLOAD_IDENTITY_MISMATCH",
+    );
+    sqlite
+      .prepare(
+        "UPDATE source_observation_payloads SET content_digest=(SELECT content_hash FROM source_observations LIMIT 1)",
+      )
+      .run();
+    sqlite.prepare("UPDATE source_derivation_bindings SET derivation_digest=?").run("e".repeat(64));
+    expect(() => repository.rederiveLeverObservation({ verificationId: verification.id })).toThrow(
+      "R2A_DERIVATION_BINDING_CONFLICT",
+    );
+    sqlite
+      .prepare("UPDATE source_derivation_bindings SET derivation_digest=?")
+      .run(derived.derivationDigest);
+    const replay = repository.rederiveLeverObservation({ verificationId: verification.id });
+    expect(replay.created).toBe(false);
+    expect(replay.derivedJobVersionId).toBe(derived.derivedJobVersionId);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_derivation_bindings").get(),
+    ).toEqual({
+      count: 1,
+    });
     sqlite.close();
   });
 });

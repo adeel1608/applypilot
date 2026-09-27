@@ -346,3 +346,13 @@ Two PR #10 review carryovers are separately classified and are not counted as R2
 4. Implement R2C, then R2D. R1 may consume R2 evidence later but cannot relax it.
 
 Implementation outcome: **R2A — evidence model and normalization** is implemented and verified on its unmerged review branch. The next implementation decision is a separate human gate; R2B, R2C, R2D, and R1 activation remain unauthorised. This R2A result made no source call or application action.
+
+## PR #51 strict provenance and R2A rederivation correction (2026-09-27)
+
+The PR #51 correction keeps the serialized R2A evidence contract at `3.1.0` while bumping the
+parser and normalization semantics to `3.2.0`. Historical normalization remains identifiable and
+immutable. Qualified preparation now requires a non-null, independently valid historical source-run
+chain. Unchanged provider content can be re-read only from its exact persisted immutable payload on
+a disposable database and is bound to the still-qualified verification through additive migration
+0011; no provider request or second verification is created. R2 threshold `50` and weights
+`r2-weights-1` are unchanged.

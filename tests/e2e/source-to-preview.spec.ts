@@ -62,6 +62,7 @@ const migrationNames = [
   "0008_real_target_inspection_scope.sql",
   "0009_green_banner_session_grant.sql",
   "0010_verified_source_packet_binding.sql",
+  "0011_immutable_r2a_derivation_bindings.sql",
 ] as const;
 
 async function createDiskFixture() {
@@ -86,7 +87,7 @@ async function createDiskFixture() {
       await readFile(join(process.cwd(), "packages", "database", "drizzle", name), "utf8"),
     );
   }
-  if (sqlite.pragma("user_version", { simple: true }) !== 10) {
+  if (sqlite.pragma("user_version", { simple: true }) !== 11) {
     throw new Error("R46_07_SCHEMA10_REQUIRED");
   }
   return { root, databasePath, documentsRoot, reportsRoot, sqlite };

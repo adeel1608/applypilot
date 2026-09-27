@@ -48,6 +48,7 @@ try {
       "0008_real_target_inspection_scope.sql",
       "0009_green_banner_session_grant.sql",
       "0010_verified_source_packet_binding.sql",
+      "0011_immutable_r2a_derivation_bindings.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
@@ -250,7 +251,7 @@ Documents
            content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
            policy_version,run_id,supersedes_observation_id)
          VALUES (?,?,NULL,'LEVER',?,?,NULL,'APPROVED_SOURCE_FETCH',?,?,?,NULL,NULL,
-           '3.1.0','fixture-policy',NULL,NULL)`,
+           '3.1.0','fixture-policy',?,NULL)`,
       )
       .run(
         observationId,
@@ -260,6 +261,7 @@ Documents
         observationContentDigest,
         `fixture:${suffix}`,
         now,
+        runId,
       );
     sqlite
       .prepare(
