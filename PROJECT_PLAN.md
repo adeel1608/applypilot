@@ -3004,3 +3004,112 @@ only by current canonical recommendation, score descending, then local job ID; a
   Push workflow `36307584991` and PR workflow `36307599125` both completed SUCCESS for that
   exact head. The local E2E invocation timed out starting its configured web server, while the
   exact-head GitHub quality workflow completed successfully; no real DB or network was touched.
+
+## 48. M2 source capability approval proposal blueprint (2026-09-27)
+
+### Objective and current state
+
+- PR #53 is approved for exact squash merge. After synchronization, prepare one offline,
+  non-persisted, non-approved Shield AI Lever `LIST_JOBS` capability proposal for a later owner
+  decision. The proposal must not perform source transport, DNS/TCP/TLS, employer interaction, or
+  any application action.
+- Current runtime baseline remains schema `11`, pending `0`, integrity `PASS`, FK `0`, active
+  source/target capabilities `0/0`, source/employer/form/upload/submission counters `16/9/0/0`,
+  Source-enabled Personal Beta `READY`, and Personal Live V1 `NOT_READY`.
+
+### Authority, lineage, and policy assumptions
+
+- Read-only inspection may use only the existing private allowlist and real DB metadata. Shield AI
+  (`LEVER`, `shieldai`, `GLOBAL`, `api.lever.co`, `/v0/postings/shieldai`) is the sole known real
+  tenant; historical smoke/fixture/test authorities remain excluded.
+- The existing `m2_source_shieldai_ace3faba83cf_1790463324757` family is the matching immutable
+  identity. Its next proposal is version `3`, predecessor `2`; no old version is resurrected and
+  no database/allowlist row is written.
+- Historical `m2-live-readiness-v1` is the current policy identity that can be reviewed and reused
+  for this owner proposal (classification A), with fresh review and expiry timestamps. The
+  proposal remains DRAFT until a new external owner approval reference is supplied.
+
+### Proposed contract and data flow
+
+1. Derive a fresh T0 and conservative policy/capability expiries (24 hours / 30 minutes), current
+   post-merge parser identity `lever-v2:<main SHA>`, and strict one-request caps: budget `1`,
+   records/page `25`, bytes `2,000,000`, request `30,000 ms`, run `120,000 ms`, retries/redirects
+   `0`, concurrency `1`, operation `LIST_JOBS` only.
+2. Validate the in-memory DRAFT with `SourceCapabilityV2Schema`, exact host/path/operation,
+   expiry ordering, limits, lineage, and source digest. Optionally calculate a separately labelled
+   APPROVED-template digest without asserting that approval exists.
+3. Record safe metadata and the complete owner-approval block in this plan only; do not create or
+   modify `data/private/source-allowlist.json`, persist a DB capability, or emit approval as fact.
+
+### Risks, rollback, validation, and acceptance
+
+- Risks are stale policy, identity/version reuse, accidental approval, timestamp expiry, or private
+  data leakage. Fail closed on any mismatch; rollback is simply discarding the unpersisted proposal.
+- No migration or application-code change is expected. Tracked change is `PROJECT_PLAN.md` only;
+  private DB/configuration, payloads, secrets, profile, documents, and approval records remain
+  ignored and untouched.
+- Run source-capability/readiness/database focused tests plus unit, integration, typecheck, lint,
+  production/showcase builds, privacy/dependency audits, read-only schema/integrity/FK checks,
+  diff-check, and fsck. Run E2E only if its configured server starts; report any timeout exactly.
+- Acceptance is a schema-valid DRAFT proposal, zero network/source/employer/application actions,
+  unchanged counters and active capabilities, and one evidence-only unmerged PR whose next task is
+  explicit owner review/approval of the exact proposal.
+
+## 49. M2 source capability approval proposal evidence (2026-09-27)
+
+### PR #53 merge and synchronized main
+
+- PR #53 exact reviewed head `a27e260004d8f919951a8337785e26caec63a133`, tree
+  `ab6bd7e4e43330f8841eda91c1535a8496477033`, base
+  `380c3ca2409db1c52211f5fd873730c1420108e1`, OPEN/UNMERGED/CLEAN with both exact-head quality
+  workflows successful, was squash-merged as `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`.
+  Parent is `380c3ca2409db1c52211f5fd873730c1420108e1`; merged tree remains
+  `ab6bd7e4e43330f8841eda91c1535a8496477033`. Local `main` equals `origin/main` at that SHA.
+- Migration 0011 and parser/normalization/evidence versions remain current (`3.2.0` / `3.2.0` /
+  `3.1.0`); threshold `50` and weight version `r2-weights-1` remain unchanged.
+
+### Read-only lineage and policy decision
+
+- The private runtime contains the real Shield AI LEVER/GLOBAL LIST_JOBS families
+  `green_source_shieldai_227df70`, `green_source_shieldai_227df70_r2`,
+  `lever_4062a7540105391462eb6f72`, `lever_542b8c0df68b35ca31987404`,
+  `lever_5a71ab797ef2101beabf507b`, `lever_69a6efe9f0e52e5728e62e8b`,
+  `lever_7a05053aa4b6764434b09b47`, `lever_a7308e8f9d1855f1801b81d5`,
+  `lever_b2195ee303962aac722b420d`, `lever_e00987dd3988294c6481d36c`,
+  `lever_f5c85d8768d86bc8eaff1a15`, and `lever_p2_r4633_20260922`.
+  Historical smoke/fixture/test aliases remain excluded. The latest matching identity family is
+  `m2_source_shieldai_ace3faba83cf_1790463324757`, version `2`, `REVOKED`, policy
+  `m2-live-readiness-v1`; no version was resurrected.
+- Policy classification is **A — CURRENT_POLICY_CAN_BE_REVIEWED_AND_REUSED**. The repository
+  repeatedly records Shield AI as the approved real tenant and the current public-board context
+  review date is `2026-09-27`; no unresolved policy/access-control concern was found offline.
+  This is a proposal only and does not assert owner approval.
+
+### DRAFT proposal (not persisted, not approved)
+
+- T0 / policyReviewedAt: `2026-09-27T09:22:11.439Z`.
+- Capability identity: `m2_source_shieldai_ace3faba83cf_1790463324757`, version `3`, predecessor
+  `2`; source/alias/tenant/region `LEVER` / `Shield AI` / `shieldai` / `GLOBAL`.
+- Exact host/path and operation: `api.lever.co` / `/v0/postings/shieldai` / `LIST_JOBS` only.
+- Bounds: request budget `1`; record/page caps `25/25`; response `2000000` bytes; request/run
+  timeouts `30000/120000` ms; retries `0`; redirects `0`; concurrency `1`.
+- Parser: `lever-v2:8acb96a817d9835b205f6cf25fabd9c24ad18e0f`.
+- Policy: `m2-live-readiness-v1`; policy expiry `2026-09-28T09:22:11.439Z`; capability expiry
+  `2026-09-27T09:52:11.439Z`.
+- Approval state is `DRAFT`, approval reference/approvedAt are null, and the proposed future
+  reference is `owner.m2-source-discovery.lever_shieldai.v3`.
+- DRAFT capability digest: `a303e662bba0753bfa86599505f4dd1d8a2a594369b2b53197a9b7e66f6544f2`.
+  An APPROVED-template digest using the proposed future reference and T0 as a placeholder is
+  `a19690a689140a55271fd281eba9fe88654e10b6b4ff28eabc003d4db74d1e02`; it is not active and
+  must be regenerated if owner approval uses fresh timestamps.
+- `SourceCapabilityV2Schema` validation, host/path/operation checks, limit relationships, expiry
+  ordering, lineage, and digest calculation passed in memory. No proposal file was created.
+
+### No-action proof and next gate
+
+- No allowlist mutation, database capability persistence, source request, DNS/TCP/TLS connection,
+  employer visit, form action, upload, or submission occurred. Source delta remains `0`; lifetime
+  counters remain `16/9/0/0`; active source/target capabilities remain `0/0`.
+- Source-enabled Personal Beta remains `READY`; Personal Live V1 remains `NOT_READY`. The only
+  remaining gate is a fresh explicit owner approval of the exact proposal outside Git, followed by
+  the separate owner-started `/sources` action.
