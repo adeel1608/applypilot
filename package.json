@@ -45,6 +45,7 @@
     "smoke:private-beta": "tsx scripts/private-beta-smoke.ts",
     "r2a:reprocess-private": "tsx scripts/r2a-reprocess-private.ts",
     "r2:evaluate-private": "tsx scripts/r2-evaluate-private.ts",
+    "r2:readiness-summary": "tsx scripts/r2-readiness-summary.ts",
     "target:prepare-inspection": "tsx scripts/prepare-target-inspection.ts",
     "target:run-inspection": "tsx scripts/run-target-inspection.ts",
     "grant:initialize": "tsx scripts/initialize-green-banner-grant.ts",

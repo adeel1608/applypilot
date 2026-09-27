@@ -134,12 +134,20 @@ export class BetaRepository {
                 v.policy_version AS sourcePolicyVersion
          FROM source_record_verifications v
          JOIN source_run_checkpoints r ON r.id=v.run_id AND r.status='COMPLETE'
+           AND r.capability_version_id=v.capability_version_id
+         JOIN source_capability_versions c ON c.id=v.capability_version_id
+           AND c.source=v.source AND c.tenant=v.tenant
+           AND c.configuration_digest=r.capability_digest
+           AND c.parser_version=v.parser_version
+           AND c.policy_version=v.policy_version
          JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id
            AND p.page_digest=v.page_digest AND v.record_index < p.record_count
          JOIN job_versions jv ON jv.id=v.job_version_id
            AND jv.job_id=? AND jv.id=? AND jv.source_observation_id=v.source_observation_id
          JOIN source_observations o ON o.id=v.source_observation_id
            AND o.content_hash=v.content_hash
+           AND o.source=v.source AND o.tenant=v.tenant AND o.external_id=v.external_id
+           AND o.parser_version=v.parser_version AND o.policy_version=v.policy_version
          WHERE v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'
          ORDER BY v.verified_at DESC,v.rowid DESC LIMIT 1`,
       )

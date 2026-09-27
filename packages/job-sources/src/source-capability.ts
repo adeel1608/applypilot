@@ -369,6 +369,9 @@ export const SourceStopCodeSchema = z.enum([
   "BOT_OR_ACCESS_INTERSTITIAL",
   "PAGE_SIZE_EXCEEDED",
   "SOURCE_RECORD_UNUSABLE",
+  "DETAIL_NOT_FOUND",
+  "SOURCE_DETAIL_ID_INVALID",
+  "SOURCE_DETAIL_ID_MISMATCH",
 ]);
 
 export const SourceAuditMetadataSchemas = {

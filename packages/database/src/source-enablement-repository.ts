@@ -5,6 +5,7 @@ import {
   SourceCapabilityV2Schema,
   SourceProviderDriftDiagnosticSchema,
   SourceRecordUnusableDiagnosticSchema,
+  runLeverDetailSourceDiscovery,
   runLeverSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
@@ -14,9 +15,11 @@ import {
   validateSourceAuditMetadata,
   type LeverPageV2,
   type LeverPostingRecordV2,
+  type LeverDetailSourceRunResult,
   type SourceCapabilityV2,
   type SourceRunBudget,
   type SourceRunSink,
+  type SourceOperation,
   type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
@@ -31,6 +34,10 @@ import { R2Repository } from "./r2-repository";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function detailPageDigest(externalId: string, record: LeverPostingRecordV2): string {
+  return sha256(`GET_JOB\n${externalId}\n${record.externalId}\n${record.contentDigest}`);
 }
 
 function employmentType(
@@ -236,10 +243,13 @@ export class SourceEnablementRepository implements SourceRunSink {
   start(input: {
     capability: SourceCapabilityV2;
     capabilityDigest: string;
-    operation: "LIST_JOBS";
+    operation: SourceOperation;
     startedAt: string;
   }): string {
     const capability = SourceCapabilityV2Schema.parse(input.capability);
+    if (!capability.allowedOperations.includes(input.operation)) {
+      throw new Error("OPERATION_NOT_APPROVED");
+    }
     if (
       sourceCapabilityReadiness(capability, new Date(input.startedAt)).status !== "SOURCE_ENABLED"
     ) {
@@ -269,13 +279,14 @@ export class SourceEnablementRepository implements SourceRunSink {
            next_cursor, seen_page_digests_json, request_count, page_count, record_count, byte_count,
            retry_count, redirect_count, safe_error_code, retry_after, owner_started_at,
            owner_cancelled_at, completed_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'RUNNING', NULL, '0', '[]', 0, 0, 0, 0, 0, 0, NULL, NULL, ?, NULL, NULL, ?, ?)`,
+         VALUES (?, ?, ?, ?, 'RUNNING', NULL, ?, '[]', 0, 0, 0, 0, 0, 0, NULL, NULL, ?, NULL, NULL, ?, ?)`,
       )
       .run(
         runId,
         row.id,
         row.digest,
         input.operation,
+        input.operation === "LIST_JOBS" ? "0" : null,
         input.startedAt,
         input.startedAt,
         input.startedAt,
@@ -507,6 +518,130 @@ export class SourceEnablementRepository implements SourceRunSink {
       return { createdJobIds, duplicateObservationCount };
     })();
     void result;
+  }
+
+  persistDetail(input: {
+    runId: string;
+    capability: SourceCapabilityV2;
+    externalId: string;
+    record: LeverPostingRecordV2;
+    pageDigest: string;
+    budget: SourceRunBudget;
+    observedAt: string;
+  }): void {
+    const capability = SourceCapabilityV2Schema.parse(input.capability);
+    if (capability.source !== "LEVER") throw new Error("SOURCE_MISMATCH");
+    if (input.record.externalId !== input.externalId) {
+      throw new Error("SOURCE_DETAIL_ID_MISMATCH");
+    }
+    if (detailPageDigest(input.externalId, input.record) !== input.pageDigest) {
+      throw new Error("SOURCE_DETAIL_DIGEST_MISMATCH");
+    }
+    this.sqlite.transaction(() => {
+      this.assertCapabilityCurrent({
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+        capabilityVersion: capability.version,
+        capabilityDigest: sourceCapabilityDigest(capability),
+      });
+      const run = this.sqlite
+        .prepare("SELECT operation FROM source_run_checkpoints WHERE id=?")
+        .get(input.runId) as { operation: string } | undefined;
+      if (!run || run.operation !== "GET_JOB") throw new Error("SOURCE_OPERATION_MISMATCH");
+      const capabilityRow = this.sqlite
+        .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
+        .get(capability.capabilityId, capability.version) as { id: string } | undefined;
+      if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
+      const cursor = `GET_JOB:${input.externalId}`;
+      const existingPage = this.sqlite
+        .prepare(
+          `SELECT id, page_digest AS pageDigest FROM source_run_pages
+           WHERE run_id=? AND page_number=1 AND cursor=? AND next_cursor IS NULL`,
+        )
+        .get(input.runId, cursor) as { id: string; pageDigest: string } | undefined;
+      if (existingPage) {
+        if (existingPage.pageDigest !== input.pageDigest)
+          throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
+        return;
+      }
+      const persisted = this.persistLeverObservation(
+        input.record,
+        capability,
+        input.runId,
+        input.observedAt,
+      );
+      if (!persisted.jobVersionId) throw new Error("SOURCE_JOB_VERSION_REQUIRED");
+      const pageId = this.id();
+      this.sqlite
+        .prepare(
+          `INSERT INTO source_run_pages
+            (id,run_id,page_number,cursor,next_cursor,page_digest,request_count,record_count,byte_count,created_at)
+           VALUES (?,?,?,?,NULL,?,?,?,?,?)`,
+        )
+        .run(
+          pageId,
+          input.runId,
+          1,
+          cursor,
+          input.pageDigest,
+          input.budget.attempts,
+          1,
+          input.budget.bytes,
+          input.observedAt,
+        );
+      if (!this.hasVerificationLedger()) throw new Error("SOURCE_VERIFICATION_LEDGER_REQUIRED");
+      this.recordVerification({
+        id: this.id(),
+        runId: input.runId,
+        capabilityVersionId: capabilityRow.id,
+        pageId,
+        source: capability.source,
+        tenant: capability.tenant,
+        externalId: input.externalId,
+        recordIndex: 0,
+        pageDigest: input.pageDigest,
+        contentHash: input.record.contentDigest,
+        sourceObservationId: persisted.observationId,
+        jobVersionId: persisted.jobVersionId,
+        disposition: "ACCEPTED",
+        qualificationState: "PAGE_PERSISTED",
+        parserVersion: capability.parserVersion,
+        policyVersion: capability.policyVersion,
+        verifiedAt: input.observedAt,
+        createdAt: input.observedAt,
+      });
+      this.sqlite
+        .prepare(
+          `UPDATE source_run_checkpoints SET current_cursor=?, next_cursor=NULL,
+             seen_page_digests_json=?, request_count=?, page_count=?, record_count=?, byte_count=?,
+             retry_count=?, redirect_count=?, updated_at=? WHERE id=?`,
+        )
+        .run(
+          cursor,
+          JSON.stringify([input.pageDigest]),
+          input.budget.attempts,
+          input.budget.pages,
+          input.budget.records,
+          input.budget.bytes,
+          input.budget.retries,
+          input.budget.redirects,
+          input.observedAt,
+          input.runId,
+        );
+      const audit = validateSourceAuditMetadata("source.page.persisted", {
+        runId: input.runId,
+        pageNumber: 1,
+        requestCount: input.budget.attempts,
+        recordCount: 1,
+        providerRecordCount: 1,
+        acceptedRecordCount: 1,
+        unusableRecordCount: 0,
+        providerDriftWarningCount: 0,
+        persistedObservationCount: persisted.created ? 1 : 0,
+        byteCount: input.budget.bytes,
+      });
+      this.audit("source.page.persisted", "source_run", input.runId, audit);
+    })();
   }
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
@@ -1254,6 +1389,36 @@ export async function runLeverSourceToQueue(input: {
       if (!evaluationId) continue;
       await input.queueJob(jobId, evaluationId);
       queuedJobIds.push(jobId);
+    }
+  }
+  return { ...result, queuedJobIds };
+}
+
+export async function runLeverDetailToQueue(input: {
+  capability: SourceCapabilityV2;
+  repository: SourceEnablementRepository;
+  externalId: string;
+  evaluateJob(jobId: string): Promise<string | null>;
+  queueJob(jobId: string, evaluationId: string): Promise<void> | void;
+  now?: () => Date;
+  signal?: AbortSignal;
+  dependencies?: SecureSourceTransportDependencies;
+}): Promise<LeverDetailSourceRunResult & { queuedJobIds: string[] }> {
+  const result = await runLeverDetailSourceDiscovery({
+    capability: input.capability,
+    sink: input.repository,
+    externalId: input.externalId,
+    now: input.now,
+    signal: input.signal,
+    dependencies: input.dependencies,
+  });
+  const queuedJobIds: string[] = [];
+  if (result.status === "COMPLETE") {
+    for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
+      const evaluationId = work.evaluationId ?? (await input.evaluateJob(work.jobId));
+      if (!evaluationId) continue;
+      await input.queueJob(work.jobId, evaluationId);
+      queuedJobIds.push(work.jobId);
     }
   }
   return { ...result, queuedJobIds };

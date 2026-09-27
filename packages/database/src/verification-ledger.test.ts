@@ -166,4 +166,90 @@ describe("qualified verification lookup", () => {
       sqlite.close();
     }
   });
+
+  it("fails closed when capability, source, tenant, external, parser, or policy lineage drifts", () => {
+    const cases: Array<{
+      name: string;
+      corrupt: (sqlite: BetterSqlite3.Database) => void;
+      restore: (sqlite: BetterSqlite3.Database) => void;
+    }> = [
+      {
+        name: "capability identity",
+        corrupt: (db) =>
+          db.prepare("UPDATE source_capability_versions SET source='GREENHOUSE'").run(),
+        restore: (db) => db.prepare("UPDATE source_capability_versions SET source='LEVER'").run(),
+      },
+      {
+        name: "run capability identity",
+        corrupt: (db) =>
+          db.prepare("UPDATE source_run_checkpoints SET capability_digest=?").run("b".repeat(64)),
+        restore: (db) =>
+          db.prepare("UPDATE source_run_checkpoints SET capability_digest=?").run("a".repeat(64)),
+      },
+      {
+        name: "source and tenant",
+        corrupt: (db) =>
+          db
+            .prepare("UPDATE source_record_verifications SET source='GREENHOUSE', tenant='other'")
+            .run(),
+        restore: (db) =>
+          db
+            .prepare("UPDATE source_record_verifications SET source='LEVER', tenant='fictional'")
+            .run(),
+      },
+      {
+        name: "external identity",
+        corrupt: (db) =>
+          db.prepare("UPDATE source_record_verifications SET external_id='other'").run(),
+        restore: (db) =>
+          db.prepare("UPDATE source_record_verifications SET external_id='external-1'").run(),
+      },
+      {
+        name: "parser and policy",
+        corrupt: (db) =>
+          db
+            .prepare(
+              "UPDATE source_record_verifications SET parser_version='other', policy_version='other'",
+            )
+            .run(),
+        restore: (db) =>
+          db
+            .prepare(
+              "UPDATE source_record_verifications SET parser_version='lever-v2', policy_version='fixture-policy'",
+            )
+            .run(),
+      },
+      {
+        name: "observation provenance",
+        corrupt: (db) =>
+          db
+            .prepare(
+              "UPDATE source_observations SET source='GREENHOUSE', tenant='other', external_id='other', parser_version='other', policy_version='other'",
+            )
+            .run(),
+        restore: (db) =>
+          db
+            .prepare(
+              "UPDATE source_observations SET source='LEVER', tenant='fictional', external_id='external-1', parser_version='lever-v2', policy_version='fixture-policy'",
+            )
+            .run(),
+      },
+    ];
+    for (const testCase of cases) {
+      const sqlite = migratedDatabase();
+      try {
+        seedQualifiedVerification(sqlite);
+        testCase.corrupt(sqlite);
+        expect(
+          new BetaRepository(sqlite).getLatestQualifiedVerification(
+            "job:verification",
+            "job-version:verification",
+          ),
+          testCase.name,
+        ).toBeNull();
+      } finally {
+        sqlite.close();
+      }
+    }
+  });
 });
