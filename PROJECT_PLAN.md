@@ -2998,3 +2998,9 @@ only by current canonical recommendation, score descending, then local job ID; a
   fill-preview `BLOCKED`; final readiness / Green-banner review `NOT_STARTED`.
 - Next task: owner must provide a fresh approved, policy-valid real source tenant/capability for
   bounded `LIST_JOBS` discovery; do not perform network discovery until that authority exists.
+- Evidence PR #53: `https://github.com/adeel1608/applypilot/pull/53`, base
+  `380c3ca2409db1c52211f5fd873730c1420108e1`, evidence head
+  `2b20e49ec78fc21dd1cb8f033bec42e2ae4d3266`, one tracked file, OPEN/UNMERGED/MERGEABLE.
+  Push workflow `36307584991` and PR workflow `36307599125` both completed SUCCESS for that
+  exact head. The local E2E invocation timed out starting its configured web server, while the
+  exact-head GitHub quality workflow completed successfully; no real DB or network was touched.
