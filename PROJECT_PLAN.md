@@ -3227,9 +3227,13 @@ only by current canonical recommendation, score descending, then local job ID; a
   58 unit test files / 626 tests passed; 3 integration files / 21 tests passed; 47 E2E tests passed.
   The E2E server used its disposable fictional SQLite database; all source transport in source-to-
   preview was mocked/local, and no employer or real source host was contacted.
-- Typecheck, lint, changed-file formatting, local production build, showcase production build,
-  showcase audit, privacy audit, `npm audit`, and production dependency audit all pass. Both npm
-  audits report 0 vulnerabilities; privacy audit reports PASS.
+- Commands and outcomes: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`,
+  `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm run privacy:audit`,
+  `npm audit`, `npm run audit:production`, `npm run preflight`, `npm run db:status`, and
+  `npm run release:check:fixture` all pass. `npm run build` includes local and showcase production
+  builds plus `showcase:audit`; both npm audits report 0 vulnerabilities.
+- The final post-commit `npm run privacy:audit` passes with 350 tracked files, 1,398 history paths,
+  1,271 history blobs, 1,944 build/test artifacts, and 11 private canaries checked.
 - The schema-11-to-12 disposable test passes integrity/FK checks, preserves the synthetic
   historical run row, creates zero receipt/binding backfills, and classifies that run as
   `LEGACY_OWNER_PROVENANCE_UNVERIFIED`. `npm run release:check:fixture` also passes against its
@@ -3257,8 +3261,8 @@ only by current canonical recommendation, score descending, then local job ID; a
   `77382fc26fc0a2b5285a0cebf48851ff021e18c0`, with 23 files. PR #55 is OPEN / UNMERGED / CLEAN;
   review decision is empty, with 0 reviews and 0 unresolved threads. Exact-head quality workflows
   `36393152880` (push) and `36393235825` (PR) both completed SUCCESS for that code implementation
-  commit. This plan-only closeout update will cause GitHub checks to run for the updated PR head;
-  report their exact final result in the task closeout. PR #54 remains OPEN / UNMERGED.
+  commit. Later plan-only closeout updates trigger fresh exact-head checks; their final outcomes
+  are reported in the task closeout. PR #54 remains OPEN / UNMERGED.
 - No local implementation or validation blocker remains. Source-enabled Personal Beta is preflight
   READY with no active capability, while the private schema-11 database still has migration 0012
   pending; do not activate or migrate it in this task. Personal Live V1 remains NOT_READY. The next
