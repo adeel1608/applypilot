@@ -7,6 +7,14 @@ import { LocalMutationTokenStore, assertLoopbackMutationRequest } from "@applypi
 
 export const LOCAL_SESSION_COOKIE = "applypilot_local_session";
 
+export interface LocalMutationGateProof {
+  action: string;
+  consumedAt: string;
+  loopbackValidated: true;
+  localSessionValidated: true;
+  nonceConsumed: true;
+}
+
 const processState = globalThis as typeof globalThis & {
   __applypilotLocalMutationTokens?: LocalMutationTokenStore;
 };
@@ -34,7 +42,10 @@ export async function issueLocalMutationNonce(action: string, returnPath: string
   return localMutationTokens.issue(session, action).nonce;
 }
 
-export async function consumeLocalMutationNonce(action: string, formData: FormData): Promise<void> {
+export async function consumeLocalMutationNonce<Action extends string>(
+  action: Action,
+  formData: FormData,
+): Promise<LocalMutationGateProof & { action: Action }> {
   const requestHeaders = await headers();
   assertLoopbackMutationRequest({
     host: requestHeaders.get("host"),
@@ -43,4 +54,11 @@ export async function consumeLocalMutationNonce(action: string, formData: FormDa
   });
   const session = (await cookies()).get(LOCAL_SESSION_COOKIE)?.value;
   localMutationTokens.consume(session, action, formData.get("mutationNonce"));
+  return {
+    action,
+    consumedAt: new Date().toISOString(),
+    loopbackValidated: true,
+    localSessionValidated: true,
+    nonceConsumed: true,
+  };
 }

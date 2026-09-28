@@ -1,4 +1,11 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  type AnySQLiteColumn,
+} from "drizzle-orm/sqlite-core";
 
 export const candidateProfiles = sqliteTable("candidate_profiles", {
   id: text("id").primaryKey(),
@@ -967,6 +974,74 @@ export const sourceRunCheckpoints = sqliteTable("source_run_checkpoints", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const sourceOwnerActionReceipts = sqliteTable(
+  "source_owner_action_receipts",
+  {
+    id: text("id").primaryKey(),
+    action: text("action").notNull(),
+    capabilityVersionId: text("capability_version_id")
+      .notNull()
+      .references(() => sourceCapabilityVersions.id, { onDelete: "restrict" }),
+    capabilityId: text("capability_id").notNull(),
+    capabilityVersion: integer("capability_version").notNull(),
+    capabilityDigest: text("capability_digest").notNull(),
+    approvalReference: text("approval_reference").notNull(),
+    source: text("source").notNull(),
+    tenant: text("tenant").notNull(),
+    operation: text("operation"),
+    policyVersion: text("policy_version").notNull(),
+    policyExpiresAt: text("policy_expires_at").notNull(),
+    capabilityExpiresAt: text("capability_expires_at").notNull(),
+    receiptExpiresAt: text("receipt_expires_at"),
+    confirmationDigest: text("confirmation_digest").notNull(),
+    nonceAction: text("nonce_action").notNull(),
+    gateConsumedAt: text("gate_consumed_at").notNull(),
+    loopbackValidated: integer("loopback_validated", { mode: "boolean" }).notNull(),
+    localSessionValidated: integer("local_session_validated", { mode: "boolean" }).notNull(),
+    nonceConsumed: integer("nonce_consumed", { mode: "boolean" }).notNull(),
+    ownerConfirmed: integer("owner_confirmed", { mode: "boolean" }).notNull(),
+    predecessorReceiptId: text("predecessor_receipt_id").references(
+      (): AnySQLiteColumn => sourceOwnerActionReceipts.id,
+      { onDelete: "restrict" },
+    ),
+    state: text("state").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("source_owner_action_receipts_predecessor_idx").on(table.predecessorReceiptId),
+    index("source_owner_action_receipts_capability_idx").on(
+      table.capabilityId,
+      table.capabilityVersion,
+      table.action,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const sourceRunOwnerBindings = sqliteTable(
+  "source_run_owner_bindings",
+  {
+    runId: text("run_id")
+      .primaryKey()
+      .references(() => sourceRunCheckpoints.id, { onDelete: "restrict" }),
+    approvalReceiptId: text("approval_receipt_id")
+      .notNull()
+      .references(() => sourceOwnerActionReceipts.id, { onDelete: "restrict" }),
+    startReceiptId: text("start_receipt_id")
+      .notNull()
+      .references(() => sourceOwnerActionReceipts.id, { onDelete: "restrict" }),
+    capabilityDigest: text("capability_digest").notNull(),
+    operation: text("operation").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("source_run_owner_bindings_start_idx").on(table.startReceiptId),
+    uniqueIndex("source_run_owner_bindings_approval_idx").on(table.approvalReceiptId),
+  ],
+);
+
 export const sourceRunPages = sqliteTable("source_run_pages", {
   id: text("id").primaryKey(),
   runId: text("run_id").notNull(),
@@ -1242,6 +1317,8 @@ export const schema = {
   discoveryRuns,
   sourceCapabilityVersions,
   sourceRunCheckpoints,
+  sourceOwnerActionReceipts,
+  sourceRunOwnerBindings,
   sourceRunPages,
   sourceRecordVerifications,
   sourceObservationPayloads,

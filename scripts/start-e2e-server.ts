@@ -49,6 +49,7 @@ try {
       "0009_green_banner_session_grant.sql",
       "0010_verified_source_packet_binding.sql",
       "0011_immutable_r2a_derivation_bindings.sql",
+      "0012_source_owner_action_receipts.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),

@@ -23,6 +23,7 @@ const migrationFiles = [
   "0009_green_banner_session_grant.sql",
   "0010_verified_source_packet_binding.sql",
   "0011_immutable_r2a_derivation_bindings.sql",
+  "0012_source_owner_action_receipts.sql",
 ];
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv): void {

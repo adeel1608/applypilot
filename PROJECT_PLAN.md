@@ -1,16 +1,42 @@
 # ApplyPilot Production Verification Project Plan
 
-Last updated: 2026-09-23
+Last updated: 2026-09-28
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `2b9e44f7633b3fb17a705a799e9b12482d2d1fb7`
+Expected current main: `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
 
 ## 1. Resume here
 
-### Active R46-10 checkpoint (2026-09-23)
+### Current work checkpoint (2026-09-28)
+
+- This engineering task starts from synchronized `main` / `origin/main` at
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f` on branch
+  `feat/m2-source-owner-action-receipts`. The worktree was clean before this plan update.
+- PR #54 remains OPEN / UNMERGED at head `212eb1d4c3928b217ecc76201d5eb8c21c764332`, base
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, tree
+  `b5c9ea0bc457f861e1cdefe6993b422db54c4373`. Do not merge it or push to it: its historical plan
+  wording overstates durable owner-action provenance. Treat it as SUPERSEDED / UNSAFE TO MERGE AS
+  WRITTEN; leave it open for later explicit supersession.
+- The prior uncommitted provenance-stop note was found and preserved before restoring its one tracked
+  file. Safe copy: `.git/codex-safety/pr54-provenance-stop-20260928.patch`, SHA-256
+  `a5e120a14eb41905f4cb0096221c6c38a57f9a821794b197cb0ee54f49c207ff` (7,614 bytes). The note
+  contains the provenance stop in `PROJECT_PLAN.md`; no private payload was copied into tracked source.
+- Read-only private runtime baseline: schema 11, pending migrations 0, integrity PASS, FK issues 0;
+  active source/target capabilities, active source runs, and pending external operations are all 0.
+  Lifetime source/employer/form-upload/submission counters are `17/9/0/0`.
+- Historical family `m2_source_shieldai_ace3faba83cf_1790463324757` has v3 recorded APPROVED with
+  reference `owner.m2-source-discovery.lever_shieldai.v3`, v4 latest and REVOKED, and one completed
+  v3 `LIST_JOBS` run `58796b51-f83f-4130-9ee2-6fa65d064d20` (one request/page, 25 records). The old
+  runtime did not durably store separate owner approval/start receipts. Those operational records
+  remain intact, while explicit human approval/start provenance for v3 is permanently
+  `LEGACY_OWNER_PROVENANCE_UNVERIFIED`; no historical receipt or run binding may be backfilled.
+- No source/employer request, capability activation, target action, migration, or private database
+  write is authorized. The real database must remain at schema 11 throughout this task.
+
+### Historical R46-10 checkpoint (2026-09-23)
 
 - Branch: `chore/p2-current-role-readiness`; PR #46 remains `OPEN / UNMERGED` with title
   `feat: implement verified source-to-packet and non-submit foundations`.
@@ -2387,6 +2413,150 @@ orchestration and was removed before the evidence branch commit; it is not track
 - The evidence branch is `chore/m2-r4633-currentness-evidence`; it changes documentation only and
   will open one PR titled `docs: record R4633 exact currentness evidence`, left open and unmerged.
 
+## 48. M2 durable source owner-action receipts engineering blueprint (2026-09-28)
+
+### Starting state and objective
+
+This offline engineering task starts from exact clean main SHA
+`8acb96a817d9835b205f6cf25fabd9c24ad18e0f` on `feat/m2-source-owner-action-receipts`. PR #54 remains
+open and unmerged at head `212eb1d4c3928b217ecc76201d5eb8c21c764332`; it is unsafe to merge as
+written because the old plan claims an explicit owner approval that the durable runtime evidence
+cannot independently prove. The safe stop note was preserved under `.git/codex-safety/` with SHA-256
+`a5e120a14eb41905f4cb0096221c6c38a57f9a821794b197cb0ee54f49c207ff` before its tracked source file
+was restored.
+
+Read-only private baseline is schema 11 / pending 0 / integrity PASS / FK issues 0; active source and
+target capabilities, active source runs, and pending external operations are 0. Lifetime source /
+employer / form-upload / submission counters are `17/9/0/0`. The historical v3 Shield AI capability
+and its one completed bounded LIST_JOBS run remain valid immutable operational records, and v4 is
+REVOKED. The old runtime has no durable separate owner approval/start receipts, so v3's explicit
+human-action provenance remains `LEGACY_OWNER_PROVENANCE_UNVERIFIED` and must never be backfilled.
+
+Objective: require a durable, exact-version owner approval receipt and a distinct fresh start receipt
+for every future real source run, then atomically consume/bind the receipt chain to the new run before
+the production runner can enter any transport code. Approval alone never starts a run. Keep the
+private database read-only at schema 11; migration 0012 is exercised only against synthetic or
+disposable databases. No Lever/employer/DNS/TCP/TLS/source request, target action, or application
+operation is authorized.
+
+### Requirements and architecture
+
+The `/sources` page will show safe per-capability readiness and receipt state. It will render separate
+forms with unchecked owner boxes, fresh action-scoped nonces, and exact phrases `APPROVE <id>` and
+`RUN <id>`. Approval uses `SOURCE_CAPABILITY_APPROVE`, validates the exact current private
+capability, persists that version through the canonical repository, records one owner approval
+receipt, and performs zero network work. Starting uses `SOURCE_RUN_START`, validates a fresh gate and
+the current exact approval receipt, creates a separate one-use start receipt, and passes only safe
+receipt IDs into the normal source runner. A repeated approval is rejected as already recorded;
+consumed approvals require a new explicit approval before another run.
+
+`consumeLocalMutationNonce()` may return a safe proof value containing only action scope, gate
+timestamp, and true loopback/session/nonce-consumed booleans. It must never expose or persist the
+nonce, session cookie/value, confirmation body, or candidate data. The receipt stores a SHA-256 digest
+of the exact canonical confirmation phrase, exact source/tenant/capability version/digest/approval
+reference/operation and policy/expiry snapshots, required gate booleans, state, timestamps, and an
+optional predecessor receipt ID. A short start-receipt expiry prevents abandoned pending receipts
+from remaining usable. Strict checks require APPROVE rows to have no operation/predecessor and START
+rows to have both; one approval can have at most one start receipt. Safe audit events record receipt
+IDs and enum/digest metadata only.
+
+Add only `packages/database/drizzle/0012_source_owner_action_receipts.sql`, with normalized
+`source_owner_action_receipts` and `source_run_owner_bindings` tables, narrow CHECK constraints,
+foreign keys using RESTRICT, indexes/uniqueness for single use, and `PRAGMA user_version=12`. Do not
+edit migrations 0000-0011 and do not backfill any historical rows. A binding has one run ID primary
+key, one approval receipt, one unique start receipt, exact capability digest, operation, and created
+timestamp. Historical runs therefore remain unbound and readable.
+
+The repository will add explicit record/read/create/fail/inspect methods. Before a run is inserted,
+`SourceEnablementRepository.start()` must validate schema 12, the current APPROVED/SOURCE_ENABLED
+capability, version row and digest, policy/capability expiries, source/tenant/reference/operation,
+receipt states and predecessor, exact confirmation digests, and successful gate flags. The separate
+start-receipt transaction consumes the approval receipt and inserts the start receipt. A second
+SQLite immediate transaction inserts the run checkpoint, consumes the start receipt, persists the
+run-to-receipt binding, and emits typed safe audit events atomically. The runner invokes this sink
+start before any transport/read call; any rejection must yield zero transport calls. Failures before
+run binding terminalize the start receipt and prohibit blind reuse. Replay,
+cross-capability/version/digest/reference/operation, stale, expired, revoked, and superseded receipts
+fail closed. The normal cancel/revoke behavior remains intact.
+
+The source-run contract will require receipt identities for both LIST_JOBS and GET_JOB runner paths.
+The non-UI `scripts/green-banner-source-run.ts` path must fail closed before transport because it has
+no fresh `/sources` owner gate; it may not provide a receipt bypass. `/sources` will label old runs
+without a binding `LEGACY OWNER ACTION PROVENANCE UNVERIFIED` and expose only safe receipt status.
+Schema-11 application state must not run sources and must present migration-required/unavailable
+receipt status until the user separately migrates; this task does not migrate it.
+
+### Proposed files, data flow, and dependencies
+
+- Migration, Drizzle schema, database schema version, migration tooling, and tests:
+  `packages/database/drizzle/0012_source_owner_action_receipts.sql`,
+  `packages/database/src/schema.ts`, `packages/database/src/index.test.ts`,
+  `packages/database/src/source-enablement-repository.ts` and its tests,
+  `scripts/lib/database-schema.ts`, `scripts/migrate-local-database.ts`, and fixture migration lists.
+- Source runner and safe audit schemas/tests: `packages/job-sources/src/source-runner.ts`,
+  `source-capability.ts`, and focused tests. Existing `SecureSourceTransport` guards stay unchanged.
+- Owner UI/action/security/workspace: `apps/web/app/sources/actions.ts`, `page.tsx`,
+  `apps/web/lib/source-workspace.ts`, and `local-mutation-security.ts` plus focused tests.
+- Ensure scripts/tests cannot bypass the gate: `scripts/green-banner-source-run.ts`, source-to-preview
+  fixture and runner/repository tests, E2E database fixture lists, release fixture lists, and
+  schema/privacy tests. Update docs only where the durable owner-action contract needs explanation.
+- Data flow: private allowlist capability -> exact current capability version persistence -> fresh
+  approval nonce/checkbox/phrase -> approval receipt -> separate fresh start nonce/checkbox/phrase ->
+  start receipt -> atomic repository validation + source run + receipt binding -> existing bounded
+  source transport -> existing immutable page/observation/R2 pipeline. No network occurs in approval.
+
+Dependencies are the existing Zod capability/audit schemas, local loopback/session/nonce gate,
+SQLite `better-sqlite3` transactions, `SourceEnablementRepository`, `SourceRunSink`, and Next server
+actions/forms. Migration status must become code schema 12 while real read-only DB remains schema 11.
+
+### Risks, privacy, rollback, and acceptance
+
+Primary risks are a hidden runner entry point that skips receipt validation, a mismatch between
+receipt and current capability identity, a crash between receipt creation and run binding, accidental
+recording of nonce/session/form values, fixture-only bypasses, and migration damage. Required controls
+are one central transactional repository gate before transport, strict receipt schemas and identity
+joins, terminal one-use receipt state and expiry, safe audit allowlists, mocked/local fictional
+transports, and disposable migration rehearsal with row-count/integrity/FK checks. No secret, private
+profile/document, page body, candidate value, raw phrase, nonce, or session identifier may enter
+receipts, logs, fixtures, or Git.
+
+Rollback is a normal code revert on this feature branch; never apply or reverse migration 0012 on the
+real DB. Disposable databases may be discarded. Migrations 0000-0011 hashes must remain unchanged.
+Acceptance requires: all exact approval/start gates and receipt bindings pass; every denied/replayed/
+stale/expired/revoked/mismatched case performs zero transport; valid fictional flow binds one start
+and one approval to one run; legacy history remains untouched and unbound; privacy checks pass; real
+DB stays schema 11 with counters `17/9/0/0`; no real source/employer/target action occurs; and one new
+PR from this branch is open/unmerged with exact-head CI green. Do not claim Personal Live V1 ready or
+emit the green-banner success phrase.
+
+Validation plan: focused migration/repository/runner/action/privacy tests; full unit and integration
+suites; E2E only with fictional local/mock source transport; typecheck, lint, changed-file formatting,
+production build, showcase build/audit, privacy and dependency audits; read-only preflight and DB
+status; disposable schema-11-to-12 migration rehearsal with historical row/count/hash invariants;
+0000-0011 migration hash comparison; `git diff --check`; and `git fsck --strict`. Record unavailable
+or failed checks exactly. Do not run any source request or apply migration 0012 to the private DB.
+
+### Exact implementation sequence
+
+1. Reconfirm this clean main-based branch, private read-only counters/status, PR #54 open/unmerged
+   state, and preserved audit-note hash; inspect all source execution entry points.
+2. Add migration 0012, Drizzle definitions, schema version/tooling updates, and in-memory/disposable
+   migration tests proving no historical receipt/binding backfill and immutable prior migration files.
+3. Implement strict typed receipt/audit schemas and repository APIs, with exact identity, expiry,
+   replay, revocation, predecessor, transaction, binding, and legacy-classification tests.
+4. Require receipt-chain identity at each production LIST_JOBS/GET_JOB runner boundary; ensure the
+   repository's atomic `start()` rejection precedes the first transport spy call; close every
+   non-UI/script route without adding a bypass.
+5. Implement separate approval and start actions and forms with fresh nonces, exact phrases,
+   unchecked confirmation boxes, safe receipt status, and legacy unverified labelling.
+6. Update fixtures and focused UI/action/E2E tests with fictional identities and mock transports;
+   preserve cancel/revoke and all existing source safeguards.
+7. Run the planned local validation and disposable migration/privacy/hash checks; inspect the exact
+   diff and report all limitations and resulting evidence here.
+8. Commit and push this branch, create exactly one PR titled
+   `feat: persist source owner approval and start receipts`, verify its base/head/tree and exact-head
+   CI, and leave it OPEN / UNMERGED. PR #54 stays untouched and unmerged.
+
 ## 38. M2 R2 scope semantics and immutable provenance engineering blueprint (2026-09-27)
 
 This implementation branch starts from the exact PR #50 squash merge
@@ -3004,3 +3174,97 @@ only by current canonical recommendation, score descending, then local job ID; a
   Push workflow `36307584991` and PR workflow `36307599125` both completed SUCCESS for that
   exact head. The local E2E invocation timed out starting its configured web server, while the
   exact-head GitHub quality workflow completed successfully; no real DB or network was touched.
+
+## 49. M2 durable source owner-action receipts implementation results (2026-09-28)
+
+### Implementation and historical evidence
+
+- Implemented on `feat/m2-source-owner-action-receipts`, based on unchanged `main` /
+  `origin/main` `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`. The work began from a clean tracked
+  tree after safely preserving the prior provenance-stop note at
+  `.git/codex-safety/pr54-provenance-stop-20260928.patch` (SHA-256
+  `a5e120a14eb41905f4cb0096221c6c38a57f9a821794b197cb0ee54f49c207ff`, 7,614 bytes).
+- PR #54 remains OPEN / UNMERGED at head `212eb1d4c3928b217ecc76201d5eb8c21c764332`, base
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, tree
+  `b5c9ea0bc457f861e1cdefe6993b422db54c4373`. It is SUPERSEDED / UNSAFE TO MERGE AS WRITTEN
+  because its wording overstates durable owner-action provenance. No commit was pushed to it.
+- Read-only post-implementation database state is schema 11, pending migration 1, integrity PASS,
+  FK issues 0; source receipt/binding tables are absent. Active source/target capabilities, active
+  source runs, and application-run operations remain 0. Lifetime source/employer/form-upload/
+  submission counters remain `17/9/0/0`. No migration was applied to the private database.
+- Historical Shield AI v3 is APPROVED in its immutable capability record, and its one bounded
+  `LIST_JOBS` run `58796b51-f83f-4130-9ee2-6fa65d064d20` is COMPLETE (one request, one page, 25
+  records). v4 is latest and REVOKED. The old runtime did not store separate durable owner approval
+  and start receipts; explicit human-action provenance remains
+  `LEGACY_OWNER_PROVENANCE_UNVERIFIED`. The old operational evidence remains intact. Historical
+  receipt backfill and run binding count are both 0.
+
+### Code and data contract delivered
+
+- Added only migration `packages/database/drizzle/0012_source_owner_action_receipts.sql`. It
+  creates `source_owner_action_receipts` and `source_run_owner_bindings`, with strict action/state/
+  operation/gate checks, exact capability version/digest/reference/source/tenant/policy/expiry
+  snapshots, predecessor and run/receipt foreign keys, and unique single-use start and approval
+  bindings. Migrations 0000-0011 are byte-identical to the starting main tree.
+- Receipt data contains only safe IDs, digests, enums, timestamps and required true gate booleans.
+  No nonce value, session cookie/ID, raw confirmation phrase, candidate value, profile value, secret,
+  page body or HTTP data is persisted.
+- `/sources` now exposes separate unchecked approval and start forms. Approval consumes
+  `SOURCE_CAPABILITY_APPROVE` with exact `APPROVE <capabilityId>` and records a receipt without
+  transport. Start consumes a fresh `SOURCE_RUN_START` nonce with exact `RUN <capabilityId>`,
+  requires the exact current approval receipt, creates a separate short-lived start receipt, and
+  atomically consumes/binds it to the run before transport. Repeated active approval is rejected;
+  another run requires a new approval. Replay and stale, expired, revoked, superseded or mismatched
+  identity fail closed before DNS. The UI labels old runs
+  `LEGACY OWNER ACTION PROVENANCE UNVERIFIED`.
+- The non-UI `grant:source-run` script stops with `SOURCE_OWNER_UI_ACTION_REQUIRED` before database
+  access or transport. The production `SecureSourceTransport` guards were not weakened. R2 scoring,
+  eligibility thresholds, the target runner and CV generation were not changed.
+
+### Validation results and current readiness
+
+- Focused migration/repository/runner/action/UI checks pass. The full final release fixture reports:
+  58 unit test files / 626 tests passed; 3 integration files / 21 tests passed; 47 E2E tests passed.
+  The E2E server used its disposable fictional SQLite database; all source transport in source-to-
+  preview was mocked/local, and no employer or real source host was contacted.
+- Commands and outcomes: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`,
+  `npm run test:integration`, `npm run build`, `npm run test:e2e`, `npm run privacy:audit`,
+  `npm audit`, `npm run audit:production`, `npm run preflight`, `npm run db:status`, and
+  `npm run release:check:fixture` all pass. `npm run build` includes local and showcase production
+  builds plus `showcase:audit`; both npm audits report 0 vulnerabilities.
+- The final post-commit `npm run privacy:audit` passes with 350 tracked files, 1,398 history paths,
+  1,271 history blobs, 1,944 build/test artifacts, and 11 private canaries checked.
+- The schema-11-to-12 disposable test passes integrity/FK checks, preserves the synthetic
+  historical run row, creates zero receipt/binding backfills, and classifies that run as
+  `LEGACY_OWNER_PROVENANCE_UNVERIFIED`. `npm run release:check:fixture` also passes against its
+  disposable fixture runtime.
+- Read-only `npm run preflight` passes with schema 11 / pending 1 / integrity PASS / FK issues 0;
+  its manual-intake blocker is `PENDING_DATABASE_MIGRATION`. It reports source-enabled beta
+  readiness `READY` with 0 active source capabilities. The release classification remains manual
+  intake beta; Personal Live V1 remains `NOT_READY`.
+- `git diff --check`, old-migration comparison, and `git fsck --strict` pass. `fsck` exits 0 and
+  reports dangling Git objects without corruption diagnostics. No real source request or GET_JOB,
+  real target/application operation, employer visit, private DB write or migration occurred. Source
+  transport and synthetic application tests used only fictional mocked/local disposable fixtures.
+  The real action delta is source/employer/form/upload/submission `0/0/0/0`.
+- Seven-milestone tracker: (1) Foundations COMPLETE; (2) current real role + fresh current packet
+  BLOCKED BY DURABLE SOURCE OWNER-ACTION PROVENANCE; (3) real-target MAP/FILL/UPLOAD/VERIFY
+  ENGINEERING / NOT LIVE VERIFIED; (4) final-review/submission safeguards BLOCKED; (5) reproducible
+  release COMPLETE; (6) controlled real fill-preview BLOCKED; (7) final readiness / Green-banner
+  review NOT STARTED. Source-enabled Personal Beta is preflight READY but has no active capability;
+  Personal Live V1 is NOT_READY.
+- Opened PR #55 at `https://github.com/adeel1608/applypilot/pull/55`, titled
+  `feat: persist source owner approval and start receipts`, from branch
+  `feat/m2-source-owner-action-receipts` to `main` at
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`. The code implementation commit is
+  `e7619d21b5c58fc0754f9a2beffe5b8d63503a6b`, tree
+  `77382fc26fc0a2b5285a0cebf48851ff021e18c0`, with 23 files. PR #55 is OPEN / UNMERGED / CLEAN;
+  review decision is empty, with 0 reviews and 0 unresolved threads. Exact-head quality workflows
+  `36393152880` (push) and `36393235825` (PR) both completed SUCCESS for that code implementation
+  commit. Later plan-only closeout updates trigger fresh exact-head checks; their final outcomes
+  are reported in the task closeout. PR #54 remains OPEN / UNMERGED.
+- No local implementation or validation blocker remains. Source-enabled Personal Beta is preflight
+  READY with no active capability, while the private schema-11 database still has migration 0012
+  pending; do not activate or migrate it in this task. Personal Live V1 remains NOT_READY. The next
+  recommended task is to review PR #55 and decide its acceptance, retaining the corrected historical
+  provenance record when PR #54 is later superseded.

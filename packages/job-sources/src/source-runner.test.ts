@@ -10,6 +10,10 @@ import {
 import { runLeverDetailSourceDiscovery } from "./source-runner";
 
 const instant = new Date("2026-09-10T00:00:00.000Z");
+const fictionalOwnerReceiptChain = {
+  approvalReceiptId: "fictional-owner-approval-receipt",
+  startReceiptId: "fictional-owner-start-receipt",
+};
 
 function capability(overrides: Partial<SourceCapabilityV2> = {}): SourceCapabilityV2 {
   return SourceCapabilityV2Schema.parse({
@@ -106,6 +110,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const result = await runLeverDetailSourceDiscovery({
       capability: capability(),
       sink: target.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies,
@@ -133,6 +138,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const result = await runLeverDetailSourceDiscovery({
       capability: capability({ allowedOperations: ["LIST_JOBS"] }),
       sink: target.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies,
@@ -149,6 +155,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const missing = await runLeverDetailSourceDiscovery({
       capability: capability(),
       sink: notFound.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies: transport({}, 404),
@@ -161,6 +168,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const redirectResult = await runLeverDetailSourceDiscovery({
       capability: capability(),
       sink: redirected.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies: transport({}, 302),
@@ -172,6 +180,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const mismatchResult = await runLeverDetailSourceDiscovery({
       capability: capability(),
       sink: mismatch.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies: transport(posting("other-id")),
@@ -188,6 +197,7 @@ describe("durable Lever GET_JOB source runner", () => {
     const result = await runLeverDetailSourceDiscovery({
       capability: capability(),
       sink: target.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
       externalId: "fixture-1",
       now: () => instant,
       dependencies: {

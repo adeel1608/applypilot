@@ -4,6 +4,14 @@ import { z } from "zod";
 
 export const SourceOperationSchema = z.enum(["LIST_JOBS", "GET_JOB"]);
 export type SourceOperation = z.infer<typeof SourceOperationSchema>;
+export const SourceOwnerActionSchema = z.enum(["APPROVE", "START"]);
+export const SourceOwnerReceiptStateSchema = z.enum([
+  "ACTIVE",
+  "CONSUMED",
+  "REVOKED",
+  "EXPIRED",
+  "FAILED",
+]);
 
 export const SourceApprovalStateSchema = z.enum([
   "DRAFT",
@@ -387,6 +395,44 @@ export const SourceAuditMetadataSchemas = {
       runId: z.string().min(1),
       capabilityId: z.string().min(1),
       capabilityVersion: z.number().int().positive(),
+      operation: SourceOperationSchema,
+    })
+    .strict(),
+  "source.owner.approval-recorded": z
+    .object({
+      receiptId: z.string().min(1),
+      capabilityId: z.string().min(1),
+      capabilityVersion: z.number().int().positive(),
+      capabilityDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      state: z.literal("ACTIVE"),
+    })
+    .strict(),
+  "source.owner.start-recorded": z
+    .object({
+      receiptId: z.string().min(1),
+      approvalReceiptId: z.string().min(1),
+      capabilityId: z.string().min(1),
+      capabilityVersion: z.number().int().positive(),
+      capabilityDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      operation: SourceOperationSchema,
+      state: z.literal("ACTIVE"),
+    })
+    .strict(),
+  "source.owner.receipt-terminal": z
+    .object({
+      receiptId: z.string().min(1),
+      action: SourceOwnerActionSchema,
+      state: z.enum(["CONSUMED", "REVOKED", "EXPIRED", "FAILED"]),
+    })
+    .strict(),
+  "source.run.owner-bound": z
+    .object({
+      runId: z.string().min(1),
+      approvalReceiptId: z.string().min(1),
+      startReceiptId: z.string().min(1),
+      capabilityId: z.string().min(1),
+      capabilityVersion: z.number().int().positive(),
+      capabilityDigest: z.string().regex(/^[a-f0-9]{64}$/),
       operation: SourceOperationSchema,
     })
     .strict(),
