@@ -3594,9 +3594,16 @@ PROJECT_PLAN.md` passes. No application/source files were reformatted because th
   submission occurred. Lifetime action counters remain `17/9/0/0`. No v5 capability, activation
   timestamps/digest, approval receipt, start receipt, source run, or historical backfill was made.
 
-Remaining sequence: commit this plan-only evidence update on
-`chore/m2-schema12-rollout-broader-source-readiness`, push it, open exactly one evidence PR, and
-wait for checks on its exact final head. Record branch/tree/PR/check identities in the evidence PR
-and task closeout. The next recommended task after this evidence review is to generate a fresh,
-exact, short-lived capability immediately before explicit owner approval. No source network action
-has occurred.
+### Evidence PR handoff
+
+- Evidence PR #56 is open and unmerged at
+  `https://github.com/adeel1608/applypilot/pull/56`, from
+  `chore/m2-schema12-rollout-broader-source-readiness` to `main` based on PR #55 merge
+  `b14c17d6997cd10675f5ab9e35cb3ca98651cedf`. Its only changed file is `PROJECT_PLAN.md`.
+- The initial evidence commit `3e295792e147d2083fa8aabc45cb999f93996664` (tree
+  `965d5ab4273874f7065b61b44fea5f5bd14c0d45`) passed exact-head push Quality run `36424384095`
+  and exact-head PR Quality run `36424513157`. This final plan-only handoff note is included in a
+  follow-up commit on the same branch; its resulting head/tree and exact push/PR run IDs are
+  recorded in the final PR comment and task closeout.
+- The next recommended task after this evidence review is to generate a fresh, exact, short-lived
+  capability immediately before explicit owner approval. No source network action has occurred.
