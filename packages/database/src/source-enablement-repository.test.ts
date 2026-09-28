@@ -13,6 +13,8 @@ import {
   readLeverPageV2,
   sourceCapabilityDigest,
   type SourceCapabilityV2,
+  type SourceOperation,
+  type SourceOwnerReceiptChain,
   type SecureSourceTransportDependencies,
 } from "@applypilot/job-sources";
 import { testProfile } from "../../../tests/fixture-data";
@@ -22,8 +24,8 @@ import { BetaRepository } from "./beta-repository";
 import { R2Repository } from "./r2-repository";
 import {
   SourceEnablementRepository,
-  runLeverDetailToQueue,
-  runLeverSourceToQueue,
+  runLeverDetailToQueue as runLeverDetailToQueueWithOwnerReceipts,
+  runLeverSourceToQueue as runLeverSourceToQueueWithOwnerReceipts,
 } from "./source-enablement-repository";
 
 const instant = new Date("2026-09-10T00:00:00.000Z");
@@ -43,9 +45,110 @@ function database() {
     "0009_green_banner_session_grant.sql",
     "0010_verified_source_packet_binding.sql",
     "0011_immutable_r2a_derivation_bindings.sql",
+    "0012_source_owner_action_receipts.sql",
   ])
     sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
   return sqlite;
+}
+
+function fictionalGateProof(
+  action: "SOURCE_CAPABILITY_APPROVE" | "SOURCE_RUN_START",
+  consumedAt: string,
+) {
+  return {
+    action,
+    consumedAt,
+    loopbackValidated: true as const,
+    localSessionValidated: true as const,
+    nonceConsumed: true as const,
+  };
+}
+
+function fictionalOwnerReceiptChain(
+  repository: SourceEnablementRepository,
+  sourceCapability: SourceCapabilityV2,
+  operation: SourceOperation,
+  consumedAt = instant.toISOString(),
+): SourceOwnerReceiptChain {
+  repository.persistCapabilityVersion(sourceCapability);
+  let approval = repository.getOwnerApprovalStatus(sourceCapability);
+  if (approval.state !== "CURRENT") {
+    repository.recordOwnerApprovalReceipt({
+      capability: sourceCapability,
+      gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", consumedAt),
+      ownerConfirmed: true,
+    });
+    approval = repository.getOwnerApprovalStatus(sourceCapability);
+  }
+  if (approval.state !== "CURRENT" || !approval.receiptId) {
+    throw new Error("TEST_FICTIONAL_OWNER_APPROVAL_REQUIRED");
+  }
+  return repository.createOwnerStartReceipt({
+    capability: sourceCapability,
+    operation,
+    gateProof: fictionalGateProof("SOURCE_RUN_START", consumedAt),
+    ownerConfirmed: true,
+  });
+}
+
+type SourceRunInput = Parameters<typeof runLeverSourceToQueueWithOwnerReceipts>[0];
+async function runLeverSourceToQueue(
+  input: Omit<SourceRunInput, "ownerReceiptChain"> & {
+    ownerReceiptChain?: SourceRunInput["ownerReceiptChain"];
+  },
+) {
+  return runLeverSourceToQueueWithOwnerReceipts({
+    ...input,
+    ownerReceiptChain:
+      input.ownerReceiptChain ??
+      fictionalOwnerReceiptChain(
+        input.repository,
+        input.capability,
+        "LIST_JOBS",
+        (input.now?.() ?? instant).toISOString(),
+      ),
+  });
+}
+
+type DetailRunInput = Parameters<typeof runLeverDetailToQueueWithOwnerReceipts>[0];
+async function runLeverDetailToQueue(
+  input: Omit<DetailRunInput, "ownerReceiptChain"> & {
+    ownerReceiptChain?: DetailRunInput["ownerReceiptChain"];
+  },
+) {
+  return runLeverDetailToQueueWithOwnerReceipts({
+    ...input,
+    ownerReceiptChain:
+      input.ownerReceiptChain ??
+      fictionalOwnerReceiptChain(
+        input.repository,
+        input.capability,
+        "GET_JOB",
+        (input.now?.() ?? instant).toISOString(),
+      ),
+  });
+}
+
+function startFictionalOwnerBoundRun(
+  repository: SourceEnablementRepository,
+  sourceCapability: SourceCapabilityV2,
+  operation: SourceOperation,
+  startedAt = instant.toISOString(),
+): string {
+  const ownerReceiptChain = fictionalOwnerReceiptChain(
+    repository,
+    sourceCapability,
+    operation,
+    startedAt,
+  );
+  return repository.start({
+    capability: sourceCapability,
+    capabilityDigest: sourceCapabilityDigest(sourceCapability),
+    operation,
+    startedAt,
+    ownerApprovalReceiptId: ownerReceiptChain.approvalReceiptId,
+    ownerStartReceiptId: ownerReceiptChain.startReceiptId,
+  });
 }
 
 function capability(overrides: Partial<SourceCapabilityV2> = {}) {
@@ -423,7 +526,7 @@ describe("offline source-to-R2 queue persistence", () => {
       sqlite
         .prepare("SELECT count(*) count FROM audit_events WHERE event_type LIKE 'source.%'")
         .get(),
-    ).toEqual({ count: 5 });
+    ).toEqual({ count: 10 });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
@@ -1894,12 +1997,7 @@ describe("offline source-to-R2 queue persistence", () => {
       () => `qualification:${++id}`,
     );
     repository.persistCapabilityVersion(approved);
-    const runId = repository.start({
-      capability: approved,
-      capabilityDigest: sourceCapabilityDigest(approved),
-      operation: "LIST_JOBS",
-      startedAt: instant.toISOString(),
-    });
+    const runId = startFictionalOwnerBoundRun(repository, approved, "LIST_JOBS");
     const budget = new SourceRunBudget(approved, instant);
     const page = await readLeverPageV2({
       capability: approved,
@@ -2105,20 +2203,10 @@ describe("offline source-to-R2 queue persistence", () => {
     );
     const approved = capability();
     repository.persistCapabilityVersion(approved);
-    const runId = repository.start({
-      capability: approved,
-      capabilityDigest: sourceCapabilityDigest(approved),
-      operation: "LIST_JOBS",
-      startedAt: instant.toISOString(),
-    });
-    expect(() =>
-      repository.start({
-        capability: approved,
-        capabilityDigest: sourceCapabilityDigest(approved),
-        operation: "LIST_JOBS",
-        startedAt: instant.toISOString(),
-      }),
-    ).toThrow("CONCURRENT_RUN");
+    const runId = startFictionalOwnerBoundRun(repository, approved, "LIST_JOBS");
+    expect(() => startFictionalOwnerBoundRun(repository, approved, "LIST_JOBS")).toThrow(
+      "CONCURRENT_RUN",
+    );
     repository.cancel(runId);
     expect(repository.recovery(runId)).toMatchObject({
       status: "STOPPED",
@@ -2370,6 +2458,424 @@ describe("offline source-to-R2 queue persistence", () => {
       sqlite.prepare("SELECT count(*) AS count FROM source_derivation_bindings").get(),
     ).toEqual({
       count: 1,
+    });
+    sqlite.close();
+  });
+
+  it("records separate owner receipts and binds the run before mocked transport", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `owner-receipt:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const approvalProof = {
+      ...fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+      nonce: "nonce-private-sentinel",
+      sessionCookie: "session-private-sentinel",
+      confirmationText: `APPROVE ${approved.capabilityId}`,
+    } as never;
+    const approval = repository.recordOwnerApprovalReceipt({
+      capability: approved,
+      gateProof: approvalProof,
+      ownerConfirmed: true,
+    });
+    expect(() =>
+      repository.recordOwnerApprovalReceipt({
+        capability: approved,
+        gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+        ownerConfirmed: true,
+      }),
+    ).toThrow("SOURCE_OWNER_APPROVAL_ALREADY_ACTIVE");
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_owner_action_receipts").get(),
+    ).toEqual({ count: 1 });
+    expect(repository.getOwnerApprovalStatus(approved)).toMatchObject({
+      state: "CURRENT",
+      receiptId: approval.id,
+      canStart: true,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
+    });
+
+    const chain = repository.createOwnerStartReceipt({
+      capability: approved,
+      operation: "LIST_JOBS",
+      gateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+      ownerConfirmed: true,
+    });
+    expect(chain.approvalReceiptId).toBe(approval.id);
+    expect(repository.getOwnerApprovalStatus(approved).state).toBe("CONSUMED");
+    expect(
+      sqlite
+        .prepare(
+          "SELECT state,operation,predecessor_receipt_id FROM source_owner_action_receipts WHERE id=?",
+        )
+        .get(chain.startReceiptId),
+    ).toEqual({
+      state: "ACTIVE",
+      operation: "LIST_JOBS",
+      predecessor_receipt_id: approval.id,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
+    });
+
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => {
+        expect(
+          sqlite.prepare("SELECT count(*) AS count FROM source_run_owner_bindings").get(),
+        ).toEqual({ count: 1 });
+        return ["8.8.8.8"];
+      }),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from("[]"),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const result = await runLeverSourceToQueueWithOwnerReceipts({
+      capability: approved,
+      repository,
+      ownerReceiptChain: chain,
+      now: () => instant,
+      dependencies,
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result.status).toBe("COMPLETE");
+    expect(dependencies.resolveHost).toHaveBeenCalledTimes(1);
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite
+        .prepare(
+          `SELECT approval_receipt_id AS approvalReceiptId,start_receipt_id AS startReceiptId,
+                  capability_digest AS capabilityDigest,operation
+           FROM source_run_owner_bindings WHERE run_id=?`,
+        )
+        .get(result.runId),
+    ).toEqual({
+      approvalReceiptId: approval.id,
+      startReceiptId: chain.startReceiptId,
+      capabilityDigest: sourceCapabilityDigest(approved),
+      operation: "LIST_JOBS",
+    });
+    expect(
+      sqlite
+        .prepare("SELECT action,state,consumed_at FROM source_owner_action_receipts ORDER BY rowid")
+        .all(),
+    ).toEqual([
+      { action: "APPROVE", state: "CONSUMED", consumed_at: instant.toISOString() },
+      { action: "START", state: "CONSUMED", consumed_at: instant.toISOString() },
+    ]);
+    const persistedSafeText = JSON.stringify({
+      receipts: sqlite.prepare("SELECT * FROM source_owner_action_receipts").all(),
+      audit: sqlite
+        .prepare(
+          "SELECT redacted_metadata_json FROM audit_events WHERE event_type LIKE 'source.owner.%' OR event_type='source.run.owner-bound'",
+        )
+        .all(),
+    });
+    for (const privateSentinel of [
+      "nonce-private-sentinel",
+      "session-private-sentinel",
+      `APPROVE ${approved.capabilityId}`,
+      `RUN ${approved.capabilityId}`,
+    ]) {
+      expect(persistedSafeText).not.toContain(privateSentinel);
+    }
+
+    await expect(
+      runLeverSourceToQueueWithOwnerReceipts({
+        capability: approved,
+        repository,
+        ownerReceiptChain: chain,
+        now: () => instant,
+        dependencies,
+        evaluateJob: async () => null,
+        queueJob: () => undefined,
+      }),
+    ).rejects.toThrow("SOURCE_OWNER_RECEIPT_CHAIN_INVALID");
+    expect(dependencies.resolveHost).toHaveBeenCalledTimes(1);
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 1,
+    });
+    sqlite.close();
+  });
+
+  it("terminalizes expired owner approvals and superseded capability approvals", () => {
+    const sqlite = database();
+    let now = instant;
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => now,
+      () => `owner-state:${++id}`,
+    );
+    const approved = capability();
+    repository.persistCapabilityVersion(approved);
+    const approval = repository.recordOwnerApprovalReceipt({
+      capability: approved,
+      gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", now.toISOString()),
+      ownerConfirmed: true,
+    });
+
+    now = new Date("2026-10-02T00:00:00.000Z");
+    expect(repository.getOwnerApprovalStatus(approved)).toMatchObject({
+      state: "EXPIRED",
+      receiptId: approval.id,
+      canStart: false,
+    });
+    expect(
+      sqlite.prepare("SELECT state FROM source_owner_action_receipts WHERE id=?").get(approval.id),
+    ).toEqual({ state: "EXPIRED" });
+
+    now = instant;
+    const secondCapability = capability({
+      capabilityId: "source-second-owner-state",
+      tenant: "second-owner-state",
+      allowedHost: "api.lever.co",
+      allowedPathPrefix: "/v0/postings/second-owner-state",
+    });
+    repository.persistCapabilityVersion(secondCapability);
+    const secondApproval = repository.recordOwnerApprovalReceipt({
+      capability: secondCapability,
+      gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", now.toISOString()),
+      ownerConfirmed: true,
+    });
+    repository.persistCapabilityVersion(
+      capability({
+        capabilityId: secondCapability.capabilityId,
+        tenant: secondCapability.tenant,
+        allowedPathPrefix: secondCapability.allowedPathPrefix,
+        version: 2,
+        predecessorVersion: 1,
+        approvalState: "REVOKED",
+        approvalReference: null,
+        approvedAt: null,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        revokedAt: now.toISOString(),
+        revocationReason: "OWNER_REVOKED",
+      }),
+    );
+    expect(repository.getOwnerApprovalStatus(secondCapability).state).toBe("SUPERSEDED");
+    expect(
+      sqlite
+        .prepare("SELECT state FROM source_owner_action_receipts WHERE id=?")
+        .get(secondApproval.id),
+    ).toEqual({ state: "REVOKED" });
+    sqlite.close();
+  });
+
+  it("fails closed before DNS for mismatched or replayed receipt identities", async () => {
+    const receiptMutations: Array<[string, string, string | number]> = [
+      ["wrong version", "capability_version", 2],
+      ["wrong digest", "capability_digest", "f".repeat(64)],
+      ["wrong reference", "approval_reference", "different-reference"],
+      ["wrong source", "source", "GREENHOUSE"],
+      ["wrong tenant", "tenant", "different-tenant"],
+      ["wrong capability ID", "capability_id", "different-capability"],
+      ["wrong operation", "operation", "GET_JOB"],
+      ["wrong policy", "policy_version", "different-policy"],
+      ["wrong policy expiry", "policy_expires_at", "2026-09-30T00:00:00.000Z"],
+      ["wrong capability expiry", "capability_expires_at", "2026-09-30T00:00:00.000Z"],
+      ["expired start receipt", "receipt_expires_at", "2026-09-09T23:59:59.000Z"],
+    ];
+    for (const [name, column, value] of receiptMutations) {
+      const sqlite = database();
+      let id = 0;
+      const approved = capability({
+        allowedOperations: ["LIST_JOBS", "GET_JOB"],
+        requestBudget: 1,
+        recordCap: 1,
+        pageSizeCap: 1,
+      });
+      const repository = new SourceEnablementRepository(
+        sqlite,
+        () => instant,
+        () => `owner-mismatch:${++id}`,
+      );
+      const chain = fictionalOwnerReceiptChain(repository, approved, "LIST_JOBS");
+      sqlite
+        .prepare(`UPDATE source_owner_action_receipts SET ${column}=? WHERE id=?`)
+        .run(value, chain.startReceiptId);
+      const dependencies: SecureSourceTransportDependencies = {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async () => {
+          throw new Error("UNEXPECTED_TRANSPORT");
+        }),
+      };
+      await expect(
+        runLeverSourceToQueueWithOwnerReceipts({
+          capability: approved,
+          repository,
+          ownerReceiptChain: chain,
+          now: () => instant,
+          dependencies,
+          evaluateJob: async () => null,
+          queueJob: () => undefined,
+        }),
+        name,
+      ).rejects.toThrow();
+      expect(dependencies.resolveHost, name).not.toHaveBeenCalled();
+      expect(dependencies.request, name).not.toHaveBeenCalled();
+      expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+        count: 0,
+      });
+      expect(
+        sqlite
+          .prepare("SELECT state FROM source_owner_action_receipts WHERE id=?")
+          .get(chain.startReceiptId),
+      ).toEqual({ state: "FAILED" });
+      sqlite.close();
+    }
+
+    for (const expiredSnapshot of [
+      { policyExpiresAt: "2026-09-10T00:01:00.000Z" },
+      { capabilityExpiresAt: "2026-09-10T00:01:00.000Z" },
+    ]) {
+      const sqlite = database();
+      let id = 0;
+      const approved = capability({
+        requestBudget: 1,
+        recordCap: 1,
+        pageSizeCap: 1,
+        ...expiredSnapshot,
+      });
+      const repository = new SourceEnablementRepository(
+        sqlite,
+        () => instant,
+        () => `owner-expiry:${++id}`,
+      );
+      const chain = fictionalOwnerReceiptChain(repository, approved, "LIST_JOBS");
+      const dependencies: SecureSourceTransportDependencies = {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async () => {
+          throw new Error("UNEXPECTED_TRANSPORT");
+        }),
+      };
+      await expect(
+        runLeverSourceToQueueWithOwnerReceipts({
+          capability: approved,
+          repository,
+          ownerReceiptChain: chain,
+          now: () => new Date("2026-09-10T00:02:00.000Z"),
+          dependencies,
+          evaluateJob: async () => null,
+          queueJob: () => undefined,
+        }),
+      ).rejects.toThrow();
+      expect(dependencies.resolveHost).not.toHaveBeenCalled();
+      expect(dependencies.request).not.toHaveBeenCalled();
+      expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+        count: 0,
+      });
+      sqlite.close();
+    }
+  });
+
+  it("rejects missing receipt links, invalid local gate proof, reused approval, and revoked capability before transport", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `owner-denied:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    expect(() =>
+      repository.recordOwnerApprovalReceipt({
+        capability: approved,
+        gateProof: {
+          ...fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+          nonceConsumed: false,
+        } as never,
+        ownerConfirmed: true,
+      }),
+    ).toThrow("LOCAL_MUTATION_GATE_REQUIRED");
+    expect(() =>
+      repository.recordOwnerApprovalReceipt({
+        capability: approved,
+        gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+        ownerConfirmed: false as never,
+      }),
+    ).toThrow("EXACT_OWNER_CONFIRMATION_REQUIRED");
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_owner_action_receipts").get(),
+    ).toEqual({
+      count: 0,
+    });
+
+    const chain = fictionalOwnerReceiptChain(repository, approved, "LIST_JOBS");
+    expect(() =>
+      repository.createOwnerStartReceipt({
+        capability: approved,
+        operation: "LIST_JOBS",
+        gateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+        ownerConfirmed: true,
+      }),
+    ).toThrow("SOURCE_OWNER_APPROVAL_REQUIRED");
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async () => {
+        throw new Error("UNEXPECTED_TRANSPORT");
+      }),
+    };
+    for (const ownerReceiptChain of [
+      { ...chain, approvalReceiptId: "missing-approval" },
+      { ...chain, startReceiptId: "missing-start" },
+    ]) {
+      await expect(
+        runLeverSourceToQueueWithOwnerReceipts({
+          capability: approved,
+          repository,
+          ownerReceiptChain,
+          now: () => instant,
+          dependencies,
+          evaluateJob: async () => null,
+          queueJob: () => undefined,
+        }),
+      ).rejects.toThrow();
+    }
+    expect(dependencies.resolveHost).not.toHaveBeenCalled();
+    expect(dependencies.request).not.toHaveBeenCalled();
+
+    const revoked = capability({
+      version: 2,
+      predecessorVersion: 1,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      createdAt: instant.toISOString(),
+      updatedAt: instant.toISOString(),
+      revokedAt: instant.toISOString(),
+      revocationReason: "OWNER_REVOKED",
+    });
+    repository.persistCapabilityVersion(revoked);
+    await expect(
+      runLeverSourceToQueueWithOwnerReceipts({
+        capability: approved,
+        repository,
+        ownerReceiptChain: chain,
+        now: () => instant,
+        dependencies,
+        evaluateJob: async () => null,
+        queueJob: () => undefined,
+      }),
+    ).rejects.toThrow("CAPABILITY_CHANGED");
+    expect(dependencies.resolveHost).not.toHaveBeenCalled();
+    expect(dependencies.request).not.toHaveBeenCalled();
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
     });
     sqlite.close();
   });

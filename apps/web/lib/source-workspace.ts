@@ -11,7 +11,7 @@ import {
   type SourceCapabilityV2,
   type SourceSchemaDiagnostic,
 } from "@applypilot/job-sources";
-import { runLeverSourceToQueue } from "@applypilot/database";
+import { runLeverSourceToQueue, type SourceOwnerActionGateProof } from "@applypilot/database";
 
 import { reevaluateBetaJob, setBetaQueueState } from "./beta-workspace";
 import { getLocalDatabase, getSourceEnablementRepository } from "./local-database";
@@ -37,6 +37,9 @@ export interface SourceEnablementView {
     pathPrefix: string;
     operations: string[];
     readiness: string;
+    ownerApprovalState: string;
+    ownerApprovalReceiptId: string | null;
+    canOwnerStart: boolean;
     policyExpiresAt: string;
     capabilityExpiresAt: string;
     requestBudget: number;
@@ -63,37 +66,51 @@ export interface SourceEnablementView {
     retryAfter: string | null;
     startedAt: string;
     completedAt: string | null;
+    ownerProvenance:
+      | "OWNER_RECEIPTS_BOUND"
+      | "LEGACY_OWNER_PROVENANCE_UNVERIFIED"
+      | "OWNER_RECEIPT_BINDING_INVALID";
   }>;
 }
 
 export async function getSourceEnablementView(): Promise<SourceEnablementView> {
   const local = getLocalDatabase();
-  if (!local || !getSourceEnablementRepository()) {
+  const repository = getSourceEnablementRepository();
+  if (!local || !repository) {
     return { status: "DATABASE_MIGRATION_REQUIRED", capabilities: [], recentRuns: [] };
   }
+  const ownerReceiptSchemaAvailable = repository.ownerActionReceiptSchemaAvailable();
   let allowlist: Awaited<ReturnType<typeof loadPrivateSourceAllowlistV2>>;
   try {
     allowlist = await loadPrivateSourceAllowlistV2(repositoryRoot(), allowlistFilename());
   } catch {
     return { status: "CONFIGURATION_REJECTED", capabilities: [], recentRuns: [] };
   }
-  const capabilities = allowlist.capabilities.map((capability) => ({
-    capabilityId: capability.capabilityId,
-    version: capability.version,
-    source: capability.source,
-    alias: capability.alias,
-    tenant: capability.tenant,
-    host: capability.allowedHost,
-    pathPrefix: capability.allowedPathPrefix,
-    operations: [...capability.allowedOperations],
-    readiness: sourceCapabilityReadiness(capability).status,
-    policyExpiresAt: capability.policyExpiresAt,
-    capabilityExpiresAt: capability.capabilityExpiresAt,
-    requestBudget: capability.requestBudget,
-    recordCap: capability.recordCap,
-    pageSizeCap: capability.pageSizeCap,
-    responseByteLimit: capability.responseByteLimit,
-  }));
+  const capabilities = ownerReceiptSchemaAvailable
+    ? allowlist.capabilities.map((capability) => {
+        const ownerApproval = repository.getOwnerApprovalStatus(capability);
+        return {
+          capabilityId: capability.capabilityId,
+          version: capability.version,
+          source: capability.source,
+          alias: capability.alias,
+          tenant: capability.tenant,
+          host: capability.allowedHost,
+          pathPrefix: capability.allowedPathPrefix,
+          operations: [...capability.allowedOperations],
+          readiness: sourceCapabilityReadiness(capability).status,
+          ownerApprovalState: ownerApproval.state,
+          ownerApprovalReceiptId: ownerApproval.receiptId,
+          canOwnerStart: ownerApproval.canStart,
+          policyExpiresAt: capability.policyExpiresAt,
+          capabilityExpiresAt: capability.capabilityExpiresAt,
+          requestBudget: capability.requestBudget,
+          recordCap: capability.recordCap,
+          pageSizeCap: capability.pageSizeCap,
+          responseByteLimit: capability.responseByteLimit,
+        };
+      })
+    : [];
   const recentRows = local.sqlite
     .prepare(
       `SELECT r.id,r.status,c.source,c.alias,r.request_count AS requestCount,
@@ -167,9 +184,14 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       retryAfter: run.retryAfter,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
+      ownerProvenance: repository.getRunOwnerProvenance(run.id),
     };
   });
-  return { status: allowlist.status, capabilities, recentRuns };
+  return {
+    status: ownerReceiptSchemaAvailable ? allowlist.status : "DATABASE_MIGRATION_REQUIRED",
+    capabilities,
+    recentRuns,
+  };
 }
 
 async function exactPrivateCapability(capabilityId: string): Promise<SourceCapabilityV2> {
@@ -181,17 +203,49 @@ async function exactPrivateCapability(capabilityId: string): Promise<SourceCapab
   return SourceCapabilityV2Schema.parse(matches[0]);
 }
 
-export async function runOwnerApprovedLeverSource(capabilityId: string) {
+export async function approveOwnerSourceCapability(
+  capabilityId: string,
+  gateProof: SourceOwnerActionGateProof,
+): Promise<void> {
   const capability = await exactPrivateCapability(capabilityId);
   if (capability.source !== "LEVER") throw new Error("LEVER_CAPABILITY_REQUIRED");
   if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED")
     throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
   const repository = getSourceEnablementRepository();
-  if (!repository) throw new Error("DATABASE_MIGRATION_REQUIRED");
+  if (!repository || !repository.ownerActionReceiptSchemaAvailable()) {
+    throw new Error("DATABASE_MIGRATION_REQUIRED");
+  }
   repository.persistCapabilityVersion(capability);
+  repository.recordOwnerApprovalReceipt({
+    capability,
+    gateProof,
+    ownerConfirmed: true,
+  });
+}
+
+export async function runOwnerApprovedLeverSource(
+  capabilityId: string,
+  gateProof: SourceOwnerActionGateProof,
+) {
+  const capability = await exactPrivateCapability(capabilityId);
+  if (capability.source !== "LEVER") throw new Error("LEVER_CAPABILITY_REQUIRED");
+  if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED")
+    throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+  const repository = getSourceEnablementRepository();
+  if (!repository || !repository.ownerActionReceiptSchemaAvailable()) {
+    throw new Error("DATABASE_MIGRATION_REQUIRED");
+  }
+  repository.persistCapabilityVersion(capability);
+  const ownerReceiptChain = repository.createOwnerStartReceipt({
+    capability,
+    operation: "LIST_JOBS",
+    gateProof,
+    ownerConfirmed: true,
+  });
   return runLeverSourceToQueue({
     capability,
     repository,
+    ownerReceiptChain,
     evaluateJob: reevaluateBetaJob,
     queueJob: (jobId) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
   });

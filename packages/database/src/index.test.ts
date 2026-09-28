@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 
 import BetterSqlite3 from "better-sqlite3";
 import { describe, expect, it } from "vitest";
+import { SourceCapabilityV2Schema, sourceCapabilityDigest } from "@applypilot/job-sources";
 
 import { openApplyPilotDatabase, schema } from "./index";
+import { SourceEnablementRepository } from "./source-enablement-repository";
 
 describe("database foundation", () => {
   it("exposes every required table", () => {
@@ -49,6 +51,8 @@ describe("database foundation", () => {
         "r2AuditEvents",
         "sourceCapabilityVersions",
         "sourceRunCheckpoints",
+        "sourceOwnerActionReceipts",
+        "sourceRunOwnerBindings",
         "sourceRunPages",
         "sourceRecordVerifications",
         "applicationRunOperations",
@@ -124,6 +128,7 @@ describe("database foundation", () => {
       "0009_green_banner_session_grant.sql",
       "0010_verified_source_packet_binding.sql",
       "0011_immutable_r2a_derivation_bindings.sql",
+      "0012_source_owner_action_receipts.sql",
     ]) {
       sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
     }
@@ -154,6 +159,8 @@ describe("database foundation", () => {
         "r2_audit_events",
         "source_capability_versions",
         "source_run_checkpoints",
+        "source_owner_action_receipts",
+        "source_run_owner_bindings",
         "source_run_pages",
         "source_observation_payloads",
         "source_derivation_bindings",
@@ -163,8 +170,162 @@ describe("database foundation", () => {
         "runner_inspection_bindings",
       ]),
     );
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(11);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(12);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("upgrades schema 11 additively and leaves historical runs unbound without receipts", () => {
+    const sqlite = new BetterSqlite3(":memory:");
+    for (const name of [
+      "0000_applypilot_foundation.sql",
+      "0001_real_world_job_intake.sql",
+      "0002_personal_live_beta_core.sql",
+      "0003_r2a_evidence_normalization.sql",
+      "0004_r2_matching_quality.sql",
+      "0005_r2_matching_quality_hardening.sql",
+      "0006_r2_calibration_qualification.sql",
+      "0007_personal_live_v1_enablement.sql",
+      "0008_real_target_inspection_scope.sql",
+      "0009_green_banner_session_grant.sql",
+      "0010_verified_source_packet_binding.sql",
+      "0011_immutable_r2a_derivation_bindings.sql",
+    ]) {
+      sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
+    }
+    const instant = "2026-09-10T00:00:00.000Z";
+    const capability = SourceCapabilityV2Schema.parse({
+      schemaVersion: 2,
+      capabilityId: "source-legacy-fixture",
+      version: 1,
+      predecessorVersion: null,
+      source: "LEVER",
+      alias: "Fictional Company",
+      tenant: "fictional",
+      region: "GLOBAL",
+      allowedHost: "api.lever.co",
+      allowedPathPrefix: "/v0/postings/fictional",
+      allowedOperations: ["LIST_JOBS"],
+      approvalState: "APPROVED",
+      approvalReference: "fixture-owner-reference",
+      approvedAt: instant,
+      policyVersion: "fixture-policy-v1",
+      policyReviewedAt: instant,
+      policyExpiresAt: "2026-10-01T00:00:00.000Z",
+      capabilityExpiresAt: "2026-10-01T00:00:00.000Z",
+      requestBudget: 1,
+      recordCap: 25,
+      pageSizeCap: 25,
+      responseByteLimit: 100_000,
+      requestTimeoutMs: 1_000,
+      runTimeoutMs: 2_000,
+      maxRedirects: 0,
+      maxRetries: 0,
+      maxConcurrency: 1,
+      parserVersion: "lever-v2-fixture",
+      createdAt: instant,
+      updatedAt: instant,
+      revokedAt: null,
+      revocationReason: null,
+    });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => new Date(instant),
+      () => "cap-version:legacy",
+    );
+    const version = repository.persistCapabilityVersion(capability);
+    sqlite
+      .prepare(
+        `INSERT INTO source_run_checkpoints
+          (id,capability_version_id,capability_digest,operation,status,current_cursor,next_cursor,
+           seen_page_digests_json,request_count,page_count,record_count,byte_count,retry_count,
+           redirect_count,safe_error_code,retry_after,owner_started_at,owner_cancelled_at,
+           completed_at,created_at,updated_at)
+         VALUES ('legacy-run',?,?,'LIST_JOBS','COMPLETE','1',NULL,'[]',1,1,25,1024,0,0,NULL,NULL,?,NULL,?,?,?)`,
+      )
+      .run(version.id, sourceCapabilityDigest(capability), instant, instant, instant, instant);
+    const historicalRun = sqlite
+      .prepare("SELECT * FROM source_run_checkpoints WHERE id='legacy-run'")
+      .get();
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(11);
+
+    sqlite.exec(
+      readFileSync(
+        new URL("../drizzle/0012_source_owner_action_receipts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(12);
+    expect(
+      sqlite.prepare("SELECT * FROM source_run_checkpoints WHERE id='legacy-run'").get(),
+    ).toEqual(historicalRun);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_owner_action_receipts").get(),
+    ).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_owner_bindings").get()).toEqual(
+      {
+        count: 0,
+      },
+    );
+    expect(new SourceEnablementRepository(sqlite).getRunOwnerProvenance("legacy-run")).toBe(
+      "LEGACY_OWNER_PROVENANCE_UNVERIFIED",
+    );
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+
+    const ownerReceiptRepository = new SourceEnablementRepository(
+      sqlite,
+      () => new Date(instant),
+      () => "approval:new-fixture",
+    );
+    const approval = ownerReceiptRepository.recordOwnerApprovalReceipt({
+      capability,
+      gateProof: {
+        action: "SOURCE_CAPABILITY_APPROVE",
+        consumedAt: instant,
+        loopbackValidated: true,
+        localSessionValidated: true,
+        nonceConsumed: true,
+      },
+      ownerConfirmed: true,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('source_owner_action_receipts_predecessor_idx','source_owner_action_receipts_capability_idx','source_run_owner_bindings_start_idx','source_run_owner_bindings_approval_idx') ORDER BY name",
+        )
+        .pluck()
+        .all(),
+    ).toEqual([
+      "source_owner_action_receipts_capability_idx",
+      "source_owner_action_receipts_predecessor_idx",
+      "source_run_owner_bindings_approval_idx",
+      "source_run_owner_bindings_start_idx",
+    ]);
+    expect(() =>
+      sqlite
+        .prepare("UPDATE source_owner_action_receipts SET action='INVALID' WHERE id=?")
+        .run(approval.id),
+    ).toThrow();
+    expect(() =>
+      sqlite
+        .prepare("UPDATE source_owner_action_receipts SET owner_confirmed=0 WHERE id=?")
+        .run(approval.id),
+    ).toThrow();
+    expect(() =>
+      sqlite
+        .prepare("UPDATE source_owner_action_receipts SET state='INVALID' WHERE id=?")
+        .run(approval.id),
+    ).toThrow();
+    const receiptForeignKeys = sqlite
+      .prepare("PRAGMA foreign_key_list(source_owner_action_receipts)")
+      .all() as Array<{ table: string }>;
+    expect(new Set(receiptForeignKeys.map(({ table }) => table))).toEqual(
+      new Set(["source_capability_versions", "source_owner_action_receipts"]),
+    );
     sqlite.close();
   });
 

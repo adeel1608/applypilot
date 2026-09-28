@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
-import { cancelSourceRunAction, revokeSourceAction, startSourceRunAction } from "./actions";
+import {
+  approveSourceCapabilityAction,
+  cancelSourceRunAction,
+  revokeSourceAction,
+  startSourceRunAction,
+} from "./actions";
 import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 import { getSourceEnablementView } from "@web/lib/source-workspace";
 
@@ -13,6 +18,7 @@ export default async function SourcesPage() {
   const view = await getSourceEnablementView();
   const nonces = await Promise.all(
     view.capabilities.map(async () => ({
+      approve: await issueLocalMutationNonce("SOURCE_CAPABILITY_APPROVE", "/sources"),
       start: await issueLocalMutationNonce("SOURCE_RUN_START", "/sources"),
       revoke: await issueLocalMutationNonce("SOURCE_REVOKE", "/sources"),
     })),
@@ -49,12 +55,16 @@ export default async function SourcesPage() {
         )}
         {view.status === "DATABASE_MIGRATION_REQUIRED" && (
           <p role="alert">
-            Local schema 0007 is required before capability approval or source recovery.
+            Local schema 12 is required before durable owner approval or source runs. Existing runs
+            remain readable and their owner-action provenance is shown separately.
           </p>
         )}
 
         {view.capabilities.map((capability, index) => {
-          const canRun = capability.source === "LEVER" && capability.readiness === "SOURCE_ENABLED";
+          const enabled =
+            capability.source === "LEVER" && capability.readiness === "SOURCE_ENABLED";
+          const canApprove = enabled && capability.ownerApprovalState !== "CURRENT";
+          const canRun = enabled && capability.canOwnerStart;
           return (
             <article className="job-row" key={`${capability.capabilityId}:${capability.version}`}>
               <div className="job-row__main">
@@ -64,6 +74,12 @@ export default async function SourcesPage() {
                 <p>
                   Tenant {capability.tenant} · v{capability.version} ·{" "}
                   {display(capability.readiness)}
+                </p>
+                <p>
+                  Durable owner approval: {display(capability.ownerApprovalState)}
+                  {capability.ownerApprovalReceiptId
+                    ? ` · receipt ${capability.ownerApprovalReceiptId}`
+                    : ""}
                 </p>
                 <p>
                   Exact boundary: https://{capability.host}
@@ -82,6 +98,29 @@ export default async function SourcesPage() {
               </div>
               <div className="page-stack">
                 <form
+                  action={approveSourceCapabilityAction}
+                  className="import-form"
+                  aria-describedby={`source-approval-help-${index}`}
+                >
+                  <input type="hidden" name="mutationNonce" value={nonces[index]?.approve} />
+                  <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                  <p id={`source-approval-help-${index}`}>
+                    This records an owner approval receipt for this exact capability version and
+                    makes no source request. Type <code>APPROVE {capability.capabilityId}</code>.
+                  </p>
+                  <label>
+                    Exact owner-approval confirmation
+                    <input name="confirmationText" autoComplete="off" required />
+                  </label>
+                  <label className="checkbox-line">
+                    <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
+                    this exact source capability.
+                  </label>
+                  <button className="button button--secondary" disabled={!canApprove}>
+                    Approve exact source capability
+                  </button>
+                </form>
+                <form
                   action={startSourceRunAction}
                   className="import-form"
                   aria-describedby={`source-run-help-${index}`}
@@ -89,8 +128,8 @@ export default async function SourcesPage() {
                   <input type="hidden" name="mutationNonce" value={nonces[index]?.start} />
                   <input type="hidden" name="capabilityId" value={capability.capabilityId} />
                   <p id={`source-run-help-${index}`}>
-                    This makes the first bounded real GET. Type{" "}
-                    <code>RUN {capability.capabilityId}</code> only after separate owner approval.
+                    This starts one bounded source read after a separate current owner approval
+                    receipt. Type <code>RUN {capability.capabilityId}</code>.
                   </p>
                   <label>
                     Exact source-run confirmation
@@ -98,7 +137,7 @@ export default async function SourcesPage() {
                   </label>
                   <label className="checkbox-line">
                     <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
-                    this exact tenant capability and bounded GET run.
+                    this separate bounded source run.
                   </label>
                   <button className="button button--primary" disabled={!canRun}>
                     Start bounded source read
@@ -152,6 +191,11 @@ export default async function SourcesPage() {
                 {run.schemaDiagnostic
                   ? ` Contract diagnostic: ${display(run.schemaDiagnostic.issueCategory)} / ${run.schemaDiagnostic.field} / expected ${run.schemaDiagnostic.expectedStructuralType}${run.schemaDiagnostic.recordIndex === undefined ? "" : ` / record ${run.schemaDiagnostic.recordIndex}`}.`
                   : ""}
+                {run.ownerProvenance === "LEGACY_OWNER_PROVENANCE_UNVERIFIED"
+                  ? " LEGACY OWNER ACTION PROVENANCE UNVERIFIED."
+                  : run.ownerProvenance === "OWNER_RECEIPT_BINDING_INVALID"
+                    ? " OWNER RECEIPT BINDING INVALID; do not treat this run as owner-proven."
+                    : " Owner approval and start receipts are bound to this run."}
                 {run.retryAfter ? ` Earliest owner-reviewed retry: ${run.retryAfter}.` : ""}
                 {run.status === "RUNNING" ? (
                   <form action={cancelSourceRunAction} className="import-form">

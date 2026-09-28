@@ -63,6 +63,7 @@ const migrationNames = [
   "0009_green_banner_session_grant.sql",
   "0010_verified_source_packet_binding.sql",
   "0011_immutable_r2a_derivation_bindings.sql",
+  "0012_source_owner_action_receipts.sql",
 ] as const;
 
 async function createDiskFixture() {
@@ -87,8 +88,8 @@ async function createDiskFixture() {
       await readFile(join(process.cwd(), "packages", "database", "drizzle", name), "utf8"),
     );
   }
-  if (sqlite.pragma("user_version", { simple: true }) !== 11) {
-    throw new Error("R46_07_SCHEMA10_REQUIRED");
+  if (sqlite.pragma("user_version", { simple: true }) !== 12) {
+    throw new Error("R46_07_SCHEMA12_REQUIRED");
   }
   return { root, databasePath, documentsRoot, reportsRoot, sqlite };
 }
@@ -167,6 +168,37 @@ function fixtureCapability(): SourceCapabilityV2 {
     updatedAt: "2026-09-01T00:00:00.000Z",
     revokedAt: null,
     revocationReason: null,
+  });
+}
+
+function fictionalOwnerReceiptChain(
+  repository: SourceEnablementRepository,
+  capabilityValue: SourceCapabilityV2,
+) {
+  const gateProof = (action: "SOURCE_CAPABILITY_APPROVE" | "SOURCE_RUN_START") => ({
+    action,
+    consumedAt: fixedNow.toISOString(),
+    loopbackValidated: true as const,
+    localSessionValidated: true as const,
+    nonceConsumed: true as const,
+  });
+  let approval = repository.getOwnerApprovalStatus(capabilityValue);
+  if (approval.state !== "CURRENT") {
+    repository.recordOwnerApprovalReceipt({
+      capability: capabilityValue,
+      gateProof: gateProof("SOURCE_CAPABILITY_APPROVE"),
+      ownerConfirmed: true,
+    });
+    approval = repository.getOwnerApprovalStatus(capabilityValue);
+  }
+  if (approval.state !== "CURRENT" || !approval.receiptId) {
+    throw new Error("R46_07_FICTIONAL_OWNER_APPROVAL_REQUIRED");
+  }
+  return repository.createOwnerStartReceipt({
+    capability: capabilityValue,
+    operation: "LIST_JOBS",
+    gateProof: gateProof("SOURCE_RUN_START"),
+    ownerConfirmed: true,
   });
 }
 
@@ -643,6 +675,7 @@ test("persists source verification through canonical R2 and packet services to a
       const first = await runLeverSourceToQueue({
         capability: capabilityValue,
         repository: source,
+        ownerReceiptChain: fictionalOwnerReceiptChain(source, capabilityValue),
         now: () => fixedNow,
         dependencies: fictionalTransport([fictionalPosting()], transportCounts),
         evaluateJob,
@@ -657,10 +690,12 @@ test("persists source verification through canonical R2 and packet services to a
       expect(transportCounts).toEqual({ dns: 1, requests: 1 });
       expect(evaluated).toHaveLength(1);
       expect(queued).toHaveLength(1);
+      expect(source.getRunOwnerProvenance(first.runId)).toBe("OWNER_RECEIPTS_BOUND");
 
       const second = await runLeverSourceToQueue({
         capability: capabilityValue,
         repository: source,
+        ownerReceiptChain: fictionalOwnerReceiptChain(source, capabilityValue),
         now: () => fixedNow,
         dependencies: fictionalTransport([fictionalPosting()], transportCounts),
         evaluateJob,
@@ -668,6 +703,7 @@ test("persists source verification through canonical R2 and packet services to a
       });
       expect(second.status, second.stopCode ?? "no stop").toBe("COMPLETE");
       expect(second.queuedJobIds).toEqual([]);
+      expect(source.getRunOwnerProvenance(second.runId)).toBe("OWNER_RECEIPTS_BOUND");
       expect(transportCounts).toEqual({ dns: 2, requests: 2 });
       expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
         count: 1,

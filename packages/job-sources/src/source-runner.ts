@@ -29,6 +29,8 @@ export interface SourceRunSink {
     capabilityDigest: string;
     operation: SourceOperation;
     startedAt: string;
+    ownerApprovalReceiptId: string;
+    ownerStartReceiptId: string;
   }): Promise<string> | string;
   assertCapabilityCurrent(input: {
     runId: string;
@@ -83,6 +85,11 @@ export interface LeverSourceRunResult {
   providerDriftDiagnostics: readonly SourceProviderDriftDiagnostic[];
 }
 
+export interface SourceOwnerReceiptChain {
+  approvalReceiptId: string;
+  startReceiptId: string;
+}
+
 function safeStopCode(error: unknown): string {
   if (error instanceof SecureSourceError && error.code === "HTTP_404") return "DETAIL_NOT_FOUND";
   if (error instanceof SecureSourceError) return error.code;
@@ -99,6 +106,7 @@ function detailPageDigest(externalId: string, record: LeverPostingRecordV2): str
 export async function runLeverSourceDiscovery(input: {
   capability: SourceCapabilityV2;
   sink: SourceRunSink;
+  ownerReceiptChain: SourceOwnerReceiptChain;
   now?: () => Date;
   signal?: AbortSignal;
   dependencies?: SecureSourceTransportDependencies;
@@ -120,6 +128,8 @@ export async function runLeverSourceDiscovery(input: {
     capabilityDigest: digest,
     operation: "LIST_JOBS",
     startedAt: now().toISOString(),
+    ownerApprovalReceiptId: input.ownerReceiptChain.approvalReceiptId,
+    ownerStartReceiptId: input.ownerReceiptChain.startReceiptId,
   });
   const records: LeverPostingRecordV2[] = [];
   const safeUnusableDiagnostics: SourceRecordUnusableDiagnostic[] = [];
@@ -234,6 +244,7 @@ export async function runLeverDetailSourceDiscovery(input: {
   sink: SourceRunSink & {
     persistDetail: NonNullable<SourceRunSink["persistDetail"]>;
   };
+  ownerReceiptChain: SourceOwnerReceiptChain;
   externalId: string;
   now?: () => Date;
   signal?: AbortSignal;
@@ -260,6 +271,8 @@ export async function runLeverDetailSourceDiscovery(input: {
     capabilityDigest: digest,
     operation: "GET_JOB",
     startedAt: now().toISOString(),
+    ownerApprovalReceiptId: input.ownerReceiptChain.approvalReceiptId,
+    ownerStartReceiptId: input.ownerReceiptChain.startReceiptId,
   });
   let record: LeverPostingRecordV2 | null = null;
   let pageDigest: string | null = null;

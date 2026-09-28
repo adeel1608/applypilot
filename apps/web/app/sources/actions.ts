@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { consumeLocalMutationNonce } from "@web/lib/local-mutation-security";
 import {
+  approveOwnerSourceCapability,
   cancelSourceRun,
   revokeSourceCapability,
   runOwnerApprovedLeverSource,
@@ -24,13 +25,22 @@ function confirm(formData: FormData, phrase: string): void {
 }
 
 export async function startSourceRunAction(formData: FormData) {
-  await consumeLocalMutationNonce("SOURCE_RUN_START", formData);
+  const gateProof = await consumeLocalMutationNonce("SOURCE_RUN_START", formData);
   const id = capabilityId(formData);
   confirm(formData, `RUN ${id}`);
-  await runOwnerApprovedLeverSource(id);
+  await runOwnerApprovedLeverSource(id, gateProof);
   revalidatePath("/sources");
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
+  redirect("/sources");
+}
+
+export async function approveSourceCapabilityAction(formData: FormData) {
+  const gateProof = await consumeLocalMutationNonce("SOURCE_CAPABILITY_APPROVE", formData);
+  const id = capabilityId(formData);
+  confirm(formData, `APPROVE ${id}`);
+  await approveOwnerSourceCapability(id, gateProof);
+  revalidatePath("/sources");
   redirect("/sources");
 }
 

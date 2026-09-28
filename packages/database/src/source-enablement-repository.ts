@@ -3,6 +3,8 @@ import { createHash, randomUUID } from "node:crypto";
 import type BetterSqlite3 from "better-sqlite3";
 import {
   SourceCapabilityV2Schema,
+  SourceOwnerActionSchema,
+  SourceOwnerReceiptStateSchema,
   SourceProviderDriftDiagnosticSchema,
   SourceRecordUnusableDiagnosticSchema,
   runLeverDetailSourceDiscovery,
@@ -19,6 +21,7 @@ import {
   type SourceCapabilityV2,
   type SourceRunBudget,
   type SourceRunSink,
+  type SourceOwnerReceiptChain,
   type SourceOperation,
   type SourceSchemaDiagnostic,
   type SourceTransportLifecycleStage,
@@ -36,6 +39,31 @@ import { R2Repository } from "./r2-repository";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+const SOURCE_OWNER_START_RECEIPT_TTL_MS = 5 * 60 * 1000;
+
+export interface SourceOwnerActionGateProof {
+  action: "SOURCE_CAPABILITY_APPROVE" | "SOURCE_RUN_START";
+  consumedAt: string;
+  loopbackValidated: true;
+  localSessionValidated: true;
+  nonceConsumed: true;
+}
+
+export type SourceOwnerApprovalStatus =
+  | "MIGRATION_REQUIRED"
+  | "APPROVAL_REQUIRED"
+  | "CURRENT"
+  | "CONSUMED"
+  | "EXPIRED"
+  | "REVOKED"
+  | "SUPERSEDED";
+
+export interface SourceOwnerApprovalStatusResult {
+  state: SourceOwnerApprovalStatus;
+  receiptId: string | null;
+  canStart: boolean;
 }
 
 function detailPageDigest(externalId: string, record: LeverPostingRecordV2): string {
@@ -166,6 +194,10 @@ export class SourceEnablementRepository implements SourceRunSink {
         )
         .get(),
     );
+  }
+
+  ownerActionReceiptSchemaAvailable(): boolean {
+    return this.hasOwnerReceiptSchema();
   }
 
   /**
@@ -537,7 +569,411 @@ export class SourceEnablementRepository implements SourceRunSink {
       state: capability.approvalState,
     });
     this.audit("source.capability.versioned", "source_capability", capability.capabilityId, audit);
+    if (this.hasOwnerReceiptSchema()) {
+      const staleReceipts = this.sqlite
+        .prepare(
+          `SELECT id,action FROM source_owner_action_receipts
+           WHERE capability_id=? AND capability_version_id<>? AND state='ACTIVE'`,
+        )
+        .all(capability.capabilityId, id) as Array<{ id: string; action: "APPROVE" | "START" }>;
+      for (const receipt of staleReceipts) {
+        this.terminalizeOwnerReceipt(receipt.id, receipt.action, "REVOKED");
+      }
+    }
     return { id, created: true };
+  }
+
+  recordOwnerApprovalReceipt(input: {
+    capability: SourceCapabilityV2;
+    gateProof: SourceOwnerActionGateProof;
+    ownerConfirmed: true;
+  }): { id: string; created: true } {
+    this.requireOwnerReceiptSchema();
+    const capability = SourceCapabilityV2Schema.parse(input.capability);
+    if (input.ownerConfirmed !== true) throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
+    this.assertGateProof(input.gateProof, "SOURCE_CAPABILITY_APPROVE");
+    const now = this.now();
+    if (sourceCapabilityReadiness(capability, now).status !== "SOURCE_ENABLED") {
+      throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+    }
+    const digest = sourceCapabilityDigest(capability);
+    const version = this.assertPersistedCapabilityCurrent(capability, digest);
+    const approvalReference = capability.approvalReference;
+    if (!approvalReference) throw new Error("SOURCE_APPROVAL_REFERENCE_REQUIRED");
+    const timestamp = now.toISOString();
+    const receiptId = this.id();
+    return this.sqlite
+      .transaction(() => {
+        const active = this.sqlite
+          .prepare(
+            `SELECT 1 FROM source_owner_action_receipts
+             WHERE capability_version_id=? AND action='APPROVE' AND state='ACTIVE' LIMIT 1`,
+          )
+          .get(version.id);
+        if (active) throw new Error("SOURCE_OWNER_APPROVAL_ALREADY_ACTIVE");
+        this.insertOwnerReceipt({
+          id: receiptId,
+          action: "APPROVE",
+          capability,
+          capabilityVersionId: version.id,
+          capabilityDigest: digest,
+          approvalReference,
+          operation: null,
+          receiptExpiresAt: null,
+          confirmationDigest: sha256(`APPROVE ${capability.capabilityId}`),
+          nonceAction: "SOURCE_CAPABILITY_APPROVE",
+          gateProof: input.gateProof,
+          predecessorReceiptId: null,
+          state: "ACTIVE",
+          consumedAt: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        this.auditOwnerApprovalRecorded(receiptId, capability, digest);
+        return { id: receiptId, created: true as const };
+      })
+      .immediate();
+  }
+
+  getOwnerApprovalStatus(capabilityInput: SourceCapabilityV2): SourceOwnerApprovalStatusResult {
+    if (!this.hasOwnerReceiptSchema()) {
+      return { state: "MIGRATION_REQUIRED", receiptId: null, canStart: false };
+    }
+    const capability = SourceCapabilityV2Schema.parse(capabilityInput);
+    const digest = sourceCapabilityDigest(capability);
+    const current = this.currentCapability(capability.capabilityId);
+    if (!current) return { state: "APPROVAL_REQUIRED", receiptId: null, canStart: false };
+    if (current.version !== capability.version || current.digest !== digest) {
+      return { state: "SUPERSEDED", receiptId: null, canStart: false };
+    }
+    const row = this.sqlite
+      .prepare(
+        `SELECT id,state,capability_digest AS capabilityDigest,
+                approval_reference AS approvalReference,source,tenant,
+                policy_version AS policyVersion,policy_expires_at AS policyExpiresAt,
+                capability_expires_at AS capabilityExpiresAt
+         FROM source_owner_action_receipts
+         WHERE capability_version_id=? AND action='APPROVE'
+         ORDER BY created_at DESC,rowid DESC LIMIT 1`,
+      )
+      .get(current.id) as
+      | {
+          id: string;
+          state: string;
+          capabilityDigest: string;
+          approvalReference: string;
+          source: string;
+          tenant: string;
+          policyVersion: string;
+          policyExpiresAt: string;
+          capabilityExpiresAt: string;
+        }
+      | undefined;
+    if (!row) return { state: "APPROVAL_REQUIRED", receiptId: null, canStart: false };
+    if (
+      row.capabilityDigest !== digest ||
+      row.approvalReference !== capability.approvalReference ||
+      row.source !== capability.source ||
+      row.tenant !== capability.tenant ||
+      row.policyVersion !== capability.policyVersion ||
+      row.policyExpiresAt !== capability.policyExpiresAt ||
+      row.capabilityExpiresAt !== capability.capabilityExpiresAt
+    ) {
+      return { state: "SUPERSEDED", receiptId: row.id, canStart: false };
+    }
+    if (
+      Date.parse(row.policyExpiresAt) <= this.now().getTime() ||
+      Date.parse(row.capabilityExpiresAt) <= this.now().getTime()
+    ) {
+      this.terminalizeOwnerReceipt(row.id, "APPROVE", "EXPIRED");
+      return { state: "EXPIRED", receiptId: row.id, canStart: false };
+    }
+    if (row.state === "REVOKED" || row.state === "FAILED") {
+      return { state: "REVOKED", receiptId: row.id, canStart: false };
+    }
+    if (row.state === "CONSUMED") {
+      return { state: "CONSUMED", receiptId: row.id, canStart: false };
+    }
+    if (
+      row.state !== "ACTIVE" ||
+      sourceCapabilityReadiness(capability, this.now()).status !== "SOURCE_ENABLED"
+    ) {
+      return { state: "REVOKED", receiptId: row.id, canStart: false };
+    }
+    return { state: "CURRENT", receiptId: row.id, canStart: true };
+  }
+
+  createOwnerStartReceipt(input: {
+    capability: SourceCapabilityV2;
+    operation: SourceOperation;
+    gateProof: SourceOwnerActionGateProof;
+    ownerConfirmed: true;
+  }): SourceOwnerReceiptChain {
+    this.requireOwnerReceiptSchema();
+    const capability = SourceCapabilityV2Schema.parse(input.capability);
+    if (input.ownerConfirmed !== true) throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
+    this.assertGateProof(input.gateProof, "SOURCE_RUN_START");
+    if (!capability.allowedOperations.includes(input.operation)) {
+      throw new Error("OPERATION_NOT_APPROVED");
+    }
+    const now = this.now();
+    if (sourceCapabilityReadiness(capability, now).status !== "SOURCE_ENABLED") {
+      throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+    }
+    const digest = sourceCapabilityDigest(capability);
+    const version = this.assertPersistedCapabilityCurrent(capability, digest);
+    const approvalStatus = this.getOwnerApprovalStatus(capability);
+    if (approvalStatus.state === "EXPIRED" && approvalStatus.receiptId) {
+      this.terminalizeOwnerReceipt(approvalStatus.receiptId, "APPROVE", "EXPIRED");
+    }
+    if (approvalStatus.state !== "CURRENT" || !approvalStatus.receiptId) {
+      throw new Error("SOURCE_OWNER_APPROVAL_REQUIRED");
+    }
+    const approvalReceiptId = approvalStatus.receiptId;
+    const startReceiptId = this.id();
+    const timestamp = now.toISOString();
+    const receiptExpiresAt = new Date(
+      now.getTime() + SOURCE_OWNER_START_RECEIPT_TTL_MS,
+    ).toISOString();
+    return this.sqlite
+      .transaction(() => {
+        const approval = this.sqlite
+          .prepare(
+            `SELECT id,state,confirmation_digest AS confirmationDigest,
+                    capability_version_id AS capabilityVersionId,
+                    capability_digest AS capabilityDigest,approval_reference AS approvalReference,
+                    source,tenant,policy_version AS policyVersion,
+                    policy_expires_at AS policyExpiresAt,
+                    capability_expires_at AS capabilityExpiresAt
+             FROM source_owner_action_receipts WHERE id=? AND action='APPROVE'`,
+          )
+          .get(approvalReceiptId) as
+          | {
+              id: string;
+              state: string;
+              confirmationDigest: string;
+              capabilityVersionId: string;
+              capabilityDigest: string;
+              approvalReference: string;
+              source: string;
+              tenant: string;
+              policyVersion: string;
+              policyExpiresAt: string;
+              capabilityExpiresAt: string;
+            }
+          | undefined;
+        if (
+          !approval ||
+          approval.state !== "ACTIVE" ||
+          approval.capabilityVersionId !== version.id ||
+          approval.capabilityDigest !== digest ||
+          approval.confirmationDigest !== sha256(`APPROVE ${capability.capabilityId}`) ||
+          approval.approvalReference !== capability.approvalReference ||
+          approval.source !== capability.source ||
+          approval.tenant !== capability.tenant ||
+          approval.policyVersion !== capability.policyVersion ||
+          approval.policyExpiresAt !== capability.policyExpiresAt ||
+          approval.capabilityExpiresAt !== capability.capabilityExpiresAt
+        ) {
+          throw new Error("SOURCE_OWNER_APPROVAL_STALE");
+        }
+        const consumed = this.sqlite
+          .prepare(
+            `UPDATE source_owner_action_receipts SET state='CONSUMED',consumed_at=?,updated_at=?
+             WHERE id=? AND action='APPROVE' AND state='ACTIVE'`,
+          )
+          .run(timestamp, timestamp, approvalReceiptId).changes;
+        if (consumed !== 1) throw new Error("SOURCE_OWNER_APPROVAL_REPLAYED");
+        this.insertOwnerReceipt({
+          id: startReceiptId,
+          action: "START",
+          capability,
+          capabilityVersionId: version.id,
+          capabilityDigest: digest,
+          approvalReference: capability.approvalReference!,
+          operation: input.operation,
+          receiptExpiresAt,
+          confirmationDigest: sha256(`RUN ${capability.capabilityId}`),
+          nonceAction: "SOURCE_RUN_START",
+          gateProof: input.gateProof,
+          predecessorReceiptId: approvalReceiptId,
+          state: "ACTIVE",
+          consumedAt: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        this.auditOwnerReceiptTerminal(approvalReceiptId, "APPROVE", "CONSUMED");
+        const audit = validateSourceAuditMetadata("source.owner.start-recorded", {
+          receiptId: startReceiptId,
+          approvalReceiptId,
+          capabilityId: capability.capabilityId,
+          capabilityVersion: capability.version,
+          capabilityDigest: digest,
+          operation: input.operation,
+          state: "ACTIVE",
+        });
+        this.audit(
+          "source.owner.start-recorded",
+          "source_owner_action_receipt",
+          startReceiptId,
+          audit,
+        );
+        return { approvalReceiptId, startReceiptId };
+      })
+      .immediate();
+  }
+
+  failOwnerStartReceipt(receiptId: string): void {
+    if (!this.hasOwnerReceiptSchema()) return;
+    const timestamp = this.now().toISOString();
+    const row = this.sqlite
+      .prepare(
+        `SELECT action FROM source_owner_action_receipts
+         WHERE id=? AND action='START' AND state='ACTIVE'`,
+      )
+      .get(receiptId) as { action: "START" } | undefined;
+    if (!row) return;
+    const changed = this.sqlite
+      .prepare(
+        `UPDATE source_owner_action_receipts SET state='FAILED',updated_at=?
+         WHERE id=? AND action='START' AND state='ACTIVE'`,
+      )
+      .run(timestamp, receiptId).changes;
+    if (changed) this.auditOwnerReceiptTerminal(receiptId, "START", "FAILED");
+  }
+
+  getRunOwnerProvenance(
+    runId: string,
+  ):
+    | "OWNER_RECEIPTS_BOUND"
+    | "LEGACY_OWNER_PROVENANCE_UNVERIFIED"
+    | "OWNER_RECEIPT_BINDING_INVALID" {
+    if (!this.hasOwnerReceiptSchema()) return "LEGACY_OWNER_PROVENANCE_UNVERIFIED";
+    const row = this.sqlite
+      .prepare(
+        `SELECT b.run_id AS runId,b.approval_receipt_id AS approvalReceiptId,
+                b.start_receipt_id AS startReceiptId,b.capability_digest AS bindingDigest,
+                b.operation AS bindingOperation,r.capability_digest AS runDigest,
+                r.operation AS runOperation,c.capability_id AS capabilityId,c.version AS version,
+                c.source AS currentSource,c.tenant AS currentTenant,
+                a.action AS approvalAction,a.state AS approvalState,
+                s.action AS startAction,s.state AS startState,
+                s.predecessor_receipt_id AS predecessorReceiptId,
+                a.capability_id AS approvalCapabilityId,a.capability_version AS approvalVersion,
+                a.capability_digest AS approvalDigest,a.approval_reference AS approvalReference,
+                a.source AS approvalSource,a.tenant AS approvalTenant,
+                a.policy_version AS approvalPolicyVersion,a.policy_expires_at AS approvalPolicyExpiresAt,
+                a.capability_expires_at AS approvalCapabilityExpiresAt,
+                a.confirmation_digest AS approvalConfirmationDigest,a.nonce_action AS approvalNonceAction,
+                a.loopback_validated AS approvalLoopbackValidated,
+                a.local_session_validated AS approvalSessionValidated,
+                a.nonce_consumed AS approvalNonceConsumed,a.owner_confirmed AS approvalOwnerConfirmed,
+                s.capability_id AS startCapabilityId,s.capability_version AS startVersion,
+                s.capability_digest AS startDigest,s.operation AS startOperation,
+                s.approval_reference AS startApprovalReference,s.source AS startSource,
+                s.tenant AS startTenant,s.policy_version AS startPolicyVersion,
+                s.policy_expires_at AS startPolicyExpiresAt,
+                s.capability_expires_at AS startCapabilityExpiresAt,
+                s.confirmation_digest AS startConfirmationDigest,s.nonce_action AS startNonceAction,
+                s.loopback_validated AS startLoopbackValidated,
+                s.local_session_validated AS startSessionValidated,
+                s.nonce_consumed AS startNonceConsumed,s.owner_confirmed AS startOwnerConfirmed
+         FROM source_run_owner_bindings b
+         JOIN source_run_checkpoints r ON r.id=b.run_id
+         JOIN source_capability_versions c ON c.id=r.capability_version_id
+         JOIN source_owner_action_receipts a ON a.id=b.approval_receipt_id
+         JOIN source_owner_action_receipts s ON s.id=b.start_receipt_id
+         WHERE b.run_id=?`,
+      )
+      .get(runId) as
+      | {
+          runId: string;
+          approvalReceiptId: string;
+          startReceiptId: string;
+          bindingDigest: string;
+          bindingOperation: string;
+          runDigest: string;
+          runOperation: string;
+          capabilityId: string;
+          version: number;
+          currentSource: string;
+          currentTenant: string;
+          approvalAction: string;
+          approvalState: string;
+          startAction: string;
+          startState: string;
+          predecessorReceiptId: string;
+          approvalCapabilityId: string;
+          approvalVersion: number;
+          approvalDigest: string;
+          approvalReference: string;
+          approvalSource: string;
+          approvalTenant: string;
+          approvalPolicyVersion: string;
+          approvalPolicyExpiresAt: string;
+          approvalCapabilityExpiresAt: string;
+          approvalConfirmationDigest: string;
+          approvalNonceAction: string;
+          approvalLoopbackValidated: number;
+          approvalSessionValidated: number;
+          approvalNonceConsumed: number;
+          approvalOwnerConfirmed: number;
+          startCapabilityId: string;
+          startVersion: number;
+          startDigest: string;
+          startOperation: string;
+          startApprovalReference: string;
+          startSource: string;
+          startTenant: string;
+          startPolicyVersion: string;
+          startPolicyExpiresAt: string;
+          startCapabilityExpiresAt: string;
+          startConfirmationDigest: string;
+          startNonceAction: string;
+          startLoopbackValidated: number;
+          startSessionValidated: number;
+          startNonceConsumed: number;
+          startOwnerConfirmed: number;
+        }
+      | undefined;
+    if (!row) return "LEGACY_OWNER_PROVENANCE_UNVERIFIED";
+    const valid =
+      row.approvalAction === "APPROVE" &&
+      row.approvalState === "CONSUMED" &&
+      row.startAction === "START" &&
+      row.startState === "CONSUMED" &&
+      row.predecessorReceiptId === row.approvalReceiptId &&
+      row.capabilityId === row.approvalCapabilityId &&
+      row.capabilityId === row.startCapabilityId &&
+      row.version === row.approvalVersion &&
+      row.version === row.startVersion &&
+      row.runDigest === row.bindingDigest &&
+      row.runDigest === row.approvalDigest &&
+      row.runDigest === row.startDigest &&
+      row.approvalReference === row.startApprovalReference &&
+      row.approvalReference !== "" &&
+      row.approvalSource === row.currentSource &&
+      row.startSource === row.currentSource &&
+      row.approvalTenant === row.currentTenant &&
+      row.startTenant === row.currentTenant &&
+      row.approvalPolicyVersion === row.startPolicyVersion &&
+      row.approvalPolicyExpiresAt === row.startPolicyExpiresAt &&
+      row.approvalCapabilityExpiresAt === row.startCapabilityExpiresAt &&
+      row.approvalConfirmationDigest === sha256(`APPROVE ${row.capabilityId}`) &&
+      row.startConfirmationDigest === sha256(`RUN ${row.capabilityId}`) &&
+      row.approvalNonceAction === "SOURCE_CAPABILITY_APPROVE" &&
+      row.startNonceAction === "SOURCE_RUN_START" &&
+      row.approvalLoopbackValidated === 1 &&
+      row.approvalSessionValidated === 1 &&
+      row.approvalNonceConsumed === 1 &&
+      row.approvalOwnerConfirmed === 1 &&
+      row.startLoopbackValidated === 1 &&
+      row.startSessionValidated === 1 &&
+      row.startNonceConsumed === 1 &&
+      row.startOwnerConfirmed === 1 &&
+      row.runOperation === row.bindingOperation &&
+      row.runOperation === row.startOperation;
+    return valid ? "OWNER_RECEIPTS_BOUND" : "OWNER_RECEIPT_BINDING_INVALID";
   }
 
   start(input: {
@@ -545,60 +981,210 @@ export class SourceEnablementRepository implements SourceRunSink {
     capabilityDigest: string;
     operation: SourceOperation;
     startedAt: string;
+    ownerApprovalReceiptId: string;
+    ownerStartReceiptId: string;
   }): string {
-    const capability = SourceCapabilityV2Schema.parse(input.capability);
-    if (!capability.allowedOperations.includes(input.operation)) {
-      throw new Error("OPERATION_NOT_APPROVED");
+    try {
+      this.requireOwnerReceiptSchema();
+      const capability = SourceCapabilityV2Schema.parse(input.capability);
+      const currentTime = this.now();
+      const startedTime = Date.parse(input.startedAt);
+      if (!Number.isFinite(startedTime) || Math.abs(startedTime - currentTime.getTime()) > 60_000) {
+        throw new Error("SOURCE_RUN_START_TIMESTAMP_INVALID");
+      }
+      if (!capability.allowedOperations.includes(input.operation)) {
+        throw new Error("OPERATION_NOT_APPROVED");
+      }
+      if (sourceCapabilityReadiness(capability, currentTime).status !== "SOURCE_ENABLED") {
+        throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+      }
+      const digest = sourceCapabilityDigest(capability);
+      if (digest !== input.capabilityDigest) throw new Error("CAPABILITY_CHANGED");
+      const row = this.assertPersistedCapabilityCurrent(capability, digest);
+      const runId = this.id();
+      return this.sqlite
+        .transaction(() => {
+          const current = this.currentCapability(capability.capabilityId);
+          if (
+            !current ||
+            current.id !== row.id ||
+            current.version !== capability.version ||
+            current.digest !== digest
+          ) {
+            throw new Error("CAPABILITY_CHANGED");
+          }
+          const receipt = this.sqlite
+            .prepare(
+              `SELECT s.id AS startReceiptId,s.action AS startAction,s.state AS startState,
+                      s.capability_version_id AS startCapabilityVersionId,
+                      s.capability_id AS startCapabilityId,s.capability_version AS startVersion,
+                      s.capability_digest AS startDigest,s.approval_reference AS startApprovalReference,
+                      s.source AS startSource,s.tenant AS startTenant,s.operation AS startOperation,
+                      s.policy_version AS startPolicyVersion,s.policy_expires_at AS startPolicyExpiresAt,
+                      s.capability_expires_at AS startCapabilityExpiresAt,
+                      s.receipt_expires_at AS receiptExpiresAt,s.confirmation_digest AS startConfirmationDigest,
+                      s.nonce_action AS startNonceAction,s.loopback_validated AS startLoopbackValidated,
+                      s.gate_consumed_at AS startGateConsumedAt,s.created_at AS startCreatedAt,
+                      s.local_session_validated AS startSessionValidated,s.nonce_consumed AS startNonceConsumed,
+                      s.owner_confirmed AS startOwnerConfirmed,s.predecessor_receipt_id AS predecessorReceiptId,
+                      a.id AS approvalReceiptId,a.action AS approvalAction,a.state AS approvalState,
+                      a.capability_version_id AS approvalCapabilityVersionId,
+                      a.capability_id AS approvalCapabilityId,a.capability_version AS approvalVersion,
+                      a.capability_digest AS approvalDigest,a.approval_reference AS approvalReference,
+                      a.source AS approvalSource,a.tenant AS approvalTenant,a.operation AS approvalOperation,
+                      a.policy_version AS approvalPolicyVersion,a.policy_expires_at AS approvalPolicyExpiresAt,
+                      a.capability_expires_at AS approvalCapabilityExpiresAt,
+                      a.confirmation_digest AS approvalConfirmationDigest,a.nonce_action AS approvalNonceAction,
+                      a.gate_consumed_at AS approvalGateConsumedAt,a.created_at AS approvalCreatedAt,
+                      a.loopback_validated AS approvalLoopbackValidated,
+                      a.local_session_validated AS approvalSessionValidated,
+                      a.nonce_consumed AS approvalNonceConsumed,a.owner_confirmed AS approvalOwnerConfirmed,
+                      a.consumed_at AS approvalConsumedAt
+               FROM source_owner_action_receipts s
+               JOIN source_owner_action_receipts a ON a.id=s.predecessor_receipt_id
+               WHERE s.id=? AND a.id=?`,
+            )
+            .get(input.ownerStartReceiptId, input.ownerApprovalReceiptId) as
+            | Record<string, string | number | null>
+            | undefined;
+          if (!receipt) throw new Error("SOURCE_OWNER_RECEIPT_CHAIN_REQUIRED");
+          const expectedApprovalDigest = sha256(`APPROVE ${capability.capabilityId}`);
+          const expectedStartDigest = sha256(`RUN ${capability.capabilityId}`);
+          const receiptExpiresAt = Date.parse(String(receipt.receiptExpiresAt ?? ""));
+          const approvalConsumedAt = Date.parse(String(receipt.approvalConsumedAt ?? ""));
+          const receiptCreatedAt = Date.parse(String(receipt.startCreatedAt ?? ""));
+          const startGateConsumedAt = Date.parse(String(receipt.startGateConsumedAt ?? ""));
+          const approvalGateConsumedAt = Date.parse(String(receipt.approvalGateConsumedAt ?? ""));
+          const approvalCreatedAt = Date.parse(String(receipt.approvalCreatedAt ?? ""));
+          const receiptsMatch =
+            receipt.startAction === "START" &&
+            receipt.startState === "ACTIVE" &&
+            receipt.approvalAction === "APPROVE" &&
+            receipt.approvalState === "CONSUMED" &&
+            receipt.predecessorReceiptId === input.ownerApprovalReceiptId &&
+            receipt.startCapabilityVersionId === row.id &&
+            receipt.approvalCapabilityVersionId === row.id &&
+            receipt.startCapabilityId === capability.capabilityId &&
+            receipt.approvalCapabilityId === capability.capabilityId &&
+            receipt.startVersion === capability.version &&
+            receipt.approvalVersion === capability.version &&
+            receipt.startDigest === digest &&
+            receipt.approvalDigest === digest &&
+            receipt.startApprovalReference === capability.approvalReference &&
+            receipt.approvalReference === capability.approvalReference &&
+            receipt.startSource === capability.source &&
+            receipt.approvalSource === capability.source &&
+            receipt.startTenant === capability.tenant &&
+            receipt.approvalTenant === capability.tenant &&
+            receipt.startOperation === input.operation &&
+            receipt.approvalOperation === null &&
+            receipt.startPolicyVersion === capability.policyVersion &&
+            receipt.approvalPolicyVersion === capability.policyVersion &&
+            receipt.startPolicyExpiresAt === capability.policyExpiresAt &&
+            receipt.approvalPolicyExpiresAt === capability.policyExpiresAt &&
+            receipt.startCapabilityExpiresAt === capability.capabilityExpiresAt &&
+            receipt.approvalCapabilityExpiresAt === capability.capabilityExpiresAt &&
+            receipt.startConfirmationDigest === expectedStartDigest &&
+            receipt.approvalConfirmationDigest === expectedApprovalDigest &&
+            receipt.startNonceAction === "SOURCE_RUN_START" &&
+            receipt.approvalNonceAction === "SOURCE_CAPABILITY_APPROVE" &&
+            receipt.startLoopbackValidated === 1 &&
+            receipt.startSessionValidated === 1 &&
+            receipt.startNonceConsumed === 1 &&
+            receipt.startOwnerConfirmed === 1 &&
+            Number.isFinite(startGateConsumedAt) &&
+            startGateConsumedAt <= receiptCreatedAt &&
+            currentTime.getTime() - startGateConsumedAt <= 15 * 60_000 &&
+            receipt.approvalLoopbackValidated === 1 &&
+            receipt.approvalSessionValidated === 1 &&
+            receipt.approvalNonceConsumed === 1 &&
+            receipt.approvalOwnerConfirmed === 1 &&
+            Number.isFinite(approvalGateConsumedAt) &&
+            approvalGateConsumedAt <= approvalCreatedAt &&
+            Number.isFinite(receiptExpiresAt) &&
+            receiptExpiresAt > currentTime.getTime() &&
+            Number.isFinite(approvalConsumedAt) &&
+            Number.isFinite(receiptCreatedAt) &&
+            Number.isFinite(approvalCreatedAt) &&
+            Math.abs(approvalConsumedAt - receiptCreatedAt) < 1000;
+          if (!receiptsMatch) throw new Error("SOURCE_OWNER_RECEIPT_CHAIN_INVALID");
+          const active = this.sqlite
+            .prepare(
+              `SELECT 1 FROM source_run_checkpoints
+               WHERE capability_version_id=? AND status='RUNNING' LIMIT 1`,
+            )
+            .get(row.id);
+          if (active) throw new Error("CONCURRENT_RUN");
+          this.sqlite
+            .prepare(
+              `INSERT INTO source_run_checkpoints
+                (id, capability_version_id, capability_digest, operation, status, current_cursor,
+                 next_cursor, seen_page_digests_json, request_count, page_count, record_count, byte_count,
+                 retry_count, redirect_count, safe_error_code, retry_after, owner_started_at,
+                 owner_cancelled_at, completed_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'RUNNING', NULL, ?, '[]', 0, 0, 0, 0, 0, 0, NULL, NULL, ?, NULL, NULL, ?, ?)`,
+            )
+            .run(
+              runId,
+              row.id,
+              digest,
+              input.operation,
+              input.operation === "LIST_JOBS" ? "0" : null,
+              input.startedAt,
+              input.startedAt,
+              input.startedAt,
+            );
+          const consumed = this.sqlite
+            .prepare(
+              `UPDATE source_owner_action_receipts SET state='CONSUMED',consumed_at=?,updated_at=?
+               WHERE id=? AND action='START' AND state='ACTIVE' AND receipt_expires_at>?`,
+            )
+            .run(
+              input.startedAt,
+              currentTime.toISOString(),
+              input.ownerStartReceiptId,
+              currentTime.toISOString(),
+            ).changes;
+          if (consumed !== 1) throw new Error("SOURCE_OWNER_START_RECEIPT_REPLAYED");
+          this.sqlite
+            .prepare(
+              `INSERT INTO source_run_owner_bindings
+                (run_id,approval_receipt_id,start_receipt_id,capability_digest,operation,created_at)
+               VALUES (?,?,?,?,?,?)`,
+            )
+            .run(
+              runId,
+              input.ownerApprovalReceiptId,
+              input.ownerStartReceiptId,
+              digest,
+              input.operation,
+              input.startedAt,
+            );
+          const startedAudit = validateSourceAuditMetadata("source.run.started", {
+            runId,
+            capabilityId: capability.capabilityId,
+            capabilityVersion: capability.version,
+            operation: input.operation,
+          });
+          this.audit("source.run.started", "source_run", runId, startedAudit);
+          const bindingAudit = validateSourceAuditMetadata("source.run.owner-bound", {
+            runId,
+            approvalReceiptId: input.ownerApprovalReceiptId,
+            startReceiptId: input.ownerStartReceiptId,
+            capabilityId: capability.capabilityId,
+            capabilityVersion: capability.version,
+            capabilityDigest: digest,
+            operation: input.operation,
+          });
+          this.audit("source.run.owner-bound", "source_run", runId, bindingAudit);
+          this.auditOwnerReceiptTerminal(input.ownerStartReceiptId, "START", "CONSUMED");
+          return runId;
+        })
+        .immediate();
+    } catch (error) {
+      this.failOwnerStartReceipt(input.ownerStartReceiptId);
+      throw error;
     }
-    if (
-      sourceCapabilityReadiness(capability, new Date(input.startedAt)).status !== "SOURCE_ENABLED"
-    ) {
-      throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
-    }
-    const row = this.currentCapability(capability.capabilityId);
-    if (
-      !row ||
-      row.version !== capability.version ||
-      row.digest !== input.capabilityDigest ||
-      row.digest !== sourceCapabilityDigest(capability)
-    ) {
-      throw new Error("CAPABILITY_CHANGED");
-    }
-    const active = this.sqlite
-      .prepare(
-        `SELECT 1 FROM source_run_checkpoints
-         WHERE capability_version_id = ? AND status = 'RUNNING'`,
-      )
-      .get(row.id);
-    if (active) throw new Error("CONCURRENT_RUN");
-    const runId = this.id();
-    this.sqlite
-      .prepare(
-        `INSERT INTO source_run_checkpoints
-          (id, capability_version_id, capability_digest, operation, status, current_cursor,
-           next_cursor, seen_page_digests_json, request_count, page_count, record_count, byte_count,
-           retry_count, redirect_count, safe_error_code, retry_after, owner_started_at,
-           owner_cancelled_at, completed_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'RUNNING', NULL, ?, '[]', 0, 0, 0, 0, 0, 0, NULL, NULL, ?, NULL, NULL, ?, ?)`,
-      )
-      .run(
-        runId,
-        row.id,
-        row.digest,
-        input.operation,
-        input.operation === "LIST_JOBS" ? "0" : null,
-        input.startedAt,
-        input.startedAt,
-        input.startedAt,
-      );
-    const audit = validateSourceAuditMetadata("source.run.started", {
-      runId,
-      capabilityId: capability.capabilityId,
-      capabilityVersion: capability.version,
-      operation: input.operation,
-    });
-    this.audit("source.run.started", "source_run", runId, audit);
-    return runId;
   }
 
   assertCapabilityCurrent(input: {
@@ -1174,6 +1760,185 @@ export class SourceEnablementRepository implements SourceRunSink {
     this.audit("source.run.stopped", "source_run", runId, audit);
   }
 
+  private hasOwnerReceiptSchema(): boolean {
+    const tables = this.sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)")
+      .all("source_owner_action_receipts", "source_run_owner_bindings") as Array<{ name: string }>;
+    return tables.length === 2;
+  }
+
+  private requireOwnerReceiptSchema(): void {
+    if (!this.hasOwnerReceiptSchema()) throw new Error("SOURCE_OWNER_RECEIPT_SCHEMA_REQUIRED");
+  }
+
+  private assertGateProof(
+    proof: SourceOwnerActionGateProof,
+    action: SourceOwnerActionGateProof["action"],
+  ): void {
+    if (
+      !proof ||
+      proof.action !== action ||
+      proof.loopbackValidated !== true ||
+      proof.localSessionValidated !== true ||
+      proof.nonceConsumed !== true
+    ) {
+      throw new Error("LOCAL_MUTATION_GATE_REQUIRED");
+    }
+    const consumedAt = Date.parse(proof.consumedAt);
+    const now = this.now().getTime();
+    if (
+      !Number.isFinite(consumedAt) ||
+      consumedAt > now + 30_000 ||
+      now - consumedAt > 15 * 60_000
+    ) {
+      throw new Error("LOCAL_MUTATION_GATE_EXPIRED");
+    }
+  }
+
+  private assertPersistedCapabilityCurrent(
+    capability: SourceCapabilityV2,
+    digest: string,
+  ): { id: string; version: number; digest: string } {
+    const current = this.currentCapability(capability.capabilityId);
+    if (!current || current.version !== capability.version || current.digest !== digest) {
+      throw new Error("CAPABILITY_CHANGED");
+    }
+    const row = this.sqlite
+      .prepare(
+        `SELECT source,tenant,approval_state AS approvalState,
+                approval_reference AS approvalReference,policy_version AS policyVersion,
+                policy_expires_at AS policyExpiresAt,
+                capability_expires_at AS capabilityExpiresAt
+         FROM source_capability_versions WHERE id=?`,
+      )
+      .get(current.id) as
+      | {
+          source: string;
+          tenant: string;
+          approvalState: string;
+          approvalReference: string | null;
+          policyVersion: string;
+          policyExpiresAt: string;
+          capabilityExpiresAt: string;
+        }
+      | undefined;
+    if (
+      !row ||
+      row.source !== capability.source ||
+      row.tenant !== capability.tenant ||
+      row.approvalState !== capability.approvalState ||
+      row.approvalReference !== capability.approvalReference ||
+      row.policyVersion !== capability.policyVersion ||
+      row.policyExpiresAt !== capability.policyExpiresAt ||
+      row.capabilityExpiresAt !== capability.capabilityExpiresAt
+    ) {
+      throw new Error("CAPABILITY_CHANGED");
+    }
+    return current;
+  }
+
+  private insertOwnerReceipt(input: {
+    id: string;
+    action: "APPROVE" | "START";
+    capability: SourceCapabilityV2;
+    capabilityVersionId: string;
+    capabilityDigest: string;
+    approvalReference: string;
+    operation: SourceOperation | null;
+    receiptExpiresAt: string | null;
+    confirmationDigest: string;
+    nonceAction: "SOURCE_CAPABILITY_APPROVE" | "SOURCE_RUN_START";
+    gateProof: SourceOwnerActionGateProof;
+    predecessorReceiptId: string | null;
+    state: "ACTIVE" | "CONSUMED" | "REVOKED" | "EXPIRED" | "FAILED";
+    consumedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }): void {
+    const action = SourceOwnerActionSchema.parse(input.action);
+    const state = SourceOwnerReceiptStateSchema.parse(input.state);
+    this.sqlite
+      .prepare(
+        `INSERT INTO source_owner_action_receipts
+          (id,action,capability_version_id,capability_id,capability_version,capability_digest,
+           approval_reference,source,tenant,operation,policy_version,policy_expires_at,
+           capability_expires_at,receipt_expires_at,confirmation_digest,nonce_action,
+           gate_consumed_at,loopback_validated,local_session_validated,nonce_consumed,owner_confirmed,
+           predecessor_receipt_id,state,consumed_at,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        input.id,
+        action,
+        input.capabilityVersionId,
+        input.capability.capabilityId,
+        input.capability.version,
+        input.capabilityDigest,
+        input.approvalReference,
+        input.capability.source,
+        input.capability.tenant,
+        input.operation,
+        input.capability.policyVersion,
+        input.capability.policyExpiresAt,
+        input.capability.capabilityExpiresAt,
+        input.receiptExpiresAt,
+        input.confirmationDigest,
+        input.nonceAction,
+        input.gateProof.consumedAt,
+        1,
+        1,
+        1,
+        1,
+        input.predecessorReceiptId,
+        state,
+        input.consumedAt,
+        input.createdAt,
+        input.updatedAt,
+      );
+  }
+
+  private auditOwnerApprovalRecorded(
+    receiptId: string,
+    capability: SourceCapabilityV2,
+    capabilityDigest: string,
+  ): void {
+    const audit = validateSourceAuditMetadata("source.owner.approval-recorded", {
+      receiptId,
+      capabilityId: capability.capabilityId,
+      capabilityVersion: capability.version,
+      capabilityDigest,
+      state: "ACTIVE",
+    });
+    this.audit("source.owner.approval-recorded", "source_owner_action_receipt", receiptId, audit);
+  }
+
+  private auditOwnerReceiptTerminal(
+    receiptId: string,
+    action: "APPROVE" | "START",
+    state: "CONSUMED" | "REVOKED" | "EXPIRED" | "FAILED",
+  ): void {
+    const audit = validateSourceAuditMetadata("source.owner.receipt-terminal", {
+      receiptId,
+      action,
+      state,
+    });
+    this.audit("source.owner.receipt-terminal", "source_owner_action_receipt", receiptId, audit);
+  }
+
+  private terminalizeOwnerReceipt(
+    receiptId: string,
+    action: "APPROVE" | "START",
+    state: "REVOKED" | "EXPIRED" | "FAILED",
+  ): void {
+    const changed = this.sqlite
+      .prepare(
+        `UPDATE source_owner_action_receipts SET state=?,updated_at=?
+         WHERE id=? AND action=? AND state='ACTIVE'`,
+      )
+      .run(state, this.now().toISOString(), receiptId, action).changes;
+    if (changed) this.auditOwnerReceiptTerminal(receiptId, action, state);
+  }
+
   private currentCapability(
     capabilityId: string,
   ): { id: string; version: number; digest: string } | undefined {
@@ -1668,19 +2433,27 @@ export class SourceEnablementRepository implements SourceRunSink {
 export async function runLeverSourceToQueue(input: {
   capability: SourceCapabilityV2;
   repository: SourceEnablementRepository;
+  ownerReceiptChain: SourceOwnerReceiptChain;
   evaluateJob(jobId: string): Promise<string | null>;
   queueJob(jobId: string, evaluationId: string): Promise<void> | void;
   now?: () => Date;
   signal?: AbortSignal;
   dependencies?: SecureSourceTransportDependencies;
 }) {
-  const result = await runLeverSourceDiscovery({
-    capability: input.capability,
-    sink: input.repository,
-    now: input.now,
-    signal: input.signal,
-    dependencies: input.dependencies,
-  });
+  let result;
+  try {
+    result = await runLeverSourceDiscovery({
+      capability: input.capability,
+      sink: input.repository,
+      ownerReceiptChain: input.ownerReceiptChain,
+      now: input.now,
+      signal: input.signal,
+      dependencies: input.dependencies,
+    });
+  } catch (error) {
+    input.repository.failOwnerStartReceipt(input.ownerReceiptChain.startReceiptId);
+    throw error;
+  }
   const queuedJobIds: string[] = [];
   if (result.status === "COMPLETE") {
     for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
@@ -1697,6 +2470,7 @@ export async function runLeverSourceToQueue(input: {
 export async function runLeverDetailToQueue(input: {
   capability: SourceCapabilityV2;
   repository: SourceEnablementRepository;
+  ownerReceiptChain: SourceOwnerReceiptChain;
   externalId: string;
   evaluateJob(jobId: string): Promise<string | null>;
   queueJob(jobId: string, evaluationId: string): Promise<void> | void;
@@ -1704,14 +2478,21 @@ export async function runLeverDetailToQueue(input: {
   signal?: AbortSignal;
   dependencies?: SecureSourceTransportDependencies;
 }): Promise<LeverDetailSourceRunResult & { queuedJobIds: string[] }> {
-  const result = await runLeverDetailSourceDiscovery({
-    capability: input.capability,
-    sink: input.repository,
-    externalId: input.externalId,
-    now: input.now,
-    signal: input.signal,
-    dependencies: input.dependencies,
-  });
+  let result: LeverDetailSourceRunResult;
+  try {
+    result = await runLeverDetailSourceDiscovery({
+      capability: input.capability,
+      sink: input.repository,
+      ownerReceiptChain: input.ownerReceiptChain,
+      externalId: input.externalId,
+      now: input.now,
+      signal: input.signal,
+      dependencies: input.dependencies,
+    });
+  } catch (error) {
+    input.repository.failOwnerStartReceipt(input.ownerReceiptChain.startReceiptId);
+    throw error;
+  }
   const queuedJobIds: string[] = [];
   if (result.status === "COMPLETE") {
     for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
