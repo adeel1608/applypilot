@@ -3268,3 +3268,335 @@ only by current canonical recommendation, score descending, then local job ID; a
   pending; do not activate or migrate it in this task. Personal Live V1 remains NOT_READY. The next
   recommended task is to review PR #55 and decide its acceptance, retaining the corrected historical
   provenance record when PR #54 is later superseded.
+
+## 50. M2 PR #55 merge, real schema-12 rollout, PR #54 supersession, and offline broader readiness blueprint (2026-09-28)
+
+### Verified starting state
+
+- Repository is clean on `feat/m2-source-owner-action-receipts`, head
+  `7e7c68b529058fd64b6c1f14d15dcc765633d982`, based on main
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`.
+- PR #55 still has exact reviewed base/head/tree
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f` /
+  `7e7c68b529058fd64b6c1f14d15dcc765633d982` /
+  `5d595eeee5a0b655d2ab10319afadcb8a1668bef`, exactly 23 reviewed changed files, and the exact
+  reviewed file set. It is OPEN / UNMERGED / CLEAN / MERGEABLE with no reviews or unresolved
+  threads. Exact-head push and PR quality runs `36395722899` and `36395727963` are SUCCESS.
+- Real private DB preflight: schema 11, pending 1, integrity PASS, FK issues 0; lifetime counters
+  source/employer/form-upload/submission `17/9/0/0`; active source/target capability count 0,
+  active source run count 0, pending application/external operations 0. Historical Shield AI v3
+  run `58796b51-f83f-4130-9ee2-6fa65d064d20` is COMPLETE / LIST_JOBS (1 request, 1 page, 25
+  records); family `m2_source_shieldai_ace3faba83cf_1790463324757` v4 is REVOKED. Schema-12
+  receipt tables do not yet exist; historical owner-action provenance is unverified and must not
+  be backfilled.
+- PR #54 is OPEN / UNMERGED at its expected exact head/base/tree, with one historical plan file,
+  no reviews, no comments, and no changed commits. It is unsafe as written and may be closed only
+  after a fresh unchanged-state check.
+
+### Objective, authorized scope, and constraints
+
+Complete the owner-authorized squash merge of only the exact reviewed PR #55, synchronize clean
+`main`, safely migrate only the real private DB through the canonical schema process from 11 to 12,
+close unchanged PR #54 with a concise supersession explanation without merging or deleting its
+branch, and record an offline-only analysis of the persisted first page plus a non-expiring static
+Shield AI discovery identity/bounds template. Create no capability, approval, receipt, run, request,
+or employer action. Keep the PR evidence branch's only tracked change in `PROJECT_PLAN.md`; open
+one evidence PR and leave it OPEN / UNMERGED.
+
+Hard safety boundary: no source LIST_JOBS or GET_JOB, source DNS/TCP/TLS, employer visit, form,
+upload, submission, capability activation, owner receipt, target action, candidate-data outbound,
+receipt backfill, or v5 capability. The only DB writes are canonical backup creation, disposable
+restore/rehearsal, and exactly migration 0012 on the real DB after all stop gates pass.
+
+### Architecture, data flow, and dependencies
+
+Reviewed PR #55 supplies schema 12 and the durable approval/start receipt contract. The real DB
+remains untouched through PR verification, merge, code-baseline audit, migration preflight, fresh
+backup verification, and disposable rehearsal. The canonical `backup` workflow creates a consistent
+private backup; the supported maintenance restore library stages that verified backup into a
+confined ignored rehearsal root; `db:migrate -- --confirm` with `APPLYPILOT_DB_PATH` pointed only at
+that rehearsal copy proves migration 0012. Only after rehearsal preservation gates pass may the
+same canonical migration command target the real local DB. Read-only status, preflight, SQLite
+integrity/FK/count queries, source UI rendering, current R2 summaries, and existing persisted source
+records feed the final safe evidence. The static template contains stable source identity and
+numeric bounds only; time-dependent policy/capability/approval fields and a digest are deliberately
+omitted.
+
+Planned tracked file: `PROJECT_PLAN.md` only. Disposable DB, backup copies, SQLite sidecars,
+profiles, documents, allowlists, source payloads, receipts, and reports stay ignored/private.
+Dependencies are exact PR GitHub metadata/checks, Git, `gh`, the reviewed migration/tooling,
+`better-sqlite3`, canonical backup/restore helpers, local UI fixtures, and current R2/readiness
+repositories. No source transport dependency is invoked.
+
+### Risks, privacy, rollback, and stop conditions
+
+- A changed PR #55 base/head/tree/file set/check/review/thread/mergeability yields
+  `PR55_REVIEW_STATE_CHANGED`; stop before merge and before any DB migration.
+- Any material mismatch in schema, integrity, foreign keys, action counters, active authority/runs,
+  pending operations, historical capability family, or run facts yields
+  `REAL_SCHEMA12_MIGRATION_PREFLIGHT_MISMATCH`; do not mutate the real DB.
+- A bad backup, failed disposable restore/migration, changed historical rows, nonzero receipt or
+  binding backfill, or failed health check yields `SCHEMA12_REHEARSAL_FAILED`; keep the real DB at
+  schema 11.
+- The canonical migration script creates and verifies its own backup and validates source/R2
+  preservation, integrity, FKs, and target schema. Any post-migration mismatch stops further work;
+  retain both verified backups and use only the repository's supported restore flow if rollback is
+  needed. Never edit or manually repair SQLite rows.
+- No raw provider payload, profile fact, candidate document, secret, nonce, session, or application
+  value may enter the plan, output, Git, or PR. Read only safe aggregate/identity metadata.
+- PR #54 is closed only if exact historical head/tree/base and OPEN / UNMERGED still match and no
+  legitimate correction or review request appeared; otherwise record
+  `PR54_STATE_CHANGED_REVIEW_REQUIRED` and leave it open.
+- All discovery results come from persisted local state after migration. If no current first-page
+  role passes every canonical packet-candidate gate, prepare the requested static template without
+  activation timestamps or digest. If one passes, report
+  `OFFLINE_CURRENT_PACKET_CANDIDATE_FOUND` and do not prepare broader identity unnecessarily. If
+  pagination cannot be safely expressed through the normal path, report
+  `SOURCE_PAGINATION_ENGINEERING_REQUIRED` and do not make an executable proposal.
+
+### Acceptance criteria and exact sequence
+
+1. Re-fetch PR #55 immediately before merge and match every provided base/head/tree/file/count/CI/
+   review/thread/state fact. Squash merge with the exact head SHA guard; record merge SHA, parent,
+   and tree. Synchronize local `main` with `origin/main` at that merge SHA and confirm clean state.
+2. Verify schema version 12, migrations 0000-0012 and old-migration hashes, unchanged parser/
+   normalization/evidence versions, R2 threshold 50, weight version `r2-weights-1`, and no active
+   source or target authority.
+3. Revalidate the real schema-11 DB preflight, exact lifetime counters and historical family/run
+   facts. Create a fresh canonical backup and record its safe ID; verify schema 11, integrity PASS,
+   FK 0, counts and history. Confirm private ignore status.
+4. Restore that backup via the supported maintenance helper into an ignored confined disposable
+   root. Run the canonical migration there exactly once. Verify schema 12/pending 0/integrity PASS/
+   FK 0, row/count preservation, empty owner receipt and run-binding tables, unchanged historical
+   v3 and v4, legacy-unverified provenance, zero active authority, and no second pending migration.
+5. Only on successful rehearsal, run the canonical migration against the real DB. Verify the same
+   history, zero backfill, counters `17/9/0/0`, schema 12/pending 0/integrity PASS/FK 0, no active
+   capability/run/pending action, and no source request.
+6. Render/check `/sources` locally without any network dispatch. Analyze persisted run
+   `58796b51-f83f-4130-9ee2-6fa65d064d20` and current R2/duplicate/queue evidence offline; emit only
+   the required safe aggregates and deterministic top-10 table. Do not print profile facts.
+7. Derive the static next lineage (same family, v5 after v4) and record only stable LEVER/Shield AI
+   identity and non-broadened limits, exact production pagination semantics, parser SHA binding,
+   and policy classification. Never create/persist/approve the capability or receipt chain.
+8. Revalidate PR #54 exact identity/state; add the safe supersession comment and close it only if
+   unchanged. Never merge it or delete its branch.
+9. Create `chore/m2-schema12-rollout-broader-source-readiness` from synchronized `main`, update the
+   plan with evidence, run all requested local-only validation gates, commit only the plan, open one
+   evidence PR, and wait for its exact-head push and PR CI. Leave that PR OPEN / UNMERGED.
+
+Acceptance additionally requires all task closeout fields, the seven-milestone tracker, source-
+enabled Personal Beta and Personal Live V1 statuses, remaining blockers, the complete static
+template, zero external-action deltas, and exactly one recommended next task (generate a fresh
+exact short-lived capability immediately before explicit owner approval). Never emit the green-
+banner success phrase.
+
+### Execution evidence
+
+Status: `IN_PROGRESS`. This blueprint was added after the exact PR/DB preflight review and before
+the authorized merge or any database mutation. Actual merge, backup, rehearsal, migration, offline
+analysis, PR #54 closure, validation commands/results, evidence branch/PR IDs, and blockers are to
+be appended below after they occur; no result is assumed here.
+
+#### Merge, post-merge code, and disposable rehearsal progress (2026-09-28)
+
+- PR #55 was revalidated immediately before merge: exact base/head/tree
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f` /
+  `7e7c68b529058fd64b6c1f14d15dcc765633d982` /
+  `5d595eeee5a0b655d2ab10319afadcb8a1668bef`; exactly 23 changed files and exact reviewed file
+  set; push/PR CI `36395722899` / `36395727963` SUCCESS; OPEN, UNMERGED, CLEAN, MERGEABLE; zero
+  reviews and unresolved threads. SHA-guarded squash merge: `b14c17d6997cd10675f5ab9e35cb3ca98651cedf`,
+  parent `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, tree
+  `5d595eeee5a0b655d2ab10319afadcb8a1668bef`. PR #55 is MERGED. Local `main` was fast-forwarded
+  to `origin/main` at that exact SHA and was clean before the evidence branch was created.
+- Post-merge code reports schema version 12 and contains migrations `0000`-`0012`. Git comparison
+  confirms migrations `0000`-`0011` have no changes from the reviewed base; migration 0012 SHA-256
+  is `E8869EF5821218CB0EB0D2F408B132445272D708896D2E26D4A9CB843EA771A7`. R2 threshold remains
+  `50`, fit weight version `r2-weights-1`; parser/normalization/evidence implementation files were
+  unchanged by PR #55. Source preflight active count is 0 and latest target capability active count
+  is 0.
+- Immediately pre-migration, the real DB was schema 11 / pending 1 / integrity PASS / FK 0.
+  Read-only counts were 17 lifetime source requests, 9 employer inspection bindings, 0 application
+  operations, 0 final consents; active source/target capabilities, source runs, and pending
+  operations were all 0. The expected v3 run and v4-revoked Shield AI lineage matched the supplied
+  gate.
+- Fresh canonical backup ID `backup-2026-09-28T11-31-55.631Z-8e91c584`: schema 11, integrity PASS,
+  FK 0, 12,513,280 bytes, SHA-256
+  `f008da3a0d794d0a64b52d2eaccfab887663915057b04fd8220135905908cff8`. Backup preview and
+  live-vs-backup checks matched. The backup and rehearsal root are Git-ignored.
+- Disposable restore used the canonical `restoreDatabase()` maintenance helper, with the verified
+  backup artifact staged under the confined ignored rehearsal root
+  `data/private/rehearsals/m2-schema12-rollout-broader-source-readiness-8e91c584/`. The canonical
+  migration preview reported `11 -> 12`, pending 1, and the canonical rehearsal migration applied
+  exactly once; its automatic rehearsal backup is
+  `backup-2026-09-28T11-41-52.713Z-c07de9cb`.
+- Rehearsal status: schema 12 / pending 0 / integrity PASS / FK 0. SHA-256 snapshots prove every
+  row in all 66 pre-existing tables is unchanged. The only new tables are
+  `source_owner_action_receipts` and `source_run_owner_bindings`, both count 0. Historical v3
+  remains COMPLETE / LIST_JOBS, 1 request / 1 page / 25 records; family v4 remains REVOKED; the
+  repository returns `LEGACY_OWNER_PROVENANCE_UNVERIFIED`; active source/target capabilities and
+  active runs/pending operations are 0; lifetime counters remain `17/9/0/0`. Real DB status after
+  rehearsal still reports schema 11 / pending 1 / integrity PASS / FK 0.
+
+### Completed rollout, supersession, and local-only analysis
+
+- PR #55 was revalidated immediately before merge at the exact reviewed base/head/tree, 23-file
+  diff, expected CI runs, zero reviews/threads, OPEN / UNMERGED / CLEAN / MERGEABLE state. Squash
+  merge SHA is `b14c17d6997cd10675f5ab9e35cb3ca98651cedf`, parent
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, tree
+  `5d595eeee5a0b655d2ab10319afadcb8a1668bef`. Local `main` and `origin/main` matched that merge
+  commit; the evidence branch was then created from it.
+- The real canonical migration was applied once after rehearsal. The migration command created
+  verified automatic pre-write backup `backup-2026-09-28T11-46-55.880Z-f037bb3f`. Result:
+  schema 12 / pending 0 / integrity PASS / FK 0. Every row in all 66 pre-existing tables matches
+  the fresh schema-11 backup hashes/counts. Only the two receipt/binding tables were added, both
+  remain empty, and real lifetime counters remain `17/9/0/0`. Read-only migration status reports
+  current 12 / target 12 / pending 0.
+- Post-migration preflight passes with no blockers: database schema 12, source-enabled Personal
+  Beta READY, zero active source capability, target owner approval still required, privacy audit
+  PASS. No source request, approval receipt, start receipt, source run, or target action was
+  created. Historical v3 remains COMPLETE / LIST_JOBS (1 request, 1 page, 25 records), its
+  provenance is `LEGACY_OWNER_PROVENANCE_UNVERIFIED`, and family version 4 remains REVOKED.
+- A loopback-only GET of `http://127.0.0.1:3099/sources` returned HTTP 200 after the app's local
+  session redirect. It does not report schema migration required and renders the legacy provenance
+  label. Approval and start forms are separate and show their exact phrases; all 12 persisted
+  capability-version cards are SOURCE DISABLED with approval/start buttons disabled. Checkbox
+  controls render unchecked, no receipt ID is shown, and source page/workspace reads contain no
+  network dispatch. The local server was stopped after the check.
+- PR #54 was re-fetched before action: exact expected head
+  `212eb1d4c3928b217ecc76201d5eb8c21c764332`, tree
+  `b5c9ea0bc457f861e1cdefe6993b422db54c4373`, original base
+  `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`, three commits, one changed file, OPEN / UNMERGED,
+  no reviews, review comments, issue comments, requested reviewers, or correction. Its mergeability
+  is now CONFLICTING because main advanced through PR #55; the historical PR content itself is
+  unchanged. A supersession comment was posted and PR #54 was closed without merging; its branch
+  was retained.
+- The offline first-page summary used only persisted run
+  `58796b51-f83f-4130-9ee2-6fa65d064d20` and local current R2/queue/duplicate data. The 25 accepted
+  roles have locations: Dallas, Texas 5; Seattle, Washington 3; San Diego, California 3; United
+  States 1; Washington, D.C. 3; Kyiv 2; Lviv 1; Wichita Metro Area 2; Orlando, Florida 1; London
+  2; Melbourne 1; Brussels 1. Melbourne count is 1; explicit Australia country count is 0 because
+  all normalized country values are `Unknown`. Engineering/robotics/mechatronics/electronics/
+  software/controls/test/vision-like title count is 11. Eligibility is ELIGIBLE 0 / REVIEW_REQUIRED
+  25 / NOT_ELIGIBLE 0; recommended true 0 / false 25; maximum score 11 / threshold 50; maximum
+  coverage 53; duplicate CLEAR 25; current evaluations 25; deterministic detail candidates 0.
+  No role is an existing current first-page packet candidate.
+- All 25 rows are current and queue state is REVIEWING / CURRENT. The deterministic top 10, sorted
+  recommended then score then coverage then local job ID, are:
+
+| Local job ID                                  | Title                                                             | Company / source  | Location              | Eligibility / reason codes                                                                                                                                                                                                                                 | Score / threshold / recommended | Coverage / partial / unobserved | Duplicate | Queue               | Detail | Blockers                                                                                                                                                      |
+| --------------------------------------------- | ----------------------------------------------------------------- | ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- | --------- | ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source-job-201826e25c62cd256bbc97f29953d7c8` | Business Development & Sales Lead - UK                            | Shield AI / LEVER | London                | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 11 / 50 / false                 | 35 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-ad308f9883cdb430928a3c33812220cc` | Air Vehicle Lead, Chief Engineer                                  | Shield AI / LEVER | San Diego, California | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 7 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-e007edfefe4ac11d3c31ff3ee5c32fa3` | Business Development Lead, Belgium, NATO & Luxembourg             | Shield AI / LEVER | Brussels              | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 7 / 50 / false                  | 35 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-68a8c68dc59d19ccce7dc691524ab45c` | Associate Sourcing Specialist (R5490)                             | Shield AI / LEVER | Dallas, Texas         | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_VEHICLE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                                      | 4 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-7f5f685b93e594ff9f6c841278d2f261` | Business Development Associate (R5964)                            | Shield AI / LEVER | Melbourne             | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 4 / 50 / false                  | 35 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-1884edb64d93ca800f6cd3a2d163e11b` | Applications Engineer, Learning & Development- Open Level (R5053) | Shield AI / LEVER | Washington, D.C.      | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 0 / 50 / false                  | 53 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-6fd9acf4ab477719e5b51450ad9c522c` | Associate Asset Management Specialist (R5697)                     | Shield AI / LEVER | Dallas, Texas         | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_EDUCATION_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_VEHICLE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`, `R2_MATERIAL_CONDITION_UNRESOLVED` | 0 / 50 / false                  | 53 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `MATERIAL_CONDITIONAL`, `SCORE_BELOW_THRESHOLD` |
+| `source-job-5ff462523d1346980407ceeb73ecf7fe` | Aerostructures Design Engineer II (R5157)                         | Shield AI / LEVER | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 0 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-6f2e491b073a4b7e8edf1610d675fdc0` | Aerostructures Design Engineer II (R4953)                         | Shield AI / LEVER | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 0 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+| `source-job-87a18c37509b06ddcb8ac751560af3d0` | Aerostructures Design Engineer II (R5156)                         | Shield AI / LEVER | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_CERTIFICATIONS_UNKNOWN`, `R2_MATERIAL_HOURS_UNKNOWN`, `R2_MATERIAL_LICENCES_UNKNOWN`, `R2_MATERIAL_SCHEDULE_UNKNOWN`, `R2_MATERIAL_WORK_RIGHTS_UNKNOWN`                               | 0 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                         |
+
+- Source runner review confirms the normal owner UI invokes `runLeverSourceToQueue()` without a
+  `startCursor`, while `runLeverSourceDiscovery()` defaults to cursor 0 and pages forward until
+  the provider returns a null cursor, guarded by `SourceRunBudget`, capability page size, and
+  reversed-cursor rejection. The static proposal can therefore use canonical cursor 0 with up to
+  four requests / 100 records; immutable observation/job-version handling supports seeing the
+  first 25 again. No continuation hack or pagination change is needed.
+- The read-only private allowlist and DB show the existing family
+  `m2_source_shieldai_ace3faba83cf_1790463324757`, latest v4 REVOKED; proposed lineage is the same
+  family, v5 after predecessor v4. Existing policy identity `m2-live-readiness-v1` can be reviewed
+  and reused (`CURRENT_POLICY_CAN_BE_REVIEWED_AND_REUSED`), with new policy and capability expiry
+  timestamps required only at future owner approval. Parser identity is
+  `lever-v2:b14c17d6997cd10675f5ab9e35cb3ca98651cedf`.
+- Static template (identity and bounds only):
+
+```text
+STATIC OWNER-REVIEW TEMPLATE — BROADER REAL SHIELD AI LEVER LIST_JOBS
+Capability family ID: m2_source_shieldai_ace3faba83cf_1790463324757
+Expected next version: 5
+Expected predecessor: 4
+Source: LEVER
+Alias: Shield AI
+Tenant: shieldai
+Region: GLOBAL
+Host: api.lever.co
+Path prefix: /v0/postings/shieldai
+Operation: LIST_JOBS
+Pagination mode: forward, canonical first-page normal path
+Start cursor: 0
+Request budget: 4
+Page size cap: 25
+Record cap: 100
+Response byte limit: 2000000
+Request timeout: 30000 ms
+Run timeout: 120000 ms
+Retries: 0
+Redirects: 0
+Concurrency: 1
+Parser identity: lever-v2:b14c17d6997cd10675f5ab9e35cb3ca98651cedf
+Policy classification: CURRENT_POLICY_CAN_BE_REVIEWED_AND_REUSED
+Policy version: m2-live-readiness-v1
+Candidate data outbound: NO
+Hosted/application URLs: NO; INERT
+GET_JOB authorized: NO
+Employer interaction authorized: NO
+Owner approval receipt required: YES
+Separate fresh start receipt required: YES
+
+GENERATE ONLY IMMEDIATELY BEFORE OWNER APPROVAL:
+- policyReviewedAt
+- policyExpiresAt
+- approvedAt
+- capabilityExpiresAt
+- approvalReference if version-dependent
+- final SourceCapabilityV2 digest
+```
+
+This is not an approval, persisted allowlist capability, or `SOURCE_ENABLED` input. No dynamic
+activation value, receipt, version 5 record, digest, or source transport was generated.
+
+### Validation results and evidence handoff
+
+- `npm run db:status`: PASS, schema 12 / pending 0 / integrity PASS / FK 0.
+  `npm run preflight`: PASS, no blockers, 12 allowlist versions / active source capability 0,
+  target approval required, both beta readiness checks READY, privacy audit PASS. `npm run
+db:migrate` read-only preview: current 12 / target 12 / pending 0; no changes made.
+- Read-only final private DB action counts: source requests 17, employer inspection bindings 9,
+  application operations 0, final consents/submissions 0, owner receipts 0, run bindings 0;
+  active source runs 0; latest Shield AI v4 is REVOKED. No source or employer delta occurred.
+- Migration `0000`-`0011` comparison against the PR #55 base passes. Focused durable owner-receipt,
+  runner, and UI tests: 5 files / 52 tests PASS. `npm test`: 58 files / 626 tests PASS.
+  `npm run test:integration`: 3 files / 21 tests PASS. `npm run test:e2e`: 47 fictional/local
+  tests PASS. `npm run typecheck` and `npm run lint`: PASS.
+- `npm run format:check` reports 51 formatting warnings in files already present on the unchanged
+  main base (application/package/docs/fixture/test sources); this plan is excluded from that
+  warning list after `npx prettier --write PROJECT_PLAN.md`, and `npx prettier --check
+PROJECT_PLAN.md` passes. No application/source files were reformatted because the requested
+  evidence branch is plan-only. `git diff --check` passes.
+- `npm run build` passes: local production build, showcase production build, and
+  `showcase:audit` (`PUBLIC_SHOWCASE_AUDIT_PASS`, 19 source files). `npm run privacy:audit` passes
+  (350 tracked files, 1,422 history paths, 1,271 blobs, 1,953 build/test artifacts, 11 private
+  canaries). `npm audit` and `npm run audit:production` each report 0 vulnerabilities.
+- `npm run release:check:fixture` passes on its disposable fictional runtime, including doctor,
+  status/preflight, format, lint, typecheck, 626 unit tests, 21 integration tests, both production
+  builds/showcase audit, all 47 local E2E tests, privacy audit, and both dependency audits. Its
+  final fixture summary confirms privacy/quality PASS, schema 12 / pending 0 / integrity PASS / FK
+  0, zero active capabilities, and `Personal Live V1=NOT_READY`. It reported the working tree
+  dirty only because this plan evidence was intentionally in progress. `git fsck --strict` exits
+  0 with dangling historical blobs/trees and no corruption diagnostics.
+- The only tracked change remains this `PROJECT_PLAN.md`. Seven-milestone tracker: (1) Foundations
+  COMPLETE; (2) current real role + fresh current packet IN PROGRESS / SOURCE DISCOVERY NOT YET
+  RESUMED; (3) real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING / NOT LIVE VERIFIED; (4) final-review/
+  submission safeguards BLOCKED; (5) reproducible release COMPLETE; (6) controlled real fill-preview
+  BLOCKED; (7) final readiness / Green-banner review NOT STARTED. Source-enabled Personal Beta is
+  READY with no active capability. Personal Live V1 remains NOT_READY.
+- No source LIST_JOBS or GET_JOB, source DNS/TCP/TLS, employer visit, form action, upload, or
+  submission occurred. Lifetime action counters remain `17/9/0/0`. No v5 capability, activation
+  timestamps/digest, approval receipt, start receipt, source run, or historical backfill was made.
+
+Remaining sequence: commit this plan-only evidence update on
+`chore/m2-schema12-rollout-broader-source-readiness`, push it, open exactly one evidence PR, and
+wait for checks on its exact final head. Record branch/tree/PR/check identities in the evidence PR
+and task closeout. The next recommended task after this evidence review is to generate a fresh,
+exact, short-lived capability immediately before explicit owner approval. No source network action
+has occurred.
