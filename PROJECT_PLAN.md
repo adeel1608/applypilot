@@ -3828,9 +3828,16 @@ apps/web/app/sources/page.test.tsx` PASS, 5 files / 148 tests. No full 600+ test
   VERIFIED; (4) final-review/submission safeguards BLOCKED; (5) reproducible release COMPLETE;
   (6) controlled real fill-preview BLOCKED; (7) final readiness / Green-banner review NOT STARTED.
   Source-enabled Personal Beta READY; Personal Live V1 NOT_READY.
-- Evidence branch: `chore/m2-v6-broader-discovery-evidence`, based on
-  `7e8534d196cec6b2e62f0bda78e0f7a29312472e`; only `PROJECT_PLAN.md` may change. PR URL, base/head,
-  tree, and exact-head CI remain to be recorded after push/creation. PR must remain OPEN / UNMERGED.
+- Evidence PR #57: `https://github.com/adeel1608/applypilot/pull/57`, base `main` at
+  `7e8534d196cec6b2e62f0bda78e0f7a29312472e`, branch
+  `chore/m2-v6-broader-discovery-evidence`. The initial evidence head is
+  `86517f8bfe010902e2f40a3910335fffc3fcbe6c`, tree
+  `d117cee23d18b75c510af962a833a200f3360899`; its push Quality run `36502542481` and PR Quality
+  run `36502565632` both PASS on that exact head, including formatting, lint, typecheck, unit and
+  integration tests, production build, and all 47 browser tests. The plan metadata follow-up is a
+  new exact PR head, so new push and PR Quality checks must also pass before closeout; their exact
+  head and run IDs are reported in the final task closeout. The PR remains OPEN / UNMERGED; do not
+  merge it.
 - Remaining blocker: there are zero deterministic detail candidates. The generic blockers are
   recommendation false for all 25, a maximum score below 50, partial material scope and insufficient
   extraction coverage for 24, plus the sole eligible role's score below threshold. No GET_JOB or
