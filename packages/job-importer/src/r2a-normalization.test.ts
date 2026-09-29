@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.4.0");
+    expect(result.parserVersion).toBe("3.5.0");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -678,6 +678,242 @@ describe("R2A evidence normalization", () => {
         .flatMap(({ unparsedSpans }) => unparsedSpans)
         .some(({ sourcePath }) => sourcePath.startsWith("structured.requirementTexts")),
     ).toBe(false);
+  });
+
+  it.each([
+    [
+      "neutral skill under requirements",
+      "Requirements",
+      "REQUIREMENTS",
+      "Ruby programming knowledge",
+      "REQUIRED",
+      true,
+    ],
+    [
+      "neutral experience under requirements",
+      "Minimum Requirements",
+      "REQUIREMENTS",
+      "3+ years experience in a fictional engineering team",
+      "REQUIRED",
+      true,
+    ],
+    [
+      "neutral qualification under requirements",
+      "Qualifications",
+      "REQUIREMENTS",
+      "A bachelor degree in fictional systems engineering",
+      "REQUIRED",
+      true,
+    ],
+    [
+      "neutral preferred qualification",
+      "Preferred Qualifications",
+      "REQUIREMENTS",
+      "A bachelor degree in fictional systems engineering",
+      "PREFERRED",
+      true,
+    ],
+    [
+      "preferred bullet under requirements",
+      "Requirements",
+      "REQUIREMENTS",
+      "Ruby programming knowledge preferred",
+      "PREFERRED",
+      false,
+    ],
+    [
+      "conditional bullet under requirements",
+      "Requirements",
+      "REQUIREMENTS",
+      "May be required to travel for a fictional event",
+      "CONDITIONAL",
+      false,
+    ],
+    [
+      "negated bullet under requirements",
+      "Requirements",
+      "REQUIREMENTS",
+      "A fictional driver licence is not required",
+      "NEGATED",
+      false,
+    ],
+    [
+      "explicit required bullet under requirements",
+      "Requirements",
+      "REQUIREMENTS",
+      "Three years experience is required",
+      "REQUIRED",
+      false,
+    ],
+  ] as const)(
+    "uses lexical modality before section context for %s",
+    (_name, heading, kind, content, expected, inherited) => {
+      const structured = { sourceSections: [{ heading, kind, content }] };
+      const sourceText = JSON.stringify(structured);
+      const result = normalizeR2AJobEvidence({
+        sourceText,
+        structured,
+        sourceObservationId: `observation:section-modality:${_name}`,
+      });
+      expect(result.requirementEvidence).toHaveLength(1);
+      expect(result.requirementEvidence[0]?.modality).toBe(expected);
+      if (inherited) {
+        expect(result.requirementEvidence[0]?.ruleId).toMatch(/_SECTION_DEFAULT$/);
+      } else {
+        expect(result.requirementEvidence[0]?.ruleId).not.toMatch(/_SECTION_DEFAULT$/);
+      }
+    },
+  );
+
+  it.each([
+    ["responsibilities", "RESPONSIBILITIES", "Ruby programming knowledge"],
+    ["benefits", "BENEFITS", "A fictional driver licence is required"],
+    ["other", "OTHER", "3+ years experience in a fictional team"],
+  ] as const)("does not infer requirement modality from %s sections", (_name, kind, content) => {
+    const structured = { sourceSections: [{ heading: _name, kind, content }] };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: `observation:section-no-fallback:${_name}`,
+    });
+    expect(result.requirementEvidence).toEqual([]);
+  });
+
+  it("limits section fallback to spans originating in structured REQUIREMENTS sections", () => {
+    const structured = {
+      sourceSections: [{ heading: "Requirements", kind: "REQUIREMENTS", content: "" }],
+      requirements: ["Ruby programming knowledge"],
+      skills: ["Python programming knowledge"],
+      qualifications: ["A bachelor degree in fictional systems engineering"],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:structured-arrays-no-section-default",
+    });
+    expect(
+      result.requirementEvidence.map(({ modality, source }) => ({
+        modality,
+        sourcePath: source.sourcePath,
+      })),
+    ).toEqual([
+      { modality: "UNKNOWN", sourcePath: "structured.requirements[0]" },
+      { modality: "UNKNOWN", sourcePath: "structured.skills[0]" },
+      { modality: "UNKNOWN", sourcePath: "structured.qualifications[0]" },
+    ]);
+  });
+
+  it("keeps description modality lexical and neutral facts unknown", () => {
+    const neutralStructured = { description: "Ruby programming knowledge." };
+    const neutral = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(neutralStructured),
+      structured: neutralStructured,
+      sourceObservationId: "observation:neutral-description-is-unknown",
+    });
+    expect(neutral.requirementEvidence.map(({ modality }) => modality)).toEqual(["UNKNOWN"]);
+    expect(neutral.requirementEvidence[0]?.ruleId).not.toMatch(/_SECTION_DEFAULT$/);
+
+    const structured = {
+      description: "Three years experience is required.\nCloud deployment preferred.",
+      sourceSections: [
+        { heading: "Responsibilities", kind: "RESPONSIBILITIES", content: "A fictional role." },
+      ],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      structured,
+      sourceObservationId: "observation:description-context-is-not-inherited",
+    });
+    expect(result.requirementEvidence.map(({ modality }) => modality)).toEqual([
+      "REQUIRED",
+      "PREFERRED",
+    ]);
+    expect(
+      result.requirementEvidence.every(({ ruleId }) => !ruleId.endsWith("_SECTION_DEFAULT")),
+    ).toBe(true);
+  });
+
+  it("preserves the exact bullet pointer and excerpt hash for inherited modality", () => {
+    const bullet = "3+ years experience in a fictional engineering team";
+    const bulletSpan = `- ${bullet}`;
+    const structured = {
+      sourceSections: [{ heading: "Requirements", kind: "REQUIREMENTS", content: bulletSpan }],
+    };
+    const sourceText = JSON.stringify(structured);
+    const input = {
+      sourceText,
+      structured,
+      sourceObservationId: "observation:section-pointer",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+    expect(result.requirementEvidence[0]?.source.excerpt).toBe(bulletSpan);
+    expect(
+      sourceText.slice(
+        result.requirementEvidence[0]!.source.start,
+        result.requirementEvidence[0]!.source.end,
+      ),
+    ).toBe(bulletSpan);
+    expect(result.requirementEvidence[0]?.source.sourcePath).toMatch(
+      /^structured\.sourceSections\[0\]\.content\.line\[0\]/,
+    );
+    expect(normalizeR2AJobEvidence(input)).toEqual(result);
+    expect(result.requirementEvidence[0]?.ruleId).toBe("R2A_EXPERIENCE_REQUIRED_SECTION_DEFAULT");
+  });
+
+  it("keeps ambiguous mixed headings and untrusted standalone text unknown", () => {
+    const mixed = {
+      sourceSections: [
+        {
+          heading: "Required and Preferred Qualifications",
+          kind: "REQUIREMENTS",
+          content: "Ruby programming knowledge",
+        },
+      ],
+    };
+    const mixedResult = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(mixed),
+      structured: mixed,
+      sourceObservationId: "observation:ambiguous-heading",
+    });
+    const standaloneResult = normalizeR2AJobEvidence({
+      sourceText: "Ruby programming knowledge",
+      sourceObservationId: "observation:no-trusted-section",
+    });
+    expect(mixedResult.requirementEvidence[0]?.modality).toBe("UNKNOWN");
+    expect(standaloneResult.requirementEvidence[0]?.modality).toBe("UNKNOWN");
+    expect(mixedResult.requirementEvidence[0]?.ruleId).not.toMatch(/_SECTION_DEFAULT$/);
+    expect(standaloneResult.requirementEvidence[0]?.ruleId).not.toMatch(/_SECTION_DEFAULT$/);
+  });
+
+  it("keeps conflict detection stable when section context supplies REQUIRED", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          kind: "REQUIREMENTS",
+          content: "Access to a vehicle\nAccess to a vehicle is not required",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:section-default-conflict",
+    });
+    expect(result.requirementEvidence).toHaveLength(2);
+    expect(result.requirementEvidence.map(({ modality }) => modality)).toEqual([
+      "REQUIRED",
+      "NEGATED",
+    ]);
+    expect(
+      result.requirementEvidence.every(
+        ({ state, conflictSetId }) => state === "CONFLICTING" && conflictSetId,
+      ),
+    ).toBe(true);
+    expect(result.conflicts).toHaveLength(1);
   });
 
   it("parses Australian full state names and does not conflict location alternatives", () => {

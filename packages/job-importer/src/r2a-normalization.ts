@@ -32,6 +32,10 @@ type Span = {
   sourceOffsets?: number[];
 };
 type Section = { family: JobFieldFamily | null; heading: string; items: Span[] };
+type RequirementSpan = {
+  span: Span;
+  sectionContext?: { kind: string; heading: string };
+};
 
 const familyValues = JobFieldFamilySchema.options;
 const stateNames: Record<string, "ACT" | "NSW" | "NT" | "QLD" | "SA" | "TAS" | "VIC" | "WA"> = {
@@ -765,13 +769,38 @@ function normalizedRequirementValues(
   return [{ kind: "TEXT", value: text.slice(0, 4096) }];
 }
 
+function sectionRequirementDefaultModality(
+  kind: string,
+  heading: string,
+): RequirementModality | null {
+  if (kind !== "REQUIREMENTS") return null;
+  const preference =
+    /\b(?:preferred|desirable|nice to have|bonus|advantageous|highly regarded)\b/i.test(heading);
+  const explicitRequirement =
+    /\b(?:requirements?|required|minimum qualifications?|minimum skills?|basic qualifications?|must[ -]?have|essential|what you need)\b/i.test(
+      heading,
+    );
+  const mixedSection =
+    /\b(?:responsibilities|duties|what you(?:'|’)ll do|the role|benefits?|perks?|what we offer)\b/i.test(
+      heading,
+    );
+  if ((preference && explicitRequirement) || mixedSection) return null;
+  if (preference) return "PREFERRED";
+  return "REQUIRED";
+}
+
 function requirementEvidence(
   source: string,
   observationId: string,
   span: Span,
+  sectionDefaultModality: RequirementModality | null = null,
 ): R2RequirementEvidence[] {
   const kind = requirementKind(span.text);
-  const statement = modality(span.text);
+  const lexicalStatement = modality(span.text);
+  const inheritedModality = lexicalStatement.modality === "UNKNOWN" ? sectionDefaultModality : null;
+  const statement = inheritedModality
+    ? { ...lexicalStatement, modality: inheritedModality }
+    : lexicalStatement;
   if (kind === "GENERAL" && statement.modality === "UNKNOWN") return [];
   const family = familyForKind(kind);
   return normalizedRequirementValues(kind, span.text, statement).map((normalizedValue, index) =>
@@ -795,7 +824,9 @@ function requirementEvidence(
       source: pointer(source, span),
       normalizedValue,
       extractorVersion: R2A_PARSER_VERSION,
-      ruleId: `R2A_${kind}_${statement.modality}`,
+      ruleId: inheritedModality
+        ? `R2A_${kind}_${statement.modality}_SECTION_DEFAULT`
+        : `R2A_${kind}_${statement.modality}`,
       derivationInputIds: [],
       ownerCorrectionId: null,
       conflictSetId: null,
@@ -1240,7 +1271,7 @@ export function normalizeR2AJobEvidence(input: {
   const isCanonicalStructuredSource = structuredSpans.size > 0;
   const sections = isCanonicalStructuredSource ? [] : parseR2ASections(source);
   const structuredSectionFieldSpans: Span[] = [];
-  const structuredSectionRequirementSpans: Span[] = [];
+  const structuredSectionRequirementSpans: RequirementSpan[] = [];
   const sectionTextLines = new Set<string>();
   const structuredSourceSectionContents: string[] = [];
   let structuredSectionInputCount = 0;
@@ -1250,7 +1281,7 @@ export function normalizeR2AJobEvidence(input: {
   structuredSourceSections.forEach((item, index) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return;
     const section = item as Record<string, unknown>;
-    const heading = structuredText(section.heading);
+    const heading = structuredText(section.heading) ?? "";
     const content = structuredText(section.content);
     if (heading) sectionTextLines.add(normalizedSourceLine(heading));
     if (heading || content) structuredSectionInputCount += 1;
@@ -1260,7 +1291,14 @@ export function normalizeR2AJobEvidence(input: {
     const path = `structured.sourceSections[${index}].content`;
     const spans = structuredStringLineChunks(source, structuredSpans.get(path), content, path);
     structuredSectionFieldSpans.push(...spans);
-    if (section.kind === "REQUIREMENTS") structuredSectionRequirementSpans.push(...spans);
+    if (section.kind === "REQUIREMENTS") {
+      structuredSectionRequirementSpans.push(
+        ...spans.map((span) => ({
+          span,
+          sectionContext: { kind: "REQUIREMENTS", heading },
+        })),
+      );
+    }
   });
   const standaloneSpans = (isCanonicalStructuredSource ? [] : lineSpans(source))
     .map((span) => {
@@ -1587,7 +1625,7 @@ export function normalizeR2AJobEvidence(input: {
     }
   }
 
-  const structuredArrayRequirementSpans: Span[] = [];
+  const structuredArrayRequirementSpans: RequirementSpan[] = [];
   for (const key of ["requirementTexts", "requirements", "skills", "qualifications"] as const) {
     const raw = structured[key];
     const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
@@ -1600,7 +1638,7 @@ export function normalizeR2AJobEvidence(input: {
       const supersededByStructuredRequirementSection =
         key === "requirementTexts" && structuredSectionRequirementSpans.length > 0;
       if (!supersededByStructuredRequirementSection) {
-        structuredArrayRequirementSpans.push(span);
+        structuredArrayRequirementSpans.push({ span });
         if (
           !uniqueSpans.some(
             (existing) =>
@@ -1616,11 +1654,14 @@ export function normalizeR2AJobEvidence(input: {
     }
   }
 
-  const requirementSpans = isCanonicalStructuredSource
+  const requirementSpans: RequirementSpan[] = isCanonicalStructuredSource
     ? structuredSectionInputCount > 0
       ? [...structuredSectionRequirementSpans, ...structuredArrayRequirementSpans]
-      : [...structuredDescriptionSpans, ...structuredArrayRequirementSpans]
-    : uniqueSpans;
+      : [
+          ...structuredDescriptionSpans.map((span) => ({ span })),
+          ...structuredArrayRequirementSpans,
+        ]
+    : uniqueSpans.map((span) => ({ span }));
   const supplementalDescriptionSpans =
     isCanonicalStructuredSource && structuredSectionInputCount > 0 && !structuredDescriptionIsHtml
       ? structuredDescriptionSpans.filter((span) => {
@@ -1905,8 +1946,11 @@ export function normalizeR2AJobEvidence(input: {
       );
   }
 
-  for (const span of requirementSpans) {
-    requirements.push(...requirementEvidence(source, observationId, span));
+  for (const item of requirementSpans) {
+    const sectionDefault = item.sectionContext
+      ? sectionRequirementDefaultModality(item.sectionContext.kind, item.sectionContext.heading)
+      : null;
+    requirements.push(...requirementEvidence(source, observationId, item.span, sectionDefault));
   }
   if (supplementalDescriptionSpans.length > 0) {
     const knownRequirementSignatures = new Set(
