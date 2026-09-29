@@ -4908,3 +4908,24 @@ Do not emit the final green-banner success phrase.
   OPEN / UNMERGED. The single recommended next engineering task remains the C1 requirement-span
   extraction audit; it must preserve the current PARTIAL gate unless a separately proven fix is
   reviewed.
+
+### Implementation PR and first exact-head CI result (2026-09-29)
+
+- Opened exactly one implementation PR, [#60](https://github.com/adeel1608/applypilot/pull/60),
+  titled `fix: preserve requirement-section modality in R2A evidence`. It is OPEN, non-draft,
+  mergeable, based on `main` at `44a4c39037fc77f5fe78ed91c590ba99a217d96b`, and remains UNMERGED.
+  Implementation head is `7dbf6d727264e6623baf61c46278b9f74b523d9a`, tree
+  `fe104acee23d984d7a660e935d378d959c4caca7`; its single commit changes the nine intended files
+  (+608/-22). The PR has 0 reviews and 0 unresolved review threads.
+- Exact implementation-head push CI run `36557903310` and PR CI run `36557951485` both completed
+  SUCCESS. The checked head is the exact implementation commit above. The PR has been attached to
+  the Codex task.
+- Re-reading real runtime after PR creation still reports schema 12, pending migrations 0,
+  integrity PASS, FK 0, counters 21/9/0/0, historical GET_JOB 1, no active source/target authority,
+  no active source run, no claimed application operations, and Shield AI v7 REVOKED. All source,
+  employer, form, upload, and submission task deltas are zero.
+- This plan update is documentation-only and will be committed as a PR follow-up. It will trigger
+  new exact-head push and PR CI runs; task closeout requires both checks to pass on the resulting
+  final PR head. No merge is authorized or intended. After the final checks, report the 84 requested
+  closeout fields and the seven milestone statuses here as well as in the task response; keep
+  Personal Live V1 NOT_READY and do not emit a green-banner success phrase.
