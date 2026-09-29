@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.2.0");
+    expect(result.parserVersion).toBe("3.3.0");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -450,6 +450,158 @@ describe("R2A evidence normalization", () => {
       result.requirementEvidence.some(({ normalizedValue }) =>
         /<li|<ul>/i.test(JSON.stringify(normalizedValue)),
       ),
+    ).toBe(false);
+  });
+
+  it("extracts long structured section chunks with exact provenance and conservative boundaries", () => {
+    const longRequirement = `${"Fictional engineering context. ".repeat(34)}Python skill preferred.`;
+    const structured = {
+      description: [
+        "Fictional overview.",
+        "Salary: AUD 80,000 per year",
+        `Extended fictional context ${"with reliable systems. ".repeat(72)}`,
+        "Required qualifications and experience",
+        "A Bachelor degree is required.",
+        "3 years of experience preferred.",
+        'Python skill may be required when supporting "fictional" trials.',
+        longRequirement,
+        "Responsibilities",
+        "Use Python systems to support fictional service delivery.",
+        "Uncategorized details",
+        "RSA certification required.",
+      ].join("\n"),
+      sourceSections: [
+        {
+          heading: "Required qualifications and experience",
+          kind: "REQUIREMENTS",
+          content: [
+            "A Bachelor degree is required.",
+            "3 years of experience preferred.",
+            'Python skill may be required when supporting "fictional" trials.',
+            longRequirement,
+          ].join("\n"),
+        },
+        {
+          heading: "Responsibilities",
+          kind: "RESPONSIBILITIES",
+          content: "Use Python systems to support fictional service delivery.",
+        },
+        {
+          heading: "Uncategorized details",
+          kind: "OTHER",
+          content: "RSA certification required.",
+        },
+        { heading: "Benefits", kind: "BENEFITS", content: "Fictional gym access." },
+      ],
+      requirementTexts: [],
+    };
+    const sourceText = JSON.stringify(structured);
+    const input = {
+      sourceText,
+      structured,
+      sourceObservationId: "observation:long-section-chunks",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+    expect(normalizeR2AJobEvidence(input)).toEqual(result);
+
+    const salary = result.fieldEvidence.find(({ canonicalField }) => canonicalField === "salary");
+    expect(salary?.source.sourcePath).toMatch(/^structured\.description\.line\[/);
+    expect(salary?.source.excerpt).toContain("Salary: AUD 80,000 per year");
+
+    const requirements = result.requirementEvidence;
+    expect(requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ canonicalKind: "QUALIFICATION", modality: "REQUIRED" }),
+        expect.objectContaining({ canonicalKind: "EXPERIENCE", modality: "PREFERRED" }),
+        expect.objectContaining({ canonicalKind: "SKILL", modality: "CONDITIONAL" }),
+        expect.objectContaining({ canonicalKind: "SKILL", modality: "PREFERRED" }),
+      ]),
+    );
+    expect(
+      requirements.every(
+        ({ source }) =>
+          !source.sourcePath.startsWith("structured.sourceSections[1]") &&
+          !source.sourcePath.startsWith("structured.sourceSections[2]") &&
+          !source.sourcePath.startsWith("structured.sourceSections[3]"),
+      ),
+    ).toBe(true);
+    expect(
+      result.requirementEvidence.some(({ canonicalKind }) => canonicalKind === "CERTIFICATION"),
+    ).toBe(false);
+    expect(
+      result.requirementEvidence
+        .filter(({ source }) => source.sourcePath.startsWith("structured.sourceSections[0]"))
+        .every(({ source }) => source.excerpt.length <= 1000),
+    ).toBe(true);
+    expect(result.coverage.find(({ family }) => family === "EDUCATION")?.state).not.toBe("UNKNOWN");
+    expect(result.coverage.find(({ family }) => family === "EXPERIENCE")?.state).not.toBe(
+      "UNKNOWN",
+    );
+  });
+
+  it("uses structured requirement text as fallback and keeps unknown sections field-only", () => {
+    const structured = {
+      description: "A fictional role with RSA certification required.",
+      sourceSections: [
+        {
+          heading: "Additional information",
+          kind: "OTHER",
+          content: "RSA certification required.",
+        },
+      ],
+      requirementTexts: [],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:unknown-section-remains-conservative",
+    });
+    expect(result.requirementEvidence).toHaveLength(0);
+    expect(result.coverage.find(({ family }) => family === "CERTIFICATIONS")?.state).toBe(
+      "PARTIAL",
+    );
+
+    const fallback = { requirementTexts: ["A Bachelor degree is required."] };
+    const fallbackResult = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(fallback),
+      structured: fallback,
+      sourceObservationId: "observation:structured-requirement-fallback",
+    });
+    expect(fallbackResult.requirementEvidence).toEqual(
+      expect.arrayContaining([expect.objectContaining({ canonicalKind: "QUALIFICATION" })]),
+    );
+  });
+
+  it("uses requirement sections once without leaving duplicate array scope unresolved", () => {
+    const requirement = "Customer service experience required.";
+    const structured = {
+      description: "Fictional service role with mentoring.\nHours\n18 hours per week",
+      sourceSections: [{ heading: "Requirements", kind: "REQUIREMENTS", content: requirement }],
+      requirementTexts: [requirement],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      structured,
+      sourceObservationId: "observation:section-array-requirement-deduplication",
+    });
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+
+    expect(result.requirementEvidence).toHaveLength(1);
+    expect(result.requirementEvidence[0]?.source.sourcePath).toMatch(
+      /^structured\.sourceSections\[0\]\.content/,
+    );
+    expect(result.coverage.find(({ family }) => family === "EXPERIENCE")).toMatchObject({
+      state: "COMPLETE",
+      unparsedSpans: [],
+    });
+    expect(
+      result.coverage
+        .flatMap(({ unparsedSpans }) => unparsedSpans)
+        .some(({ sourcePath }) => sourcePath.startsWith("structured.requirementTexts")),
     ).toBe(false);
   });
 

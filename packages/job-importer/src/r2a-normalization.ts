@@ -23,7 +23,13 @@ import {
 
 import { extractInertHtmlText } from "./sanitize";
 
-type Span = { text: string; start: number; end: number; sourcePath: string };
+type Span = {
+  text: string;
+  start: number;
+  end: number;
+  sourcePath: string;
+  sourceOffsets?: number[];
+};
 type Section = { family: JobFieldFamily | null; heading: string; items: Span[] };
 
 const familyValues = JobFieldFamilySchema.options;
@@ -94,9 +100,25 @@ function boundedSourceSpan(source: string, span: Span): Span {
 }
 
 function exactChildSpan(source: string, parent: Span, value: string): Span | null {
+  const textIndex = parent.text.indexOf(value);
+  if (textIndex >= 0) return childSpan(parent, textIndex, value);
   const start = source.indexOf(value, parent.start);
   if (start < parent.start || start + value.length > parent.end) return null;
   return { text: value, start, end: start + value.length, sourcePath: parent.sourcePath };
+}
+
+function childSpan(parent: Span, index: number, text: string): Span {
+  const start = parent.sourceOffsets?.[index] ?? parent.start + index;
+  const end = parent.sourceOffsets?.[index + text.length] ?? start + text.length;
+  return {
+    text,
+    start,
+    end,
+    sourcePath: parent.sourcePath,
+    ...(parent.sourceOffsets
+      ? { sourceOffsets: parent.sourceOffsets.slice(index, index + text.length + 1) }
+      : {}),
+  };
 }
 
 function finiteNonnegative(value: string | undefined, maximum = Number.MAX_VALUE): number | null {
@@ -230,12 +252,25 @@ function indexStructuredSpans(
     const encoded = JSON.stringify(value);
     if (encoded === undefined) return start;
     const end = start + encoded.length;
-    if (encoded.length <= 1000) {
+    const longEvidenceString =
+      typeof value === "string" &&
+      (path === "structured.description" ||
+        /^structured\.sourceSections\[\d+\]\.content$/.test(path));
+    if (encoded.length <= 1000 || longEvidenceString) {
+      const valueOffsets = typeof value === "string" ? jsonStringOffsets(value) : null;
       spans.set(path, {
         text: typeof value === "string" ? value : encoded,
         start,
         end,
         sourcePath: path,
+        ...(valueOffsets
+          ? {
+              sourceOffsets: Array.from(
+                { length: valueOffsets.length },
+                (_, index) => start + 1 + valueOffsets[index]!,
+              ),
+            }
+          : {}),
       });
     }
     if (Array.isArray(value)) {
@@ -257,6 +292,103 @@ function indexStructuredSpans(
   };
   walk(JSON.parse(source) as Record<string, unknown>, "structured", 0);
   return spans;
+}
+
+function jsonStringOffsets(value: string): number[] {
+  const offsets = new Array<number>(value.length + 1).fill(0);
+  let decodedOffset = 0;
+  let encodedOffset = 0;
+  for (const character of value) {
+    offsets[decodedOffset] = encodedOffset;
+    if (character.length === 2) offsets[decodedOffset + 1] = encodedOffset;
+    encodedOffset += JSON.stringify(character).length - 2;
+    decodedOffset += character.length;
+    offsets[decodedOffset] = encodedOffset;
+  }
+  return offsets;
+}
+
+function structuredStringChunks(
+  source: string,
+  parent: Span | undefined,
+  value: string,
+  sourcePath: string,
+  startOffset = 0,
+  endOffset = value.length,
+): Span[] {
+  if (!parent || parent.end - parent.start < 2) return [];
+  const offsets = jsonStringOffsets(value);
+  const chunks: Span[] = [];
+  let cursor = startOffset;
+  let chunkIndex = 0;
+  while (cursor < endOffset) {
+    let end = cursor;
+    let whitespaceBoundary = cursor;
+    while (end < endOffset) {
+      const code = value.charCodeAt(end);
+      const next =
+        code >= 0xd800 &&
+        code <= 0xdbff &&
+        value.charCodeAt(end + 1) >= 0xdc00 &&
+        value.charCodeAt(end + 1) <= 0xdfff
+          ? end + 2
+          : end + 1;
+      if (next - cursor > 500 || offsets[next] - offsets[cursor] > 900) break;
+      end = next;
+      if (/\s/.test(value.slice(next - 1, next))) whitespaceBoundary = next;
+    }
+    if (end === cursor) end = cursor + 1;
+    if (end < endOffset && whitespaceBoundary - cursor >= 250) end = whitespaceBoundary;
+
+    let textStart = cursor;
+    let textEnd = end;
+    while (textStart < textEnd && /\s/.test(value[textStart]!)) textStart += 1;
+    while (textEnd > textStart && /\s/.test(value[textEnd - 1]!)) textEnd -= 1;
+    if (textStart < textEnd) {
+      const start = parent.start + 1 + offsets[textStart]!;
+      const finish = parent.start + 1 + offsets[textEnd]!;
+      const text = value.slice(textStart, textEnd);
+      const excerpt = source.slice(start, finish);
+      if (excerpt.length <= sourceEvidenceExcerptLimit) {
+        chunks.push({
+          text,
+          start,
+          end: finish,
+          sourcePath: `${sourcePath}.chunk[${chunkIndex}]`,
+          sourceOffsets: Array.from(
+            { length: text.length + 1 },
+            (_, index) => parent.start + 1 + offsets[textStart + index]!,
+          ),
+        });
+        chunkIndex += 1;
+      }
+    }
+    cursor = end;
+    while (cursor < endOffset && /\s/.test(value[cursor]!)) cursor += 1;
+  }
+  return chunks;
+}
+
+function structuredStringLineChunks(
+  source: string,
+  parent: Span | undefined,
+  value: string,
+  sourcePath: string,
+): Span[] {
+  return lineSpans(value).flatMap((line, index) =>
+    structuredStringChunks(
+      source,
+      parent,
+      value,
+      `${sourcePath}.line[${index}]`,
+      line.start,
+      line.end,
+    ),
+  );
+}
+
+function normalizedSourceLine(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function materialFamilies(text: string): JobFieldFamily[] {
@@ -1106,6 +1238,27 @@ export function normalizeR2AJobEvidence(input: {
   const structuredSpans = indexStructuredSpans(source, structured);
   const isCanonicalStructuredSource = structuredSpans.size > 0;
   const sections = isCanonicalStructuredSource ? [] : parseR2ASections(source);
+  const structuredSectionFieldSpans: Span[] = [];
+  const structuredSectionRequirementSpans: Span[] = [];
+  const sectionTextLines = new Set<string>();
+  let structuredSectionInputCount = 0;
+  const structuredSourceSections = Array.isArray(structured.sourceSections)
+    ? structured.sourceSections
+    : [];
+  structuredSourceSections.forEach((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return;
+    const section = item as Record<string, unknown>;
+    const heading = structuredText(section.heading);
+    const content = structuredText(section.content);
+    if (heading) sectionTextLines.add(normalizedSourceLine(heading));
+    if (heading || content) structuredSectionInputCount += 1;
+    if (!content) return;
+    for (const line of lineSpans(content)) sectionTextLines.add(normalizedSourceLine(line.text));
+    const path = `structured.sourceSections[${index}].content`;
+    const spans = structuredStringLineChunks(source, structuredSpans.get(path), content, path);
+    structuredSectionFieldSpans.push(...spans);
+    if (section.kind === "REQUIREMENTS") structuredSectionRequirementSpans.push(...spans);
+  });
   const standaloneSpans = (isCanonicalStructuredSource ? [] : lineSpans(source))
     .map((span) => {
       const text = span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim();
@@ -1121,26 +1274,39 @@ export function normalizeR2AJobEvidence(input: {
     .flatMap(clauseSpans);
   const descriptionValue = structuredText(structured.description);
   const descriptionSource = structuredSpans.get("structured.description");
-  const structuredDescriptionSpans =
-    descriptionValue && descriptionSource
-      ? lineSpans(
-          /<[A-Za-z!/]/.test(descriptionValue)
-            ? extractInertHtmlText(descriptionValue)
-            : descriptionValue,
-        )
-          .filter((span) => isHeading(span) === undefined)
-          .flatMap(clauseSpans)
-          .map((span, index) => ({
-            text: span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim(),
-            start: descriptionSource.start,
-            end: descriptionSource.end,
-            sourcePath: `structured.description.item.${index}`,
-          }))
-      : [];
+  const structuredDescriptionSpans = (() => {
+    if (!descriptionValue || !descriptionSource) return [];
+    if (/<[A-Za-z!/]/.test(descriptionValue)) {
+      return lineSpans(extractInertHtmlText(descriptionValue))
+        .filter((span) => isHeading(span) === undefined)
+        .flatMap(clauseSpans)
+        .map((span, index) => ({
+          text: span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim(),
+          start: descriptionSource.start,
+          end: descriptionSource.end,
+          sourcePath: `structured.description.item.${index}`,
+        }));
+    }
+    const lines = lineSpans(descriptionValue).filter((span) => {
+      if (isHeading(span) !== undefined) return false;
+      return !sectionTextLines.has(normalizedSourceLine(span.text));
+    });
+    return lines.flatMap((span, index) =>
+      structuredStringChunks(
+        source,
+        descriptionSource,
+        descriptionValue,
+        `structured.description.line[${index}]`,
+        span.start,
+        span.end,
+      ),
+    );
+  })();
   const candidateSpans = [
     ...sections.flatMap(({ items }) => items.flatMap(clauseSpans)),
     ...standaloneSpans,
     ...structuredDescriptionSpans,
+    ...structuredSectionFieldSpans,
   ];
   const seenSpans = new Set<string>();
   const uniqueSpans = candidateSpans.filter((span) => {
@@ -1415,6 +1581,7 @@ export function normalizeR2AJobEvidence(input: {
     }
   }
 
+  const structuredArrayRequirementSpans: Span[] = [];
   for (const key of ["requirementTexts", "requirements", "skills", "qualifications"] as const) {
     const raw = structured[key];
     const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
@@ -1423,9 +1590,31 @@ export function normalizeR2AJobEvidence(input: {
       if (!value) continue;
       const path = Array.isArray(raw) ? `structured.${key}[${index}]` : `structured.${key}`;
       const span = structuredSpans.get(path) ?? textSpan(source, value, path);
-      if (span) uniqueSpans.push(span);
+      if (!span) continue;
+      const supersededByStructuredRequirementSection =
+        key === "requirementTexts" && structuredSectionRequirementSpans.length > 0;
+      if (!supersededByStructuredRequirementSection) {
+        structuredArrayRequirementSpans.push(span);
+        if (
+          !uniqueSpans.some(
+            (existing) =>
+              existing.sourcePath === span.sourcePath &&
+              existing.start === span.start &&
+              existing.end === span.end &&
+              existing.text === span.text,
+          )
+        ) {
+          uniqueSpans.push(span);
+        }
+      }
     }
   }
+
+  const requirementSpans = isCanonicalStructuredSource
+    ? structuredSectionInputCount > 0
+      ? [...structuredSectionRequirementSpans, ...structuredArrayRequirementSpans]
+      : [...structuredDescriptionSpans, ...structuredArrayRequirementSpans]
+    : uniqueSpans;
 
   for (const span of lineSpans(source)) {
     const labelled = span.text.match(
@@ -1538,13 +1727,7 @@ export function normalizeR2AJobEvidence(input: {
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
       const itemSpan =
-        exactChildSpan(source, span, item.match) ??
-        ({
-          ...span,
-          text: item.match,
-          start: span.start + item.index,
-          end: span.start + item.index + item.match.length,
-        } satisfies Span);
+        exactChildSpan(source, span, item.match) ?? childSpan(span, item.index, item.match);
       fields.push(
         fieldEvidence({
           source,
@@ -1585,12 +1768,7 @@ export function normalizeR2AJobEvidence(input: {
       );
     }
     for (const item of hoursValues(span.text)) {
-      const itemSpan = {
-        ...span,
-        text: item.match,
-        start: span.start + item.index,
-        end: span.start + item.index + item.match.length,
-      };
+      const itemSpan = childSpan(span, item.index, item.match);
       fields.push(
         fieldEvidence({
           source,
@@ -1703,7 +1881,9 @@ export function normalizeR2AJobEvidence(input: {
           ruleId: "R2A_TRAINING_AVAILABLE",
         }),
       );
+  }
 
+  for (const span of requirementSpans) {
     requirements.push(...requirementEvidence(source, observationId, span));
   }
 

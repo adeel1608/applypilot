@@ -21,14 +21,18 @@ function fictionalLeverForm(largeDom: boolean) {
 
 export const dynamic = "force-dynamic";
 
+const showcasePort = process.env.APPLYPILOT_SHOWCASE_E2E_PORT ?? "3200";
+if (!/^\d+$/.test(showcasePort) || Number(showcasePort) < 1024 || Number(showcasePort) > 65535) {
+  throw new Error("APPLYPILOT_SHOWCASE_E2E_PORT_INVALID");
+}
+
 export async function GET(request: Request) {
   const fixture = new URL(request.url).searchParams.get("case");
   return new Response(fictionalLeverForm(fixture === "large-dom"), {
     status: 200,
     headers: {
       "cache-control": "no-store",
-      "content-security-policy":
-        "default-src 'none'; connect-src http://127.0.0.1:3200; style-src 'none'; img-src 'none'",
+      "content-security-policy": `default-src 'none'; connect-src http://127.0.0.1:${showcasePort}; style-src 'none'; img-src 'none'`,
       "content-type": "text/html; charset=utf-8",
       "x-content-type-options": "nosniff",
     },

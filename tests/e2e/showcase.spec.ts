@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { SHOWCASE_E2E_PORT } from "./ports";
 
-const showcase = "http://127.0.0.1:3200";
+const showcase = `http://127.0.0.1:${SHOWCASE_E2E_PORT}`;
 
 test.describe("public showcase", () => {
   test("renders the landing experience and follows every internal route", async ({ page }) => {
