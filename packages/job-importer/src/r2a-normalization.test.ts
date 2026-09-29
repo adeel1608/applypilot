@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.5.1");
+    expect(result.parserVersion).toBe("3.5.2");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -517,6 +517,134 @@ describe("R2A evidence normalization", () => {
       state: "PARTIAL",
       unparsedSpans: [expect.any(Object)],
     });
+  });
+
+  it("treats certificate-level education as EDUCATION rather than a second certification scope", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content:
+            "A fictional bachelor's degree and Certificate IV in fictional systems are preferred.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const input = {
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-education-certificate-scope",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    const again = normalizeR2AJobEvidence(input);
+
+    expect(result.coverage.find(({ family }) => family === "EDUCATION")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "CERTIFICATIONS")?.state).toBe(
+      "UNKNOWN",
+    );
+    expect(result.requirementEvidence.map(({ family }) => family)).toEqual(["EDUCATION"]);
+    expect(result.requirementEvidence[0]).toMatchObject({
+      modality: "PREFERRED",
+      ruleId: "R2A_QUALIFICATION_PREFERRED",
+    });
+    expect(result.requirementEvidence).toEqual(again.requirementEvidence);
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("keeps explicit certification scope beside a formal education credential", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "A fictional bachelor's degree and a current RSA certification are required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-explicit-certification-scope",
+    });
+
+    expect(result.coverage.find(({ family }) => family === "CERTIFICATIONS")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [expect.any(Object)],
+    });
+    expect(result.requirementEvidence[0]).toMatchObject({
+      canonicalKind: "QUALIFICATION",
+      family: "EDUCATION",
+    });
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("classifies a standalone certificate-level credential as education", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "Certificate IV in fictional network systems",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-certificate-iv-education",
+    });
+
+    expect(result.coverage.find(({ family }) => family === "EDUCATION")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "CERTIFICATIONS")?.state).toBe(
+      "UNKNOWN",
+    );
+    expect(result.requirementEvidence[0]).toMatchObject({
+      canonicalKind: "QUALIFICATION",
+      family: "EDUCATION",
+      modality: "REQUIRED",
+      ruleId: "R2A_QUALIFICATION_REQUIRED_SECTION_DEFAULT",
+    });
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("keeps vague generic certificate wording unresolved", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "Experience with a certificate process may be helpful.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-vague-certificate-wording",
+    });
+
+    expect(result.coverage.find(({ family }) => family === "CERTIFICATIONS")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [expect.any(Object)],
+    });
+    expect(result.requirementEvidence.some(({ family }) => family === "CERTIFICATIONS")).toBe(
+      false,
+    );
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
   });
 
   it("does not split structured comma-separated content", () => {
