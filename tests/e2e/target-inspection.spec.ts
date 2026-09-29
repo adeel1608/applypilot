@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "playwright";
+import { E2E_PORT, SHOWCASE_E2E_PORT } from "./ports";
 
 import {
   ApplicationPacketSchema,
@@ -20,7 +21,7 @@ const now = new Date("2026-09-13T04:00:00.000Z");
 
 function inspection(caseName: string, route = "synthetic-inspection") {
   const targetPath = `/${route}`;
-  const targetUrl = `http://127.0.0.1:3100${targetPath}?case=${caseName}`;
+  const targetUrl = `http://127.0.0.1:${E2E_PORT}${targetPath}?case=${caseName}`;
   const packet = ApplicationPacketSchema.parse({
     id: `packet:e2e-inspection:${caseName}`,
     jobId: "job:e2e-inspection",
@@ -38,7 +39,7 @@ function inspection(caseName: string, route = "synthetic-inspection") {
   });
   const identity = {
     targetKind: "SYNTHETIC_LOCAL" as const,
-    allowedOrigin: "http://127.0.0.1:3100",
+    allowedOrigin: `http://127.0.0.1:${E2E_PORT}`,
     allowedPathPrefix: targetPath,
     operation: "OPEN_AND_INSPECT_ONLY" as const,
     formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
@@ -52,7 +53,7 @@ function inspection(caseName: string, route = "synthetic-inspection") {
     predecessorVersion: null,
     targetKind: "SYNTHETIC_LOCAL",
     alias: "Fictional Lever inspection target",
-    allowedOrigin: "http://127.0.0.1:3100",
+    allowedOrigin: `http://127.0.0.1:${E2E_PORT}`,
     allowedPathPrefix: targetPath,
     formVersion: LEVER_APPLICATION_INSPECTION_FORM_VERSION,
     adapterVersion: LEVER_REAL_INSPECTION_ADAPTER_VERSION,
@@ -461,7 +462,8 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
   let crossOriginRequests = 0;
   let nonReadRequestCount = 0;
   page.on("request", (request) => {
-    if (request.url().startsWith("http://127.0.0.1:3200/")) crossOriginRequests += 1;
+    if (request.url().startsWith(`http://127.0.0.1:${SHOWCASE_E2E_PORT}/`))
+      crossOriginRequests += 1;
     if (!new Set(["GET", "HEAD"]).has(request.method())) nonReadRequestCount += 1;
   });
   const resourcePage = new Proxy(page, {
@@ -469,9 +471,11 @@ test("cross-origin passive resources stay blocked without destabilizing the fict
       if (property === "goto") {
         return async (...args: Parameters<Page["goto"]>) => {
           const response = await page.goto(...args);
-          await page.evaluate(async () => {
-            await fetch("http://127.0.0.1:3200/fictional-passive-resource").catch(() => undefined);
-          });
+          await page.evaluate(async (showcasePort) => {
+            await fetch(`http://127.0.0.1:${showcasePort}/fictional-passive-resource`).catch(
+              () => undefined,
+            );
+          }, SHOWCASE_E2E_PORT);
           return response;
         };
       }

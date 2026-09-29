@@ -1,4 +1,5 @@
 import { expect, request, test } from "@playwright/test";
+import { E2E_PORT } from "./ports";
 
 test("serves fictional draft PDF preview/download and DOCX download only to a local session", async ({
   page,
@@ -23,7 +24,7 @@ test("serves fictional draft PDF preview/download and DOCX download only to a lo
   expect(docxDownload.headers()["content-disposition"]).toContain("attachment;");
   expect((await docxDownload.body()).subarray(0, 2).toString("ascii")).toBe("PK");
 
-  const withoutSession = await request.newContext({ baseURL: "http://127.0.0.1:3100" });
+  const withoutSession = await request.newContext({ baseURL: `http://127.0.0.1:${E2E_PORT}` });
   try {
     expect((await withoutSession.get("/documents/document:e2e-pdf")).status()).toBe(401);
     expect(

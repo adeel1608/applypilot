@@ -17,6 +17,14 @@ const profilePath = join(dataDirectory, "profile.e2e.private.json");
 const privateDocumentDirectory = join(dataDirectory, "private", "e2e-documents");
 const pdfPath = join(privateDocumentDirectory, "fictional-preview.pdf");
 const docxPath = join(privateDocumentDirectory, "fictional-download.docx");
+const e2ePortValue = process.env.APPLYPILOT_E2E_PORT ?? "3100";
+if (!/^\d+$/.test(e2ePortValue)) {
+  throw new Error("APPLYPILOT_E2E_PORT must be an integer loopback port between 1024 and 65535");
+}
+const e2ePort = Number(e2ePortValue);
+if (!Number.isInteger(e2ePort) || e2ePort < 1024 || e2ePort > 65535) {
+  throw new Error("APPLYPILOT_E2E_PORT must be an integer loopback port between 1024 and 65535");
+}
 mkdirSync(dataDirectory, { recursive: true });
 for (const suffix of ["", "-shm", "-wal"]) {
   const target = `${databasePath}${suffix}`;
@@ -583,7 +591,14 @@ Documents
 
 const server = spawn(
   process.execPath,
-  [resolve("node_modules", "next", "dist", "bin", "next"), "dev", "-H", "127.0.0.1", "-p", "3100"],
+  [
+    resolve("node_modules", "next", "dist", "bin", "next"),
+    "dev",
+    "-H",
+    "127.0.0.1",
+    "-p",
+    String(e2ePort),
+  ],
   { cwd: resolve("apps/web"), env: environment, stdio: "inherit" },
 );
 function cleanup(): void {

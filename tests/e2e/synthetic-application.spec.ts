@@ -5,6 +5,9 @@ import {
   SyntheticApplicationRunner,
   packetDigest,
 } from "@applypilot/application-runner";
+import { E2E_PORT } from "./ports";
+
+const e2eOrigin = `http://127.0.0.1:${E2E_PORT}`;
 
 test("exposes every synthetic stop fixture only on loopback", async ({ page }) => {
   let externalRequest = false;
@@ -37,7 +40,7 @@ test("exposes changed and unsupported controls and bounded response outcomes", a
     ["http-429", 429, "RATE_LIMIT"],
   ] as const) {
     const response = await page.request.post(`/synthetic-application/submit?case=${fixture}`, {
-      headers: { origin: "http://127.0.0.1:3100" },
+      headers: { origin: e2eOrigin },
       multipart: { formVersion: "synthetic-form-v1" },
     });
     expect(response.status()).toBe(status);
@@ -46,14 +49,14 @@ test("exposes changed and unsupported controls and bounded response outcomes", a
 
   const started = Date.now();
   const slow = await page.request.post("/synthetic-application/submit?case=slow-response", {
-    headers: { origin: "http://127.0.0.1:3100" },
+    headers: { origin: e2eOrigin },
     multipart: { formVersion: "synthetic-form-v1" },
   });
   expect(Date.now() - started).toBeGreaterThanOrEqual(250);
   expect(slow.ok()).toBe(true);
 
   const receipt = await page.request.post("/synthetic-application/submit?case=success-receipt", {
-    headers: { origin: "http://127.0.0.1:3100" },
+    headers: { origin: e2eOrigin },
     multipart: { formVersion: "synthetic-form-v1" },
   });
   expect(await receipt.json()).toMatchObject({
@@ -91,7 +94,7 @@ test("represents unknown, changed-action, document, redirect, and lost-response 
     "synthetic-form-v2",
   );
   const response = await page.request.post("/synthetic-application/submit?case=lost-response", {
-    headers: { origin: "http://127.0.0.1:3100" },
+    headers: { origin: e2eOrigin },
     multipart: {
       formVersion: "synthetic-form-v1",
       applicantName: "Example",
@@ -115,7 +118,7 @@ test("executes one consent-bound synthetic browser submission without retry", as
     profileVersionId: "profile-version:e2e",
     evaluationVersionId: "evaluation:e2e",
     eligibilityStatus: "ELIGIBLE",
-    targetUrl: "http://127.0.0.1:3100/synthetic-application?case=document-upload",
+    targetUrl: `${e2eOrigin}/synthetic-application?case=document-upload`,
     targetHost: "127.0.0.1",
     jobExpiryState: "ACTIVE",
     duplicateState: "CLEAR",

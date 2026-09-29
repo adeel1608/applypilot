@@ -13,6 +13,7 @@ import {
   createPinnedSourceLookup,
   loadPrivateSourceAllowlistV2,
   readLeverDetailV2,
+  readLeverPostingV2FromPayload,
   readLeverPageV2,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
@@ -1512,6 +1513,25 @@ describe("R1A source capability and transport", () => {
         "mutated";
     }).toThrow(TypeError);
     expect(record.rawPayload.lists[0]?.content).toBe(value.lists[0]?.content);
+  });
+
+  it("classifies generic qualification headings without broadening unknown sections", () => {
+    const record = readLeverPostingV2FromPayload({
+      capability: capability(),
+      payload: {
+        ...posting(12),
+        lists: [
+          { text: "Required qualifications and experience", content: "Fictional degree." },
+          { text: "What you need from the successful candidate", content: "Fictional skills." },
+          { text: "Ways of working", content: "Fictional work." },
+        ],
+      },
+    });
+    expect(record.sections.map(({ kind }) => kind)).toEqual([
+      "REQUIREMENTS",
+      "REQUIREMENTS",
+      "OTHER",
+    ]);
   });
 
   it("requires explicit GET_JOB authority and keeps application URLs inert", async () => {

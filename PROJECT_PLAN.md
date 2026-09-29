@@ -4081,3 +4081,305 @@ apps/web/app/sources/page.test.tsx` PASS, 5 files / 148 tests. No full 600+ test
   No product code changed, and no R2 reconciliation write was needed. GitHub push and PR CI run
   on the committed exact head; report the final head/tree, diff, workflow IDs, review count, and
   unresolved thread count in the task closeout. PR #57 remains OPEN / UNMERGED; do not merge.
+
+## 52. M2 R2A structured-section extraction repair blueprint (2026-09-29)
+
+### Starting state and objective
+
+- PR #57 was re-fetched immediately before merge and matched its approved guard: title `docs: record
+M2 v6 source closeout evidence`; OPEN, unmerged, non-draft, mergeable/CLEAN; base
+  `7e8534d196cec6b2e62f0bda78e0f7a29312472e`; head
+  `a2293fec01e5ce1eb64347f732423b1696391064`; tree
+  `b0ac8abd0b1661bfc87bf1351fc5d1533410815a`; only `PROJECT_PLAN.md`, 3 commits, +477/-3, 0
+  reviews, 0 unresolved review threads, ahead 3 / behind 0. Exact-head push CI `36508886032` and
+  PR CI `36508888965` both succeeded. It was squash-merged as
+  `452dd70b53de2c79342c256a14cd0778076e215d`; its only parent is the approved base and its tree is
+  the reviewed tree. Local `main` and `origin/main` are synchronized at that merge SHA. The
+  worktree was clean before creating branch `fix/m2-r2a-structured-section-extraction`.
+- Objective: characterize R2A evidence loss from immutable persisted Lever payloads, implement a
+  generic extraction correction only if diagnostics prove one, add fictional regression coverage,
+  and measure its effect by replaying all 100 v6 jobs on a verified disposable database copy.
+  Leave one implementation PR OPEN / UNMERGED only if the material-improvement and validation
+  gates pass.
+- Verified read-only baseline: schema 12, pending migrations 0, integrity PASS, FK issues 0;
+  source/employer/application/final counters 21/9/0/0; source request totals 21 (20 LIST_JOBS, 1
+  historical GET_JOB); active source and target capabilities 0; active source runs 0; pending
+  application operations 0; latest Shield AI capability v7 REVOKED. V6 run
+  `4c143a7b-b102-4dea-a489-de4327fbe678` is COMPLETE LIST_JOBS with 4 requests/pages and 100
+  accepted, qualified records. Its 100 canonical jobs have current latest versions, 100 exact
+  active-profile evaluations, and 100 CURRENT queues. `npm run db:status` and `npm run preflight`
+  passed; preflight reports a valid private profile, zero active source capability, and no
+  blockers. These commands opened the real DB read-only. No real R2 rows were written.
+
+### Requirements, current code observations, and hypotheses
+
+- Absolute boundaries: no Lever/source request or probe, no employer/target action, no capability
+  or owner action, and no GET_JOB. Keep the real DB read-only; lifetime counters must remain
+  21/9/0/0 and historical GET_JOB total 1. Analyze payloads only in memory and emit safe metadata,
+  aggregate counts, and reason codes. Never output raw payloads/descriptions, application URLs,
+  secrets, or candidate profile values.
+- Current semantic constants are parser `3.2.0`, normalization `3.2.0`, and evidence contract
+  `3.1.0`. A material extraction behavior change must bump the parser; bump normalization only if
+  normalization semantics change. Change the evidence-contract version only for an actual schema
+  or contract change. Do not rewrite immutable observations or historical derived evidence.
+- Static code inspection plus a read-only replay of all 100 immutable payloads establishes the
+  following causes. `readLeverPostingV2FromPayload()` -> `mapPosting()` / `sectionKind()` ->
+  `structuredLeverRecord()` preserves sections, but R2A normalizes a serialized structured object.
+  The current span index excludes encoded values over 1,000 characters. Of 100 descriptions, 99
+  exceed that encoded limit, so `structured.description` gets no indexed span and no
+  `structuredDescriptionSpans` are built for those records. `structuredLeverRecord()` separately
+  supplies `sourceSections` and `responsibilities`; `normalizeR2AJobEvidence()` consumes
+  `requirementTexts`, but does not consume those section/responsibility arrays as bounded inputs.
+  When the long description is skipped, field facts in those sections are dropped. Processing the
+  existing section text with the same normalizer found 20 novel, source-stated field-evidence
+  signatures across 15 jobs (12 from RESPONSIBILITIES sections and 8 from OTHER sections). This
+  proves a generic extraction gap in H2/H3 without assuming any candidate fact. The same diagnostic
+  re-read the immutable record identity and validated source pointer slices/hashes for all 100
+  normalized results.
+- Diagnostic population: 99 descriptions are over 1,000 characters (54 are 1,001-5,000 and 45 are
+  over 5,000); 97 records have source sections, comprising 170 REQUIREMENTS, 94 RESPONSIBILITIES,
+  26 OTHER, and 0 BENEFITS sections. Four records have no REQUIREMENTS section and no
+  `requirementTexts`; three have zero stored requirement evidence. Current stored R2A totals are
+  742 field-evidence rows and 919 requirement-evidence rows. Fifteen records have previously
+  unrecorded section field evidence as described above. The all-100 engineering-title scan covered
+  all 56 matches and safely ranked the top 20 for focused inspection.
+- H1 result: 7 records have an OTHER section whose content contains broad requirement/material
+  signals. The inspected OTHER headings did not match generic requirements/qualifications/skills/
+  experience or need/bring patterns, so their headings do not yet prove that the sections are job
+  requirements. Keep these sections conservative; do not relabel them as REQUIREMENTS or emit
+  requirement evidence from them without stronger heading semantics. R4633 has 3 OTHER sections,
+  zero recognized REQUIREMENTS sections, zero `requirementTexts`, and zero current requirement
+  evidence; its section content nevertheless yields 2 novel field-evidence signatures when
+  processed as section text.
+- H4 result: no recognized `requirementTexts` line with a material/explicit-modality signal was
+  lost by the current `requirementKind()` / `modality()` filter in the bounded line diagnostic.
+  This is not a proven contributor. H5 result: current exact source-slice and excerpt-hash checks
+  pass for all 100 re-read normalizations; new encoded chunk pointers still require focused tests.
+  H6 result: applying the current eligibility and scorer code to stored normalization/profile data
+  reproduced persisted eligibility, score, and recommendation for all 100 jobs. The 74 older rows
+  use parser/normalization 3.1.0 (26 use 3.2.0); current eligibility coverage differed for those
+  older 74 rows, so before/after coverage will be recomputed with one canonical current engine on
+  the disposable copy. No scorer/profile mismatch explains the newly observed section field facts.
+- Test all requested hypotheses: H1 generic Lever heading classification and OTHER sections; H2
+  descriptions over the structured-span limit; H3 whether source section/requirement/responsibility
+  fields reach R2A; H4 requirements dropped by kind/modality classification; H5 bounded chunk and
+  source-pointer integrity; H6 extraction loss versus scorer/profile behavior. Inspect the four
+  Melbourne roles, the all-100 top engineering population, and aggregate all 100. H2/H3 are proven
+  contributors; H1 remains conservative/unproven as a heading-classification fix; H4 is not
+  supported by the diagnostic; H5 passes for current pointers; H6 shows persisted score parity,
+  with old-version coverage recalculated consistently during shadow comparison.
+
+### Proposed architecture and file scope (conditional on diagnostics)
+
+- Data flow to validate: immutable persisted payload -> `readLeverPostingV2FromPayload()` ->
+  `mapPosting()` / `sectionKind()` -> `structuredLeverRecord()` ->
+  `normalizeR2AJobEvidence()` -> persisted R2A evidence and coverage -> canonical eligibility, fit,
+  recommendation, duplicate, and queue state.
+- Likely implementation scope, if proven: `packages/job-sources/src/lever/v2-reader.ts`,
+  `packages/job-importer/src/r2a-normalization.ts`, their focused tests, and
+  `packages/job-model/src/r2a.ts` only for warranted semantic version changes. Inspect
+  `packages/database/src/source-enablement-repository.ts`, `packages/database/src/r2a-repository.ts`,
+  and `packages/database/src/r2-repository.ts` to preserve existing derivation/evaluation/queue
+  APIs; do not change schema or add a migration in this task. Any required schema migration stops
+  with `R2A_EXTRACTION_SCHEMA_CHANGE_REVIEW_REQUIRED`.
+- The fix must be provider-safe and generic: preserve section provenance; use bounded deterministic
+  chunks and valid source paths; keep unknown headings conservative; derive modality only from
+  text; never turn responsibilities into mandatory requirements; never invent evidence, infer
+  candidate facts, or alter scorer thresholds, weights, duplicate logic, or profile data. If the
+  root cause is not proven, make no speculative behavior change.
+- Diagnosis and replay use the production payload reader and normalizer. Shadow writes, if the fix
+  qualifies, use `SourceEnablementRepository.rederiveLeverObservation()`, canonical eligibility and
+  fit functions, `R2Repository.recordEvaluation()`, and `recordQueueDecision()` only on the
+  disposable copy. Preserve each existing queue state and duplicate decision. If this canonical
+  path cannot safely rederive/evaluate/queue all members, stop with
+  `R2A_SHADOW_REDERIVATION_ENGINEERING_REQUIRED`; do not fabricate rows with SQL.
+
+### Privacy, backup, validation, and rollback
+
+- Real-payload diagnostics are read-only and print only allowed metadata: local job ID, title, safe
+  location, section counts/kinds, description-length bucket, structured requirement/responsibility
+  counts, R2A field/requirement counts, material-family/coverage results, eligibility/score/reason
+  codes, and H1-H6 categories. Do not include candidate facts or raw content. Prove all 100 run
+  members and exact current-profile bindings before analysis.
+- Before private shadow replay, create a fresh backup with `createDatabaseBackup()` and verify its
+  manifest, digest, schema, integrity, FK state, and counts. Restore through
+  `restoreDatabase()` into an ignored `data/private/rehearsals/` SQLite path. Its path guard requires
+  a sibling `private/backups` root, so place a verified copy of the backup file and manifest in
+  that disposable restore root before invoking the supported restore API. Verify the restored copy
+  has schema 12, integrity PASS, FK 0, matching lifetime counters, v6 membership, v7 REVOKED, and
+  zero authority before any shadow write. Never point a write-capable handle or environment
+  override at the real DB.
+- Make the no-source-network boundary executable in temporary local tooling: the replay script
+  consumes persisted payloads only and fails if fetch, DNS, TCP, or TLS entry points are invoked.
+  GitHub review/PR traffic is separate from source/employer traffic. Do not commit temporary audit
+  scripts, backups, manifests, restored databases, or private data.
+- Fictional regression coverage must exercise long structured descriptions, recognized and generic
+  requirement headings, conservative OTHER sections, chunk boundaries, technology/experience/
+  education text, required/preferred/conditional modality, responsibility exclusion, exact source
+  pointers and hashes, deterministic replay, inert HTML/script handling, existing goldens,
+  conflict stability, and evidence-backed coverage changes.
+- Pre-shadow checks: targeted Lever reader, R2A normalizer/repository, and affected R2 tests;
+  typecheck; lint; and `git diff --check`. If the behavior change passes, run full unit/integration/
+  fictional E2E, typecheck, lint, format, production/showcase builds and audit, privacy audit,
+  dependency audits, release fixture, migration immutability, diff check, and `git fsck --strict`.
+  Do not use real source/employer traffic.
+- Rollback: revert only the implementation commit/branch if code validation fails; do not alter
+  immutable source history or the real database. Keep the ignored disposable copy isolated and
+  report its safe backup ID/health. Do not open an implementation PR if the material gate fails.
+
+### Stop conditions, acceptance criteria, and exact sequence
+
+- Stop immediately with `R2A_EXTRACTION_ENGINEERING_PREFLIGHT_MISMATCH` if the verified real runtime
+  differs materially from the baseline above. Stop with `R2A_EXTRACTION_SCHEMA_CHANGE_REVIEW_REQUIRED`
+  if a schema change is required. Stop with `R2A_SHADOW_REDERIVATION_ENGINEERING_REQUIRED` if the
+  supported service path cannot safely process all 100 jobs on the copy. If no real persisted job
+  gains demonstrably present but previously dropped evidence, stop with `R2A_FIX_NOT_MATERIAL`. Stop
+  on any unexplained loss with `R2A_EXTRACTION_REGRESSION`.
+- Material acceptance requires fictional tests proving the generic bug; no unjustified golden
+  regressions; valid exact source pointers and excerpt hashes; no candidate inference or external
+  action; no unexplained evidence loss; at least one materially improved real payload/job; and
+  extraction-only improvement with thresholds, weights, profile, and source data unchanged. Classify
+  every decreased record as corrected false evidence, expected semantic change, or regression.
+- Exact sequence: (1) complete safe H1-H6 diagnostics; (2) record proven root cause and affected
+  populations here; (3) make the narrow generic fix and fictional tests; (4) update semantic
+  versions only as justified; (5) pass all pre-shadow checks; (6) create/verify fresh backup and
+  disposable restore; (7) shadow rederive/evaluate/queue all 100 through canonical services; (8)
+  compute safe all-100, four-Melbourne, and top-20 before/after results; (9) enforce material and
+  regression gates; (10) complete full validation and recheck the real DB read-only; (11) update
+  this plan with commands/results/blockers; (12) commit one coherent change and open exactly one
+  implementation PR only if every gate passes, leaving it OPEN / UNMERGED and waiting for exact-head
+  push and PR CI.
+- Completion criteria: the seven-milestone tracker remains at R2A extraction engineering in
+  progress; source-enabled Personal Beta may remain READY while Personal Live V1 remains NOT_READY.
+  Do not emit the final green-banner success phrase. Record one next task at closeout.
+
+### Selected implementation details before code changes
+
+- Keep the change in `packages/job-importer/src/r2a-normalization.ts` and its fictional tests. Do
+  not change Lever heading classification because the real OTHER headings do not establish a
+  heading-classification defect. Bump parser and normalization versions from `3.2.0` to `3.3.0`;
+  keep evidence contract `3.1.0` because the schema and pointer contract remain unchanged.
+- Index long serialized structured strings without treating their full values as evidence spans.
+  Map decoded UTF-16 offsets to exact escaped JSON source offsets, then split source text into
+  deterministic line chunks bounded to 500 decoded code units and 900 serialized source code
+  units, avoiding surrogate-pair splits. Every evidence pointer will reference the exact immutable
+  serialized substring for its chunk and remain within the existing 1,000-character excerpt limit.
+- Consume `sourceSections` as first-class input. All section kinds may supply field candidates;
+  only sections explicitly classified `REQUIREMENTS` may supply section-based requirement
+  evidence. Use existing structured requirement arrays as fallback when there are no recognized
+  requirement sections; when recognized sections supersede `requirementTexts`, exclude the
+  duplicate array spans from independent coverage scope so they do not appear as unparsed evidence.
+  `RESPONSIBILITIES`, `BENEFITS`, and `OTHER` remain field-only. For records
+  with section objects, parse non-duplicated description lines as field candidates only; for generic
+  structured sources without sections, retain current description-based field and requirement
+  parsing. This keeps section modality text-derived and unknown headings conservative.
+- Fixture coverage will include long escaped JSON descriptions and sections, exact encoded slices
+  and hashes, chunk boundaries, required/preferred/conditional statements, responsibilities and
+  unknown-heading exclusions, deterministic replay, inert HTML, and existing goldens/conflict and
+  coverage behavior. The section classification test will exercise generic wording already
+  accepted by the reader; no unsupported real heading pattern will be added.
+- E2E validation exposed an environment collision: Playwright reused the live user app on loopback
+  port 3100 instead of the fictional E2E server, so tests requiring seeded fixture data failed. Add
+  environment-configurable loopback ports for the web and showcase E2E servers, wire their health
+  URLs to those ports, and disable existing-server reuse for these checks. Parameterize the
+  synthetic inspection fixture's CSP allowlist from that same test-only environment value. This is
+  test-harness isolation only; it does not change production runtime behavior. Update E2E version
+  assertions to parser/normalization `3.3.0`.
+- The isolated E2E run also exposed a duplicate-scope edge case: a requirement present in both the
+  recognized section and its legacy `requirementTexts` array was extracted from the section but
+  counted as a separate unparsed coverage span from the array. Add a fictional normalizer regression
+  assertion and deduplicate the superseded array from coverage accounting. Keep the source section
+  pointer as the single authoritative requirement source.
+
+### Implementation and final offline replay results
+
+- The proven H2/H3 gap was fixed generically in `packages/job-importer/src/r2a-normalization.ts`.
+  The parser now indexes long serialized description and source-section strings with exact escaped
+  JSON offsets, makes deterministic bounded line chunks, and treats source sections as first-class
+  field evidence. Only explicitly `REQUIREMENTS` sections produce requirement evidence;
+  responsibilities, benefits, and unknown headings remain field-only. Recognized section content
+  supersedes its duplicate `requirementTexts` array for both requirement extraction and coverage
+  accounting. No provider heading vocabulary was broadened.
+- Semantic versions changed from parser `3.2.0` / normalization `3.2.0` to parser `3.3.0` /
+  normalization `3.3.0`. Evidence contract remains `3.1.0`: no evidence schema, pointer contract,
+  or database schema changed. There are no database migration changes. Candidate profile values,
+  scoring weights, recommendation threshold (50), source payloads, and duplicate decisions were
+  not edited.
+- Fictional regression coverage now exercises long descriptions and escaped section content,
+  exact bounded pointers and hashes, chunk boundaries, recognized and generic requirement headings,
+  conservative OTHER handling, required/preferred/conditional modality, responsibilities as field
+  evidence only, inert text, deterministic replay, and the duplicate section/array coverage case.
+  Existing golden/conflict tests remain green.
+- The initially isolated E2E run identified the duplicate coverage accounting issue above. The
+  regression is fixed and the final full suite passed. Playwright now accepts distinct validated
+  loopback ports for the web and showcase servers, never reuses an existing server, and passes the
+  showcase port to the synthetic inspection CSP. E2E used ports 3148/3248; the user's existing app
+  listener on 3100 remained running and untouched.
+- Final fresh verified backup: `backup-2026-09-29T03-28-59.692Z-c076f773`. Backup and restored
+  disposable copy both report schema 12, integrity PASS, and FK issues 0. Final shadow ID:
+  `m2-r2a-shadow-1790652539900-c44c53d4`. Shadow pre/post integrity is PASS, FK issues 0, counters
+  remain 21/9/0/0, v6 membership and derivation each include 100 jobs, and latest capability v7 is
+  REVOKED. The source network guard was installed and blocked-attempt count was 0.
+- Final canonical shadow comparison (single current evaluation engine on all rows):
+
+  | Metric                                                |      Baseline |  Proposed 3.3.0 |
+  | ----------------------------------------------------- | ------------: | --------------: |
+  | Jobs evaluated                                        |           100 |             100 |
+  | Field evidence                                        |           742 |             857 |
+  | Requirement evidence                                  |           919 |             963 |
+  | Material family states (complete / partial / unknown) | 2 / 394 / 604 | 113 / 330 / 557 |
+  | Mean / median coverage                                |       1% / 0% |  24.37% / 22.5% |
+  | Eligibility (eligible / review required)              |        1 / 99 |          1 / 99 |
+  | Recommended (true / false)                            |       0 / 100 |         0 / 100 |
+  | Maximum score (threshold 50)                          |            19 |              29 |
+  | Duplicate state CLEAR                                 |           100 |             100 |
+  | Deterministic detail candidates                       |             0 |               0 |
+
+- Coverage increased for 72 jobs, was unchanged for 28, and decreased for 0. Field evidence
+  increased on 83 jobs, stayed the same on 17, and decreased on 0. Requirement evidence increased
+  on 2 jobs, stayed the same on 98, and decreased on 0. Decreased jobs: none; corrected-false or
+  unexplained regression count: 0. The R4633 Computer Vision Engineer record gained 6 field
+  evidence items and no requirement evidence; the read-only diagnostic independently proved two
+  novel field-evidence signatures came from immutable OTHER/responsibility section content that the
+  previous parser dropped. No recommendation, threshold, candidate fact, or external behavior was
+  manipulated. Material-improvement gate: PASS.
+- Safe Melbourne comparison (material counts are observed / resolved / partial / unobserved):
+
+  | Job                                          | Coverage  | Score  | Eligibility                        | Recommended    | Material counts    |
+  | -------------------------------------------- | --------- | ------ | ---------------------------------- | -------------- | ------------------ |
+  | R5712, Engineer II, Modelling and Simulation | 0% -> 25% | 0 -> 0 | REVIEW_REQUIRED -> REVIEW_REQUIRED | false -> false | 4/0/4/6 -> 4/1/3/6 |
+  | R4633, Computer Vision Engineer (C++)        | 0% -> 0%  | 0 -> 0 | REVIEW_REQUIRED -> REVIEW_REQUIRED | false -> false | 1/0/1/9 -> 3/0/3/7 |
+  | R5964, Business Development Associate        | 0% -> 20% | 4 -> 4 | REVIEW_REQUIRED -> REVIEW_REQUIRED | false -> false | 5/0/5/5 -> 5/1/4/5 |
+  | R5713, Engineer II, Autonomy                 | 0% -> 25% | 0 -> 0 | REVIEW_REQUIRED -> REVIEW_REQUIRED | false -> false | 3/0/3/7 -> 4/1/3/6 |
+
+- With zero detail candidates, proposed blocker distribution is: `ELIGIBILITY_NOT_ELIGIBLE` 99;
+  `EXTRACTION_COVERAGE_INSUFFICIENT` 90; `MATERIAL_SCOPE_PARTIAL` 99;
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT` 90; `R2_MATERIAL_SCOPE_PARTIAL` 99;
+  `SCORE_BELOW_THRESHOLD` 100; `R2_MANDATORY_CAPABILITY_UNCONFIRMED` 1;
+  `MATERIAL_CONDITIONAL` 4; `R2_MATERIAL_CONDITION_UNRESOLVED` 4; `MATERIAL_UNKNOWN` 6;
+  `R2_JOB_ROSTER_UNKNOWN` 6; `R2_VARIABLE_SCHEDULE_REVIEW_REQUIRED` 4;
+  `R2_NO_MATERIAL_BLOCKERS` 1; `R2_MANDATORY_LICENCE_UNCONFIRMED` 1. No GET_JOB or detail
+  candidate action occurred.
+- Final real-DB read-only check: schema 12, pending migrations 0, integrity PASS, FK issues 0;
+  counters 21/9/0/0; total source requests 21 (20 LIST_JOBS, 1 historical GET_JOB); active source
+  and target authority 0; active source runs 0; pending application operations 0; latest Shield AI
+  v7 REVOKED. V6 run remains COMPLETE LIST_JOBS, 4 pages, 100 accepted/qualified records, and 100
+  current active-profile evaluations/queues. No real R2 derivation or evaluation row was written.
+- Validation after the final parser correction: `npm run release:check:fixture` PASS; 58 unit test
+  files / 630 tests PASS; 3 integration files / 21 tests PASS; fictional local E2E 47/47 PASS;
+  typecheck and lint PASS; production web build PASS; showcase build and audit PASS
+  (`source_files=19`, export checked); privacy audit PASS; `npm audit --audit-level=high` and
+  `npm audit --omit=dev` report 0 vulnerabilities; `git diff --check` and `git fsck --strict`
+  return success. Release fixture's strict Prettier check with `--end-of-line auto` passes all
+  matched files. Plain `npm run format:check` still reports 43 repository files with pre-existing
+  formatting/line-ending warnings; no unrelated files were reformatted. Every changed file passes
+  the targeted Prettier check with the repository's Windows line-ending mode. The full schema test
+  remains green; the drizzle migration directory is unchanged.
+- Seven-milestone closeout state: foundations COMPLETE; current real role + fresh packet IN
+  PROGRESS / R2A extraction engineering; target MAP/FILL/UPLOAD/VERIFY ENGINEERING / NOT LIVE
+  VERIFIED; final-review/submission safeguards BLOCKED; reproducible release COMPLETE; controlled
+  real fill-preview BLOCKED; final readiness/green-banner review NOT STARTED. Source-enabled Personal
+  Beta is READY with 0 active capabilities; Personal Live V1 remains NOT_READY because real target
+  approval is required (first real target validation is already PROVEN, with 2 completed
+  inspections). Next task: review the single implementation PR and merge only after its final
+  exact-head checks pass and it receives approval.
