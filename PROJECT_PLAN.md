@@ -54,15 +54,15 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
   `2026-09-28T23:57:02.978Z`. The ignored private allowlist was schema-validated and atomically
   updated to the revoked v7 family version. Latest family is v7 REVOKED; active source authority
   and current start-capable owner receipts are both 0. Preserve all v5/v6 history.
-- All broader-discovery analysis used only the persisted run and local R2/evaluation/queue/duplicate
-  data after revocation. It found 100 distinct external IDs and verification references, 25 new
-  source observations and 25 new job versions, 75 deterministic duplicate/no-op dispositions, 25
-  unique current jobs/evaluations, and 25 REVIEWING / CURRENT queue rows. No deterministic detail
-  candidate exists. No GET_JOB, employer page, application navigation/form action, upload, or
-  submission occurred. Post-run lifetime counters are source/employer/application-operation/final-
-  consent `21/9/0/0`; historical total GET_JOB requests remain 1, with no task delta. The app
-  preflight reports source-enabled Personal Beta READY with zero active source authority; Personal
-  Live V1 remains NOT_READY.
+- Correction in section 51 supersedes the initial population interpretation: the v6 run has 100
+  qualified canonical jobs, not 25. The 25 new observations/job versions were the v6 processing
+  delta; 75 accepted records reused pre-existing observations. All 100 jobs already had exact
+  current active-profile evaluations and CURRENT queue decisions, so pending pipeline work was 0. The earlier 25-job candidate table described only the new-observation/pipeline-work subset.
+  The all-100 audit still found no deterministic detail candidate. No GET_JOB, employer page,
+  application navigation/form action, upload, or submission occurred. Post-run lifetime
+  source/employer/application-operation/final-consent counters remain 21/9/0/0; historical total
+  GET_JOB requests remain 1, with no task delta. Source-enabled Personal Beta remains READY with
+  zero active source authority; Personal Live V1 remains NOT_READY.
 - The seven-milestone tracker remains: (1) Foundations COMPLETE; (2) current real role + fresh
   current packet IN PROGRESS / BROADER DISCOVERY; (3) real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING
   / NOT LIVE VERIFIED; (4) final-review/submission safeguards BLOCKED; (5) reproducible release
@@ -3838,8 +3838,246 @@ apps/web/app/sources/page.test.tsx` PASS, 5 files / 148 tests. No full 600+ test
   new exact PR head, so new push and PR Quality checks must also pass before closeout; their exact
   head and run IDs are reported in the final task closeout. The PR remains OPEN / UNMERGED; do not
   merge it.
-- Remaining blocker: there are zero deterministic detail candidates. The generic blockers are
-  recommendation false for all 25, a maximum score below 50, partial material scope and insufficient
-  extraction coverage for 24, plus the sole eligible role's score below threshold. No GET_JOB or
-  role-specific workaround is authorized. Exactly one next task: review the open plan-only evidence
-  PR and decide whether to accept its recorded closeout.
+- The initial v6 closeout recorded zero deterministic detail candidates in its 25-job subset. The
+  all-100 reconciliation and corrected blocker distribution are recorded in section 51 below.
+  Exactly one next task: review the open plan-only evidence PR and decide whether to accept its
+  corrected all-100 closeout.
+
+## 51. M2 PR #57 all-100 completed-run reconciliation and candidate audit (2026-09-29)
+
+### Implementation blueprint and authorization boundary
+
+- Starting state: branch chore/m2-v6-broader-discovery-evidence at
+  ca0fe81fbee8f6ce3130b4e00e139cab64c5dade, based on main
+  7e8534d196cec6b2e62f0bda78e0f7a29312472e. The tracked worktree was clean before this
+  amendment. PR #57 was re-fetched before editing and remained OPEN, UNMERGED, CLEAN; base/head/tree,
+  one-file diff, two commits, exact-head checks, review count, and thread count matched baseline.
+  Do not merge PR #57.
+- Objective: reconcile every accepted record in completed run
+  4c143a7b-b102-4dea-a489-de4327fbe678 to canonical job IDs, current R2 evaluation, queue, duplicate,
+  eligibility, score, coverage, and deterministic detail-candidate state; correct evidence on the
+  existing PR #57 plan-only branch.
+- Assumptions and requirements: the persisted COMPLETE LIST_JOBS run is the sole membership source;
+  the latest Shield AI capability is v7 REVOKED; schema 12 is current; current source and target
+  authority are both 0; one active candidate profile version exists. No source request, GET_JOB,
+  capability creation, owner action, employer interaction, application operation, form, upload, or
+  submission is authorized or needed. Do not infer candidate facts or weaken the score threshold.
+- Architecture/data flow: use a read-only SQLite snapshot to join qualified accepted verifications
+  to job versions, observations, exact active-profile evaluations, latest queue decisions, duplicate
+  candidates, and material coverage. Faithfully reproduce jobIdsForRun membership and
+  pipelineWorkForCompletedRun currentness without calling methods that may update PAGE_PERSISTED
+  verification rows. All 100 rows were already QUALIFIED. Use the canonical ten-family
+  partial/unobserved formula and current evaluation/queue bindings. Detail remains eligible +
+  recommended + exact current evaluation + current queue + duplicate-clear.
+- Dependencies: current schema-12 local SQLite DB, repository source, preflight scripts, and
+  existing Vitest suites. No job-source network dependency is required. GitHub PR reads, pushing
+  this existing branch, and its requested CI are review-workflow actions, not source/employer
+  traffic.
+- Security/privacy: record only local job IDs, safe titles/locations, reason codes, aggregate R2
+  fields, statuses, and page digests. Do not include raw payloads/descriptions, candidate profile
+  values/references, cookies, nonces, sessions, or secrets. No helper or analysis script is
+  committed.
+- Planned file/architecture: PROJECT_PLAN.md only. Do not change application code, schema, private
+  DB, allowlist, capability, receipts, run history, or candidate profile.
+- Risks: a missing verification link, membership mismatch, changed job version, stale profile
+  binding, or changed PR review state invalidates the analysis. Stop before R2 mutation or plan
+  correction if any such mismatch appears. Results below prove 100 canonical IDs, no broken links,
+  current v6 job-version bindings, and unchanged PR state.
+- Validation strategy: db:status, preflight, focused source-enablement/R2 repository tests,
+  privacy:audit, Prettier check for this plan, git diff --check, and git fsck --strict. Repository
+  tests cover mocked source-to-queue processing and duplicate replay. Independently compare exact
+  read-only membership and pending-work semantics against the full persisted run. No product change
+  means no full suite/build.
+- Rollback: no real database or external state changed. If evidence needs correction, amend only
+  PROJECT_PLAN.md on the same open PR branch; preserve immutable run and receipt history.
+- Acceptance and steps: (1) revalidate PR/runtime; (2) read page and verification ledgers; (3) prove
+  full-run membership; (4) inspect all 100 current evaluation/queue/duplicate and safe candidate
+  metrics; (5) reconcile missing current rows only through canonical local services after membership
+  proof and only if the v6 version is current; (6) amend only this plan; (7) run checks; (8) commit
+  and push only the plan on the existing branch; (9) wait for exact-head push and PR CI. Step 5 was
+  unnecessary: all 100 jobs were current, so no R2 write was performed.
+
+### PR and runtime baseline revalidation
+
+- PR #57 title: docs: record M2 v6 source closeout evidence. Starting base SHA
+  7e8534d196cec6b2e62f0bda78e0f7a29312472e; starting head SHA
+  ca0fe81fbee8f6ce3130b4e00e139cab64c5dade; starting tree SHA
+  d309bbf7d9c4f9b1effadfa586adfb52af3d74f6. It had 2 commits, changed only PROJECT_PLAN.md,
+  +239/-3, OPEN / UNMERGED / CLEAN, 0 reviews, 0 unresolved threads. Push workflow 36503085584 and
+  PR workflow 36503088736 both succeeded on that exact starting head.
+- DB: schema 12, pending migrations 0, integrity PASS, foreign-key issues 0. Preflight passed:
+  private profile VALID; source allowlist v2 ready with 12 configured and 0 active capabilities;
+  source-enabled Personal Beta READY; first-real-target validation PROVEN with 2 historical
+  inspections; current runner target approval is still required; no preflight blockers.
+- Lifetime source/employer/application-operation/final-consent-or-submission counts at audit
+  start: 21/9/0/0. Checkpoint totals: 21 requests, 20 LIST_JOBS and 1 historical GET_JOB. Active
+  source authority 0; latest target capabilities with authority 0; active source runs 0;
+  application run operations 0; final action consents 0. Application-run status table had no rows.
+  The latest Shield AI capability is v7 REVOKED.
+
+### Persisted v6 page and verification reconciliation
+
+- Run 4c143a7b-b102-4dea-a489-de4327fbe678 is COMPLETE, LIST_JOBS, 4 requests, 4 pages, 100
+  provider records, 1,462,469 bytes, 0 retries, and 0 redirects. Persisted cursors are 0, 25, 50,
+  75, with 25 records each:
+
+| Page | Cursor | Next cursor | Records / bytes | Accepted / unusable | New v6 observations | Pre-existing observations | Matching verification digests | Page digest                                                      |
+| ---- | ------ | ----------- | --------------- | ------------------- | ------------------- | ------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| 1    | 0      | 25          | 25 / 365322     | 25 / 0              | 3                   | 22                        | 25 / 25                       | 8b12d11170ad2ff8925b42ea9d60f209dab08e57924120cab562de52159c3dbc |
+| 2    | 25     | 50          | 25 / 389634     | 25 / 0              | 7                   | 18                        | 25 / 25                       | d9deec788791b362ab4b7d1b89bdcbf090dc7591778e11b772288ccf1ef4963b |
+| 3    | 50     | 75          | 25 / 334597     | 25 / 0              | 7                   | 18                        | 25 / 25                       | 0ca94d883983a5c55c4b01a51fe36247c0b5524d46b751bb4625c9a1124cfd46 |
+| 4    | 75     | none        | 25 / 372916     | 25 / 0              | 8                   | 17                        | 25 / 25                       | df45061c7732d3386305cbd643559fb9cc00f44a61615a8801cc7ad7a2ce5680 |
+
+- Page accounting: checkpoint digest sequence exactly matches page rows; all 100 verification
+  rows match their persisted page digest; each page has one consistent verification digest; the
+  database proves 4 distinct page digests. Page bytes sum to 1,462,469. Production code in
+  packages/job-sources/src/lever/v2-reader.ts builds the LIST pagination parameters in this order:
+  mode=json, skip=<cursor>, limit=<pageSize>. This is code evidence only; no request was sent.
+- Verification ledger: 100 rows; ACCEPTED 100; UNUSABLE 0; QUALIFIED 100; distinct external IDs
+  100; distinct content hashes 100; distinct source observations 100; distinct job versions 100;
+  distinct canonical job IDs 100; null/broken observation or job-version links 0. Each of 100
+  external IDs maps to exactly one canonical job ID. V6 created 25 observations/job versions;
+  75 records reused pre-existing observations.
+- Exact accepted + qualified verification-to-job-version membership query used by
+  SourceEnablementRepository.jobIdsForRun returns 100. It matches the ledger-proven 100 jobs; no
+  membership bug was found.
+
+### Full-run currentness and explanation of the prior 25-job result
+
+- For all run jobs, the v6 verification version equals the latest job version: 100 current,
+  0 changed-after-v6, 0 broken relations. One active candidate profile version was present.
+- Exact active-profile evaluation: 100 current, 0 missing, 0 stale, 0 profile-binding mismatch.
+  Current queue decisions: 100 / 100, all CURRENT and bound to the selected exact evaluation.
+  Full job-version/profile/evaluation queue bindings matched for all 100.
+- Read-only reproduction of pipelineWorkForCompletedRun returns 0 pending work. The seven-way
+  classification sums to 100:
+
+| Classification                      | Jobs |
+| ----------------------------------- | ---: |
+| NEW_IN_V6_AND_CURRENT               |   25 |
+| PREEXISTING_AND_CURRENT             |   75 |
+| CURRENT_EVALUATION_MISSING          |    0 |
+| CURRENT_QUEUE_MISSING_OR_STALE      |    0 |
+| LATEST_JOB_VERSION_CHANGED_AFTER_V6 |    0 |
+| ACTIVE_PROFILE_BINDING_STALE        |    0 |
+| OTHER_SAFE_RECONCILIATION_STATE     |    0 |
+
+- The earlier 25-job number was the new-observation/job-version and pipeline-processing delta,
+  not full-run membership. The 75 reused observations already had current exact evaluations and
+  queues. The earlier 25-job candidate table represented only that subset. This correction
+  preserves the historical report while superseding its unsafe claim that 25 was full membership.
+- Canonical local R2 reconciliation performed: NO. Jobs reconciled: 0. No evaluation or queue
+  rows were written. Post-reconciliation currentness remains 100 exact evaluations and 100 current
+  queues; counts are unchanged.
+
+### All-100 candidate metrics and deterministic detail decision
+
+- Full-run population: 100 canonical jobs; 100 current exact evaluations; 100 current queues;
+  engineering-like titles 56 using the established case-insensitive terms engineer, engineering,
+  robotics, mechatronics, electronics, software, controls, test, and vision.
+- Location distribution (count): Dallas, Texas 19; Seattle, Washington 19; Washington, D.C. 12;
+  San Diego, California 10; London 8; Melbourne 4; Kyiv 2; New Delhi 2; Remote 2; Taipei 2;
+  United States 2; Wichita Metro Area 2; Amsterdam 1; Athens 1; Boston, Massachusetts 1; Brussels
+  1; Bucharest 1; Copenhagen 1; Lviv 1; Madrid 1; Mexico City 1; Munich 1; Orlando, Florida 1;
+  Oslo 1; San Mateo, California 1; Singapore 1; Tokyo 1; Warsaw 1.
+- Melbourne count 4. Explicit Australia country/location evidence count 0; none of the four
+  Melbourne rows had explicit Australia country code/text in normalized geography evidence.
+  Engineering-like count 56.
+- Eligibility: ELIGIBLE 1; REVIEW_REQUIRED 99; NOT_ELIGIBLE 0. Recommended true 0; false 100.
+  Maximum score 19 against threshold 50; maximum extraction coverage 100. Canonical duplicate
+  states: CLEAR 100, POSSIBLE/UNRESOLVED 0, CONFIRMED/LINKED 0, UNKNOWN 0.
+- Deterministic detail rule: ELIGIBLE + recommended true + exact current active-profile evaluation
+  - current queue bound to that evaluation + no unresolved duplicate. Result: 0 / 100. No GET_JOB
+    or new source capability was used.
+- Generic blocker distribution, counting jobs with each code: ELIGIBILITY_NOT_ELIGIBLE 99;
+  SCORE_BELOW_THRESHOLD 100; MATERIAL_SCOPE_PARTIAL 99; EXTRACTION_COVERAGE_INSUFFICIENT 99;
+  MATERIAL_UNKNOWN 76; MATERIAL_CONDITIONAL 3. No material-conflict, no-observed-scope, queue, or
+  duplicate blocker was present.
+- Source/provider-evidence reason-code counts are job/code intersections and may overlap:
+  R2_EXTRACTION_COVERAGE_INSUFFICIENT 99; R2_MATERIAL_CERTIFICATIONS_UNKNOWN 66;
+  R2_MATERIAL_HOURS_UNKNOWN 73; R2_MATERIAL_LICENCES_UNKNOWN 73;
+  R2_MATERIAL_SCHEDULE_UNKNOWN 73; R2_MATERIAL_VEHICLE_UNKNOWN 55;
+  R2_MATERIAL_WORK_RIGHTS_UNKNOWN 74; R2_MATERIAL_SCOPE_PARTIAL 25;
+  R2_MATERIAL_CONDITION_UNRESOLVED 3; R2_MATERIAL_EDUCATION_UNKNOWN 23;
+  R2_MATERIAL_EXPERIENCE_UNKNOWN 1; R2_MATERIAL_SKILLS_UNKNOWN 4.
+- Candidate-fact-referenced reason-code counts also may overlap; no private fact or reference is
+  disclosed: R2_JOB_ROSTER_UNKNOWN 2; R2_MANDATORY_CAPABILITY_UNCONFIRMED 1;
+  R2_VARIABLE_SCHEDULE_REVIEW_REQUIRED 1; R2_MANDATORY_LICENCE_UNCONFIRMED 1. Derived
+  eligibility/score gates are reported separately above; they assert no unknown candidate fact.
+- The previous zero-detail conclusion changes: NO. It is confirmed across all 100. The only
+  ELIGIBLE job has score 0, is not recommended, and is below threshold; all 100 recommendations
+  are false. The full-run blocker evidence does not authorize a role-specific workaround.
+
+### Safe all-100 top-20 table
+
+- Ordering: recommended descending, score descending, coverage descending, then local job ID
+  ascending. All rows use current exact R2 fields and canonical safe reason/blocker codes.
+
+| Local job ID                                | Title                                                                         | Safe location         | Observation | Eligibility     | Current reason codes                                                                                                                                                                                                                                        | Score / threshold / recommended | Coverage / partial / unobserved | Duplicate | Queue freshness | Detail | Generic blockers                                                                                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------------- | --------------------- | ----------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- | --------- | --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| source-job-55154d347bb155f29fbd0d33c8b590e5 | Electronics Failure Analysis Engineer (R5258)                                 | Seattle, Washington   | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                | 19 / 50 / false                 | 41 / 4 / 6                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-700bc5aa369fab8a0ef0f5561349e2c6 | Engineer II, Systems Test (R5038)                                             | Washington, D.C.      | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                | 11 / 50 / false                 | 41 / 4 / 6                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-201826e25c62cd256bbc97f29953d7c8 | Business Development & Sales Lead - UK                                        | London                | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                             | 11 / 50 / false                 | 35 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-b13aad1f511b8068a24c2a2144722916 | Field Solutions Engineer                                                      | Amsterdam             | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                | 8 / 50 / false                  | 35 / 4 / 6                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-8a8a7782984c21481af28e7586a4d616 | Field Solutions Engineer (R5632)                                              | Athens                | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                | 8 / 50 / false                  | 29 / 4 / 6                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-e44bf4fee003a80ee50b5429b93f479a | Field Marketing Manager, India (R5942)                                        | New Delhi             | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                              | 8 / 50 / false                  | 0 / 3 / 7                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                                         |
+| source-job-275180d2ec54cae9d212f05e49fbfff0 | Director, Test Engineering - ACP Programs (R5044)                             | Washington, D.C.      | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                             | 7 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-ad308f9883cdb430928a3c33812220cc | Air Vehicle Lead, Chief Engineer                                              | San Diego, California | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                             | 7 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-e0c110ee940d2cab9fb9b8481470bdd4 | Configuration and Change Control Analyst (R5300)                              | Dallas, Texas         | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_EDUCATION_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                     | 7 / 50 / false                  | 47 / 4 / 6                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-e007edfefe4ac11d3c31ff3ee5c32fa3 | Business Development Lead, Belgium, NATO & Luxembourg                         | Brussels              | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                             | 7 / 50 / false                  | 35 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-268f1dc1b7b788fc493ce84cd47ba202 | Capture Strategy & Operations Sr. Lead, X-BAT Family of Systems (FoS) (R6012) | San Diego, California | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                                         |
+| source-job-a7e29b9fb9a16a41eafb7ab0120ce5a7 | Director, International Growth Campaign Leader (R5851)                        | Washington, D.C.      | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_JOB_ROSTER_UNKNOWN, R2_MATERIAL_CONDITION_UNRESOLVED, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                     | 7 / 50 / false                  | 0 / 7 / 3                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_CONDITIONAL, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD |
+| source-job-aa8b3f696de16a177f33161eb43a3274 | Capture Strategy & Operations Sr. Lead, X-BAT Family of Systems (FoS) (R6083) | San Diego, California | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                                         |
+| source-job-c00e188a797b27a8e79e032877d86cd9 | Capture Portfolio Analyst, X-BAT Family of Systems (FoS) (R6011)              | San Diego, California | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                                         |
+| source-job-fa24c913da878e8353ae7bd8d0b2b2d8 | Assistant Product Owner, CCA Mission Autonomy (Platform Integration) (R5849)  | Washington, D.C.      | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MANDATORY_CAPABILITY_UNCONFIRMED, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                         | 7 / 50 / false                  | 0 / 6 / 4                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                                         |
+| source-job-68a8c68dc59d19ccce7dc691524ab45c | Associate Sourcing Specialist (R5490)                                         | Dallas, Texas         | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                                    | 4 / 50 / false                  | 47 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-2e9083ca535bada6f1d9eb2840c1d3fb | Engineer II, Hydraulics (R4936)                                               | Seattle, Washington   | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_EDUCATION_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN | 4 / 50 / false                  | 35 / 3 / 7                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-7f5f685b93e594ff9f6c841278d2f261 | Business Development Associate (R5964)                                        | Melbourne             | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                             | 4 / 50 / false                  | 35 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-dcd56bbdc609264e754195ebd9ef85ee | Engineer II, Mechanical Design (R4922)                                        | Seattle, Washington   | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_EDUCATION_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN | 4 / 50 / false                  | 35 / 3 / 7                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD                       |
+| source-job-8fba911d3f584d3fb8a6c799813dda38 | Field Service Representative                                                  | Taipei                | NEW_IN_V6   | ELIGIBLE        | R2_NO_MATERIAL_BLOCKERS                                                                                                                                                                                                                                     | 0 / 50 / false                  | 100 / 0 / 8                     | CLEAR     | CURRENT         | NO     | SCORE_BELOW_THRESHOLD                                                                                                                             |
+
+### Melbourne and explicit Australia subset
+
+- The union contains all four Melbourne jobs; no additional job has explicit Australia
+  country/location evidence. Fields and ordering match the all-100 table.
+
+| Local job ID                                | Title                                         | Safe location | Observation | Eligibility     | Current reason codes                                                                                                                                                                                                                                     | Score / threshold / recommended | Coverage / partial / unobserved | Duplicate | Queue freshness | Detail | Generic blockers                                                                                                            |
+| ------------------------------------------- | --------------------------------------------- | ------------- | ----------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- | --------- | --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| source-job-7f5f685b93e594ff9f6c841278d2f261 | Business Development Associate (R5964)        | Melbourne     | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN                                                          | 4 / 50 / false                  | 35 / 5 / 5                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD |
+| source-job-1ab64bf28df236dfcad613117ee2cd16 | Engineer II, Autonomy (R5713)                 | Melbourne     | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_CERTIFICATIONS_UNKNOWN, R2_MATERIAL_HOURS_UNKNOWN, R2_MATERIAL_LICENCES_UNKNOWN, R2_MATERIAL_SCHEDULE_UNKNOWN, R2_MATERIAL_SKILLS_UNKNOWN, R2_MATERIAL_VEHICLE_UNKNOWN, R2_MATERIAL_WORK_RIGHTS_UNKNOWN | 0 / 50 / false                  | 24 / 3 / 7                      | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, MATERIAL_UNKNOWN, SCORE_BELOW_THRESHOLD |
+| source-job-2a28f2764def648964221b971f7e7546 | Computer Vision Engineer (C++) (R4633)        | Melbourne     | PREEXISTING | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                           | 0 / 50 / false                  | 0 / 1 / 9                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                   |
+| source-job-ab46b7c671069db77edbcaf84bee70dc | Engineer II, Modelling and Simulation (R5712) | Melbourne     | NEW_IN_V6   | REVIEW_REQUIRED | R2_EXTRACTION_COVERAGE_INSUFFICIENT, R2_MATERIAL_SCOPE_PARTIAL                                                                                                                                                                                           | 0 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | CURRENT         | NO     | ELIGIBILITY_NOT_ELIGIBLE, EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, SCORE_BELOW_THRESHOLD                   |
+
+### Zero external/source/employer/application action delta and closeout
+
+- Task delta: LIST_JOBS 0; GET_JOB 0; source DNS/TCP/TLS 0/0/0; employer navigation 0; form 0;
+  upload 0; submission 0; new source capability 0; owner APPROVE 0; owner START 0; source run 0.
+  Lifetime source/employer/application-operation/final-consent-or-submission counters remain
+  21/9/0/0. Latest Shield AI authority remains v7 REVOKED; current source/target authority, active
+  runs, and pending external/application operations remain 0.
+- The previous 25-job analysis was subset-only: YES. The previous zero-detail conclusion changed:
+  NO. There is no deterministic detail candidate across all 100 jobs.
+- Seven-milestone tracker: (1) Foundations COMPLETE; (2) current real role + fresh current packet
+  IN PROGRESS / FULL 100-JOB SOURCE RECONCILIATION; (3) real-target MAP/FILL/UPLOAD/VERIFY
+  ENGINEERING / NOT LIVE VERIFIED; (4) final-review/submission safeguards BLOCKED; (5)
+  reproducible release COMPLETE; (6) controlled real fill-preview BLOCKED; (7) final readiness /
+  Green-banner review NOT STARTED. Source-enabled Personal Beta READY. Personal Live V1 NOT_READY.
+- Remaining blocker: no job is recommended and the maximum score is 19 against threshold 50;
+  provider-evidence unknown/partial coverage remains as quantified above. Exactly one next task:
+  review the corrected open PR #57 and decide whether to accept its all-100 closeout. Do not emit
+  the final green-banner success phrase.
+- Final local validation: npm run db:status PASS (schema 12 / pending 0 / integrity PASS / FK 0);
+  npm run preflight PASS (profile VALID, source-enabled Personal Beta READY, 0 active source
+  authority, no blockers); npm run privacy:audit PASS (350 tracked files, 1,430 history paths,
+  1,278 blobs, 1,961 build/test artifacts, 11 private canaries); npx prettier --check
+  PROJECT_PLAN.md PASS after npx prettier --write PROJECT_PLAN.md; git diff --check PASS; and
+  git fsck --strict exit 0. Fsck listed dangling blobs/trees but no integrity error. Focused
+  command npx vitest run packages/database/src/source-enablement-repository.test.ts
+  packages/database/src/r2-repository.test.ts passed 2 files / 46 tests, including mocked
+  source-to-queue and duplicate replay coverage. The exact membership and pending-work semantics
+  were independently reproduced read-only against the real run. The initial Prettier check failed
+  before the plan was formatted; the check passed after formatting.
+- Final tracked diff is limited to PROJECT_PLAN.md: 252 insertions / 14 deletions before commit.
+  No product code changed, and no R2 reconciliation write was needed. GitHub push and PR CI run
+  on the committed exact head; report the final head/tree, diff, workflow IDs, review count, and
+  unresolved thread count in the task closeout. PR #57 remains OPEN / UNMERGED; do not merge.
