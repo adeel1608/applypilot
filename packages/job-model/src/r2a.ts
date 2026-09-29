@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { RequirementKindSchema, RequirementModalitySchema } from "./beta";
 
-export const R2A_PARSER_VERSION = "3.3.0";
+export const R2A_PARSER_VERSION = "3.4.0";
 export const R2A_EVIDENCE_CONTRACT_VERSION = "3.1.0";
-export const R2A_NORMALIZATION_VERSION = "3.3.0";
+export const R2A_NORMALIZATION_VERSION = "3.4.0";
 
 export const JobEvidenceStateSchema = z.enum([
   "SOURCE_STATED",

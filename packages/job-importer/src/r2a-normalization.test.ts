@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.3.0");
+    expect(result.parserVersion).toBe("3.4.0");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -572,6 +572,81 @@ describe("R2A evidence normalization", () => {
     expect(fallbackResult.requirementEvidence).toEqual(
       expect.arrayContaining([expect.objectContaining({ canonicalKind: "QUALIFICATION" })]),
     );
+  });
+
+  it("adds only explicit unsectioned description requirements with exact source provenance", () => {
+    const structured = {
+      description: [
+        "Python skill required.",
+        "Python skill essential.",
+        'Rust skill preferred — include "Unicode".',
+        "Go skill may be required.",
+        "Scala skill is not required.",
+        "Use Ruby skill required.",
+        "Use Dart skill required.",
+        "Use Kotlin skill required.",
+      ].join("\n"),
+      sourceSections: [
+        { heading: "Requirements", kind: "REQUIREMENTS", content: "Python skill required." },
+        {
+          heading: "Responsibilities",
+          kind: "RESPONSIBILITIES",
+          content: "Use Ruby skill required.",
+        },
+        { heading: "Additional information", kind: "OTHER", content: "Use Dart skill required." },
+        { heading: "Benefits", kind: "BENEFITS", content: "Use Kotlin skill required." },
+      ],
+      requirementTexts: [],
+    };
+    const sourceText = JSON.stringify(structured);
+    const input = {
+      sourceText,
+      structured,
+      sourceObservationId: "observation:structured-description-requirement-supplement",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+    expect(normalizeR2AJobEvidence(input)).toEqual(result);
+    expect(
+      result.requirementEvidence.map(({ modality, canonicalKind }) => ({
+        modality,
+        canonicalKind,
+      })),
+    ).toEqual([
+      { modality: "REQUIRED", canonicalKind: "SKILL" },
+      { modality: "PREFERRED", canonicalKind: "SKILL" },
+    ]);
+    expect(result.requirementEvidence[1]?.source.sourcePath).toMatch(
+      /^structured\.description\.line\[\d+\]\.chunk\[0\]$/,
+    );
+    expect(result.requirementEvidence[1]?.source.excerpt).toContain("Rust skill preferred");
+    expect(
+      result.requirementEvidence.some(
+        ({ source }) =>
+          source.sourcePath.startsWith("structured.sourceSections[1]") ||
+          source.sourcePath.startsWith("structured.sourceSections[2]") ||
+          source.sourcePath.startsWith("structured.sourceSections[3]"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not supplement HTML description text when structured sections are present", () => {
+    const structured = {
+      description: "<p>Swift skill required.</p>",
+      sourceSections: [
+        { heading: "Additional information", kind: "OTHER", content: "Fictional context." },
+      ],
+      requirementTexts: [],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      structured,
+      sourceObservationId: "observation:html-description-not-supplemented",
+    });
+    assertR2ASourcePointers(result, sourceText);
+    expect(result.requirementEvidence).toEqual([]);
   });
 
   it("uses requirement sections once without leaving duplicate array scope unresolved", () => {

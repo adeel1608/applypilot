@@ -1,6 +1,6 @@
 # Fit Scorer
 
-Status: the compatibility scorer and verified-only R2 scorer 2.1.0 / `r2-weights-1` are implemented and hardened on the current offline provenance branch. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, and owner approval. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: the compatibility scorer and verified-only R2 scorer 2.2.0 / `r2-weights-1` are implemented and hardened on the current offline provenance branch. R2 remains an `UNCALIBRATED` owner-review ordering aid pending approved private performance thresholds, all safety gates, and owner approval. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Purpose
 
