@@ -486,6 +486,12 @@ function normalizedSourceLine(value: string): string {
 }
 
 function materialFamilies(text: string): JobFieldFamily[] {
+  const formalEducationCredential =
+    /\b(?:degree|diploma|qualification|education|studying|certificate\s+[ivx]+)\b/i.test(text);
+  const explicitCertificationMarker =
+    /\b(?:RSA|first aid|certification|certified|food safety|WWCC|police check)\b/i.test(text);
+  const certificateIsEducationContext =
+    /\bcertificate\b/i.test(text) && formalEducationCredential && !explicitCertificationMarker;
   const rules: Array<[JobFieldFamily, RegExp]> = [
     ["GEOGRAPHY", /\b(?:location|postcode|suburb|state|remote|hybrid|on-site|travel|commute)\b/i],
     [
@@ -497,7 +503,7 @@ function materialFamilies(text: string): JobFieldFamily[] {
     ["COMPENSATION", /\b(?:salary|remuneration|AUD|super|bonus)\b|\$/i],
     ["DATES", /\b(?:date|posted|closing|close|valid through|start)\b/i],
     ["EXPERIENCE", /\bexperience\b/i],
-    ["EDUCATION", /\b(?:degree|diploma|qualification|education|studying)\b/i],
+    ["EDUCATION", /\b(?:degree|diploma|qualification|education|studying|certificate\s+[ivx]+)\b/i],
     ["LICENCES", /\blicen[cs]e\b/i],
     ["CERTIFICATIONS", /\b(?:RSA|first aid|certification|certificate|WWCC)\b/i],
     ["WORK_RIGHTS", /\b(?:work rights?|visa|sponsorship)\b/i],
@@ -515,7 +521,10 @@ function materialFamilies(text: string): JobFieldFamily[] {
     );
   return rules
     .filter(
-      ([family, pattern]) => pattern.test(text) && !(family === "SKILLS" && physicalOnlyAbility),
+      ([family, pattern]) =>
+        pattern.test(text) &&
+        !(family === "SKILLS" && physicalOnlyAbility) &&
+        !(family === "CERTIFICATIONS" && certificateIsEducationContext),
     )
     .map(([family]) => family);
 }

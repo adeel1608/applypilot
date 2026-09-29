@@ -5324,3 +5324,258 @@ format:check` reports 53 checkout-format files; the Windows-aware full check in 
 - Exactly one next recommended task: after the implementation PR's exact-head CI passes, audit the
   remaining 43 C1 spans (A=3, H=40) with narrow provider-neutral evidence before expanding any
   extraction semantics.
+
+## 56. PR #61 merge / final residual C1 audit blueprint (2026-09-30)
+
+### Current state and objective
+
+- PR #61 was guarded and squash-merged at `e4e1a5650c5db55681958645d293be1737eced12`.
+  Its parent is reviewed base `333edbf3db3cfd71253fff97971b1f9eb42ad2f6` and its tree is the
+  reviewed tree `fff96fe91a8cf6e62d62e20d5b9ff1684507af3b`. Local `main` and `origin/main` are
+  synchronized. The task branch is `fix/m2-r2a-final-residual-scope`.
+- Current reviewed corpus state is 100 v6 jobs, parser/normalization 3.5.1, evidence contract 3.1.0,
+  scorer 2.2.0, weights `r2-weights-1`, thresholds 50/60, 1,388 requirement rows, and 43 residual
+  C1 spans (A=3, H=40). Coverage is COMPLETE/PARTIAL/UNKNOWN `117/308/575`, mean/median
+  26.14%/25%, maximum score 25, with no score-50 jobs, recommendations, or detail candidates.
+- Objective: establish whether any residual span has a provable generic defect under the existing
+  truthful evidence contract. This is the final extraction/coverage pass for this Shield AI corpus.
+  If no material supported defect remains, classify the corpus as exhausted and move the next task to
+  broader source discovery. Do not continue parser polishing by regex possibility alone.
+
+### Requirements, architecture, and boundaries
+
+- Re-fetch and guard PR #61 before merge; merge identity and exact reviewed state are recorded above.
+  Verify real production DB read-only at schema 12, pending 0, integrity PASS, FK 0, counters
+  `21/9/0/0`, 20 LIST_JOBS plus historical GET_JOB 1, no active source/target authority, runs, or
+  pending application operations, and Shield AI v7 REVOKED. The v6 run is
+  `4c143a7b-b102-4dea-a489-de4327fbe678`; never rederive the real DB.
+- Make a fresh canonical real-DB backup, then restore only to an ignored disposable DB. Run current
+  baseline rederivation/evaluation/queueing and all residual diagnostics against disposable copies.
+  Keep diagnostic output to safe aggregate metadata; only the four already-approved Melbourne role
+  rows may include local ID, title, and location. Never print requirement prose, raw payloads, or
+  candidate values. Keep a no-network guard active.
+- Baseline expected engine is parser/normalization 3.5.1, evidence 3.1.0, scorer 2.2.0,
+  `r2-weights-1`, score threshold 50, coverage threshold 60. Any material baseline divergence stops
+  with `PR61_SHADOW_BASELINE_DIVERGED`.
+- Audit the exact remaining 43 pointers and classify residual H spans into exactly one H1-H9 subtype;
+  separately decide the disposition of A=3. A code change is permitted only for a provider-neutral,
+  explicit proposition mapped to an existing kind/family with exact provenance and a fictional
+  positive/negative/near-miss regression. No new kind/schema, migrations, candidate-specific facts,
+  employer-specific rules, semantic guessing, scorer changes, or gate changes are in scope.
+- If contract/schema work is required, stop with `FINAL_C1_SCHEMA_OR_CONTRACT_CHANGE_REQUIRED`.
+  If no generic defect is proven, do not add parser code; use the corpus-exhaustion outcome only if
+  residual H1-H5 safe defects are zero or immaterial and unsupported/ambiguous/non-material spans
+  truthfully remain PARTIAL.
+
+### Proposed files, data flow, risks, and validation
+
+- Planned persistent file is this `PROJECT_PLAN.md` section for the blueprint and final evidence. A
+  code fix, only if proven, may touch the existing R2A normalizer/model and provider-neutral fictional
+  tests. Disposable DBs and diagnostics stay under ignored `data/private/rehearsals`; no profile,
+  private DB, or raw source payload may be committed.
+- Data flow: canonical backup -> ignored restore -> baseline replay through local canonical services
+  -> exact pointer inventory and H1-H9/A classification -> either a narrow tested generic repair and
+  fresh proposed restore/replay, or a corpus-exhaustion decision and offline adapter inventory.
+- Risks include falsely calling ambiguous requirements supported, pointer/hash drift, accidentally
+  marking an unrelated family COMPLETE, leaking source/candidate text, touching real runtime state,
+  and overfitting to employer wording. Abort if any pointer/hash/modality validation fails, a
+  non-REQUIREMENTS source is altered, network is attempted, or gates/regressions change.
+- If code changes, run focused tests, typecheck, lint, changed-file formatting, `git diff --check`,
+  then full required validation and fresh 100-job replay. If no code changes, run focused diagnostic
+  checks, typecheck, lint, privacy audit, `git diff --check`, and `git fsck --strict`.
+- Rollback: discard only the disposable restore; for a code path, revert its isolated commit. Never
+  reset/delete user work or mutate production data. Acceptance is either a proven generic fix with
+  truthful improvement and no regressions, or a documented `CURRENT_SHIELDAI_CORPUS_EXHAUSTED`
+  decision with offline source-adapter readiness and broader-source discovery as the next task.
+
+### Exact implementation steps and stop conditions
+
+1. Verify the PR #61 guard, merge ancestry/tree, and synchronize local `main`.
+2. Create the task branch and record this blueprint before application-code edits.
+3. Run real DB health checks read-only; create and verify a fresh backup and disposable restore.
+4. Replay all 100 jobs with merged PR #61 and compare every required baseline metric.
+5. Inventory all 43 C1 spans using safe metadata only; classify H1-H9 and A=3 with evidence.
+6. Stop parser work if no J1-J5 generic defect passes every authorization condition. If a new kind or
+   schema is needed, stop with the specified review code.
+7. If a supported fix is proven, add fictional tests first, implement narrowly, validate, then replay
+   all jobs from a fresh disposable restore. Otherwise inventory implemented adapters offline and
+   record source-authority v2/schema12 onboarding readiness without creating any tenant/capability.
+8. Update this plan with exact results, any failed checks, corpus/packet outcome, final real DB
+   invariants, and exactly one next task. Do not emit the final green-banner success phrase.
+
+### Exact residual audit findings and pre-code decision (2026-09-30)
+
+- Fresh canonical backup `backup-2026-09-29T21-57-31.986Z-42ab5577` and disposable restore
+  `m2-r2a-shadow-1790719052488-cbaf20c2` passed schema 12, integrity PASS, FK 0, counters
+  `21/9/0/0`, v6 membership 100, Shield AI v7 REVOKED, zero active authority, and network guard
+  blocked 0 attempts. Current-engine replay rederived, evaluated, and queued 100 jobs at parser and
+  normalization 3.5.1 / evidence 3.1.0 / scorer 2.2.0. It matches the required PR61 baseline:
+  1,388 requirement rows, C1=43 (A=3/H=40), coverage 117/308/575, 26.14%/25%, max 25,
+  score>=50 0, recommended 0, detail candidates 0.
+- The exact 43-span diagnostic validated byte slices, source lengths, hashes, reconstructed structured
+  spans, and REQUIREMENTS provenance. Pointer/hash failures 0; provenance mismatches 0; detector
+  versus coverage family mismatches 0; network attempts 0. All 43 have one exact-pointer requirement
+  row. One H span also has an `.extract[EXPERIENCE]` child row; no residual has a pointer/hash defect.
+- Residual A=3: coverage family EXPERIENCE, current primary QUALIFICATION/EDUCATION, one exact
+  EDUCATION row each, no EXPERIENCE child row; each has an experience-secondary pattern candidate,
+  but the experience marker repeats and the current conservative extractor does not emit a child.
+  No exact safe isolated experience proposition is proven; keep all three PARTIAL. H inventory
+  family counts: SKILLS 16, VEHICLE 8, EXPERIENCE 10, GEOGRAPHY 4, HOURS 1, CERTIFICATIONS 1.
+  H lexical modality UNKNOWN 38 / REQUIRED 2; trusted section context REQUIRED 24 / PREFERRED 16.
+  Material-family cardinality is 1:4 / 2:35 / 3:1; compound punctuation is sentence+conjunction
+  34 / none 3 / conjunction 5 / sentence only 1; all 43 are <=250 characters.
+- Conservative final H1-H9 disposition: H1=0, H2=0, H3=0, H4=1, H5=0, H6=39, H7=0, H8=0,
+  H9=0. H4 is one CERTIFICATIONS scope false positive: the exact pointer's supported primary is a
+  qualification/EDUCATION proposition, it contains a formal education credential marker and a
+  generic certificate token but no separate certification marker, and the same row has an already
+  extracted EXPERIENCE child. The broad `certificate` detector created a second family without a
+  separate certification proposition. H6 retains the remaining ambiguous scopes: SKILLS 16,
+  VEHICLE 8, EXPERIENCE 10, GEOGRAPHY 4, HOURS 1. Their exact cross-family wording does not prove a
+  further independent supported proposition, a false positive, or a new canonical kind. Keep them
+  PARTIAL rather than infer.
+- The one H4 is a generic J3 defect under the existing EDUCATION/CERTIFICATIONS contract. Authorized
+  narrow repair: treat an explicit formal certificate-level qualification with degree/education
+  context as EDUCATION, and do not also count generic `certificate` as CERTIFICATIONS unless an
+  independent existing certification marker is present. Preserve standalone generic certificate
+  detection outside a formal-qualification context and preserve explicit RSA/First Aid/etc. scope.
+  No vehicle or generic-ability rule is authorized from this audit because their independent meaning
+  is not established safely by the aggregate evidence.
+- Planned tracked edits are only this plan, `packages/job-importer/src/r2a-normalization.ts`, and
+  provider-neutral fictional cases in `packages/job-importer/src/r2a-normalization.test.ts`.
+  Tests must cover formal certificate qualification (positive), explicit certification beside an
+  education credential (near miss), standalone certification retention, exact pointers/hashes,
+  deterministic replay, and no fabricated CERTIFICATIONS completion. No schema, evidence contract,
+  scorer, weight, threshold, eligibility, candidate-fact, or PARTIAL-policy changes.
+- After focused validation, create a fresh proposed disposable restore and replay all 100 jobs. If the
+  generic repair passes with no regressions, retain the narrow fix and one open PR. Then decide the
+  Shield AI corpus is exhausted only if all remaining spans are H6/H7/H8/H9 or the separately
+  unresolved A=3 and no H1-H5 safe repair remains; packet candidate criteria stay unchanged.
+
+### Proposed replay precondition and versioning decision (2026-09-30)
+
+- A fresh restore from the verified backup passed schema 12, integrity PASS, FK 0, counters
+  `21/9/0/0`, v6 membership 100, v7 REVOKED, authority 0/0, and network guard blocked 0 attempts.
+- The first proposed-replay attempt stopped before writes with
+  `R2A_SHADOW_PARENT_VERSION_MISMATCH`: all 100 accepted v6 verifications reference a parent one
+  job-version behind the current derived version. This is consistent across all members and does
+  not indicate source/payload drift. The shared repository rederive method explicitly validates the
+  immutable accepted observation and preserves its original parent binding, so the disposable replay
+  harness must compare against that verification parent while summarizing the current derived
+  version. Do not alter verification rows or mutate the real DB.
+- The J3 material-family behavior change requires the mandated patch version bump. Set parser and
+  normalization to `3.5.2` (from `3.5.1`); evidence contract stays `3.1.0`, scorer `2.2.0`, weights
+  and thresholds stay fixed. Update only version expectations in existing tests. Adjust the ignored
+  disposable replay helper to accept the verified parent/current-version relationship described
+  above. Recreate a fresh restore before replay.
+- Add `packages/job-model/src/r2a.ts` and the existing parser/version assertion sites in
+  `packages/job-importer/src/r2a-normalization.test.ts`,
+  `packages/database/src/r2a-repository.test.ts`, and
+  `packages/database/src/source-enablement-repository.test.ts` to the tracked change list. The
+  ignored C1 audit helper will mirror the exact new family-detector rule for proposed-state auditing.
+- Full fictional E2E validation reported 46/47 passing. The only failure is the R2A evidence
+  display test hard-coding parser/normalization `3.5.1`; the app correctly displays `3.5.2`. Update
+  that stale expected version in `tests/e2e/r2a-evidence.spec.ts`, run the focused case, then rerun
+  the full suite on ports 3101/3201.
+- Tighten the provider-neutral fixture matrix before final validation: assert lexical PREFERRED
+  precedence inside a REQUIREMENTS section for the positive formal-education case; assert section
+  REQUIRED inheritance for an unmarked Certificate IV qualification; keep a vague generic
+  certificate mention PARTIAL and unparsed; and retain the explicit RSA near-miss. This covers
+  modality behavior and ensures ambiguous wording is not treated as resolved.
+
+### Final residual audit, replay, and packet-gate closeout (2026-09-30)
+
+- PR #61 was OPEN, UNMERGED, non-draft, and mergeable before guarded squash merge. Reviewed base
+  333edbf3db3cfd71253fff97971b1f9eb42ad2f6, head 25d9881e94e639f68cc9f7c335e8affaf4701088,
+  tree fff96fe91a8cf6e62d62e20d5b9ff1684507af3b; 1 commit, 7 files, +962/-29. Exact-head push
+  CI 36573424871 and PR CI 36573540604 passed; reviews 0, threads 0. Squash merge
+  e4e1a5650c5db55681958645d293be1737eced12 has the reviewed base parent and tree. Main and
+  origin/main synchronized at that SHA before this branch.
+- Final real read-only runtime remains schema 12, pending migrations 0, integrity PASS, FK 0;
+  counters 21/9/0/0; historical GET_JOB 1; LIST_JOBS requests 20; active source/target
+  capabilities 0/0; source runs 0; pending operations 0; v6 run complete with 100 accepted,
+  qualified members and current evaluations/queues; Shield AI v7 REVOKED.
+- Backup backup-2026-09-29T21-57-31.986Z-42ab5577 and proposed restore
+  m2-r2a-shadow-1790721138762-ebc297c0 passed schema 12, integrity PASS, FK 0. Counters and
+  authority were preserved; network guard blocked 0 attempts.
+- PR61 baseline shadow m2-r2a-shadow-1790719052488-cbaf20c2: 100 jobs, parser/normalization
+  3.5.1, evidence 3.1.0, scorer 2.2.0, weights r2-weights-1, thresholds 50/60, 1,388
+  requirement rows, C1=43 (A=3/H=40), COMPLETE/PARTIAL/UNKNOWN 117/308/575, mean/median
+  coverage 26.14%/25%, max score 25, zero scores >=50/recommendations/details.
+- Baseline coverage families: SKILLS 16, VEHICLE 8, EXPERIENCE 13, GEOGRAPHY 4, HOURS 1,
+  CERTIFICATIONS 1. Lexical modality UNKNOWN 41 / REQUIRED 2; trusted section context REQUIRED
+  27 / PREFERRED 16. Punctuation: sentence+conjunction 34, none 3, conjunction-only 5,
+  sentence-only 1. Family cardinality 1:4 / 2:35 / 3:1. Exact pointers/hashes and decoded
+  spans passed; 43/43 exact requirement pointers; provenance mismatches 0; family detector
+  mismatches 0; blocked network attempts 0.
+- Baseline residual H1-H9: H1=0, H2=0, H3=0, H4=1, H5=0, H6=39, H7=0, H8=0, H9=0.
+  H4 was one false CERTIFICATIONS scope caused by a generic certificate token with formal
+  education context and no independent certification marker. H6 is SKILLS 16, VEHICLE 8,
+  EXPERIENCE 10, GEOGRAPHY 4, HOURS 1; lexical UNKNOWN 37 / REQUIRED 2; section REQUIRED
+  23 / PREFERRED 16. No safe atomic, multi-proposition, deterministic segmentation, normalizer,
+  or new-kind defect was found in H6. A=3 each has an EDUCATION exact row and EXPERIENCE
+  coverage, but repeated experience wording yields no safe child. Keep A3 and H39 PARTIAL.
+- The proven J3 fix classifies formal Certificate IV-level credentials as EDUCATION and suppresses
+  overlapping generic CERTIFICATIONS unless an independent supported certification marker exists.
+  Parser/normalization moved 3.5.1 -> 3.5.2; evidence remains 3.1.0; scorer remains 2.2.0.
+  Weights, thresholds, eligibility, duplicate semantics, score policy, and PARTIAL gate are
+  unchanged. Provider-neutral fixtures cover no duplicate scope, explicit RSA retention, formal
+  standalone education, vague generic certificate remaining PARTIAL, exact pointers/hashes,
+  deterministic replay, lexical PREFERRED precedence, and section REQUIRED inheritance.
+- Proposed replay rederived/evaluated/queued all 100 jobs at 3.5.2. Requirement evidence 1,388 ->
+  1,388; C1 43 -> 42; A=3 remains, H=40 -> 39. Final H1=0,H2=0,H3=0,H4=0,H5=0,H6=39,H7=0,
+  H8=0,H9=0. Proposed residual families: SKILLS 16, VEHICLE 8, EXPERIENCE 13, GEOGRAPHY 4,
+  HOURS 1. Lexical UNKNOWN 40 / REQUIRED 2; section REQUIRED 26 / PREFERRED 16; punctuation
+  sentence+conjunction 34, none 3, conjunction-only 4, sentence-only 1. Pointers/hashes and
+  reconstructed spans PASS; provenance/detector mismatches 0; network attempts 0.
+- Baseline -> proposed coverage COMPLETE/PARTIAL/UNKNOWN 117/308/575 -> 117/307/576; mean/median
+  26.14%/25% -> 26.17%/25%; coverage increased 1, unchanged 99, decreased 0. Field and
+  requirement rows were unchanged on all jobs. Score distribution unchanged: 0=26, 1-9=42,
+  10-19=23, 20-29=9, 30-49=0, 50-100=0. Max score 25, score>=50 0, eligibility
+  REVIEW_REQUIRED 99 / ELIGIBLE 1 / INELIGIBLE 0, recommendations 0, details 0, positive
+  contributions 129, negative 0, unexplained regressions 0; duplicate CLEAR 100.
+- Four Melbourne roles after replay: R5712 has 16 requirement rows, C1=0, 3 COMPLETE / 4 PARTIAL /
+  10 UNKNOWN families, 25% coverage, three positive contributions (2 required-skill and 1
+  preferred-skill), score 18/50, REVIEW_REQUIRED, not recommended, detail unjustified.
+  R4633 has 0 rows, C1=0, 4/4/9 family states, 0% coverage, no positive contribution, score
+  0/50, REVIEW_REQUIRED, not recommended, detail unjustified. R5964 has 8 rows, C1=0, 3/4/10
+  states, 25% coverage, one required-skill contribution, score 7/50, REVIEW_REQUIRED, not
+  recommended, detail unjustified. R5713 has 11 rows, C1=1 (H6), 3/4/10 states, 25% coverage,
+  one required-skill contribution, score 7/50, REVIEW_REQUIRED, not recommended, detail
+  unjustified. All four duplicate CLEAR. Applicable blockers: ELIGIBILITY_NOT_ELIGIBLE,
+  EXTRACTION_COVERAGE_INSUFFICIENT, MATERIAL_SCOPE_PARTIAL, R2_EXTRACTION_COVERAGE_INSUFFICIENT,
+  R2_MANDATORY_CAPABILITY_UNCONFIRMED (except R4633), R2_MATERIAL_SCOPE_PARTIAL, and
+  SCORE_BELOW_THRESHOLD.
+- Decision: CURRENT_SHIELDAI_CORPUS_EXHAUSTED. Highest score 25, highest coverage 100%; jobs
+  within 10 / 20 / 30 points of 50: 0 / 0 / 9. The remaining 42 spans (A3 and H6=39) are
+  ambiguous and truthfully PARTIAL. Further Shield AI parser edits would guess whether exact spans
+  imply independent skills, travel/vehicle, experience, geography, or schedule propositions.
+  No additional corpus-specific parser work is justified.
+- Offline source inventory: bounded public readers implement Lever LIST_JOBS and GET_JOB and
+  Greenhouse LIST_JOBS and GET_JOB. Durable source-capability v2/schema-12 owner receipts and
+  durable LIST/GET persistence are implemented for Lever only. SEEK supports local fixtures and
+  user-supplied content; public network modes are disabled. Indeed, LinkedIn, Employment Hero,
+  Workday, and generic-company-site registry entries remain placeholders; LinkedIn stays
+  manual/assisted only. An owner-approved Lever tenant can reuse the current durable architecture.
+  Greenhouse has capability encoding/readers but needs a durable v2 runner/persistence path before
+  onboarding. No tenant/capability was created. Broader discovery can run for an owner-approved
+  supported Lever tenant; current active source authority remains zero.
+- Validation: focused R2A 6 files / 158 tests PASS; final full unit 59 files / 667 tests PASS;
+  integration 3 files / 21 tests PASS; fictional E2E 47/47 PASS on 3101/3201; typecheck, lint,
+  changed-file formatting, Windows-aware full Prettier, local and showcase production builds,
+  showcase audit, privacy audit, dependency audits (0 vulnerabilities), release fixture, migration
+  immutability (git diff --exit-code origin/main -- packages/database/drizzle), git diff --check,
+  and git fsck --strict PASS. Standard npm run format:check reports 60 checkout line-ending/style
+  warnings; prettier --check . --end-of-line auto passes. Unrelated files were not reformatted.
+  git fsck reported dangling objects but exited 0.
+- Final real read-only check confirms schema 12/pending 0/integrity PASS/FK 0, counters 21/9/0/0,
+  historical GET_JOB 1, LIST_JOBS requests 20, active authority 0/0, active runs 0, pending
+  operations 0, v6 100 accepted/qualified current jobs/evaluations/queues, and v7 REVOKED.
+  Task deltas: LIST_JOBS 0, GET_JOB 0, source DNS/TCP/TLS 0/0/0, employer 0, form 0, upload 0,
+  submission 0.
+- Seven milestones: 1 Foundations COMPLETE; 2 Current real role + fresh packet IN PROGRESS /
+  BROADER SOURCE DISCOVERY REQUIRED; 3 real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING / NOT LIVE
+  VERIFIED; 4 final-review/submission safeguards BLOCKED; 5 reproducible release COMPLETE;
+  6 controlled real fill-preview BLOCKED; 7 final readiness / Green-banner review NOT STARTED.
+  Personal Beta remains READY with 0 active capabilities. Personal Live V1 remains NOT_READY.
+  Exactly one recommended task: stage broader source discovery with an owner-approved supported
+  tenant/provider.
