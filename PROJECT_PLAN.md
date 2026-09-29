@@ -4929,3 +4929,398 @@ Do not emit the final green-banner success phrase.
   final PR head. No merge is authorized or intended. After the final checks, report the 84 requested
   closeout fields and the seven milestone statuses here as well as in the task response; keep
   Personal Live V1 NOT_READY and do not emit a green-banner success phrase.
+
+## 53. M2 PR #60 merge / C1 true-unparsed requirement scope blueprint (2026-09-29)
+
+### Guarded PR #60 merge and starting state
+
+- PR #60 was re-fetched immediately before merge. It matched the requested title, OPEN / UNMERGED /
+  non-draft / MERGEABLE state, base `44a4c39037fc77f5fe78ed91c590ba99a217d96b`, reviewed head
+  `20e4c4f3f53e6c5ed5410faacdc7e4c33756a2e9`, reviewed tree
+  `1c8ab16656ee327a3492758742428ee80c74e568`, 2 commits, 9 files, +629/-22, ahead 2 / behind 0,
+  0 reviews, 0 unresolved review threads, and exact-head push/PR CI runs `36558463208` /
+  `36558468429` SUCCESS. The normal squash merge was guarded by the exact reviewed head.
+- Squash merge: `333edbf3db3cfd71253fff97971b1f9eb42ad2f6`; parent is the requested base and tree
+  equals the reviewed tree. Local `main` and `origin/main` were synchronized to this merge SHA.
+  Fresh branch: `fix/m2-r2a-true-requirement-scope`, created from clean synchronized main.
+- Current implementation baseline: R2A parser `3.5.0`, normalization `3.5.0`, evidence contract
+  `3.1.0`, scorer `2.2.0`, weights `r2-weights-1`, score threshold `50`, and minimum extraction
+  coverage `60`. PR #60 changed modality interpretation only; no new C1 root cause is assumed.
+
+### Objective, scope, and invariants
+
+Audit each of the exact 76 REQUIREMENTS-origin unparsed spans previously classified
+`TRUE_UNPARSED_REQUIREMENT_SCOPE` (C1), first on a fresh disposable copy, and decide whether a
+generic R2A extraction or coverage-accounting defect can truthfully resolve at least one span.
+Preserve genuinely unsupported scope as PARTIAL. This task does not perform any source or employer
+action and the real production database remains read-only throughout.
+
+Hard invariants: lifetime counters remain `21/9/0/0`; historical GET_JOB remains `1`; source and
+target authority, active source runs, and pending application operations remain zero. Do not create a
+source capability or owner receipt; do not dispatch LIST_JOBS/GET_JOB, network probes, employer or
+target navigation, MAP/FILL/UPLOAD/VERIFY/FILL_PREVIEW/SUBMIT; do not change profile facts, evidence
+states, duplicate decisions, scorer, weights, thresholds, eligibility, or the PARTIAL blocker. Do not
+print source requirement text, payloads, URLs, candidate facts, profile values, or private records.
+
+### Read-only baseline, backup, and disposable data flow
+
+1. Re-read real DB schema 12 / pending 0 / integrity PASS / FK 0, counters `21/9/0/0`, source
+   history 20 LIST_JOBS + 1 historical GET_JOB, zero active source/target authority, runs, and
+   pending operations, and latest Shield AI v7 REVOKED. Confirm the v6 run
+   `4c143a7b-b102-4dea-a489-de4327fbe678` remains intact. Never open a write-capable handle or point
+   a DB override at the real DB.
+2. Create a fresh canonical backup and record only its safe ID and schema/integrity/FK state. Restore
+   it through the supported maintenance API into a fresh ignored disposable path. Verify schema 12,
+   integrity PASS, FK 0, unchanged safe counters, v6 membership, v7 REVOKED, and zero active
+   authority before any diagnostic or replay writes.
+3. On the disposable DB only, run canonical current-engine rederive/evaluate/queue for all 100 v6
+   jobs. Require PR #60 parity: 100 jobs; 1,346 requirements (REQUIRED/PREFERRED/CONDITIONAL/
+   NEGATED/UNKNOWN `827/477/4/3/35`); material COMPLETE/PARTIAL/UNKNOWN `113/330/557`; mean/median
+   coverage `24.37%/22.5%`; max score 25; zero score >=50, recommendations, or deterministic detail
+   candidates; and exactly 76 C1 unparsed spans. On material divergence stop as
+   `PR60_SHADOW_BASELINE_DIVERGED`.
+4. For exactly those 76 spans, compute requested provenance, current family/evidence/pointer,
+   modality, punctuation, conjunction, and length metadata in memory. Output aggregate distributions
+   only; the four Melbourne rows may include job ID, safe title/location, and safe codes/counts.
+   The requirement text itself must never reach console, report, tracked file, or PR.
+
+### C1 classification and hypotheses
+
+Each span receives exactly one primary bucket: A `MULTI_FAMILY_SINGLE_SPAN_SECONDARY_UNPARSED`; B
+`COMPOUND_STRUCTURED_REQUIREMENT_NOT_SEGMENTED`; C
+`REQUIREMENT_KIND_COVERAGE_FAMILY_MISMATCH`; D `MATERIAL_FAMILY_FALSE_POSITIVE`; E
+`SUPPORTED_REQUIREMENT_NOT_EMITTED`; F `SOURCE_POINTER_OR_COVERAGE_KEY_MISMATCH`; G
+`GENUINELY_UNSUPPORTED_REQUIREMENT_SCOPE`; or H `OTHER`. Report A-H counts, per-bucket material
+family and modality distributions, multi-family cardinality, compound punctuation, and involvement
+of each Melbourne role. The C1 spans must sum to exactly 76.
+
+Test hypotheses only after this composition is known: H1 single-primary-family bottleneck; H2
+structured compound-span bottleneck; H3 material-family over-classification; H4 pointer/coverage key
+mismatch; H5 unsupported canonical kind; H6 no bug / legitimately partial scope. A hypothesis is
+not proven by source keyword counts alone: semantic distinctions must be supported by exact safe
+metadata and fictional tests. Do not edit application code before the 76-span composition and
+hypothesis results are recorded.
+
+### Conditional implementation scope and semantic versions
+
+Application changes are authorized only for a proven generic defect. Potential scope is limited to
+`packages/job-importer/src/r2a-normalization.ts`, its provider-neutral fictional tests, and
+`packages/job-model/src/r2a.ts` only if a real schema contract change is proven necessary. Existing
+R2A repository, scorer, eligibility, reader, and source APIs should remain unchanged unless direct
+evidence proves a contract gap; a required schema change stops with
+`TRUE_REQUIREMENT_SCOPE_SCHEMA_CHANGE_REVIEW_REQUIRED` and no migration is allowed in this task.
+
+Allowed conditional repairs: add a family-specific supported requirement extractor for a truly
+multi-family proposition; split structured spans only at proven semicolon or safe sentence
+boundaries while preserving exact encoded source offsets and inherited modality; refine
+`materialFamilies()` only for proven generic false-positive families; or reconcile pointer identity
+without weakening provenance. Never duplicate an entire line into every detected family, split on
+comma/slash/ampersand/and/or without a separate narrow grammar proof, infer vehicle access from a
+driver licence, create unsupported skill evidence, treat responsibilities as requirements, or
+suppress true unsupported spans to improve coverage.
+
+If parser/normalization semantics change, bump both `3.5.0` versions to the next semantic version;
+keep evidence contract `3.1.0`, scorer `2.2.0`, weights, thresholds, eligibility, and duplicate
+semantics unchanged unless a separately proven contract requirement makes this impossible (which
+would be a stop). No migration is expected.
+
+### Fictional regression and material/safety gates
+
+Add provider-neutral fictional tests for each proven defect. Applicable requirements include
+multi-family degree/experience extraction with separate safe evidence; no licence-to-vehicle
+inference; unchanged work-right multi-proposition behavior; one parsed family not completing another;
+exact structured semicolon/sentence child offsets and hashes; no automatic comma or and/or splitting;
+section-default modality inheritance with explicit lexical precedence; removal of proven coverage
+false positives while retaining true unsupported PARTIAL; unrelated families remaining UNKNOWN;
+deterministic replay, unchanged conflict behavior, unchanged scorer 2.2 short-token behavior,
+continued PR #60 modality tests, and zero employer-specific fixture text.
+
+An implementation PR is allowed only if all hold: a generic defect is proven; fictional tests
+reproduce it; no evidence is fabricated; true unsupported scope remains PARTIAL; candidate facts,
+scorer/weights/thresholds, and PARTIAL blocking are unchanged; every source pointer/hash validates;
+no external action occurs; no unexplained extraction/score/eligibility regression remains; and at
+least one of the 76 C1 spans is truthfully resolved or a false-positive coverage mark is truthfully
+removed. Recommendation is not required. Otherwise stop with
+`C1_REQUIREMENT_SCOPE_REPAIR_NOT_MATERIAL` and do not open an implementation PR.
+
+### Validation, replay, rollback, and stop conditions
+
+Before proposed replay, run focused R2A normalization/repository, source rederivation, Lever reader
+if touched, eligibility, scorer, R2 repository/readiness suites, typecheck, lint, changed-file
+formatting, and `git diff --check`. Restore a second fresh disposable copy from the verified backup;
+rederive/evaluate/queue all 100 canonically and compare C1/A-H, requirement totals, material scope,
+coverage, unparsed spans/provenance, scores/contributions, eligibility, recommendations, detail
+candidates, and all four Melbourne records. Then run the full requested unit/integration/fictional
+E2E, typecheck, lint, changed-file Prettier and repository format status, local/showcase builds and
+audit, privacy/dependency audits, release fixture, migration immutability, diff check, and strict
+fsck. Record failed or unavailable gates exactly; do not reformat unrelated files.
+
+If an application change fails a gate, revert only this branch's application/test edits and retain
+the safe diagnostic plan evidence. Never mutate or restore the real DB, rewrite immutable source
+history, or perform ad-hoc SQL repair. Stop on changed PR state, real DB mismatch, failed backup or
+restore, baseline divergence, incomplete C1 accounting, ambiguous proof, schema need, invalid
+pointers/hashes, fictional/pre-shadow failure, attempted network, unexplained regression, or failed
+material gate.
+
+After proposed replay, packet decision is CASE 1 `PACKET_GATE_CANDIDATE_EXISTS` if any job is
+ELIGIBLE and recommended; CASE 2 `SCORE_GATE_REACHED_BUT_EVIDENCE_GATE_BLOCKED` if none is
+recommended but any score reaches 50; otherwise CASE 3 `CURRENT_CORPUS_STILL_BELOW_THRESHOLD`.
+Never GET_JOB, generate a real packet, or select a job for the owner. Re-read real DB invariants
+before closeout. If every gate passes, open exactly one PR to main, leave it OPEN / UNMERGED, and
+require exact-head push and PR CI SUCCESS.
+
+The final response and plan closeout must use title `M2 PR60 MERGE / C1 TRUE-REQUIREMENT-SCOPE
+REPAIR CLOSEOUT`, report the task's 91 requested fields, preserve the seven-milestone statuses,
+keep Personal Live V1 `NOT_READY`, name exactly one next task, and never emit the green-banner
+success phrase. At blueprint creation, only the guarded PR #60 merge was complete. Section 54
+records the completed exact C1 diagnosis, verified backup, and first shadow. The current proposed
+3.5.1 replay is recorded in the follow-up closeout section; full repository validation, final real
+DB read-only checks, and PR/CI closeout remain outstanding.
+
+## 54. C1 exact-span baseline and conservative classification (2026-09-29)
+
+### Verified disposable baseline
+
+- Real DB read-only checks passed before diagnostics: schema 12, pending migrations 0, integrity
+  PASS, FK 0, counters `21/9/0/0`, source history 20 LIST_JOBS + 1 historical GET_JOB, source and
+  target authority 0/0, active source runs 0, pending application operations 0, latest Shield AI
+  v7 REVOKED, and v6 run `4c143a7b-b102-4dea-a489-de4327fbe678` with 100 qualified members.
+- Fresh canonical backup `backup-2026-09-29T11-28-22.486Z-4425360c` and supported ignored restore
+  `m2-r2a-shadow-1790681302674-1029f84f` both passed schema 12 / integrity / FK checks and retained
+  safe counters and run membership. Network guard blocked 0 attempts.
+- Current-engine replay rederived/evaluated/queued 100 jobs on the disposable copy: parser and
+  normalization 3.5.0, evidence contract 3.1.0, scorer 2.2.0, `r2-weights-1`, score threshold 50,
+  coverage threshold 60; 857 fields, 1,346 requirements (`827/477/4/3/35` by modality),
+  `113/330/557` material coverage, mean/median `24.37%/22.5%`, max score 25, 0 at score >=50,
+  0 recommendations, 0 detail candidates, and exactly 76 C1 spans.
+
+### Exact 76-span metadata and classification
+
+- The diagnostic rebuilt the exact canonical structured source in memory. All 76 pointer slices,
+  excerpt hashes, source lengths, and decoded structured chunks validated; REQUIREMENTS section
+  provenance mismatches 0; material detector / coverage-family mismatches 0; the source path family
+  is structured source-section line/chunk; one exact requirement-evidence pointer row exists for
+  each C1 span, and there are no same-family same-content alternate pointers. Network attempts: 0.
+- Conservative primary A-H classification is `A/B/C/D/E/F/G/H = 8/4/15/3/0/0/0/46` (sum 76).
+  Family counts: A EXPERIENCE 7 / SKILLS 1; B CERTIFICATIONS 1 / EXPERIENCE 3; C VEHICLE 15;
+  D SKILLS 2 / VEHICLE 1; E/F/G none; H EXPERIENCE 16 / SKILLS 16 / VEHICLE 8 / GEOGRAPHY 4 /
+  HOURS 1 / CERTIFICATIONS 1. The 46 H rows are intentionally unresolved and remain PARTIAL.
+- Lexical modality counts by bucket: A UNKNOWN 8; B UNKNOWN 4; C UNKNOWN 13 / REQUIRED 2; D
+  UNKNOWN 2 / REQUIRED 1; H UNKNOWN 41 / REQUIRED 2 / PREFERRED 3. Trusted section context:
+  A REQUIRED 7 / PREFERRED 1; B REQUIRED 3 / PREFERRED 1; C REQUIRED 13 / PREFERRED 2; D
+  REQUIRED 3; H REQUIRED 30 / PREFERRED 16. Current primary kinds and exact evidence families
+  match one-for-one; each exact evidence row points to a different family than its C1 coverage row.
+- Material-family cardinality is 1:7 / 2:67 / 3:2. Punctuation combinations: conjunction 10;
+  sentence terminator + conjunction 53; semicolon + sentence terminator + conjunction 3;
+  semicolon + conjunction 4; sentence terminator only 3; none 3. Every span is <=250 characters.
+- Four Melbourne safe rows: R5712 0 C1; R4633 0; R5964 1 C1 (C, VEHICLE coverage / LOCATION
+  kind / GEOGRAPHY evidence / travel cue); R5713 1 C1 (H, preferred context / GEOGRAPHY coverage /
+  GENERAL kind / SKILLS evidence). No source text or non-Melbourne per-span identity was emitted.
+
+### Hypothesis decisions and implementation boundary
+
+- H1 is proven for the eight high-confidence A spans: multiple supported family cues coexist with
+  an exact primary evidence row for a different family. Four B spans show the related safe compound
+  case. Remaining multi-family-looking rows stay H until separately proven.
+- H2 is proven for four structured compounds with safe semicolon/sentence boundaries and distinct
+  supported family cues. The task will fix only the independently validated material-family defects
+  unless tests justify a broader change.
+- H3 is proven for 3 D spans: 15 travel-only spans are classified as C mismatches (the current
+  LOCATION/GEOGRAPHY evidence is exact); one driver's-licence span adds VEHICLE; two physical-only
+  ability spans add SKILLS. The generic detector can be narrowed without inferring vehicle access or
+  skill evidence.
+- H4 is rejected: exact source pointers and hashes validate; no family-matching content uses a
+  different source pointer. H5 has no proven new canonical kind/schema requirement in this audit.
+  H6 remains applicable: 46 ambiguous spans are kept PARTIAL and no source text is used to claim
+  them complete or unsupported.
+- Authorized first implementation scope is limited to provider-neutral generic detector behavior:
+  classify travel/commute under GEOGRAPHY consistently with the existing LOCATION requirement
+  kind, remove bare `driver` from VEHICLE material detection, and avoid a SKILLS over-classification
+  when `ability to` only expresses a physical requirement. Parser/normalization semantic versions
+  move from 3.5.0 to 3.5.1 if the fictional regressions pass; evidence 3.1.0, scorer 2.2.0, weights,
+  thresholds, and PARTIAL policy remain fixed. Add tests before changing application code.
+- No app code has been edited yet. Baseline replay and this metadata audit are complete; the exact
+  diagnosis is recorded before conditional implementation. The next gate is fictional regression
+  tests and focused pre-shadow validation; any ambiguity or residual-scope regression stops the
+  proposed change and preserves the safe diagnostic evidence.
+
+### Structured compound splitter addendum (2026-09-29, before implementation)
+
+- The exact audit also proves four bucket-B C1 spans have separate supported propositions at
+  structured punctuation boundaries. The user task requires implementing the structured-safe
+  splitter when H2 is proven, so this addendum expands the implementation blueprint beyond the
+  coverage-detector refinement already recorded above.
+- Implement a generic structured-requirement clause helper over existing `sourceOffsets`. Split at
+  semicolons and sentence terminators only when decimal and common-abbreviation checks pass. Keep
+  comma, slash, ampersand, `and`, and `or` intact. Give children deterministic `.clause[n]` sourcePath
+  suffixes; preserve exact serialized JSON offsets, source excerpt hashes, and inherited section
+  modality. Lexical modality on a child takes precedence through the existing requirement extractor.
+- Apply the same child spans to requirement evidence and requirement material-scope reconciliation so
+  each child pointer can independently reach COMPLETE/PARTIAL without making an unrelated family
+  complete. Do not duplicate a whole parent proposition across families. Preserve exact parent spans
+  when no safe split exists.
+- Add provider-neutral fictional regressions for semicolon and sentence boundaries, comma and
+  and/or non-splitting, inherited REQUIRED/PREFERRED context, lexical child overrides, exact offsets
+  and hashes, deterministic IDs/replay, and unchanged unrelated-family coverage. Update the ignored
+  C1 audit decoder to recognize child suffixes while continuing to emit only aggregates and the four
+  allowed Melbourne rows.
+- Risks are incorrect abbreviation/decimal boundaries, escaped-JSON offset drift, duplicate evidence,
+  and coverage being marked complete from a sibling clause. Stop if any pointer/hash or modality
+  check fails, a non-requirements section is split, or any unrelated family becomes complete. No
+  schema/migration, evidence-contract, scorer, weight, threshold, eligibility, or privacy change is
+  planned. Rollback is to revert the implementation commit; disposable shadows remain isolated.
+
+## 55. M2 PR60 merge / C1 true-requirement-scope repair closeout (2026-09-29)
+
+### Guarded PR #60 merge
+
+- Immediately before merge PR #60 was OPEN, unmerged, non-draft, and mergeable. Title was
+  `fix: preserve requirement-section modality in R2A evidence`; base
+  `44a4c39037fc77f5fe78ed91c590ba99a217d96b`; reviewed head
+  `20e4c4f3f53e6c5ed5410faacdc7e4c33756a2e9`; reviewed tree
+  `1c8ab16656ee327a3492758742428ee80c74e568`.
+- It had 2 commits, 9 files, cumulative diff +629/-22, ahead 2 / behind 0, 0 reviews, and 0
+  unresolved review threads. Exact-head push CI `36558463208` and PR CI `36558468429` were both
+  SUCCESS. Expected file list matched exactly: this plan, `docs/ELIGIBILITY_ENGINE.md`, the R2A
+  repository tests, source-enablement repository tests, importer normalizer and tests, model R2A
+  version file, Lever reader tests, and R2A E2E spec.
+- Exact reviewed-head squash guard succeeded. Merge SHA
+  `333edbf3db3cfd71253fff97971b1f9eb42ad2f6`; parent was the reviewed base above; merge tree was
+  `1c8ab16656ee327a3492758742428ee80c74e568`. Local `main` and `origin/main` synchronized to that
+  SHA. Engineering branch `fix/m2-r2a-true-requirement-scope` was created from synchronized main.
+
+### Real database, verified backup, and baseline shadow
+
+- Real database remained read-only. Final status: schema 12, pending migrations 0, integrity PASS,
+  foreign-key issues 0; lifetime counters `21 / 9 / 0 / 0`; historical GET_JOB total 1; 20
+  LIST_JOBS requests; active source and target capabilities 0/0; active source runs 0; pending
+  application operations 0; latest Shield AI capability v7 REVOKED. V6 run
+  `4c143a7b-b102-4dea-a489-de4327fbe678` remains COMPLETE with 100 members, accepted and qualified.
+- Final real preflight PASS: SOURCE_ENABLED_BETA READY with 0 active capabilities; no target
+  authority. Personal Live V1 remains NOT_READY. No task source/employer/target or application action
+  was performed.
+- Fresh canonical backup `backup-2026-09-29T11-28-22.486Z-4425360c`: schema 12, integrity PASS, FK 0. Baseline shadow `m2-r2a-shadow-1790681302674-1029f84f` and final proposed shadow
+  `m2-r2a-shadow-1790686545697-6f838ab7` were disposable restores of this backup. Both verified
+  schema 12, integrity PASS, FK 0, unchanged counters, v6 present, v7 revoked, zero active source or
+  target capability, and blocked network attempts 0.
+- Current-engine baseline replay used the merged PR #60 parser/normalizer 3.5.0, evidence contract
+  3.1.0, scorer 2.2.0, `r2-weights-1`, recommendation threshold 50, and minimum extraction coverage 60. It rederived, evaluated, and queued all 100 v6 jobs through canonical local services.
+
+### Exact C1 audit and hypothesis results
+
+- Baseline had 100 jobs, 857 field evidence rows, 1,346 requirement rows, modalities REQUIRED 827 /
+  PREFERRED 477 / CONDITIONAL 4 / NEGATED 3 / UNKNOWN 35, and coverage COMPLETE/PARTIAL/UNKNOWN
+  `113 / 330 / 557`; mean/median 24.37% / 22.5%; exactly 76 C1 REQUIREMENTS-origin unparsed spans.
+- All 76 canonical source pointers, byte slices, hashes, source lengths, decoded chunks, and
+  REQUIREMENTS provenance validated. Section-provenance and material-detector/coverage-family
+  mismatches were 0; one exact evidence pointer row existed per baseline C1 span; alternate
+  same-family/same-content pointers 0; network attempts 0.
+- Baseline A-H classification was `8 / 4 / 15 / 3 / 0 / 0 / 0 / 46`. Family distributions: A
+  EXPERIENCE 7 / SKILLS 1; B CERTIFICATIONS 1 / EXPERIENCE 3; C VEHICLE 15; D SKILLS 2 / VEHICLE
+  1; E/F/G none; H EXPERIENCE 16 / SKILLS 16 / VEHICLE 8 / GEOGRAPHY 4 / HOURS 1 /
+  CERTIFICATIONS 1. Lexical modality by bucket: A UNKNOWN 8; B UNKNOWN 4; C UNKNOWN 13 / REQUIRED
+  2; D UNKNOWN 2 / REQUIRED 1; H UNKNOWN 41 / REQUIRED 2 / PREFERRED 3. Section context: A
+  REQUIRED 7 / PREFERRED 1; B REQUIRED 3 / PREFERRED 1; C REQUIRED 13 / PREFERRED 2; D REQUIRED
+  3; H REQUIRED 30 / PREFERRED 16.
+- Baseline multi-family cardinality was 1:7 / 2:67 / 3:2. Compound punctuation was conjunction 10;
+  sentence terminator + conjunction 53; semicolon + sentence terminator + conjunction 3; semicolon +
+  conjunction 4; sentence terminator only 3; none 3. All were at most 250 characters.
+- H1 was proven for eight multi-family spans; H2 was proven for four safely bounded structured
+  compounds. H3 was proven: 15 travel-only coverage mismatches, one driver-licence-only VEHICLE
+  false positive, and two physical-ability-only SKILLS false positives. H4 was rejected (exact
+  pointers matched). H5 did not justify a new canonical kind or schema. H6 remains: ambiguous scope
+  stays PARTIAL.
+- Melbourne baseline C1 counts: R5712 0, R4633 0, R5964 1, R5713 1. R5964 was VEHICLE coverage
+  with LOCATION/GEOGRAPHY evidence; R5713 remained ambiguous under PREFERRED context with
+  GEOGRAPHY coverage and GENERAL/SKILLS evidence. No requirement prose was printed.
+
+### Generic implementation and versions
+
+- Implemented only proven generic behavior. Coverage now classifies travel/commute with GEOGRAPHY,
+  requires explicit `vehicle` for VEHICLE scope, and excludes physical-only ability from SKILLS
+  scope. Structured REQUIREMENTS children split only at semicolons or safe sentence boundaries;
+  decimal and common abbreviation periods are guarded. Child pointers retain exact encoded JSON
+  source offsets and deterministic `.clause[n]` suffixes. Commas and conjunction words are not split.
+- Family-specific secondary evidence is limited to one explicit quantified/anchored experience
+  proposition or one explicit named-skill proposition. It receives its exact source substring and
+  deterministic `.extract[FAMILY]` path, uses inherited parent/section modality only when its own
+  lexical modality is unknown, and adds no derivation inputs. Generic or ambiguous mentions remain
+  unparsed. The whole parent is never copied into unrelated family evidence.
+- Parser and normalization moved 3.5.0 -> 3.5.1. Evidence contract remains 3.1.0; scorer remains
+  2.2.0; weights, score threshold 50, coverage threshold 60, eligibility, duplicate handling, and
+  PARTIAL blocking are unchanged. No schema migration or candidate-fact change.
+- Added fictional tests first; the pre-implementation run showed the expected failures. Final
+  normalizer suite: 97/97 PASS, including semicolon/sentence offsets and hashes, decimal/abbreviation
+  guards, modality inheritance/override, comma and `and/or` non-splitting, exact family-specific
+  extraction, deterministic replay, and ambiguous-scope preservation.
+- Tracked implementation files (7): this plan; database R2A and source-enablement tests; importer
+  normalizer and tests; job model R2A version; R2A evidence E2E spec. No app-specific or
+  employer-specific behavior.
+
+### Final proposed 100-job shadow and packet decision
+
+- Final proposed replay on `m2-r2a-shadow-1790686545697-6f838ab7`: 100/100 rederived, evaluated, and
+  queued; parser/normalization 3.5.1, evidence 3.1.0, scorer 2.2.0. Field rows 857 -> 857;
+  requirement rows 1,346 -> 1,388; requirement modalities became REQUIRED 862 / PREFERRED 483 /
+  CONDITIONAL 4 / NEGATED 3 / UNKNOWN 36.
+- C1 spans 76 -> 43. Residual A-H `3 / 0 / 0 / 0 / 0 / 0 / 0 / 40`; residual family counts A
+  EXPERIENCE 3; H SKILLS 16 / VEHICLE 8 / EXPERIENCE 10 / GEOGRAPHY 4 / HOURS 1 /
+  CERTIFICATIONS 1. Residual lexical modality A UNKNOWN 3; H UNKNOWN 38 / REQUIRED 2. Context A
+  REQUIRED 3; H REQUIRED 24 / PREFERRED 16. Residual multi-family cardinality 1:4 / 2:38 / 3:1;
+  punctuation sentence terminator + conjunction 34 / none 3 / conjunction 5 / sentence terminator
+  only 1. Exact pointer/hash/provenance validations PASS; network attempts 0.
+- Coverage COMPLETE/PARTIAL/UNKNOWN changed `113/330/557 -> 117/308/575`; average/median
+  `24.37%/22.5% -> 26.14%/25%`. Coverage increased on 16 jobs, was unchanged on 84, and decreased
+  on 0. Total unparsed spans `494 -> 450`; provenance REQUIREMENTS `76 -> 43`, RESPONSIBILITIES
+  `67 -> 64`, OTHER `31 -> 31`, DESCRIPTION `320 -> 312`, all remaining provenance 0.
+- Score distribution changed from `0:28, 1-9:40, 10-19:26, 20-29:6` to
+  `0:26, 1-9:42, 10-19:23, 20-29:9`; no scores above 29. Maximum remained 25; scores >=50 0.
+  Positive contributions `124 -> 129` (required skill 97, preferred skill 26, education 1 -> 6);
+  negative contributions 0. Scores increased on 5 jobs, unchanged on 95, decreased on 0. Eligibility
+  stayed REVIEW_REQUIRED 99 / ELIGIBLE 1; changes and regressions 0. Recommendations 0 and detail
+  candidates 0 on both runs. Duplicate state CLEAR for all 100.
+- Four Melbourne comparison (before -> after): R5712 has 16 requirement rows and 0 C1 both sides;
+  R4633 has 0 rows and 0 C1 both sides; R5964 has 8 rows and C1 1 -> 0, with VEHICLE leaving its
+  partial families; R5713 has 11 rows and C1 1 -> 1, remaining PARTIAL. Scores are R5712 18,
+  R4633 0, R5964 7, R5713 7; all remain REVIEW_REQUIRED, not recommended, with threshold 50 and
+  detail unjustified. The comparison report contains each role's exact family, coverage,
+  contribution-code, and blocker before/after counts without requirement prose.
+- Packet gate: `CURRENT_CORPUS_STILL_BELOW_THRESHOLD`; no job reached 50 and no qualifying job
+  exists. Top safe rows: Applications Engineer, Learning & Development- Open Level (R5053),
+  Washington, D.C., 25/40%; Director, Test Engineering - ACP Programs (R5044), Washington, D.C.,
+  25/20%; Engineer II, Systems Test (R5038), Washington, D.C., 25/20%; Associate Systems
+  Administrator (R5997), Kyiv, 21/40%; Applications Engineer, Autonomy (open level), United States,
+  21/25%. All have duplicate CLEAR and detail unjustified.
+- Material/safety gate PASS: generic defects proven, fictional regressions pass, 33 of 76 C1 spans
+  truthfully resolved, ambiguous scope remains PARTIAL, candidate facts unchanged, scorer/policies
+  unchanged, exact provenance valid, no network/external actions, and no score/eligibility
+  regressions.
+
+### Validation, real final invariants, and next task
+
+- Final gates: 59 unit-test files / 663 tests PASS; 3 integration files / 21 tests PASS; 47 fictional
+  E2E tests PASS on ports 3101/3201; typecheck PASS; ESLint PASS; changed-file Prettier PASS; local
+  and showcase production builds PASS; showcase audit PASS; privacy audit PASS; `npm audit` and
+  production audit each found 0 vulnerabilities; release fixture PASS; migration-immutability test
+  11/11 PASS; `git diff --check` PASS; `git fsck --strict` PASS. The standard full-tree `npm run
+format:check` reports 53 checkout-format files; the Windows-aware full check in the release fixture
+  (`prettier --check . --end-of-line auto`) passes. No unrelated files were reformatted.
+- E2E initially refused to use port 3100 because the user's existing app owns it. That process was
+  left untouched; the complete rerun used 3101/3201 and passed. The first release-fixture attempt
+  had the same port collision; its final rerun with those ports passed. A standalone privacy check
+  overlapped a build and could not read transient Turbopack artifacts; the final serialized fixture
+  privacy audit passed.
+- Final real read-only snapshot: schema 12, pending migrations 0, integrity PASS, FK 0, counters
+  `21/9/0/0`, historical GET_JOB 1, 20 LIST_JOBS, source/target authority 0/0, active source runs
+  0, pending application operations 0, latest Shield AI v7 REVOKED. Task deltas: LIST_JOBS 0,
+  GET_JOB 0, source DNS/TCP/TLS 0/0/0, employer 0, form 0, upload 0, submission 0.
+- Seven-milestone tracker: 1 Foundations COMPLETE; 2 Current real role + fresh current packet IN
+  PROGRESS / TRUE REQUIREMENT SCOPE REPAIR; 3 Real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING / NOT
+  LIVE VERIFIED; 4 Final-review/submission safeguards BLOCKED; 5 Reproducible release COMPLETE;
+  6 Controlled real fill-preview BLOCKED; 7 Final readiness / Green-banner review NOT STARTED.
+- Source-enabled Personal Beta: real preflight READY, active capabilities 0. Personal Live V1:
+  NOT_READY. The implementation is ready for one open PR; do not merge it in this task. Remaining
+  blocker is evidence coverage/partial scope and maximum score 25.
+- Exactly one next recommended task: after the implementation PR's exact-head CI passes, audit the
+  remaining 43 C1 spans (A=3, H=40) with narrow provider-neutral evidence before expanding any
+  extraction semantics.

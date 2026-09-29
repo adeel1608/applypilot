@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.5.0");
+    expect(result.parserVersion).toBe("3.5.1");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -252,6 +252,345 @@ describe("R2A evidence normalization", () => {
     expect(
       commute.find(({ canonicalField }) => canonicalField === "commute.distance"),
     ).toMatchObject({ normalizedValue: { value: { durationMinutes: null, distanceKm: 18 } } });
+  });
+
+  it("does not infer vehicle scope from a driver's licence requirement", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "A fictional driver's licence is required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-driver-licence-scope",
+    });
+
+    expect(result.requirementEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ canonicalKind: "LICENCE", family: "LICENCES" }),
+      ]),
+    );
+    expect(result.coverage.find(({ family }) => family === "LICENCES")?.unparsedSpans).toHaveLength(
+      0,
+    );
+    expect(result.coverage.find(({ family }) => family === "VEHICLE")?.state).toBe("UNKNOWN");
+  });
+
+  it("aligns travel requirement coverage with the existing location requirement kind", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "Travel to fictional client sites is required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-travel-scope",
+    });
+
+    expect(result.requirementEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ canonicalKind: "LOCATION", family: "GEOGRAPHY" }),
+      ]),
+    );
+    expect(
+      result.coverage.find(({ family }) => family === "GEOGRAPHY")?.unparsedSpans,
+    ).toHaveLength(0);
+    expect(result.coverage.find(({ family }) => family === "VEHICLE")?.state).toBe("UNKNOWN");
+  });
+
+  it("does not count a physical ability as a separate skills family", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "Ability to lift fictional 10 kg loads is required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-physical-scope",
+    });
+
+    expect(result.requirementEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ canonicalKind: "PHYSICAL", family: "PHYSICAL_REQUIREMENTS" }),
+      ]),
+    );
+    expect(
+      result.coverage.find(({ family }) => family === "PHYSICAL_REQUIREMENTS")?.unparsedSpans,
+    ).toHaveLength(0);
+    expect(result.coverage.find(({ family }) => family === "SKILLS")?.state).toBe("UNKNOWN");
+  });
+
+  it("splits structured semicolon clauses with exact child pointers and inherited modality", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content:
+            "A fictional bachelor's degree; at least 3 years of fictional field experience is preferred.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const input = {
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-structured-semicolon",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    const again = normalizeR2AJobEvidence(input);
+
+    expect(result.requirementEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonicalKind: "QUALIFICATION",
+          family: "EDUCATION",
+          modality: "REQUIRED",
+          source: expect.objectContaining({
+            sourcePath: expect.stringMatching(/\.clause\[0\]$/),
+          }),
+        }),
+        expect.objectContaining({
+          canonicalKind: "EXPERIENCE",
+          family: "EXPERIENCE",
+          modality: "PREFERRED",
+          source: expect.objectContaining({
+            sourcePath: expect.stringMatching(/\.clause\[1\]$/),
+          }),
+        }),
+      ]),
+    );
+    expect(result.coverage.find(({ family }) => family === "EDUCATION")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "EXPERIENCE")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [],
+    });
+    expect(result.coverage.find(({ family }) => family === "SKILLS")?.state).toBe("UNKNOWN");
+    expect(result.requirementEvidence).toEqual(again.requirementEvidence);
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("splits structured sentence clauses without splitting decimal or abbreviation periods", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content:
+            "A fictional 3.5-year diploma (e.g. a technical credential) is preferred. At least 3 years of fictional field experience is required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-structured-sentences",
+    });
+
+    expect(result.requirementEvidence).toHaveLength(2);
+    expect(
+      result.requirementEvidence.map(({ family, modality }) => ({ family, modality })),
+    ).toEqual(
+      expect.arrayContaining([
+        { family: "EDUCATION", modality: "PREFERRED" },
+        { family: "EXPERIENCE", modality: "REQUIRED" },
+      ]),
+    );
+    expect(result.requirementEvidence.map(({ source: pointer }) => pointer.sourcePath)).toEqual([
+      expect.stringMatching(/\.clause\[0\]$/),
+      expect.stringMatching(/\.clause\[1\]$/),
+    ]);
+    expect(result.requirementEvidence[0]?.source.excerpt).toContain("3.5-year");
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("extracts a quantified secondary experience proposition from a structured span", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content:
+            "A fictional bachelor's degree and at least 3 years of fictional field experience are required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const input = {
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-secondary-experience",
+    };
+    const result = normalizeR2AJobEvidence(input);
+    const again = normalizeR2AJobEvidence(input);
+    const experience = result.requirementEvidence.find(({ family }) => family === "EXPERIENCE");
+
+    expect(result.requirementEvidence.map(({ family }) => family)).toEqual([
+      "EDUCATION",
+      "EXPERIENCE",
+    ]);
+    expect(experience).toMatchObject({
+      canonicalKind: "EXPERIENCE",
+      modality: "REQUIRED",
+      derivationInputIds: [],
+      source: { sourcePath: expect.stringMatching(/\.extract\[EXPERIENCE\]$/) },
+    });
+    expect(experience?.source.excerpt).toContain("3 years");
+    expect(experience?.source.excerpt).toContain("experience");
+    expect(experience?.source.excerpt).not.toContain("degree");
+    expect(result.requirementEvidence).toEqual(again.requirementEvidence);
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("extracts only an explicit named secondary skills proposition", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content:
+            "A fictional degree is required and demonstrated programming skill in fictional controls are preferred.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-secondary-skills",
+    });
+    const skill = result.requirementEvidence.find(({ family }) => family === "SKILLS");
+
+    expect(skill).toMatchObject({
+      canonicalKind: "SKILL",
+      family: "SKILLS",
+      modality: "PREFERRED",
+      derivationInputIds: [],
+      source: { sourcePath: expect.stringMatching(/\.extract\[SKILLS\]$/) },
+    });
+    expect(skill?.source.excerpt).toContain("programming skill");
+    expect(skill?.source.excerpt).not.toContain("degree");
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("leaves a generic experience mention unparsed without a safe secondary extractor", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "A fictional degree and general experience are required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-ambiguous-secondary",
+    });
+
+    expect(result.requirementEvidence.map(({ family }) => family)).toEqual(["EDUCATION"]);
+    expect(result.coverage.find(({ family }) => family === "EXPERIENCE")).toMatchObject({
+      state: "PARTIAL",
+      unparsedSpans: [expect.any(Object)],
+    });
+  });
+
+  it("does not split structured comma-separated content", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "A fictional degree, along with a fictional portfolio, is required.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-comma-boundary",
+    });
+
+    expect(result.requirementEvidence).toHaveLength(1);
+    expect(result.requirementEvidence[0]?.canonicalKind).toBe("QUALIFICATION");
+    expect(result.requirementEvidence[0]?.source.sourcePath).not.toMatch(/\.clause\[/);
+  });
+
+  it("does not split structured and/or content into separate requirements", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Requirements",
+          content: "A fictional degree is required and/or general experience is preferred.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "observation:fictional-conjunction-boundary",
+    });
+
+    expect(result.requirementEvidence).toHaveLength(1);
+    expect(result.requirementEvidence[0]).toMatchObject({
+      canonicalKind: "QUALIFICATION",
+      modality: "PREFERRED",
+    });
+    expect(result.requirementEvidence[0]?.source.sourcePath).not.toMatch(/\.clause\[/);
+  });
+
+  it("preserves preferred section defaults while child lexical modality takes precedence", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Desirable",
+          content: "A fictional degree. A fictional diploma must be completed.",
+          kind: "REQUIREMENTS",
+        },
+      ],
+    };
+    const source = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      sourceText: source,
+      structured,
+      sourceObservationId: "observation:fictional-preferred-section",
+    });
+
+    expect(result.requirementEvidence.map(({ modality }) => modality)).toEqual([
+      "PREFERRED",
+      "REQUIRED",
+    ]);
+    expect(result.requirementEvidence.map(({ ruleId }) => ruleId)).toEqual([
+      "R2A_QUALIFICATION_PREFERRED_SECTION_DEFAULT",
+      "R2A_QUALIFICATION_REQUIRED",
+    ]);
+    assertR2ASourcePointers(result, source);
+    assertR2AExcerptHashes(result);
   });
 
   it("preserves source state separately from conditional modality", () => {

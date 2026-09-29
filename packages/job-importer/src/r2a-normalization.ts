@@ -231,6 +231,95 @@ function clauseSpans(span: Span): Span[] {
   return results.length ? results : [span];
 }
 
+function structuredRequirementClauses(span: Span): Span[] {
+  if (
+    !span.sourcePath.startsWith("structured.") ||
+    /\.clause\[\d+\]$/.test(span.sourcePath) ||
+    !span.sourceOffsets
+  ) {
+    return [span];
+  }
+
+  const commonAbbreviations = new Set([
+    "approx",
+    "dr",
+    "e.g",
+    "etc",
+    "i.e",
+    "jr",
+    "mr",
+    "mrs",
+    "ms",
+    "ph.d",
+    "prof",
+    "sr",
+    "vs",
+  ]);
+  const nextClauseStarts: number[] = [];
+  const text = span.text;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === ";") {
+      let next = index + 1;
+      while (next < text.length && /\s/.test(text[next]!)) next += 1;
+      if (index > 0 && next < text.length) nextClauseStarts.push(next);
+      index = next - 1;
+      continue;
+    }
+    if (character !== "." && character !== "!" && character !== "?") continue;
+
+    if (
+      character === "." &&
+      index > 0 &&
+      index + 1 < text.length &&
+      /\d/.test(text[index - 1]!) &&
+      /\d/.test(text[index + 1]!)
+    ) {
+      continue;
+    }
+    if (character === ".") {
+      const previousToken = text.slice(0, index).match(/([A-Za-z][A-Za-z.]*)$/)?.[1];
+      const abbreviation = previousToken?.toLowerCase();
+      if (
+        abbreviation &&
+        (commonAbbreviations.has(abbreviation) || /^(?:[a-z]\.)+[a-z]?$/i.test(abbreviation))
+      ) {
+        continue;
+      }
+    }
+
+    let afterTerminator = index + 1;
+    while (/["'”’)}\]]/.test(text[afterTerminator] ?? "")) afterTerminator += 1;
+    if (!/\s/.test(text[afterTerminator] ?? "")) continue;
+    let next = afterTerminator;
+    while (next < text.length && /\s/.test(text[next]!)) next += 1;
+    if (index > 0 && next < text.length) nextClauseStarts.push(next);
+    index = next - 1;
+  }
+  if (nextClauseStarts.length === 0) return [span];
+
+  const segments: Array<{ start: number; end: number }> = [];
+  let start = 0;
+  for (const nextStart of nextClauseStarts) {
+    let end = nextStart;
+    while (end > start && /\s/.test(text[end - 1]!)) end -= 1;
+    let childStart = start;
+    while (childStart < end && /\s/.test(text[childStart]!)) childStart += 1;
+    if (childStart < end) segments.push({ start: childStart, end });
+    start = nextStart;
+  }
+  let end = text.length;
+  while (end > start && /\s/.test(text[end - 1]!)) end -= 1;
+  while (start < end && /\s/.test(text[start]!)) start += 1;
+  if (start < end) segments.push({ start, end });
+  if (segments.length < 2) return [span];
+
+  return segments.map(({ start: childStart, end: childEnd }, index) => {
+    const child = childSpan(span, childStart, text.slice(childStart, childEnd));
+    return { ...child, sourcePath: `${span.sourcePath}.clause[${index}]` };
+  });
+}
+
 function structuredText(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
   if (typeof value === "number") return String(value);
@@ -398,7 +487,7 @@ function normalizedSourceLine(value: string): string {
 
 function materialFamilies(text: string): JobFieldFamily[] {
   const rules: Array<[JobFieldFamily, RegExp]> = [
-    ["GEOGRAPHY", /\b(?:location|postcode|suburb|state|remote|hybrid|on-site)\b/i],
+    ["GEOGRAPHY", /\b(?:location|postcode|suburb|state|remote|hybrid|on-site|travel|commute)\b/i],
     [
       "EMPLOYMENT",
       /\b(?:employment type|work type|job type|full[ -]?time|part[ -]?time|casual|contract|internship)\b/i,
@@ -412,13 +501,23 @@ function materialFamilies(text: string): JobFieldFamily[] {
     ["LICENCES", /\blicen[cs]e\b/i],
     ["CERTIFICATIONS", /\b(?:RSA|first aid|certification|certificate|WWCC)\b/i],
     ["WORK_RIGHTS", /\b(?:work rights?|visa|sponsorship)\b/i],
-    ["VEHICLE", /\b(?:vehicle|driver|travel|commute)\b/i],
+    ["VEHICLE", /\bvehicle\b/i],
     ["PHYSICAL_REQUIREMENTS", /\b(?:lift|standing|physical|age)\b/i],
     ["TRAINING", /\btraining\b/i],
     ["DOCUMENTS", /\b(?:CV|resume|cover letter|portfolio|transcript|selection criteria)\b/i],
     ["SKILLS", /\b(?:skill|proficien|knowledge|ability)\b/i],
   ];
-  return rules.filter(([, pattern]) => pattern.test(text)).map(([family]) => family);
+  const physicalOnlyAbility =
+    /\bability to\b/i.test(text) &&
+    /\b(?:lift|lifting|stand|standing|physical|manual handling)\b/i.test(text) &&
+    !/\b(?:skills?|proficien|knowledge|communication|customer service|software|programming|embedded|automation|robotics)\b/i.test(
+      text,
+    );
+  return rules
+    .filter(
+      ([family, pattern]) => pattern.test(text) && !(family === "SKILLS" && physicalOnlyAbility),
+    )
+    .map(([family]) => family);
 }
 
 type StructuredLocation = {
@@ -794,13 +893,24 @@ function requirementEvidence(
   observationId: string,
   span: Span,
   sectionDefaultModality: RequirementModality | null = null,
+  parentStatement: ReturnType<typeof modality> | null = null,
 ): R2RequirementEvidence[] {
   const kind = requirementKind(span.text);
   const lexicalStatement = modality(span.text);
-  const inheritedModality = lexicalStatement.modality === "UNKNOWN" ? sectionDefaultModality : null;
-  const statement = inheritedModality
-    ? { ...lexicalStatement, modality: inheritedModality }
-    : lexicalStatement;
+  const inheritedParentStatement =
+    lexicalStatement.modality === "UNKNOWN" && parentStatement?.modality !== "UNKNOWN"
+      ? parentStatement
+      : null;
+  const inheritedSectionModality =
+    lexicalStatement.modality === "UNKNOWN" && !inheritedParentStatement
+      ? sectionDefaultModality
+      : null;
+  const inheritedModality = inheritedParentStatement?.modality ?? inheritedSectionModality;
+  const statement = inheritedParentStatement
+    ? inheritedParentStatement
+    : inheritedSectionModality
+      ? { ...lexicalStatement, modality: inheritedSectionModality }
+      : lexicalStatement;
   if (kind === "GENERAL" && statement.modality === "UNKNOWN") return [];
   const family = familyForKind(kind);
   return normalizedRequirementValues(kind, span.text, statement).map((normalizedValue, index) =>
@@ -824,14 +934,57 @@ function requirementEvidence(
       source: pointer(source, span),
       normalizedValue,
       extractorVersion: R2A_PARSER_VERSION,
-      ruleId: inheritedModality
-        ? `R2A_${kind}_${statement.modality}_SECTION_DEFAULT`
-        : `R2A_${kind}_${statement.modality}`,
+      ruleId: inheritedParentStatement
+        ? `R2A_${kind}_${statement.modality}_EXTRACTED_CONTEXT`
+        : inheritedModality
+          ? `R2A_${kind}_${statement.modality}_SECTION_DEFAULT`
+          : `R2A_${kind}_${statement.modality}`,
       derivationInputIds: [],
       ownerCorrectionId: null,
       conflictSetId: null,
     }),
   );
+}
+
+function secondaryRequirementSpans(source: string, span: Span): Span[] {
+  if (!span.sourcePath.startsWith("structured.")) return [];
+
+  const primaryFamily = familyForKind(requirementKind(span.text));
+  const detectedFamilies = materialFamilies(span.text);
+  const result: Span[] = [];
+  const addExtracted = (family: JobFieldFamily, excerpt: string): void => {
+    if (/\b(?:and|or)\b/i.test(excerpt)) return;
+    const child = exactChildSpan(source, span, excerpt);
+    if (!child || familyForKind(requirementKind(child.text)) !== family) return;
+    result.push({ ...child, sourcePath: `${span.sourcePath}.extract[${family}]` });
+  };
+
+  if (
+    primaryFamily !== "EXPERIENCE" &&
+    (primaryFamily === "EDUCATION" || primaryFamily === "CERTIFICATIONS") &&
+    detectedFamilies.includes("EXPERIENCE") &&
+    (span.text.match(/\bexperience\b/gi)?.length ?? 0) === 1
+  ) {
+    const experiencePatterns = [
+      /\b(?:(?:at least|minimum(?: of)?|over|more than)\s+)?\d+(?:\.\d+)?\+?\s*(?:years?|months?)\b[^,;.!?]{0,100}?\bexperience\b/i,
+      /\bexperience\s+(?:in|with|as)\b[^,;.!?]*/i,
+      /\bexperience\s+(?:required|essential|preferred|desirable)\b/i,
+      /\bbackground in\b[^,;.!?]*/i,
+    ];
+    const experience = experiencePatterns
+      .map((pattern) => pattern.exec(span.text)?.[0])
+      .find((match): match is string => Boolean(match));
+    if (experience) addExtracted("EXPERIENCE", experience);
+  }
+
+  if (primaryFamily !== "SKILLS" && detectedFamilies.includes("SKILLS")) {
+    const skillPattern =
+      /\b(?:skills?\s+(?:in|with)|proficient\s+(?:in|with)|proficiency\s+(?:in|with)|knowledge\s+of|communication\s+skills?|customer\s+service\s+skills?|programming\s+skills?)\b[^,;.!?]*/gi;
+    const skills = [...span.text.matchAll(skillPattern)];
+    if (skills.length === 1 && skills[0]?.[0]) addExtracted("SKILLS", skills[0][0]);
+  }
+
+  return result;
 }
 
 function parseLocation(label: string) {
@@ -1293,10 +1446,12 @@ export function normalizeR2AJobEvidence(input: {
     structuredSectionFieldSpans.push(...spans);
     if (section.kind === "REQUIREMENTS") {
       structuredSectionRequirementSpans.push(
-        ...spans.map((span) => ({
-          span,
-          sectionContext: { kind: "REQUIREMENTS", heading },
-        })),
+        ...spans.flatMap((span) =>
+          structuredRequirementClauses(span).map((child) => ({
+            span: child,
+            sectionContext: { kind: "REQUIREMENTS", heading },
+          })),
+        ),
       );
     }
   });
@@ -1638,7 +1793,9 @@ export function normalizeR2AJobEvidence(input: {
       const supersededByStructuredRequirementSection =
         key === "requirementTexts" && structuredSectionRequirementSpans.length > 0;
       if (!supersededByStructuredRequirementSection) {
-        structuredArrayRequirementSpans.push({ span });
+        structuredArrayRequirementSpans.push(
+          ...structuredRequirementClauses(span).map((child) => ({ span: child })),
+        );
         if (
           !uniqueSpans.some(
             (existing) =>
@@ -1658,10 +1815,21 @@ export function normalizeR2AJobEvidence(input: {
     ? structuredSectionInputCount > 0
       ? [...structuredSectionRequirementSpans, ...structuredArrayRequirementSpans]
       : [
-          ...structuredDescriptionSpans.map((span) => ({ span })),
+          ...structuredDescriptionSpans.flatMap((span) =>
+            structuredRequirementClauses(span).map((child) => ({ span: child })),
+          ),
           ...structuredArrayRequirementSpans,
         ]
     : uniqueSpans.map((span) => ({ span }));
+  const structuredRequirementChildrenByParent = new Map<string, Span[]>();
+  for (const { span } of requirementSpans) {
+    if (!span.sourcePath.startsWith("structured.")) continue;
+    const parentPath = span.sourcePath.replace(/\.clause\[\d+\]$/, "");
+    const children = structuredRequirementChildrenByParent.get(parentPath) ?? [];
+    if (!children.some(({ sourcePath }) => sourcePath === span.sourcePath)) children.push(span);
+    structuredRequirementChildrenByParent.set(parentPath, children);
+  }
+  const structuredExtractedRequirementSpansByParent = new Map<string, Span[]>();
   const supplementalDescriptionSpans =
     isCanonicalStructuredSource && structuredSectionInputCount > 0 && !structuredDescriptionIsHtml
       ? structuredDescriptionSpans.filter((span) => {
@@ -1951,6 +2119,21 @@ export function normalizeR2AJobEvidence(input: {
       ? sectionRequirementDefaultModality(item.sectionContext.kind, item.sectionContext.heading)
       : null;
     requirements.push(...requirementEvidence(source, observationId, item.span, sectionDefault));
+    const parentStatement = modality(item.span.text);
+    for (const child of secondaryRequirementSpans(source, item.span)) {
+      const evidence = requirementEvidence(
+        source,
+        observationId,
+        child,
+        sectionDefault,
+        parentStatement,
+      );
+      if (evidence.length === 0) continue;
+      requirements.push(...evidence);
+      const children = structuredExtractedRequirementSpansByParent.get(item.span.sourcePath) ?? [];
+      children.push(child);
+      structuredExtractedRequirementSpansByParent.set(item.span.sourcePath, children);
+    }
   }
   if (supplementalDescriptionSpans.length > 0) {
     const knownRequirementSignatures = new Set(
@@ -2062,9 +2245,17 @@ export function normalizeR2AJobEvidence(input: {
     const sectionItems = sections
       .filter((section) => section.family === family)
       .flatMap(({ items }) => items.flatMap(clauseSpans));
-    const materialSpans = uniqueSpans.filter((span) =>
-      materialFamilies(span.text).includes(family),
-    );
+    const materialSpans = uniqueSpans
+      .flatMap((span) => {
+        const requirementChildren = structuredRequirementChildrenByParent.get(span.sourcePath) ?? [
+          span,
+        ];
+        return requirementChildren.flatMap((child) => [
+          child,
+          ...(structuredExtractedRequirementSpansByParent.get(child.sourcePath) ?? []),
+        ]);
+      })
+      .filter((span) => materialFamilies(span.text).includes(family));
     const scopeSpans = [...sectionItems, ...materialSpans].filter(
       (span, index, all) =>
         all.findIndex(
@@ -2076,7 +2267,15 @@ export function normalizeR2AJobEvidence(input: {
     );
     const parsed = parsedRangesByFamily.get(family) ?? new Set<string>();
     const unparsedSpans = scopeSpans
-      .filter((span) => !parsed.has(spanKey(span)))
+      .filter((span) => {
+        if (parsed.has(spanKey(span))) return false;
+        return !structuredExtractedRequirementSpansByParent
+          .get(span.sourcePath)
+          ?.some(
+            ({ sourcePath }) =>
+              sourcePath === `${span.sourcePath}.extract[${family}]` && parsed.has(sourcePath),
+          );
+      })
       .map((span) => pointer(source, span));
     const credibleCompleteScope =
       sectionItems.length > 0 ||
