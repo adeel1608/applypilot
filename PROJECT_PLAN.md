@@ -4663,5 +4663,10 @@ Do not emit the final green-banner success phrase.
   REVOKED. The v6 run remains COMPLETE LIST_JOBS with 100 accepted/qualified jobs and 100 current
   evaluations/queues. Task deltas for LIST_JOBS, GET_JOB, source DNS/TCP/TLS, employer actions,
   forms, uploads, and submission are all zero.
-- Next: open exactly one PR from `fix/m2-r2-fit-alignment`; leave it OPEN/UNMERGED and verify
-  exact-head push/PR CI.
+- PR #59, `fix: align atomic R2 requirements with verified candidate facts`, is OPEN/UNMERGED on
+  `fix/m2-r2-fit-alignment`, based on `19e349ded029b3acec733d12dfdcb51c132ec41d`. Initial PR head
+  `69486b8dbff3bcc6a58909c365d85cedb6ef8bcb` had tree
+  `9ac90583b379623267df7461ea715fad7f608dac`, 12 changed files, and no reviews or unresolved
+  threads; exact-head push and PR CI were pending at this plan update.
+- Next: review PR #59 after exact-head push and PR CI succeed; keep it open and unmerged until
+  human review authorizes the merge.
