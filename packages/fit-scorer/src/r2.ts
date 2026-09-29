@@ -10,7 +10,7 @@ import {
   type EvaluationEvidenceClass,
   type R2EligibilityResult,
 } from "@applypilot/eligibility-engine";
-import { clamp, normalizeText, VerificationStatus } from "@applypilot/shared";
+import { clamp, VerificationStatus } from "@applypilot/shared";
 import { z } from "zod";
 
 import {
@@ -19,7 +19,7 @@ import {
   type R2CalibrationState,
 } from "./calibration";
 
-export const R2_FIT_SCORER_VERSION = "2.1.0";
+export const R2_FIT_SCORER_VERSION = "2.2.0";
 export const R2_FIT_WEIGHT_VERSION = "r2-weights-1";
 export const R2_RECOMMENDATION_THRESHOLD = 50;
 export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-2";
@@ -104,9 +104,31 @@ function usableState(state: R2JobFieldEvidence["state"]): boolean {
 }
 
 function matches(left: string, right: string): boolean {
-  const a = normalizeText(left);
-  const b = normalizeText(right);
-  return a.includes(b) || b.includes(a);
+  const tokens = (value: string): string[] =>
+    value
+      .normalize("NFKD")
+      .toLocaleLowerCase("en-AU")
+      .match(/c\+\+\d*|c#\d*|f#\d*|\.net\d*|[a-z0-9]+/g) ?? [];
+  const a = tokens(left);
+  const b = tokens(right);
+  if (a.length === 0 || b.length === 0) return false;
+
+  const sameSequence = (first: string[], second: string[]) =>
+    first.length === second.length && first.every((token, index) => token === second[index]);
+  if (sameSequence(a, b)) return true;
+
+  const containsSequence = (haystack: string[], needle: string[]) =>
+    haystack.some((_, index) =>
+      needle.every((token, offset) => haystack[index + offset] === token),
+    );
+  const containsAmbiguousShortToken = (values: string[]) =>
+    values.some((token) => token.length <= 2 && !/[+#.]|\d/.test(token));
+
+  // Very short alphabetic labels such as C, R, Go, or AI are too ambiguous to
+  // match inside a longer phrase. Punctuated identifiers remain distinct tokens.
+  if (a.length < b.length && containsAmbiguousShortToken(a)) return false;
+  if (b.length < a.length && containsAmbiguousShortToken(b)) return false;
+  return containsSequence(a, b) || containsSequence(b, a);
 }
 
 function minutes(value: string): number {

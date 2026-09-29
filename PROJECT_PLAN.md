@@ -4383,3 +4383,285 @@ M2 v6 source closeout evidence`; OPEN, unmerged, non-draft, mergeable/CLEAN; bas
   approval is required (first real target validation is already PROVEN, with 2 completed
   inspections). Next task: review the single implementation PR and merge only after its final
   exact-head checks pass and it receives approval.
+
+## M2 PR58 merge / R2 fit-alignment diagnostic blueprint (2026-09-29)
+
+### Current state and objective
+
+- PR #58 (`fix: preserve structured Lever requirements in R2A normalization`) was re-fetched before
+  merge and matched the requested acceptance state exactly: base
+  `452dd70b53de2c79342c256a14cd0778076e215d`, head
+  `d85629220fb7fe071b4ce0a97c83db063db8de5c`, reviewed tree
+  `6618b92752f3823fd022ee08889b8349c6d194d4`, one commit, 16 files, +768/-64, no reviews or
+  unresolved threads, ahead 1 / behind 0, mergeable, and both recorded exact-head CI runs successful.
+  It was squash-merged as `19e349ded029b3acec733d12dfdcb51c132ec41d`; parent is the expected base and
+  tree equals the reviewed tree. Local `main` and `origin/main` are synchronized there.
+- PR #58's disposable replay evidence records field evidence 742 -> 857, requirement evidence
+  919 -> 963, material complete/partial/unknown 2/394/604 -> 113/330/557, mean/median coverage
+  1%/0% -> 24.37%/22.5%, coverage up on 72 jobs and down on 0, max score 19 -> 29, with no
+  unexplained regressions, recommendations, or deterministic detail candidates. The four target
+  Melbourne roles remained REVIEW_REQUIRED / recommended=false.
+- Objective: use a fresh verified private backup and an ignored disposable restore to rederive all
+  100 v6 jobs under the merged parser 3.3.0/current canonical engine, then determine why eligible
+  positive fit contributions remain absent or small. Do not presume a scorer defect. Preserve the
+  intentional partial-material-scope recommendation gate.
+- Target automation remains premature until a current, duplicate-clear, CURRENT PREPARING evaluation
+  is ELIGIBLE and recommended=true. `REAL_RUNNER_TARGET_APPROVAL_REQUIRED` alone does not establish
+  packet readiness.
+
+### Requirements, hypotheses, and architecture
+
+- Read the real private runtime only. Verify schema 12, pending migrations 0, integrity PASS, FK 0,
+  lifetime counters 21/9/0/0, historical source requests 20 LIST_JOBS + 1 GET_JOB, no active source
+  or target authority, no active source run, no pending application operation, latest Shield AI v7
+  REVOKED, and run `4c143a7b-b102-4dea-a489-de4327fbe678` still COMPLETE with 100 canonical jobs
+  and 100 current evaluation/queue rows. Do not rederive the real database.
+- Test these value-free hypotheses: sparse VERIFIED profile facts; UNKNOWN/CONDITIONAL modality
+  filters; non-atomic requirement text; requirement kind/normalization gaps; conservative matcher
+  behavior; employment responsibility and education matching paths; parser-vs-employer causes of
+  partial material scope; and whether existing verified fact classes could mathematically reach
+  score 50 with unchanged weights.
+- Data flow: canonical consistent backup -> backup verification -> supported maintenance restore
+  into `data/private/rehearsals/<task-id>/` -> assert schema/integrity/FK/counters/authority -> use
+  canonical repository/services to rederive/re-evaluate/queue all 100 jobs only in the restored
+  copy -> aggregate safe profile/evidence/contribution diagnostics. Never manually fabricate SQL
+  evaluation rows. Never print candidate values, job requirement prose, source payloads, descriptions,
+  URLs, profile snapshots, raw database rows, or raw exceptions.
+- Keep private material, backups, restored databases, and detailed matching inspection in ignored
+  private roots. Persist only allowlisted counts, statuses, reason codes, versions, and aggregates in
+  this plan. No source/employer/target/network action is allowed; no capability, approval, run, map,
+  fill, upload, verify, fill-preview, or submit operation is allowed.
+- Do not alter candidate facts or verification states, profile, thresholds, weights, calibration,
+  duplicate decisions, source data, or the partial-scope gate. Do not migrate the real DB. No schema
+  change is expected.
+
+### Diagnostic hypotheses and change authorization
+
+- For every usable requirement evidence row on R5712, R4633, R5964, and R5713, classify exactly once
+  into task buckets A-L. Inspect G/K evidence privately to determine whether a generic, reproducible
+  implementation defect exists; report only counts, normalized kind, and safe reason codes. Summarize
+  scorer contributions/blockers for those roles and all 100 jobs.
+- A code fix is authorized only if a generic defect is demonstrated against already-existing job
+  evidence and already-VERIFIED profile evidence and reproduced with fictional tests. Candidate-specific
+  aliases/tokens, inferred verification, broadening positive matching, increasing points, threshold or
+  weight edits, UNKNOWN/CONDITIONAL promotion, responsibility-as-requirement behavior, or weakening
+  partial scope are out of scope.
+- If scoring behavior changes, bump `R2_FIT_SCORER_VERSION`. Do not bump weight version when weights
+  are unchanged unless repository version policy requires it. If normalization semantics change, bump
+  parser/normalization versions appropriately. Keep evidence contract version stable unless its
+  contract changes. A migration requirement is a stop:
+  `R2_FIT_ALIGNMENT_SCHEMA_CHANGE_REVIEW_REQUIRED`.
+- If no generic defect is proven, make no application-code change and classify the primary dependency
+  as exactly one of `OWNER_PROFILE_VERIFICATION_REQUIRED`,
+  `EMPLOYER_REQUIREMENT_EVIDENCE_REMAINS_PARTIAL`,
+  `CURRENT_VERIFIED_PROFILE_DOES_NOT_MATCH_AVAILABLE_JOBS`, or
+  `R2_CALIBRATION_REVIEW_REQUIRED`. Do not create a speculative implementation PR.
+
+### Proposed files, testing, privacy, and rollback
+
+- Tracked changes start with this blueprint and safe final evidence in `PROJECT_PLAN.md` only.
+- Conditional implementation scope after defect proof: likely
+  `packages/fit-scorer/src/r2.ts`, focused fictional scorer/eligibility/repository tests, relevant
+  model/version constants, and this plan. Diagnostic harnesses and private outputs stay ignored in
+  `data/private/rehearsals/` and must never be committed.
+- Main privacy risk is accidental disclosure through logs or committed artifacts; emit allowlisted
+  aggregates only and inspect diff/status before push. Main operational risk is wrong DB targeting;
+  validate the real DB path read-only, then require replay's explicit DB path to resolve within the
+  task's ignored rehearsal directory.
+- Rollback: no real-DB mutation or migration is allowed. If replay/comparison fails, stop and retain
+  only safe evidence. If code changes and fail gates, revert only this branch's implementation changes
+  while retaining failure evidence; do not delete or rewrite private history. Handle disposable files
+  only through the private-data procedure.
+
+### Acceptance, validation, and exact steps
+
+1. Record guarded PR #58 state and squash identity; start from clean synchronized `main` and branch
+   `fix/m2-r2-fit-alignment`.
+2. Complete a read-only real-runtime baseline and save its safe counters/run/status for final
+   invariance comparison.
+3. Create and verify a fresh canonical backup; restore through supported maintenance to a unique
+   ignored rehearsal path; verify schema 12, integrity PASS, FK 0, counters 21/9/0/0, v6 run present,
+   v7 REVOKED, and zero active authority.
+4. Rederive/re-evaluate/requeue all 100 run jobs via canonical code in that copy; stop if counts differ
+   or extraction metrics materially diverge from reviewed PR #58 shadow evidence.
+5. Produce aggregate-only verified-fact inventory, upper-bound threshold calculation, four-role
+   audit, A-L matrix, all-100 aggregates, and S1-S9 conclusions. Prove/reject a generic defect before
+   considering code.
+6. If none is proven, change no application code and record the primary non-code blocker. If proven,
+   add fictional regressions first, make the narrow versioned fix, then run a fresh 100-job shadow
+   replay. Open one PR only if every material-improvement gate passes; leave it open/unmerged and
+   require exact-head push and PR CI success.
+7. If code changes, run focused scorer/eligibility/repository/readiness/importer tests as applicable,
+   full unit/integration/fictional E2E, typecheck, lint, changed-file formatting and repository format
+   status, production and showcase builds/audit, privacy and dependency audits, release fixture,
+   migration immutability, `git diff --check`, and `git fsck --strict`. Report every failed check.
+8. Recheck the real DB read-only; require zero task deltas for LIST_JOBS, GET_JOB, source DNS/TCP/TLS,
+   employer, form, upload, and submit. Preserve counters 21/9/0/0 and all authority/pending invariants.
+
+Stop conditions: changed PR #58 review state before merge; failed real-runtime baseline; unverified
+backup/restore; any accidental real DB write or network/source/employer/target action; replay count or
+material extraction divergence; privacy leak; incomplete root-cause proof; schema requirement; failed
+fictional regression; unexplained shadow regression; or failure of any material-improvement gate.
+Do not emit the final green-banner success phrase.
+
+### Execution progress
+
+- Blueprint was recorded on branch `fix/m2-r2-fit-alignment` at synchronized main
+  `19e349ded029b3acec733d12dfdcb51c132ec41d` before any application-code edit. Next: read-only real
+  runtime baseline, then verified backup and disposable restore.
+
+### Diagnostic refinement before implementation (2026-09-29)
+
+- The existing read-only, current-engine PR58 shadow remains the only diagnostic input. Its ignored
+  helper was extended to test an exact-token matcher in memory; no database rows or application code
+  were changed. The candidate profile has 2 VERIFIED skill labels that normalize to at most two
+  alphanumeric characters; verified short facts in other inventoried classes: 0. Across the 100
+  current jobs, all 37 current positive contribution rows referenced one of those short facts, and
+  the conservative exact-token simulation retained 0 of those particular contribution-to-evidence
+  pairs. This proves a reproducible broad-substring false-positive risk (including punctuation-only
+  technical identifiers); it does not prove those are the only possible matches after a safe matcher
+  is installed, since a later VERIFIED fact may then become the first valid match.
+- A separate description counterfactual found 184 potential positive contributions / 1,054 points
+  across 98 jobs under the old matcher. All 184 selected references were short normalized facts and
+  0 of those selected reference/evidence pairs pass the proposed conservative token comparison.
+  Therefore these counterfactuals are NOT evidence of a real score gain under a corrected matcher.
+  They remain an extraction-gap signal only. The second canonical shadow replay must measure any
+  newly selected long-token exact matches; if no real job gains an independently justified positive
+  contribution from already-VERIFIED evidence, the material gate fails and no code PR is opened.
+- The distinct parser hypothesis remains: explicit REQUIRED/PREFERRED requirement evidence present
+  in unsectioned description text is omitted when a canonical record already contains source
+  sections. The current counterfactual is used only to motivate a narrowly scoped regression, not to
+  claim improved fit. Supplemental evidence must come from exact plain-text JSON-string spans, exclude
+  spans whose normalized excerpt already appears in any structured section (including
+  RESPONSIBILITIES, OTHER, or BENEFITS), retain only parser-classified REQUIRED/PREFERRED modality,
+  and deduplicate against existing evidence by proposition key plus modality. UNKNOWN, CONDITIONAL,
+  and NEGATED evidence stays excluded. Do not synthesize requirements from section content or HTML
+  spans without exact excerpt pointers.
+
+### Conditional implementation blueprint (recorded before application-code edits)
+
+- Objective: correct generic false-positive skill/evidence matches from normalized substring
+  collisions, and, only if exact-provenance tests pass, preserve explicit description requirements
+  that the current canonical structured normalizer drops. No candidate facts, fact states, source
+  payloads, weights, threshold 50, eligibility rules, duplicate decisions, material coverage logic,
+  or partial-scope gate may change.
+- Proposed matcher in `packages/fit-scorer/src/r2.ts`: replace substring matching with exact
+  normalized token-sequence containment. Tokenization is case/diacritic insensitive, preserves
+  C++/C#/F# and numeric language-version identifiers as distinct tokens, and treats ordinary
+  punctuation as a separator. Short ambiguous alphabetic tokens (for example `C`, `R`, `Go`, or
+  `AI`) may match only when both normalized token sequences are equal; punctuated identifiers may
+  match only their exact identifier token. No alias or technology equivalence is inferred. Bump
+  `R2_FIT_SCORER_VERSION` from 2.1.0 to 2.2.0; keep weight version `r2-weights-1` unchanged.
+- Proposed parser change in `packages/job-importer/src/r2a-normalization.ts`: keep existing
+  REQUIREMENTS-section and legacy array behavior; for canonical structured records with at least
+  one source section, add only explicit REQUIRED/PREFERRED plain-text description spans that are not
+  contained in any normalized source-section content. Preserve JSON escape-aware start/end/excerpt
+  hashes and source paths. Do not supplement HTML descriptions. Do not change field evidence from
+  RESPONSIBILITIES/OTHER/BENEFITS into requirements. Deduplicate supplemental evidence by
+  `r2RequirementPropositionKey` + modality against existing and earlier supplemental rows. Bump
+  `R2A_PARSER_VERSION` and `R2A_NORMALIZATION_VERSION` from 3.3.0 to 3.4.0; keep evidence contract
+  3.1.0 and schema unchanged. Update version assertions/fixtures that bind these versions.
+- Fictional regression coverage in fit scorer and importer tests: exact verified atomic skill yields
+  the existing configured REQUIRED/PREFERRED points and candidate reference; unverified duplicate
+  yields no positive points; multi-skill facts as separate atomic evidence remain separate and
+  deterministic; C++ must not match “computer vision”, C# must not match C++, ambiguous short tokens
+  require exact phrase equality, punctuation/case and exact version repetitions are deterministic,
+  and differing explicit versions do not match. Also cover known employment/education paths,
+  UNKNOWN/CONDITIONAL/NEGATED exclusions, unchanged required/preferred weights, positive references,
+  currentness, partial-scope recommendation block, coverage 60, threshold 50, and deterministic replay.
+  Importer tests must prove pointer/hash validity for JSON-escaped and Unicode plain-text excerpts,
+  no duplicate description/section evidence, no section-contained description promotion, no
+  promotion of HTML or non-explicit modalities, and stable replay.
+- Dependencies/data flow: pure parser/scorer functions and existing test fixtures first; then a
+  fresh canonical backup/restore into a unique ignored shadow; canonical 100-job rederive/evaluate/
+  queue only on that disposable copy. Real DB remains read-only, and the task network boundary stays
+  installed with zero source/employer/target operations.
+- Risks: corrected matching may remove the current 37 false-positive pairs, lowering some scores;
+  exact-token matches may select a different verified fact; description supplementation may be
+  inert after correction. Report every decrease by generic reason and require zero unexplained
+  regressions. No profile value, job text, or raw payload may enter tracked files or emitted logs.
+- Acceptance gate: focused regressions pass; all positive contributions remain bound to existing
+  VERIFIED facts; no required policy/weight/state/gate changes; exact evidence pointers validate;
+  fresh shadow has 100 current evaluations and queues; at least one real job gains a justified
+  contribution after the corrected matcher; no unexplained regression; and every existing material
+  task gate passes. Otherwise roll back only application changes, retain this diagnostic record,
+  open no implementation PR, and classify the remaining blocker.
+- Rollback: revert only the task's scorer/parser/version/test application changes if any acceptance
+  condition fails. Keep `PROJECT_PLAN.md` evidence and ignored private artifacts. Do not mutate,
+  migrate, rederive, or repair the real production DB. No schema migration is expected; if one is
+  needed, stop with `R2_FIT_ALIGNMENT_SCHEMA_CHANGE_REVIEW_REQUIRED`.
+- Exact next steps: implement fictional scorer/parser tests and narrow changes; update model and
+  dependent version assertions; run focused unit tests; prepare a second fresh verified backup and
+  shadow; run canonical 100-job replay and value-free comparison against the PR58 baseline; decide
+  the material gate; only then run the full prescribed validation and consider one open/unmerged PR.
+
+### Execution results and closeout (2026-09-29)
+
+- PR #58 was merged only after its exact reviewed state and exact-head CI were revalidated. Merge
+  commit `19e349ded029b3acec733d12dfdcb51c132ec41d` has parent
+  `452dd70b53de2c79342c256a14cd0778076e215d` and reviewed tree
+  `6618b92752f3823fd022ee08889b8349c6d194d4`; synchronized `main` and `origin/main` point there.
+- Fresh backup `backup-2026-09-29T08-15-04.875Z-0e28d0e7` restored into ignored shadow
+  `m2-r2a-shadow-1790669705070-df7a247f`. The copy is schema 12, integrity PASS, FK 0, lifetime
+  counters 21/9/0/0, v6 run present with 100 accepted/qualified jobs, latest v7 REVOKED, and zero
+  active source/target authority. The existing PR58 baseline shadow remains
+  `m2-r2a-shadow-1790665758443-e9933769`. Both copies retain 100 current evaluation and queue rows.
+- The active profile inventory contains 48/48 VERIFIED skills, 3/3 VERIFIED employment records,
+  19/19 VERIFIED employment responsibility statements, 3/3 VERIFIED education entries, 2/2
+  VERIFIED licences, 3/3 VERIFIED certifications, and 4/4 VERIFIED recurring-availability entries.
+  Preferred locations are 0/3 VERIFIED and 3 UNKNOWN; preferred work types 0/3 VERIFIED and 3
+  UNKNOWN; preferred categories 0/12 VERIFIED and 12 UNKNOWN. Commute distance is 1 UNVERIFIED;
+  vehicle access and work rights are each 1 VERIFIED; maximum weekly hours is 1 UNVERIFIED and
+  maximum fortnightly hours is 1 VERIFIED. No candidate values were emitted or changed. The
+  optimistic profile-only upper bound is 100, so score 50 is mathematically reachable in principle;
+  the compatible-evidence upper bound across these 100 jobs is 29, below threshold.
+- PR58 parser 3.3 / scorer 2.1 baseline: 100 jobs, 857 field rows, 963 requirement rows, material
+  complete/partial/unknown 113/330/557, mean/median coverage 24.37%/22.5%, 37 positive
+  contributions (18 required and 19 preferred; 202 points), maximum score 29, zero scores >=50,
+  zero recommendations, and zero detail candidates. There are 907 UNKNOWN and 4 CONDITIONAL rows
+  among 963 requirements; 20 are REQUIRED, 29 PREFERRED, and 3 NEGATED.
+- Root-cause matrix on those four roles before the matcher correction: A=1 apparent skill match,
+  H=27 UNKNOWN-modality-filtered rows, and all other buckets B-G/I-L=0. Private inspection proved
+  the one apparent match was a short-token substring collision, not an atomic evidence match. With
+  scorer 2.2 against the same parser 3.3 rows, the matrix is A-G=0, H=27, I-K=0, L=1; the former
+  apparent match no longer contributes. The other 27 remain intentionally fail-closed on UNKNOWN.
+- The implementation bumps scorer 2.1.0 -> 2.2.0 and R2A parser/normalization 3.3.0 -> 3.4.0;
+  evidence contract 3.1.0, weight version `r2-weights-1`, threshold 50, schema 12, eligibility,
+  duplicate handling, and partial-scope gate are unchanged. The matcher uses conservative exact
+  token-sequence matching and preserves technical punctuation/version tokens. The parser adds only
+  explicit REQUIRED/PREFERRED plain-text description spans outside structured sections, with exact
+  source pointers/hashes and proposition-modality deduplication; HTML and non-explicit modalities
+  remain excluded.
+- Proposed parser 3.4 / scorer 2.2 shadow: 857 fields, 971 requirements, unchanged material counts
+  and coverage, 99 jobs with zero contributions and 1 with one preferred-skill contribution (+4),
+  maximum score 4, zero scores >=50, zero recommended jobs, and zero detail candidates. One job
+  gained the contribution after the matcher correction; 21 jobs scored lower, 1 higher, and 78 were
+  unchanged versus the old scorer. All 37 prior contributions were short-token collisions and were
+  removed; no score decrease is unexplained. No job crossed threshold or became ELIGIBLE. Across
+  the proposed 100 rows, root-cause counts are A=1, G=12, H=907, I=4, L=47, and B-F/J-K=0; G reasons
+  are only safe aggregate kinds/reason codes. The four Melbourne roles remain REVIEW_REQUIRED,
+  unrecommended, and at score 0; their partial-scope gate is unchanged.
+- Material-improvement gate: PASS. Fictional regressions cover short-token and punctuated/version
+  collisions, verified/unverified skill evidence, required/preferred weights, provenance references,
+  employment and education paths, modality/polarity exclusions, and stable description provenance.
+  No candidate facts, verification states, weights, threshold, schema, or scope gates changed.
+- Validation run: focused scorer/eligibility/R2 repository/readiness/importer tests passed (7 files,
+  147 tests); full unit suite passed (58 files, 635 tests); integration passed (3 files, 21 tests);
+  fictional local E2E passed (47/47 on alternate loopback ports because the existing user app owns
+  port 3100); typecheck, lint, production and showcase builds, showcase audit, privacy audit, and
+  both dependency audits passed. `npm audit --audit-level=high` and `npm audit --omit=dev` each
+  found 0 vulnerabilities. Changed source/test/documentation files pass Prettier with
+  `--end-of-line auto`. The standard `npm run format:check` reports repository-wide Windows
+  formatting/line-ending warnings, including untouched baseline files; no unrelated files were
+  reformatted. `git diff --check`, `git fsck --strict` (exit 0; dangling objects reported), and the
+  migration-directory immutability check pass. `npm run release:check:fixture` passed end-to-end:
+  formatter, lint, typecheck, unit/integration/browser suites, both builds, privacy/dependency
+  audits, release summary, diff check, and fsck. Fixture E2E used free alternate loopback ports.
+- Final read-only runtime check: schema 12, pending migrations 0, integrity PASS, FK 0, counters
+  21/9/0/0, source request history 20 LIST_JOBS + 1 historical GET_JOB, active source/target
+  authorities 0/0, active source runs 0, pending application operations 0, and Shield AI v7
+  REVOKED. The v6 run remains COMPLETE LIST_JOBS with 100 accepted/qualified jobs and 100 current
+  evaluations/queues. Task deltas for LIST_JOBS, GET_JOB, source DNS/TCP/TLS, employer actions,
+  forms, uploads, and submission are all zero.
+- Next: open exactly one PR from `fix/m2-r2-fit-alignment`; leave it OPEN/UNMERGED and verify
+  exact-head push/PR CI.

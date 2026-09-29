@@ -52,6 +52,163 @@ describe("R2 fit scoring", () => {
     ).toBe(true);
   });
 
+  it("does not confuse short tokens or punctuated identifiers with longer text", () => {
+    const makeProfile = (name: string, verification = "VERIFIED") =>
+      CandidateProfileSchema.parse({
+        ...testProfile,
+        skills: [{ ...testProfile.skills[0]!, id: "fictional-short-skill", name, verification }],
+        employment: [],
+        education: [],
+        licences: [],
+        certifications: [],
+      });
+    const positiveContributions = (profile: ReturnType<typeof makeProfile>, text: string) => {
+      const requirement = r2RequirementEvidence("fictional-match", "SKILLS", "SKILL", {
+        kind: "TEXT",
+        value: text,
+      });
+      const normalization = r2TestNormalization({ requirements: [requirement] });
+      return score({
+        profile,
+        normalization,
+        eligibility: eligible(normalization, profile),
+      }).contributions.filter(({ points }) => points > 0);
+    };
+
+    expect(positiveContributions(makeProfile("C++"), "Computer vision")).toEqual([]);
+    expect(positiveContributions(makeProfile("C"), "Computer vision")).toEqual([]);
+    expect(positiveContributions(makeProfile("C++"), "C#")).toEqual([]);
+    expect(positiveContributions(makeProfile("C++"), "C++17")).toEqual([]);
+    expect(positiveContributions(makeProfile("C++17"), "c++17")).toHaveLength(1);
+    expect(positiveContributions(makeProfile("C++"), "c++")).toContainEqual(
+      expect.objectContaining({ code: "R2_REQUIRED_SKILL_VERIFIED_MATCH", points: 7 }),
+    );
+    expect(positiveContributions(makeProfile("C++", "USER_CONFIRMATION_REQUIRED"), "C++")).toEqual(
+      [],
+    );
+  });
+
+  it("scores separately evidenced fictional skills without changing required or preferred weights", () => {
+    const profile = CandidateProfileSchema.parse({
+      ...testProfile,
+      skills: [
+        { ...testProfile.skills[0]!, id: "fictional-cpp", name: "C++", verification: "VERIFIED" },
+        {
+          ...testProfile.skills[0]!,
+          id: "fictional-python",
+          name: "Python",
+          verification: "VERIFIED",
+        },
+      ],
+      employment: [],
+      education: [],
+      licences: [],
+      certifications: [],
+    });
+    const requirements = [
+      r2RequirementEvidence("fictional-cpp-required", "SKILLS", "SKILL", {
+        kind: "TEXT",
+        value: "C++",
+      }),
+      r2RequirementEvidence(
+        "fictional-python-preferred",
+        "SKILLS",
+        "SKILL",
+        { kind: "TEXT", value: "Python" },
+        { modality: "PREFERRED" },
+      ),
+    ];
+    const normalization = r2TestNormalization({ requirements });
+    const result = score({
+      profile,
+      normalization,
+      eligibility: eligible(normalization, profile),
+    });
+    expect(result.score).toBe(11);
+    expect(result.contributions.map(({ code, points }) => ({ code, points }))).toEqual([
+      { code: "R2_REQUIRED_SKILL_VERIFIED_MATCH", points: 7 },
+      { code: "R2_PREFERRED_SKILL_VERIFIED_MATCH", points: 4 },
+    ]);
+    expect(
+      result.contributions.every(
+        ({ candidateFactReferences }) => candidateFactReferences.length > 0,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps verified employment-task and education-field token matches", () => {
+    const profile = CandidateProfileSchema.parse({
+      ...testProfile,
+      skills: [],
+      employment: [
+        {
+          ...testProfile.employment[0]!,
+          id: "fictional-employment",
+          title: "Fictional Systems Engineer",
+          responsibilities: ["Autonomy systems"],
+          verification: "VERIFIED",
+        },
+      ],
+      education: [
+        {
+          ...testProfile.education[0]!,
+          id: "fictional-education",
+          qualification: "Fictional Bachelor Degree",
+          field: "Systems Engineering",
+          verification: "VERIFIED",
+        },
+      ],
+      licences: [],
+      certifications: [],
+    });
+    const requirements = [
+      r2RequirementEvidence("fictional-autonomy-experience", "EXPERIENCE", "EXPERIENCE", {
+        kind: "EXPERIENCE",
+        value: {
+          domain: "Autonomy systems",
+          minimum: null,
+          maximum: null,
+          unit: "UNKNOWN",
+          recency: null,
+          alternatives: [],
+          condition: null,
+        },
+      }),
+      r2RequirementEvidence("fictional-systems-education", "EDUCATION", "QUALIFICATION", {
+        kind: "EDUCATION",
+        value: {
+          level: "Bachelor",
+          field: "Systems Engineering",
+          equivalence: null,
+          completionRequired: null,
+          currentStudyAllowed: null,
+          condition: null,
+        },
+      }),
+    ];
+    const normalization = r2TestNormalization({ requirements });
+    const result = score({
+      profile,
+      normalization,
+      eligibility: eligible(normalization, profile),
+    });
+    expect(
+      result.contributions.map(({ code, candidateFactReferences }) => ({
+        code,
+        candidateFactReferences,
+      })),
+    ).toEqual([
+      {
+        code: "R2_EXPERIENCE_VERIFIED_MATCH",
+        candidateFactReferences: ["employment.fictional-employment"],
+      },
+      {
+        code: "R2_EDUCATION_VERIFIED_MATCH",
+        candidateFactReferences: ["education.fictional-education"],
+      },
+    ]);
+  });
+
   it("gives unverified commute limits zero positive and zero negative points", () => {
     const commute = r2FieldEvidence(
       "commute-distance",

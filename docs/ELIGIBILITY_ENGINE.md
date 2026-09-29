@@ -1,6 +1,6 @@
 # Eligibility Engine
 
-Status: deterministic Beta compatibility rules and R2 eligibility engine 2.1.0 are implemented and hardened. R2 consumes current R2A 3.2.0 evidence (serialized evidence contract 3.1.0) and preserves conservative source-scope semantics. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
+Status: deterministic Beta compatibility rules and R2 eligibility engine 2.1.0 are implemented and hardened. R2 consumes current R2A 3.4.0 evidence (serialized evidence contract 3.1.0) and preserves conservative source-scope semantics. See [R2 matching quality plan](R2_MATCHING_QUALITY_PLAN.md).
 
 ## Contract
 

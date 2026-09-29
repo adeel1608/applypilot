@@ -22,6 +22,7 @@ import {
 } from "@applypilot/job-model";
 
 import { extractInertHtmlText } from "./sanitize";
+import { normalizeText } from "@applypilot/shared";
 
 type Span = {
   text: string;
@@ -1241,6 +1242,7 @@ export function normalizeR2AJobEvidence(input: {
   const structuredSectionFieldSpans: Span[] = [];
   const structuredSectionRequirementSpans: Span[] = [];
   const sectionTextLines = new Set<string>();
+  const structuredSourceSectionContents: string[] = [];
   let structuredSectionInputCount = 0;
   const structuredSourceSections = Array.isArray(structured.sourceSections)
     ? structured.sourceSections
@@ -1253,6 +1255,7 @@ export function normalizeR2AJobEvidence(input: {
     if (heading) sectionTextLines.add(normalizedSourceLine(heading));
     if (heading || content) structuredSectionInputCount += 1;
     if (!content) return;
+    structuredSourceSectionContents.push(content);
     for (const line of lineSpans(content)) sectionTextLines.add(normalizedSourceLine(line.text));
     const path = `structured.sourceSections[${index}].content`;
     const spans = structuredStringLineChunks(source, structuredSpans.get(path), content, path);
@@ -1274,9 +1277,12 @@ export function normalizeR2AJobEvidence(input: {
     .flatMap(clauseSpans);
   const descriptionValue = structuredText(structured.description);
   const descriptionSource = structuredSpans.get("structured.description");
+  const structuredDescriptionIsHtml = Boolean(
+    descriptionValue && /<[A-Za-z!/]/.test(descriptionValue),
+  );
   const structuredDescriptionSpans = (() => {
     if (!descriptionValue || !descriptionSource) return [];
-    if (/<[A-Za-z!/]/.test(descriptionValue)) {
+    if (structuredDescriptionIsHtml) {
       return lineSpans(extractInertHtmlText(descriptionValue))
         .filter((span) => isHeading(span) === undefined)
         .flatMap(clauseSpans)
@@ -1615,6 +1621,22 @@ export function normalizeR2AJobEvidence(input: {
       ? [...structuredSectionRequirementSpans, ...structuredArrayRequirementSpans]
       : [...structuredDescriptionSpans, ...structuredArrayRequirementSpans]
     : uniqueSpans;
+  const supplementalDescriptionSpans =
+    isCanonicalStructuredSource && structuredSectionInputCount > 0 && !structuredDescriptionIsHtml
+      ? structuredDescriptionSpans.filter((span) => {
+          const excerpt = normalizeText(span.text);
+          return (
+            excerpt.length > 0 &&
+            !structuredSourceSectionContents.some((content) => {
+              const sectionExcerpt = normalizeText(content);
+              return (
+                sectionExcerpt.length > 0 &&
+                (sectionExcerpt.includes(excerpt) || excerpt.includes(sectionExcerpt))
+              );
+            })
+          );
+        })
+      : [];
 
   for (const span of lineSpans(source)) {
     const labelled = span.text.match(
@@ -1885,6 +1907,20 @@ export function normalizeR2AJobEvidence(input: {
 
   for (const span of requirementSpans) {
     requirements.push(...requirementEvidence(source, observationId, span));
+  }
+  if (supplementalDescriptionSpans.length > 0) {
+    const knownRequirementSignatures = new Set(
+      requirements.map((item) => `${r2RequirementPropositionKey(item)}:${item.modality}`),
+    );
+    for (const span of supplementalDescriptionSpans) {
+      for (const evidence of requirementEvidence(source, observationId, span)) {
+        if (evidence.modality !== "REQUIRED" && evidence.modality !== "PREFERRED") continue;
+        const signature = `${r2RequirementPropositionKey(evidence)}:${evidence.modality}`;
+        if (knownRequirementSignatures.has(signature)) continue;
+        knownRequirementSignatures.add(signature);
+        requirements.push(evidence);
+      }
+    }
   }
 
   const conflicts: R2ANormalization["conflicts"] = [];
