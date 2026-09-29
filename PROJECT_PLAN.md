@@ -4670,3 +4670,262 @@ Do not emit the final green-banner success phrase.
   threads; exact-head push and PR CI were pending at this plan update.
 - Next: review PR #59 after exact-head push and PR CI succeed; keep it open and unmerged until
   human review authorizes the merge.
+
+### Requirement-section modality repair blueprint (2026-09-29)
+
+- **Starting point and guarded merge:** PR #59 was re-fetched immediately before merge and matched
+  every requested guard: title `fix: align atomic R2 requirements with verified candidate facts`,
+  OPEN / unmerged / non-draft / mergeable, base `19e349ded029b3acec733d12dfdcb51c132ec41d`, head
+  `16eef18a2cfdf2ac95c72828ac557068e13b243b`, tree
+  `bb708d9c72c664f90bc06cff0a5eb44601706d37`, 12 files, 2 commits, +596/-19, compare ahead 2 /
+  behind 0, push CI `36547152166` and PR CI `36547157212` SUCCESS on the exact head, 0 reviews and
+  0 unresolved threads. It was squash-merged with the exact-head guard as
+  `44a4c39037fc77f5fe78ed91c590ba99a217d96b`; parent is the required pre-merge main and tree is
+  the reviewed tree. Local `main` and `origin/main` are synchronized there. The clean focused branch
+  is `fix/m2-r2a-requirement-section-modality`.
+- **Current engine and read-only runtime:** merged parser / normalization are 3.4.0 / 3.4.0,
+  evidence contract 3.1.0, scorer 2.2.0, weights `r2-weights-1`, recommendation threshold 50, and
+  minimum coverage 60. The real DB read-only check reports schema 12, pending migrations 0,
+  integrity PASS, FK 0, counters 21/9/0/0, LIST_JOBS 20, historical GET_JOB 1, active source and
+  target authority 0/0, active source runs 0, latest Shield AI v7 REVOKED, and the v6 run complete
+  with 100 accepted/qualified members and 100 current evaluations/queues. Re-read pending-operation
+  count with the disposable replay preflight before corpus work. Existing verified-profile evidence
+  is count-only: skills 48/48, employment records 3/3, employment-responsibility statements 19/19,
+  education 3/3, licences 2/2, certifications 3/3, recurring availability 4/4; preferred locations
+  0/3, work types 0/3, and categories 0/12 VERIFIED. Do not print candidate values.
+- **Objective and unproven diagnosis:** establish the current-engine 100-job baseline, audit every
+  requirement row and its safe provenance bucket, then prove or reject a generic context-loss defect.
+  The hypothesis is that `LeverV2Reader` stores section `heading`, `content`, and `kind`, while
+  `normalizeR2AJobEvidence()` filters `sourceSections` to `kind === "REQUIREMENTS"`, flattens their
+  text spans, and later calls `requirementEvidence(source, observationId, span)`; that function
+  classifies only `modality(span.text)` and receives no heading. This is a code-path hypothesis,
+  **not yet proven against the fresh 100-job corpus**. Preserve section and bullet provenance in
+  memory while processing; keep the bullet span as the immutable evidence pointer.
+- **Requirements and semantic contract:** first audit all safe heading categories and modality
+  counts. Only if every task proof criterion is met, add a generic provider-independent section
+  default for REQUIREMENTS. Explicit bullet modality precedence is NEGATED, CONDITIONAL, PREFERRED,
+  REQUIRED, then a trusted heading/section fallback, then UNKNOWN; fallback runs only when lexical
+  classification is UNKNOWN. Preference headings yield PREFERRED. A generic REQUIREMENTS heading
+  may default to REQUIRED only if the heading audit finds no common unsafe mixed meaning. No
+  fallback for RESPONSIBILITIES, BENEFITS, OTHER, or neutral generic description prose. Keep
+  scorer, weights, threshold, eligibility and PARTIAL gates unchanged. Preserve deterministic
+  evidence IDs, excerpt hashes, exact bullet pointers, conflict behavior, and a rule ID that marks
+  inherited modality without storing heading text in logs. If this cannot be represented without
+  evidence/schema migration, stop with `SECTION_MODALITY_SCHEMA_CHANGE_REVIEW_REQUIRED`.
+- **Data flow, dependencies, and privacy:** perform a read-only real-runtime preflight, create a
+  fresh canonical backup, copy its database and manifest into a unique ignored
+  `data/private/rehearsals/` workspace, and restore with the repository maintenance API to a new
+  disposable DB path. Verify backup and restore health before use. Baseline rederive/evaluate/queue
+  and every corpus diagnostic run only on that copy, through stored source observations and
+  canonical local services; no network, adapter transport, employer or target action is permitted.
+  Output only allowlisted counts, distributions, IDs expressly requested for the four jobs, and
+  reason codes. Never log job prose, raw source payload, candidate values, or private DB content.
+  Backups, shadow DBs, intermediate outputs, and one-off diagnostic helpers remain ignored and are
+  not part of the PR.
+- **Proposed file scope and versioning:** likely application change is confined to
+  `packages/job-importer/src/r2a-normalization.ts`, its focused fictional tests, and
+  `packages/job-model/src/r2a.ts` version constants/assertions. Update reader/repository tests only
+  if needed to prove the same contract. No migration or schema change is planned. If modality
+  semantics change, bump parser and normalization from 3.4.0 to 3.5.0; keep evidence contract 3.1.0
+  and scorer 2.2.0 unchanged unless the persisted structure or scorer actually changes. Weights,
+  threshold, profile, source state, and real DB remain unchanged.
+- **Testing and replay:** first create a 100-job baseline on the fresh shadow and require 100 jobs,
+  current evaluations and queues, zero recommendations and deterministic detail candidates, and
+  parity with reviewed PR #59 maxima. Audit provenance P1-P8, requirement-section heading classes,
+  and proof criteria without emitting source text. If proven, add at least the 20 requested
+  provider-neutral fictional cases, then run the focused reader, normalization, repository,
+  scorer, eligibility and readiness tests, typecheck, lint and `git diff --check` before proposed
+  replay. Reset a second shadow from the verified backup and replay all 100 through canonical
+  services. Compare modality, provenance, coverage, scores, eligibility, recommendation/detail,
+  four requested Melbourne roles, and remaining PARTIAL scope; run a read-only C1-C6 provenance
+  audit without changing coverage semantics.
+- **Risks, rollback, stop conditions, and acceptance:** primary risks are unsafe broad REQUIREMENTS
+  defaults, changing explicit negation/conditional/preference precedence, losing source linkage, and
+  leaking private data. Stop if PR state is changed, baseline diverges, context-loss proof fails,
+  heading semantics are ambiguous, schema change is needed, pointers/hashes fail, any fictional or
+  pre-shadow check fails, network is attempted, or any replay regression is unexplained. Do not
+  weaken PARTIAL blocking. A PR is allowed only if all semantic/safety gates pass and at least one
+  real UNKNOWN row is correctly resolved from immutable trusted requirement-section provenance. If
+  zero rows are safely resolved, record `SECTION_MODALITY_REPAIR_NOT_MATERIAL`; do not open a PR.
+  Roll back only this branch's application/test edits if a gate fails; retain safe plan evidence and
+  ignored private artifacts. If all gates pass, run the prescribed full validation, recheck the real
+  DB read-only, and open exactly one PR to `main`, leaving it OPEN / UNMERGED until exact-head push
+  and PR CI both succeed.
+- **Exact next steps:** re-read the safe runtime counters and pending-operation count; create a fresh
+  canonical backup and supported disposable restore; verify it; run current-engine baseline replay;
+  audit P1-P8 and headings; decide whether the proof is complete; only then consider the narrow
+  implementation and its second fresh replay. Finish by documenting actual commands/results,
+  material-gate decision, PR/CI state if any, unchanged real-runtime counters, blockers, and exactly
+  one recommended next engineering task.
+
+### Section-context defect proof and implementation authorization (2026-09-29)
+
+- **Fresh private copy and baseline replay:** canonical backup
+  `backup-2026-09-29T09-50-45.495Z-c42516ce` is schema 12 / integrity PASS / FK 0. Supported
+  maintenance restore created ignored shadow `m2-r2a-shadow-1790675445693-3b1de6ef`, also schema
+  12 / PASS / FK 0, counters 21/9/0/0, v6 run members 100, latest v7 REVOKED, active source and
+  target authority 0/0. The installed replay network guard blocked 0 calls. Canonical local
+  rederive/evaluate/queue processed 100/100/100 at parser/normalization 3.4.0 and evidence contract
+  3.1.0. The current-engine result matches reviewed PR #59: 857 fields, 971 requirements,
+  material families COMPLETE/PARTIAL/UNKNOWN 113/330/557, mean/median coverage 24.37%/22.5%, max
+  score 4, 0 scores at least 50, 0 recommendations, 0 detail candidates; scorer 2.2.0 and weights
+  `r2-weights-1` remain active. All current 100 evaluations and queues are bound to current versions.
+- **Safe P1-P8 corpus audit:** 971 requirement rows classify as P1 `STRUCTURED_EXPLICIT_REQUIREMENTS_SECTION`
+  917, P2 `STRUCTURED_REQUIREMENTS_ARRAY` 0, P3 `STRUCTURED_SKILLS_ARRAY` 0, P4
+  `STRUCTURED_QUALIFICATIONS_ARRAY` 0, P5 `STRUCTURED_REQUIREMENT_TEXTS_ARRAY` 0, P6
+  `SUPPLEMENTAL_DESCRIPTION` 54, P7 `UNSTRUCTURED_VISIBLE_SECTION` 0, P8 `OTHER` 0. Aggregate
+  modalities are REQUIRED 24, PREFERRED 33, CONDITIONAL 4, NEGATED 3, UNKNOWN 907. P1 modalities
+  are 14/25/3/3/872 in that order; P6 modalities are 10/8/1/0/35. All 917 P1 source paths map to
+  immutable source sections whose kind is REQUIREMENTS; mismatch count is 0. Across 100 jobs,
+  290 source sections classify as REQUIREMENTS 170, RESPONSIBILITIES 94, BENEFITS 0, OTHER 26.
+  Pointers and excerpt hashes validate for all 100 jobs. P1 unknown rows with neutral bullet-level
+  lexical classification: 872; P1 unknown rows containing a lexical explicit-modality marker: 0.
+- **Heading audit and proof decision:** P1 requirement-row heading classes are
+  H_REQUIRED_EXPLICIT 601, H_PREFERRED_EXPLICIT 316, H_REQUIREMENT_CONTEXT_GENERIC 0, and
+  H_AMBIGUOUS 0. The required-heading rows include 564 neutral UNKNOWN bullets; preference-heading
+  rows include 308 neutral UNKNOWN bullets. Existing lexical REQUIRED/PREFERRED/CONDITIONAL/NEGATED
+  rows remain separately represented under those headings. The reader persists immutable heading,
+  content, and kind; normalization uses only the section kind to choose P1 spans and then passes only
+  each bullet to `modality()`. The fictional current-engine probe returns UNKNOWN for a neutral
+  bullet under both “requirement” and preference contexts, preserves explicit PREFERRED,
+  CONDITIONAL, and NEGATED bullet results, and emits no requirement evidence from
+  RESPONSIBILITIES, BENEFITS, or OTHER sections. Neutral structured-description evidence stays
+  UNKNOWN; explicit REQUIRED/PREFERRED description behavior remains intact. Code review found no R2
+  contract that requires every requirement bullet to repeat “must” or “required”; UNKNOWN is the
+  lexical classifier’s fail-closed result. All seven context-loss proof conditions are met, so the
+  defect is **PROVEN**.
+- **Authorized narrow implementation:** in `r2a-normalization.ts`, retain each requirement span
+  with its originating section kind and heading only in memory; pass a trusted default to
+  `requirementEvidence()` only for spans from structured source sections of kind REQUIREMENTS. The
+  explicit lexical result wins and the section default applies only when it is UNKNOWN. A preferred
+  heading defaults to PREFERRED; conflicting/mixed headings remain without a default; otherwise a
+  REQUIREMENTS-kind section defaults to REQUIRED. This is supported by the audited absence of
+  ambiguous/mixed corpus headings and follows Lever’s provider-neutral classifier. No fallback for
+  responsibilities, benefits, other sections, or neutral description prose. Record inherited
+  modality with a generic `ruleId` variant while preserving the original bullet path, exact excerpt,
+  hash, deterministic conflict semantics, and evidence schema. No heading text or job prose is
+  emitted. Bump parser and normalization 3.4.0 -> 3.5.0; retain evidence contract 3.1.0, scorer
+  2.2.0, weights, threshold, coverage, and eligibility gates. No database migration is authorized.
+- **Implementation-specific stop/acceptance checks:** implement provider-neutral fictional tests
+  before shadow work, including mixed/ambiguous heading no-default behavior, explicit modality
+  precedence, unsupported section no-default behavior, unchanged generic description behavior,
+  pointer/hash validity, deterministic replay, unchanged conflict detection, and short-token scorer
+  regression. Run the task’s focused pre-shadow suite, typecheck, lint, and diff check. Then restore a
+  second fresh shadow from the verified backup, rederive/evaluate/queue all 100, compare against this
+  3.4 baseline, report the specified modality/coverage/score/eligibility/Melbourne/partial-scope
+  aggregates, and require no unexplained regression plus at least one correctly resolved real
+  UNKNOWN row. Any requirement-schema change, failed explicit precedence, or unsafe heading default
+  stops with the task-specified code; zero real conversions stops as
+  `SECTION_MODALITY_REPAIR_NOT_MATERIAL`. Only after that gate may full validation and one
+  open/unmerged PR be considered.
+
+### Proposed section-modality replay and partial-scope audit (2026-09-29)
+
+- **Exact 3.4 -> 3.5 comparison:** the baseline remains parser/normalization 3.4.0 and the second
+  fresh shadow is parser/normalization 3.5.0; evidence contract is 3.1.0 in both. Each replay has
+  100 jobs, 857 field-evidence rows, 100 current evaluations, and 100 current queues. Requirement
+  rows changed 971 -> 1,346. Modalities changed from REQUIRED/PREFERRED/CONDITIONAL/NEGATED/UNKNOWN
+  `24/33/4/3/907` to `827/477/4/3/35`. The 872 baseline UNKNOWN rows sourced from REQUIREMENTS
+  sections are now resolved by trusted context; the proposed P1 section has 1,292 rows, including
+  803 section-inherited REQUIRED and 444 section-inherited PREFERRED rows. It also emits 375
+  additional safe structured-section clauses that had no prior evidence row. Remaining 35 UNKNOWN
+  rows are supplemental-description evidence; no description fallback was added.
+- **Coverage and safety comparison:** field evidence, material-family totals (COMPLETE/PARTIAL/UNKNOWN
+  `113/330/557`), mean/median coverage (`24.37%/22.5%`), and each job’s coverage are unchanged.
+  Coverage movement is increased/unchanged/decreased `0/100/0`; scores increased/unchanged/decreased
+  `72/28/0`; eligibility worsened `0`; evidence counts decreased `0`; unexplained regressions `0`.
+  Maximum score is `4 -> 25`; proposed score-at-least-50 jobs `0`; eligibility remains
+  REVIEW_REQUIRED/ELIGIBLE/INELIGIBLE `99/1/0`; recommendations and deterministic detail candidates
+  remain `0/0`. Scorer 2.2.0, `r2-weights-1`, threshold 50, minimum coverage 60, verified profile,
+  evidence contract, and PARTIAL blocking are unchanged. The second shadow was restored from the same
+  canonical backup, and its replay network guard recorded zero blocked attempts.
+- **Requested Melbourne before/after comparison:** R5712 goes from 14 all-UNKNOWN rows / 0 usable /
+  score 0 to 16 rows (12 REQUIRED, 4 PREFERRED) / 16 usable / score 18; coverage stays 25%, status
+  REVIEW_REQUIRED, not recommended, detail false. R4633 stays at 0 requirements / 0 usable / score
+  0; coverage 0%, REVIEW_REQUIRED, not recommended, detail false. R5964 goes from 7 rows (6 UNKNOWN,
+  1 PREFERRED) / 1 usable / score 0 to 8 rows (7 REQUIRED, 1 PREFERRED) / 8 usable / score 7;
+  coverage stays 20%, REVIEW_REQUIRED, not recommended, detail false. R5713 goes from 7 all-UNKNOWN
+  rows / 0 usable / score 0 to 11 rows (4 REQUIRED, 7 PREFERRED) / 11 usable / score 7; coverage
+  stays 25%, REVIEW_REQUIRED, not recommended, detail false. All four retain their existing partial
+  and unobserved material families and blockers; no private profile values or job prose are recorded.
+- **Remaining partial provenance:** a read-only provenance audit of the proposed shadow covers all
+  330 remaining partial material-family records and 494 unparsed material spans. Provenance counts
+  are REQUIREMENTS 76, RESPONSIBILITIES 67, BENEFITS 0, OTHER 31, DESCRIPTION 320,
+  STRUCTURED_FIELD 0, UNKNOWN 0. Exclusive cause counts are C1 true unparsed requirement scope 76,
+  C2 responsibility/role scope 67, C3 ambiguous OTHER scope 31, C4 location/other field extraction
+  gap 109, C5 parser duplication accounting 0, C6 other 211. For all four Melbourne roles together,
+  13 partial families contain 19 unparsed spans: provenance REQUIREMENTS 2, RESPONSIBILITIES 1,
+  BENEFITS 0, OTHER 4, DESCRIPTION 12, STRUCTURED_FIELD 0, UNKNOWN 0; causes C1-C6 are
+  `2/1/4/4/0/8`. Per role, C1-C6: R5712 `0/0/0/1/0/2`; R4633 `0/0/4/1/0/2`; R5964
+  `1/1/0/1/0/2`; R5713 `1/0/0/1/0/2`. No exact/overlapping evidence pointer supports a duplicate
+  accounting diagnosis. The remaining spans establish concrete scope provenance but do not alone
+  prove a second generic coverage defect. PARTIAL blocking remains unchanged; the next task should
+  examine C1 requirement spans for a separate extraction fix without weakening the gate.
+- **Current state:** the semantic gate is materially supported: all seven defect proof conditions
+  passed, 872 real UNKNOWN rows were resolved from immutable REQUIREMENTS-section context, fictional
+  precedence regressions passed, pointers/hashes passed for all 100, and no coverage/eligibility/score
+  regression was unexplained. Full task validation, final real-DB read-only invariants, and one
+  open/unmerged implementation PR remain outstanding. Exact commands and outcomes must be appended
+  here after the full validation run; no PR should be opened before that gate completes.
+
+### Section-modality full validation and runtime recheck (2026-09-29)
+
+- **Focused pre-shadow gate:** focused reader, normalization, R2A persistence, source-enablement,
+  scorer, eligibility, and readiness tests passed (9 files / 167 tests); typecheck, lint, changed-file
+  Prettier with `--end-of-line auto`, and `git diff --check` passed before the second shadow replay.
+  A first typecheck attempt caught a context type-inference issue; it was fixed before replay, and the
+  final gate passed.
+- **Full test and build commands:** `npm test` passed (59 files / 652 tests);
+  `npm run test:integration` passed (3 files / 21 tests); `npm run test:e2e` passed (47/47) on
+  alternate loopback ports 3110/3210 using the disposable fictional test DB. `npm run typecheck`,
+  `npm run lint`, and changed-file `prettier --check --end-of-line auto` passed. The first lint run
+  surfaced an unused-argument warning and a local variable naming rule in ignored rehearsal helpers;
+  both helpers were fixed and the final lint passed. `npm run build` passed for the local app and
+  showcase, including `PUBLIC_SHOWCASE_AUDIT_PASS`.
+- **Formatting and release gates:** `npm run format:check` reports formatting/line-ending warnings
+  in 59 repository files, including pre-existing unrelated files. No unrelated files were changed.
+  The exact changed-file format check passes with `--end-of-line auto`, and the release fixture’s
+  same repository-wide Windows-aware Prettier check passes. `npm run privacy:audit` passes with 351
+  tracked files, 1,489 history paths, 1,308 blobs, 1,959 build/test artifacts, and 11 private
+  canaries checked. `npm audit --audit-level=high` and `npm run audit:production` each report 0
+  vulnerabilities. `npm run release:check:fixture` passes end-to-end using a disposable schema-12
+  fixture database, synthetic mode, and alternate E2E ports; release readiness stays
+  Personal Live V1 `NOT_READY` for its existing target-approval / first-validation blockers.
+  `git diff --exit-code origin/main -- packages/database/drizzle` confirms migration files are
+  unchanged. `git diff --check` passes. `git fsck --strict` passes; it reports dangling Git objects
+  but exits successfully.
+- **Real-runtime read-only recheck:** `npm run db:status` reports schema 12, pending migrations 0,
+  integrity PASS, FK issues 0. A read-only SQLite summary confirms counters 21/9/0/0, historical
+  GET_JOB total 1, 20 LIST_JOBS requests, active source/target capabilities 0/0, active source runs
+  0, claimed application operations 0, and latest Shield AI capability v7 REVOKED. The v6 run is
+  COMPLETE LIST_JOBS with 100 accepted/qualified members and 100 current evaluations/queues. All
+  real-runtime task deltas remain zero so far.
+- **Acceptance and remaining work:** semantic/safety gate PASS; no schema or migration change, no
+  scorer/weight/threshold/gate change, no profile mutation, and no live source/employer/target action.
+  The task is not closed yet: stage only the nine intended files, commit the implementation, push
+  `fix/m2-r2a-requirement-section-modality`, open exactly one PR to `main`, wait for exact-head push
+  and PR checks, then re-read real DB invariants and finalize the 84-field closeout. Leave the PR
+  OPEN / UNMERGED. The single recommended next engineering task remains the C1 requirement-span
+  extraction audit; it must preserve the current PARTIAL gate unless a separately proven fix is
+  reviewed.
+
+### Implementation PR and first exact-head CI result (2026-09-29)
+
+- Opened exactly one implementation PR, [#60](https://github.com/adeel1608/applypilot/pull/60),
+  titled `fix: preserve requirement-section modality in R2A evidence`. It is OPEN, non-draft,
+  mergeable, based on `main` at `44a4c39037fc77f5fe78ed91c590ba99a217d96b`, and remains UNMERGED.
+  Implementation head is `7dbf6d727264e6623baf61c46278b9f74b523d9a`, tree
+  `fe104acee23d984d7a660e935d378d959c4caca7`; its single commit changes the nine intended files
+  (+608/-22). The PR has 0 reviews and 0 unresolved review threads.
+- Exact implementation-head push CI run `36557903310` and PR CI run `36557951485` both completed
+  SUCCESS. The checked head is the exact implementation commit above. The PR has been attached to
+  the Codex task.
+- Re-reading real runtime after PR creation still reports schema 12, pending migrations 0,
+  integrity PASS, FK 0, counters 21/9/0/0, historical GET_JOB 1, no active source/target authority,
+  no active source run, no claimed application operations, and Shield AI v7 REVOKED. All source,
+  employer, form, upload, and submission task deltas are zero.
+- This plan update is documentation-only and will be committed as a PR follow-up. It will trigger
+  new exact-head push and PR CI runs; task closeout requires both checks to pass on the resulting
+  final PR head. No merge is authorized or intended. After the final checks, report the 84 requested
+  closeout fields and the seven milestone statuses here as well as in the task response; keep
+  Personal Live V1 NOT_READY and do not emit a green-banner success phrase.
