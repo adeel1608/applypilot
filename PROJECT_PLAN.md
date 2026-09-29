@@ -1,16 +1,80 @@
 # ApplyPilot Production Verification Project Plan
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `8acb96a817d9835b205f6cf25fabd9c24ad18e0f`
+Expected current main: `7e8534d196cec6b2e62f0bda78e0f7a29312472e`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
 
 ## 1. Resume here
 
-### Current work checkpoint (2026-09-28)
+### Current work checkpoint (2026-09-29)
+
+- The long-window v6 Shield AI source-authority task started from synchronized `main` /
+  `origin/main` at `7e8534d196cec6b2e62f0bda78e0f7a29312472e`; the plan-only evidence branch is
+  `chore/m2-v6-broader-discovery-evidence`. The tree was clean at branch creation. The only planned
+  tracked change is this file. No application code, migration, private database, allowlist, backup,
+  raw payload, receipt-private field, or candidate-profile value belongs in the evidence PR.
+- Before this task, lifetime source/employer/application-operation/final-consent counters were
+  `17/9/0/0`, schema 12 had no pending migrations, integrity was PASS, FK issues were 0, no source
+  run was active, and no source authority was active. The Shield AI v5 private configuration's exact
+  digest was `a2cadcad7d877555d769fae23093078fc587d89c8347e226d79865952f6c15a1`; it was expired,
+  with no v5 APPROVE receipt, START receipt, run binding, run, or request. It was reconciled only as
+  immutable configuration history through `SourceEnablementRepository.persistCapabilityVersion`.
+  Persisted v5 row `bb0fe9e2-e2e3-4353-a986-79de9a076513` retains version 5 / predecessor 4 and the
+  exact digest; readiness is `SOURCE_DISABLED / CAPABILITY_EXPIRED`. The ignored pre-v6 allowlist
+  backup is `source-allowlist-pre-v6-20260929-70564d68.json.bak`, SHA-256
+  `70564d68aee035b7558719f99306f1a03b901852ccd0f3588bc2ade5b15ca6c8`.
+- v6 identity: capability `m2_source_shieldai_ace3faba83cf_1790463324757`, version 6 / predecessor
+  5; T0 `2026-09-28T23:34:20Z`; digest
+  `e67a3da4f6b2047c6aa63d13cac67f8e360e13080463b32ae0beb18d161f34a6`; parser
+  `lever-v2:7e8534d196cec6b2e62f0bda78e0f7a29312472e`; policy `m2-live-readiness-v1`; policy and
+  capability expiry `2026-09-29T23:34:20.000Z`, a 24-hour window. Configuration
+  `approvalState: APPROVED` and approval-reference text are configuration metadata, not proof of a
+  human action. Human owner approval was separately completed in the loopback `/sources` form and
+  durably recorded as APPROVE receipt `7fdaf702-bd4b-4494-81df-35795bb114df`, state CONSUMED. Its
+  exact capability/version/digest/reference/source/tenant/policy binding matched; the nonce action
+  was `SOURCE_CAPABILITY_APPROVE`, and loopback/session/nonce/owner confirmation gates were true.
+  Before RUN, `canOwnerStart=true`.
+- The human owner separately submitted RUN exactly once. START receipt
+  `e60a3051-0052-4130-8779-53686199ebf2` is CONSUMED with operation `LIST_JOBS` and nonce action
+  `SOURCE_RUN_START`. The single owner binding is keyed by run
+  `4c143a7b-b102-4dea-a489-de4327fbe678`, and references that exact APPROVE receipt, START receipt,
+  v6 digest, and `LIST_JOBS`. That single v6 run is COMPLETE: 4 requests, 4 pages, 100 provider
+  records, 1,462,469 bytes, maximum page 389,634 bytes / 25 records, 0 retries, 0 redirects,
+  concurrency 1. All 100 records were accepted and 0 were unusable. This was the only source action
+  in the task; LIST_JOBS lifetime delta is +4 and GET_JOB delta is 0. No candidate data was sent.
+- After terminal run verification, v7 was created through the canonical immutable
+  `SourceEnablementRepository.persistCapabilityVersion` revocation derivation, with predecessor 6,
+  `REVOKED`, null approval reference/time, reason `OWNER_REVOKED`, and preserved v6 lineage. V7 row
+  `8522969a-8a06-48b7-86b6-076a4f1af46f` digest is
+  `5c58e6d2cbdc3f0774a4e6cf61e55637806644e264d1f629c071e86cba3559d7`, revoked at
+  `2026-09-28T23:57:02.978Z`. The ignored private allowlist was schema-validated and atomically
+  updated to the revoked v7 family version. Latest family is v7 REVOKED; active source authority
+  and current start-capable owner receipts are both 0. Preserve all v5/v6 history.
+- All broader-discovery analysis used only the persisted run and local R2/evaluation/queue/duplicate
+  data after revocation. It found 100 distinct external IDs and verification references, 25 new
+  source observations and 25 new job versions, 75 deterministic duplicate/no-op dispositions, 25
+  unique current jobs/evaluations, and 25 REVIEWING / CURRENT queue rows. No deterministic detail
+  candidate exists. No GET_JOB, employer page, application navigation/form action, upload, or
+  submission occurred. Post-run lifetime counters are source/employer/application-operation/final-
+  consent `21/9/0/0`; historical total GET_JOB requests remain 1, with no task delta. The app
+  preflight reports source-enabled Personal Beta READY with zero active source authority; Personal
+  Live V1 remains NOT_READY.
+- The seven-milestone tracker remains: (1) Foundations COMPLETE; (2) current real role + fresh
+  current packet IN PROGRESS / BROADER DISCOVERY; (3) real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING
+  / NOT LIVE VERIFIED; (4) final-review/submission safeguards BLOCKED; (5) reproducible release
+  COMPLETE; (6) controlled real fill-preview BLOCKED; (7) final readiness / Green-banner review NOT
+  STARTED. Do not emit the final green-banner success phrase.
+- Acceptance and safety criteria: one terminal bounded owner-bound LIST_JOBS run; no GET_JOB or
+  employer/application action; canonical v7 revocation with zero remaining authority; local-only
+  analysis; plan-only evidence; one open/unmerged PR; exact-head CI. Rollback is not to rewrite
+  immutable capability/receipt/run history; if the evidence PR needs correction, amend only this
+  plan and re-run exact-head CI. No code change is expected or authorized by this operational task.
+
+### Historical checkpoint (2026-09-28; superseded)
 
 - This engineering task starts from synchronized `main` / `origin/main` at
   `8acb96a817d9835b205f6cf25fabd9c24ad18e0f` on branch
@@ -3607,3 +3671,168 @@ PROJECT_PLAN.md` passes. No application/source files were reformatted because th
   recorded in the final PR comment and task closeout.
 - The next recommended task after this evidence review is to generate a fresh, exact, short-lived
   capability immediately before explicit owner approval. No source network action has occurred.
+
+## 50. M2 long-window v6 source authority and broader discovery closeout (2026-09-29)
+
+### Objective, scope, and architecture
+
+- Objective: close the owner-approved Shield AI v6 discovery cycle with durable local evidence,
+  revoke source authority, analyze the 100 returned records locally, and publish a plan-only
+  evidence PR. This operational task requires no product-code or schema change.
+- Starting repository state: synchronized `main` / `origin/main` at
+  `7e8534d196cec6b2e62f0bda78e0f7a29312472e`, clean tracked worktree, schema 12, pending migrations
+  0, integrity PASS, foreign-key issues 0. Work was prepared on
+  `chore/m2-v6-broader-discovery-evidence` from that main SHA.
+- Data flow: existing local owner forms recorded APPROVE and RUN receipts; the normal production
+  source runner bound those receipts to one forward-cursor LIST_JOBS run; the canonical local source
+  repository created an immutable v7 revocation; the schema-validated ignored allowlist was updated;
+  local database job/evaluation/queue state was analyzed; only redacted, safe evidence is recorded
+  below in this plan.
+- Dependencies: existing SourceCapabilityV2 schema/readiness behavior, schema-12 owner-action
+  receipt and run-binding tables, canonical Lever adapter/runner, local R2/evaluation/queue/duplicate
+  derivation, SQLite runtime, Git, GitHub CLI, and exact-head repository CI. No optional AI service
+  or new package is required.
+- Security/privacy: no direct HTTP, alternate runner, continuation hack, GET_JOB, employer or hosted
+  application navigation, form action, upload, submission, candidate-data egress, private allowlist
+  tracking, DB tracking, raw payload, nonce/session disclosure, or candidate-profile facts. The
+  result rows below contain local job identifiers, source-provided title/location, reason-code
+  tokens, and deterministic status only. Source authority is revoked before this PR is created.
+- Rollback strategy: do not alter immutable v5/v6/v7, receipt, binding, or run history. If this
+  evidence needs correction, make a plan-only follow-up on the same branch, re-run the listed local
+  checks, and wait for CI on the new exact head. Leave the PR open and unmerged.
+- Acceptance criteria: v6 has exactly one consumed APPROVE and START receipt and one exact run
+  binding; the one run is terminal and within bounds; no unauthorized source/employer/application
+  operation occurred; v7 is the latest revoked family version with active authority 0; local result
+  analysis is complete; privacy and DB checks pass; only `PROJECT_PLAN.md` is tracked; one evidence
+  PR is open/unmerged; final exact-head CI passes.
+
+### Immutable v5 history and v6 human gates
+
+- Pre-task lifetime counters were source/employer/application operations/final consent or submission
+  `17/9/0/0`. Exact staged v5 digest
+  `a2cadcad7d877555d769fae23093078fc587d89c8347e226d79865952f6c15a1` was verified and expired:
+  policy expiry `2026-09-29T22:43:03.000Z`, capability expiry `2026-09-28T23:13:03.000Z`. It had
+  zero APPROVE receipts, zero START receipts, zero run bindings, zero source runs, and zero request
+  delta. Its immutable configuration-history row was reconciled as version 5 / predecessor 4,
+  exact digest retained, readiness `SOURCE_DISABLED / CAPABILITY_EXPIRED`; no owner provenance was
+  inferred or backfilled.
+- Before allowlist replacement, the ignored pre-v6 backup was
+  `source-allowlist-pre-v6-20260929-70564d68.json.bak` (SHA-256
+  `70564d68aee035b7558719f99306f1a03b901852ccd0f3588bc2ade5b15ca6c8`). The backup, allowlist,
+  database, and analysis scripts remain ignored private data and are not PR content.
+- V6 T0 was `2026-09-28T23:34:20Z`. It was version 6 / predecessor 5, configuration digest
+  `e67a3da4f6b2047c6aa63d13cac67f8e360e13080463b32ae0beb18d161f34a6`, parser
+  `lever-v2:7e8534d196cec6b2e62f0bda78e0f7a29312472e`, policy `m2-live-readiness-v1`, policy expiry
+  `2026-09-29T23:34:20.000Z`, capability expiry `2026-09-29T23:34:20.000Z`, and lifetime 24 hours.
+  The bounded configuration permitted LIST_JOBS only: request budget 4, record cap 100, page-size
+  cap 25, response-byte limit 2,000,000, request timeout 30,000 ms, run timeout 120,000 ms,
+  retries 0, redirects 0, concurrency 1, canonical forward cursor from 0.
+- Configuration `approvalState: APPROVED` and the string reference
+  `owner.m2-source-discovery.lever_shieldai.v6` are not durable proof of human owner action. The
+  human owner completed the separate APPROVE action in `/sources` (YES). Durable APPROVE receipt
+  `7fdaf702-bd4b-4494-81df-35795bb114df` has state CONSUMED, exact v6 family/version/digest/reference,
+  LEVER / shieldai, and the v6 policy binding; nonce action `SOURCE_CAPABILITY_APPROVE`; loopback,
+  local session, nonce consumption, and owner-confirmation booleans all true. No v5 human receipt
+  exists.
+- Before RUN, local `/sources` state reported `canOwnerStart=true`. The human owner completed the
+  separate RUN action in `/sources` exactly once (YES). START receipt
+  `e60a3051-0052-4130-8779-53686199ebf2` has state CONSUMED, operation LIST_JOBS, exact v6 digest,
+  predecessor APPROVE receipt ID, nonce action `SOURCE_RUN_START`, and all four owner/gate booleans
+  true. One source-run owner-binding row is keyed by run
+  `4c143a7b-b102-4dea-a489-de4327fbe678`; it binds that exact approval receipt, start receipt, v6
+  digest, and LIST_JOBS operation. No nonce, session value, or receipt confirmation digest is
+  included in this evidence.
+
+### Terminal run, counters, and revocation
+
+- Source run `4c143a7b-b102-4dea-a489-de4327fbe678`: COMPLETE, LIST_JOBS, 4 requests, 4 pages, 100
+  provider records, 1,462,469 bytes, max page 389,634 bytes / 25 records, retries 0, redirects 0,
+  concurrency 1. Accepted records 100; unusable records 0. The run used the production forward
+  pagination path and remained inside every v6 request/page/record/response bound.
+- Request-counter reconciliation: pre-task total 17; this run added exactly 4 LIST_JOBS requests;
+  post-task total 21. GET_JOB delta 0 (historical lifetime GET_JOB count remains 1). Employer,
+  application/form, upload, and submission/final-consent deltas are all 0; lifetime counters are
+  source/employer/application operations/final consent or submission `21/9/0/0`. No active source
+  run remains. No task audit event shows employer, application, form, upload, submission, or hosted
+  navigation activity. Candidate data outbound was 0 fields.
+- After terminal run and receipt-chain verification, canonical immutable revocation produced v7,
+  predecessor 6, state REVOKED, approval reference/time null, revocation reason `OWNER_REVOKED`,
+  `revokedAt=2026-09-28T23:57:02.978Z`, digest
+  `5c58e6d2cbdc3f0774a4e6cf61e55637806644e264d1f629c071e86cba3559d7`. The ignored allowlist was
+  updated atomically after SourceAllowlistV2Schema / SourceCapabilityV2Schema validation. Latest
+  persisted family version is v7 REVOKED; v5/v6 history remains; active Shield AI source authority
+  count 0, active receipt count 0, and a blind rerun is not possible. No source interaction followed
+  the run.
+
+### Local broader-discovery results
+
+- Analysis used the one persisted v6 run and current local R2, evaluation, queue, and canonical
+  duplicate state after revocation; it made no source request. Accepted provider records: 100;
+  unusable: 0; distinct external IDs: 100; verification references: 100; new source observations:
+  25; new job versions: 25; deterministic duplicate/no-op dispositions: 75; unique jobs: 25;
+  current evaluations: 25; current queue rows REVIEWING / CURRENT: 25.
+- Location distribution: Seattle, Washington 7; San Diego, California 4; Dallas, Texas 3;
+  Washington, D.C. 2; Remote 2; New Delhi 1; Taipei 1; Lviv 1; Kyiv 1; London 1; Melbourne 1;
+  Singapore 1. Melbourne count 1; normalized Australia country count 0 because country values are
+  Unknown. Engineering/robotics/mechatronics/electronics/software/controls/test/vision-like title
+  count 9.
+- Eligibility: ELIGIBLE 1 / REVIEW_REQUIRED 24 / NOT_ELIGIBLE 0. Recommended true 0 / false 25.
+  Maximum score 8 / threshold 50; maximum coverage 100; duplicate CLEAR 25; current evaluations
+  25; deterministic detail-candidate count 0 under the current recommended + eligible + current
+  evaluation + current queue + duplicate-clear rule. Generic blockers: no row is recommended;
+  maximum score is below threshold; 24 rows retain partial material scope and insufficient
+  extraction coverage; the sole ELIGIBLE row has score 0 and is below threshold. No role-specific
+  rule or preference was invented. Do not perform GET_JOB.
+- Safe deterministic top 15, sorted recommended descending, score descending, coverage descending,
+  then local job ID ascending. Reason codes are the canonical R2 reason tokens only; no candidate
+  profile values are present.
+
+| Local job ID                                  | Title                                                                         | Safe location         | Eligibility / reason codes                                                                                                                       | Score / threshold / recommended | Coverage / partial / unobserved | Duplicate | Queue               | Detail | Blockers                                                                                                                                                      |
+| --------------------------------------------- | ----------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- | ------------------------------- | --------- | ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source-job-e44bf4fee003a80ee50b5429b93f479a` | Field Marketing Manager (R5942)                                               | New Delhi             | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 8 / 50 / false                  | 0 / 3 / 7                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-268f1dc1b7b788fc493ce84cd47ba202` | Capture Strategy & Operations Sr. Lead, X-BAT Family of Systems (FoS) (R6012) | San Diego, California | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-a7e29b9fb9a16a41eafb7ab0120ce5a7` | Director, International Growth Campaign Leader (R5851)                        | Washington, D.C.      | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`, `R2_MATERIAL_CONDITION_UNRESOLVED`, `R2_JOB_ROSTER_UNKNOWN` | 7 / 50 / false                  | 0 / 7 / 3                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_UNKNOWN`, `MATERIAL_SCOPE_PARTIAL`, `MATERIAL_CONDITIONAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD` |
+| `source-job-aa8b3f696de16a177f33161eb43a3274` | Capture Strategy & Operations Sr. Lead, X-BAT Family of Systems (FoS) (R6083) | San Diego, California | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-c00e188a797b27a8e79e032877d86cd9` | Capture Portfolio Analyst, X-BAT Family of Systems (FoS) (R6011)              | San Diego, California | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 7 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-fa24c913da878e8353ae7bd8d0b2b2d8` | Assistant Product Owner, CCA Mission Autonomy (Platform Integration) (R5849)  | Washington, D.C.      | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`, `R2_MANDATORY_CAPABILITY_UNCONFIRMED`                       | 7 / 50 / false                  | 0 / 6 / 4                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-8fba911d3f584d3fb8a6c799813dda38` | Field Service Representative                                                  | Taipei                | ELIGIBLE; `R2_NO_MATERIAL_BLOCKERS`                                                                                                              | 0 / 50 / false                  | 100 / 0 / 8                     | CLEAR     | REVIEWING / CURRENT | NO     | `SCORE_BELOW_THRESHOLD`                                                                                                                                       |
+| `source-job-053390b7a0437e5ca022c05a121133b4` | Engineer I, PCB (R6065)                                                       | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 3 / 7                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-186f56166822e7d1cdd43b9321a39b09` | Flight Controls Engineer (R4815)                                              | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 3 / 7                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-364a3d167d2e3bfba1dff873d31b700e` | Associate Facilities Coordinator (R5567)                                      | Lviv                  | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-3a4a1a9607035f62b62c73c5098c1595` | Electric Power System Lead (R5987)                                            | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 2 / 8                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-50e0ff06800a7bc0c5573b29aac24a5f` | Fleet Support Specialist, Field Integration & Test (R5615)                    | Dallas, Texas         | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 5 / 5                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-5b48aa63bb31b19e9d051222ae238d60` | Facilities Technician II (R5444)                                              | Dallas, Texas         | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`, `R2_MANDATORY_LICENCE_UNCONFIRMED`                          | 0 / 50 / false                  | 0 / 6 / 4                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-6b5b4ccaf4fefd3777d907acf4741b91` | Associate Facilities Coordinator (R5534)                                      | Kyiv                  | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+| `source-job-71caecd8870708a4b88dfbd7682e93df` | Director, People Operations (R5390)                                           | Seattle, Washington   | REVIEW_REQUIRED; `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`                                                              | 0 / 50 / false                  | 0 / 4 / 6                       | CLEAR     | REVIEWING / CURRENT | NO     | `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `SCORE_BELOW_THRESHOLD`                                             |
+
+### Validation, tracker, and evidence PR handoff
+
+- After terminal revocation and again during final plan-only validation: `npm run db:status` PASS
+  (schema 12 / pending 0 / integrity PASS / FK 0); `npm run preflight` PASS with no blockers, zero
+  active source authority, Source-enabled Personal Beta READY, and Personal Live V1 NOT_READY;
+  `npm run privacy:audit` PASS (350 tracked files, 1,428 history paths, 1,276 history blobs, 1,961
+  build/test artifacts, 11 private canaries); `npx prettier --check PROJECT_PLAN.md` PASS after
+  `npx prettier --write PROJECT_PLAN.md` corrected the initial formatting warning; `git diff
+--check` PASS. Focused owner-receipt/source-run/recovery/UI command
+  `npx vitest run packages/job-sources/src/source-capability.test.ts
+packages/database/src/source-enablement-repository.test.ts
+packages/job-sources/src/source-runner.test.ts apps/web/app/sources/actions.test.ts
+apps/web/app/sources/page.test.tsx` PASS, 5 files / 148 tests. No full 600+ test suite is needed
+  for this plan-only change.
+- Privacy review: the ignored `.source-analysis-once.ts` and any other temporary audit script were
+  removed. The final tracked diff is restricted to `PROJECT_PLAN.md`; private allowlist, DB,
+  allowlist backups, run payloads, receipts, browser state, and candidate profile documents remain
+  untracked and ignored.
+- Seven-milestone tracker: (1) Foundations COMPLETE; (2) current real role + fresh current packet
+  IN PROGRESS / BROADER DISCOVERY; (3) real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING / NOT LIVE
+  VERIFIED; (4) final-review/submission safeguards BLOCKED; (5) reproducible release COMPLETE;
+  (6) controlled real fill-preview BLOCKED; (7) final readiness / Green-banner review NOT STARTED.
+  Source-enabled Personal Beta READY; Personal Live V1 NOT_READY.
+- Evidence branch: `chore/m2-v6-broader-discovery-evidence`, based on
+  `7e8534d196cec6b2e62f0bda78e0f7a29312472e`; only `PROJECT_PLAN.md` may change. PR URL, base/head,
+  tree, and exact-head CI remain to be recorded after push/creation. PR must remain OPEN / UNMERGED.
+- Remaining blocker: there are zero deterministic detail candidates. The generic blockers are
+  recommendation false for all 25, a maximum score below 50, partial material scope and insufficient
+  extraction coverage for 24, plus the sole eligible role's score below threshold. No GET_JOB or
+  role-specific workaround is authorized. Exactly one next task: review the open plan-only evidence
+  PR and decide whether to accept its recorded closeout.
