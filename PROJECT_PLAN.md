@@ -6864,10 +6864,13 @@ m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion,
   full `npm run format:check` still reports 64 pre-existing tracked files; a representative source
   file passes with CRLF formatting and fails with LF formatting, consistent with this Windows
   checkout's `core.autocrlf=true` versus Prettier's LF default. No unrelated file was reformatted.
-  There were 0 reviews and 0 comments at the first status check. Commit the plan correction and wait
-  for new exact-head push/PR checks; keep this PR open/unmerged.
+  Formatting was committed as `401ec57925d3865d23a6b20ae74bc15fa6f1bd87`. At that exact head, both
+  the push quality run `36696981048` and PR quality run `36696987931` passed, including formatting,
+  lint, typecheck, unit/integration tests, production build, and browser tests. PR #64 remained
+  OPEN / UNMERGED with 0 reviews and 0 comments. This plan status update itself will trigger a new
+  exact-head check; report that final head's status in closeout and keep the PR open/unmerged.
 
-### Final Part R/S validation before evidence PR (2026-09-30)
+### Final Part R/S validation and evidence PR (2026-09-30)
 
 - `npm run preflight` exited 0: doctor PASS; schema 12 / pending migrations 0 / integrity PASS /
   FK 0; privacy audit PASS; private profile VALID; source allowlist schema v2 with 15 configured
@@ -6892,8 +6895,10 @@ m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion,
   requests/+2 runs (one Lyrebird and one Kogan); GET_JOB +0; employer inspections +0; form changes
   +0; uploads +0; submissions +0. No source traffic beyond the two human-authorized bounded
   LIST_JOBS requests occurred.
-- **Evidence PR:** PR #64 is open/unmerged at `https://github.com/adeel1608/applypilot/pull/64`,
-  base `main`, head branch `chore/m2-source-authority-and-next-wave`. Its original commit
-  `c9a5ce4ffccb2d01b427638370d6e51f581ac3ff` changes only this plan. The formatter correction is
-  ready for a follow-up evidence commit; latest exact-head CI and final review/thread status remain
-  to be verified. No merge is authorized.
+- **Evidence PR:** PR #64 is OPEN / UNMERGED at
+  `https://github.com/adeel1608/applypilot/pull/64`, base `main`, head branch
+  `chore/m2-source-authority-and-next-wave`; tracked scope is `PROJECT_PLAN.md` only. The original
+  head's formatting failure and correction are documented above. At `401ec57925d3865d23a6b20ae74bc15fa6f1bd87`,
+  both exact-head `quality` checks passed and the PR had 0 reviews / 0 comments. The final plan
+  evidence commit triggers another pair of checks; those checks are the remaining closeout gate.
+  No merge is authorized.
