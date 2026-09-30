@@ -3,7 +3,7 @@
 Last updated: 2026-09-30
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`
+Expected current main: `df3db4cad99cb4fbc90251f7282105e3a3010559`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
@@ -12,26 +12,48 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
 
 ### Current work checkpoint (2026-09-30)
 
-- PR #62 was exact-guarded and squash-merged as `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`;
-  local `main` and `origin/main` match. The active evidence branch is
-  `chore/m2-broader-source-discovery-wave`; only this plan is tracked as modified.
-- The pre-stage real DB baseline passed schema 12, migrations 0, integrity PASS, FK 0, lifetime
-  counters `21/9/0/0`, historical source requests 20 LIST_JOBS + 1 GET_JOB, and zero active
-  source/target authority, source runs, pending app operations, or active owner START receipts.
-  Shield AI v7 is REVOKED. After staging, configured source readiness is 1 for the pending Quad Lock
-  capability; target authority, source runs, pending app operations, and its owner receipts remain
-  zero. Current parser/normalization is 3.5.2, evidence 3.1.0, scorer 2.2.0, weights
-  `r2-weights-1`, thresholds 50/60.
-- Quad Lock v1 is staged only in ignored private configuration, capability
-  `m2_source_quadlock_a901a80a3621_1790726425925`, digest
-  `444c4c1024f08b7a261f86db3cbc083ce2d9519f3c974c077fe2024a1ba3d463`. Its exact limits and fresh
-  24-hour policy/capability binding are in section 57. It is SOURCE_ENABLED configuration, while
-  durable APPROVE and START receipts, database capability row, run binding, and run count are all
-  zero. No network or database write has occurred for this family.
-- Stop at `QUADLOCK_OWNER_ACTION_PENDING`. The owner must use the exact `/sources` APPROVE form and
-  then its separate RUN form for this capability once each. Until the resulting exact receipt chain
-  and run binding are verified, do not make a source request or stage TSMG. Personal Live V1 remains
-  NOT_READY. The evidence PR is deferred until executed discovery waves are complete.
+- PR #63 passed its exact-head guards and was squash-merged as
+  `df3db4cad99cb4fbc90251f7282105e3a3010559`; reviewed tree and merged tree are
+  `ffdc076bf7301ee0a99902565dfabe7df7bac62c`, with parent
+  `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`. The active evidence branch is
+  `chore/m2-source-authority-and-next-wave`; only this plan is tracked as modified. Ignored private
+  audit/staging helpers and allowlist backups remain untracked and private.
+- Lyrebird v1 was approved and run by its human owner; exact receipts and owner binding were verified
+  against its existing COMPLETE run `61e3d30f-792f-410f-9f26-a2acc9f17706` (1 request/page, 7
+  records). Its exact persisted v2 is now the private allowlist head and is REVOKED /
+  OWNER_REVOKED. Membership is exact (7 accepted/qualified records, 7 canonical jobs, 7 new
+  observations/versions, 0 broken references). A fresh audit after Kogan found 7 current
+  evaluations and 6 current queues before the Kogan cross-source audit; the one stale queue for
+  `source-job-b2264c07ebf53a292d4bd5d612dec150` was refreshed through the canonical R2 repository
+  as queue v2 `55c7bf7e-3205-4d76-a862-899851b6d0c6`, bound to its existing current evaluation and
+  current duplicate-resolution version. Final read-only audit now confirms 7/7 current evaluation
+  and queues. All five Melbourne rows have score 0, REVIEW_REQUIRED, and no packet candidate. No
+  GET_JOB or packet action occurred.
+- Fresh Kogan pre-stage gate passed. Kogan v1 was staged in the ignored private canonical allowlist
+  for the owner gate: `m2_source_kogan_df3db4cad99c_1790843296995`, digest
+  `eefa2abc0aa8584ae916c9140a36b9cf0bcaf926d9e05d6cfe0929928e1b578e`. It is LEVER / GLOBAL,
+  alias `Kogan broader discovery`, host `api.lever.co`, path `/v0/postings/kogan`, LIST_JOBS only;
+  limits 4 requests / 150 records / 50 per page / 5,000,000 bytes / 30,000 ms request / 180,000 ms
+  run / zero redirects / zero retries / concurrency 1. After the owner’s APPROVE and RUN, exact
+  Kogan v1 database row,
+  receipts, owner binding, and one completed run were verified. Run
+  `90dbd19a-9e60-455a-b487-d3538e22eb64` is COMPLETE / LIST_JOBS with 1 request, 1 page, 20
+  records, and zero retries/redirects. Exact persisted Kogan v2 is now REVOKED / OWNER_REVOKED and
+  the private allowlist is reconciled to that head; current readiness is SOURCE_DISABLED. The v1
+  policy/capability window expires at `2026-10-01T08:28:16.995Z`. Its exact-run audit found 20/20 current
+  evaluations and queues, 20 accepted/qualified records, and no packet candidate.
+- Post-stage `npm run preflight` passed: schema 12, pending migrations 0, integrity PASS, FK 0,
+  valid private profile, 15 configured capabilities / 1 configured active entry, no blockers;
+  privacy audit passed. `git diff --check` passed. Current lifetime totals are LIST_JOBS 30
+  requests / 17 runs and historical GET_JOB 1 request / 1 run. Pre-stage/post-stage DB checks showed
+  source/target authority 0, active receipts 0, RUNNING runs 0, and pending application operations 0. The owner approval subsequently created the exact approved Kogan v1 row and one active APPROVE
+  receipt; there is still no START, binding, or run.
+- **Current status:** `EVIDENCE_PR_OPEN_CI_RECHECK_PENDING`. Both exact owner-directed runs are
+  complete; both new source families are revoked; the private allowlist is reconciled; all 27
+  canonical run jobs have current R2 evaluations and queues; and no packet-gate candidate exists.
+  The only remaining steps are Part R/S validation and one open, unmerged evidence PR. Do not repeat
+  either source action, GET_JOB, navigate to an employer, or create a packet. Personal Live V1 remains
+  NOT_READY.
 
 ### Completed Shield AI v6 source-authority checkpoint (2026-09-29)
 
@@ -6288,3 +6310,595 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
 - **Remaining:** keep the final source-authority readiness count mismatch above visible in closeout.
   Recheck exact-head push/PR CI and reviews after the plan checkpoint push. No source/employer
   network, source request, or live application action was made. Personal Live V1 remains NOT_READY.
+
+## Source-authority discrepancy reconciliation and next Lever wave (2026-09-30)
+
+### Blueprint before private configuration or application-code changes
+
+- **Current state:** PR #63 was re-fetched and matched its reviewed contract, then squash-merged as
+  `df3db4cad99cb4fbc90251f7282105e3a3010559`; the merge parent is
+  `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`, and the merge tree is
+  `ffdc076bf7301ee0a99902565dfabe7df7bac62c`, equal to the reviewed head tree. Local `main` and
+  `origin/main` now match. PR checks succeeded; it had 0 reviews and 0 review threads. Real DB is
+  schema 12 / integrity PASS / FK 0; LIST_JOBS 29, GET_JOB 1, employer inspection bindings 9,
+  application operations 0, final consents 0. TSMG remains STOPPED / RUN_TIMEOUT with 400
+  PAGE_PERSISTED and 0 QUALIFIED; latest stored TSMG v2 is REVOKED / OWNER_REVOKED. Preflight
+  reports source allowlist configured count 14 / active count 1; raw canonical loader confirms
+  schema v2 and approval state totals 7 APPROVED / 7 REVOKED. No allowlist backup or mutation for
+  this phase has happened yet.
+- **Objective:** resolve the one-active-capability discrepancy without any source request. Only if
+  raw and latest-family readiness, effective DB authority, receipts, source runs, target authority,
+  and pending operations all prove zero, and no source-readiness code change is pending review, may
+  the owner-approved Lyrebird Health wave proceed. Kogan is conditional on Lyrebird having no
+  packet-gate candidate. Public visibility does not grant fetch permission.
+- **Assumptions and requirements:** canonical private loader uses
+  `data/private/${APPLYPILOT_SOURCE_ALLOWLIST_FILENAME ?? "source-allowlist.json"}` and validates
+  `SourceAllowlistV2Schema`. Current `operationalSourceReadiness()` counts readiness per raw entry;
+  current `/sources` view also maps every raw entry, and owner action lookup requires one exact
+  capabilityId match. These behaviors are to be compared with actual family contents and persisted
+  lineage before classification. No authority is reduced unless the task's explicit stale-predecessor
+  Case B conditions are all proven; genuine/unexplained active authority requires owner review.
+- **Architecture and possible changes:** first create an ignored private copy of the exact canonical
+  allowlist and validate that copy as schema v2. Read-only audit then emits approval/readiness
+  counts, safe metadata for active entries, family version/readiness summaries, and exact DB
+  comparison metadata (version, digest, safe state/revocation enum, receipts/bindings/runs), never
+  raw JSON, unrelated tenants, credentials, source/application URLs, or candidate values. If Case B
+  applies, only the private file is reconciled to the already-persisted latest revoked/superseded
+  head (or stale predecessor removed only if canonical head-only format requires it); no DB or
+  application code changes. If Case C is proven, change `packages/job-sources/src/source-capability.ts`
+  to select latest family heads with strict duplicate/gap failure; use it consistently from
+  `scripts/lib/source-readiness.ts` and `apps/web/lib/source-workspace.ts` including exact approval,
+  RUN, and revoke lookups and the `/sources` view. Add fictional source capability/workspace/action
+  tests. Do not stage a capability or run a source while that code fix awaits review. Cases A/D
+  stop with `ACTIVE_SOURCE_AUTHORITY_OWNER_REVIEW_REQUIRED`; E/F stop with
+  `SOURCE_AUTHORITY_RECONCILIATION_ENGINEERING_REQUIRED`.
+- **Data flow:** canonical allowlist loader -> private backup/schema validation -> raw-entry and
+  latest-family pure readiness summaries -> read-only DB lineage comparison -> exactly one root-cause
+  class -> Case B private-only reduction, Case C reviewed code PR, or stop for owner review. Only a
+  zero-authority proof with no code-review blocker permits capability staging. An owner must perform
+  separate APPROVE and RUN actions in `/sources`; after verifying durable receipts and exact run
+  binding, one bounded LIST_JOBS run may execute, then its new capability family is revoked. There is
+  never GET_JOB, employer navigation, application action, candidate-data transmission, or blind retry.
+- **Security, privacy, and risks:** no DNS/TCP/TLS before the discrepancy is reconciled and zero
+  authority proven. Candidate tenants `lyrebirdhealth` and `kogan` are discovery candidates only.
+  Preserve no raw allowlist content in command output, Git, PR body, or plan. Keep backup ignored.
+  If family identity/digest/state is uncertain, do not change config. If runtime process identity
+  cannot be proven current after synchronization/rebuild/restart, do not stage authority. Keep owner
+  gates and bounded LIST_JOBS limits exact. Source-readiness code changes require review/merge before
+  any new source wave.
+- **Rollback:** private-only Case B reconciliation can be reversed from the ignored before-copy, but
+  do not restore an older active predecessor without recomputing and reviewing effective authority.
+  For a Case C fix, use an ordinary revert on its implementation branch; never undo immutable DB
+  receipts/runs/revocation history. Do not mutate real DB as part of discrepancy resolution.
+- **Testing and acceptance:** audit must reproduce both raw active-entry count and latest-family
+  active count, map every raw active entry to exact DB family versions/digest/state and receipt/run
+  counts, then classify exactly one A–F outcome. Case B acceptance is loader-valid backup/reconciled
+  allowlist, raw and family active counts 0, no active receipts/runs, and unchanged DB. Case C tests
+  cover the requested 12 cases (approved v1/revoked or superseded v2, revoked v1/approved v2,
+  unrelated families, gaps, duplicates, latest-only UI/actions, expired/revoked no-fallback, and
+  single-version compatibility); typecheck/lint/unit/integration/build must pass before opening one
+  source-readiness fix PR and stopping. If zero-authority gate passes with no code change, restart
+  only the identified ApplyPilot runtime, prove current versions, then stage Lyrebird. The owner gates
+  stop execution until human actions arrive. Each run requires exact owner receipts, one bounded
+  LIST_JOBS, terminal revocation, full membership reconciliation, current R2 evaluation and safe
+  aggregate/table. Only a no-candidate Lyrebird result allows a separately staged Kogan wave with
+  the same human boundary. Then run preflight, DB status, privacy, migration immutability, diff/fsck,
+  and current R2 checks and open exactly one evidence PR if allowed.
+- **Exact steps:** (1) guarded PR #63 merge verification; (2) read-only real DB/preflight baseline;
+  (3) resolve canonical ignored allowlist path and create/verify a private before-copy; (4) run the
+  dual raw-entry/latest-family audit and DB comparison without printing raw config; (5) classify A–F;
+  (6) perform only the resolution explicitly allowed for that class, or stop; (7) prove zero authority
+  and no pending review before any source staging; (8) prove restarted runtime engine identity;
+  (9) stage exact Lyrebird v1 and stop for human APPROVE/RUN; (10) after owner response verify receipts
+  first, execute at most one LIST_JOBS and revoke v2; (11) inspect/reconcile and evaluate current R2;
+  (12) stage/run Kogan only if Lyrebird has no packet-gate candidate and all gates still pass;
+  (13) verify final invariants, update this plan, and open the appropriate single PR. Never substitute
+  Codex-entered phrases for human UI actions.
+
+### Read-only authority audit result before Case B reconciliation (2026-09-30)
+
+- **Classification:** Case B, `STALE_ALLOWLIST_PREDECESSOR_OF_REVOKED_FAMILY`. The canonical private
+  allowlist is a current-head-only format: 14 entries represent 14 capability families, with no
+  multi-version family in the file. Thirteen entries are SOURCE_DISABLED and one TSMG v1 entry is
+  SOURCE_ENABLED. The TSMG database family has that exact v1 digest persisted as APPROVED, then a
+  linked v2 persisted as REVOKED / OWNER_REVOKED. The database v2 is the family head; its capability
+  version audit confirms the same ordering. The configured v1 is therefore a stale predecessor,
+  not an unrecognized active owner authority.
+- **Durable run/receipt check:** the v1 APPROVE and LIST_JOBS START receipts are both CONSUMED and
+  digest-bound to v1. The owner binding points to the existing TSMG run, which is STOPPED /
+  RUN_TIMEOUT after 8 requests, 8 pages, and 400 PAGE_PERSISTED records, with 0 QUALIFIED. The latest
+  v2 has no active APPROVE or START receipt; there are no running source runs, effective active
+  database source families, active target authority, or pending application operations. The database
+  is schema 12, integrity PASS, and FK violations 0. Preflight independently showed one configured
+  active allowlist entry before reconciliation.
+- **Backup:** before-copy of the canonical allowlist is already present under the ignored private
+  reconciliation directory and was verified byte-identical and schema-valid. The filename is kept
+  out of this shared plan; no raw configuration was printed or added to Git.
+- **Authorized next action:** remove only that exact stale TSMG v1 predecessor from the private
+  current-head allowlist. Do not alter the database, receipts, run, other capabilities, or application
+  code. First re-read the exact configured file and confirm it still matches the audited content and
+  expected family counts; validate the filtered schema before atomic replacement. Then prove raw and
+  latest-family active counts are both zero, the TSMG family is absent from the allowlist, the database
+  and its durable history are unchanged, and preflight reports zero active source authority. Only that
+  verified result permits proceeding to the runtime identity gate and Lyrebird staging.
+
+### Case B reconciliation and zero-authority gate result (2026-09-30)
+
+- **Private configuration:** an audited dry-run passed, then a guarded same-directory atomic
+  replacement removed only the exact stale TSMG v1. The operation rechecked the original SHA-256
+  against the ignored byte-identical backup, validated the family lineage and consumed receipts/run
+  from a read-only database connection, and validated the resulting file through
+  `SourceAllowlistV2Schema` and the canonical private loader. The database snapshot before and after
+  the replacement was identical. No source request or application action occurred.
+- **Post-reconciliation evidence:** canonical allowlist schema v2 has 13 entries across 13 families;
+  all 13 are SOURCE_DISABLED, with raw active count 0 and latest-family active count 0. TSMG is absent
+  from the allowlist. Database effective active families, active APPROVE receipts, active START
+  receipts, and RUNNING source runs are all 0. `npm run db:status` reports schema 12, pending
+  migrations 0, integrity PASS, FK violations 0. `npx tsx scripts/preflight-summary.ts` reports a
+  valid private profile, source count 13 / active count 0, source-enabled beta READY, and no blockers.
+- **Gate decision:** zero source authority is proven, with no source-readiness code change pending
+  review. Continue only through the documented current-runtime identity check. Do not stage Lyrebird
+  until the server/build identity is proven current; stop if the owned process cannot be verified.
+- **Runtime guard/build:** no owned-process metadata or loopback listener was present on the configured
+  port 3000; the previously observed PID had exited, and no Node process command line referenced this
+  checkout. `npm run build` passed for the local app and showcase, including `PUBLIC_SHOWCASE_AUDIT_PASS`.
+  The fresh local production server bundles contain all four required engine version literals
+  (R2A parser 3.5.2, normalization 3.5.2, evidence contract 3.1.0, scorer 2.2.0). Next start only
+  through `npm run local:start`, then prove its process marker/time/root and live loopback response
+  before staging a capability.
+
+### Lyrebird v1 staging blueprint before private configuration change (2026-09-30)
+
+- **Pre-stage uniqueness/capacity:** canonical schema-v2 allowlist currently has 13 entries, all
+  SOURCE_DISABLED, and capacity is 20. Neither `lyrebirdhealth` nor `kogan` has an allowlist entry;
+  the read-only schema-12 database has 0 Lyrebird capability versions, owner receipts, bindings, or
+  runs. The merged main head remains `df3db4cad99cb4fbc90251f7282105e3a3010559`. A byte-identical
+  ignored before-stage backup was created and verified as
+  `authority-pre-lyrebird-20260930075345-2ec3ea59.json.bak`.
+- **Exact proposed configuration:** stage only LEVER / GLOBAL v1 `m2_source_lyrebirdhealth_df3db4cad99c_1790841225903`, predecessor null; alias `Lyrebird Health broader discovery`; tenant `lyrebirdhealth`; host `api.lever.co`; prefix `/v0/postings/lyrebirdhealth`; operations `LIST_JOBS` only. Bounds are request budget 3, 100 records, page size 50, 5,000,000 response bytes, 30,000 ms request timeout, 120,000 ms run timeout, zero redirects/retries, and concurrency 1. Reuse reviewed policy `m2-live-readiness-v1` and current Lever parser binding `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`. T0 is `2026-09-30T07:53:45.903Z`; policy and capability expire at `2026-10-01T07:53:45.903Z` (24 hours). Expected configuration digest is `1e38c9114933b03f0dc4fc85b9c81f2c0e1f4c43c1746a89018bd72196b44b2c`. `APPROVED` here is only the capability policy/readiness state; owner approval is still required separately in the UI.
+- **Staging method:** after this blueprint, recheck that the current allowlist hash still matches the zero-authority audit; read the private stage manifest; parse both the capability and full updated allowlist through their canonical schemas; verify `SOURCE_ENABLED`; atomically replace the ignored allowlist and reload it through the canonical loader. Do not write the DB, create receipts, bindings, or runs. Then query durable DB counts and repository owner status and require 0 receipts, bindings, and runs with `APPROVAL_REQUIRED` / `canOwnerStart=false`. No DNS/TCP/TLS or source request is part of staging.
+- **Proposed files and rollback:** tracked changes remain limited to this plan. Runtime-only ignored files are the canonical private allowlist and safe stage manifest/backup under `data/private/authority-reconciliation`. Before any owner action, rollback may remove this exact staged v1 using the verified before-stage backup; after a human receipt exists, preserve immutable DB evidence and use the canonical revocation lineage instead. Never roll back by restoring old active state.
+- **Acceptance and next step:** exact metadata/digest/bounds read back from the canonical loader; config entry count 14; one staged active capability; no database rows or owner actions for this family; source request delta 0. If all pass, stop at Human Gate #1 and have the owner open `http://127.0.0.1:3000/sources`, verify the exact tenant/host/path/operation, then submit the human APPROVE and separate RUN exactly once each. Codex must not interact with either UI control. On owner response, inspect receipts and any existing run before acting; never synthesize receipts or rerun.
+
+### Lyrebird v1 staged; Human Gate #1 pending (2026-09-30)
+
+- **Staged configuration:** canonical loader read-back confirms capability
+  `m2_source_lyrebirdhealth_df3db4cad99c_1790841225903`, v1 / predecessor null, digest
+  `1e38c9114933b03f0dc4fc85b9c81f2c0e1f4c43c1746a89018bd72196b44b2c`. It is LEVER / GLOBAL,
+  tenant `lyrebirdhealth`, alias `Lyrebird Health broader discovery`, host `api.lever.co`, path
+  `/v0/postings/lyrebirdhealth`, LIST_JOBS only. Bounds: 3 requests, 100 records, page size 50,
+  5,000,000 response bytes, 30,000 ms request timeout, 120,000 ms run timeout, no redirects/retries,
+  concurrency 1. Policy `m2-live-readiness-v1`, parser binding
+  `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`; 24-hour window from
+  `2026-09-30T07:53:45.903Z` through `2026-10-01T07:53:45.903Z`. This file readiness state does not
+  constitute the separate human owner receipt.
+- **Owner gate and database:** allowlist has 14 entries and one SOURCE_ENABLED configuration. The
+  exact staged capability has 0 database capability versions, 0 APPROVE/START receipts, 0 owner
+  bindings, and 0 source runs. `getOwnerApprovalStatus()` reports `APPROVAL_REQUIRED`, no receipt,
+  and `canOwnerStart=false`. Database effective active families remain 0; global active APPROVE /
+  START receipts and RUNNING source runs remain 0. The source was not requested. Lifetime counters
+  remain 29 LIST_JOBS requests across 16 runs and 1 historical GET_JOB request across 1 run.
+- **Checks performed:** `npm run build` passed for both local and showcase production builds and
+  public showcase audit. Runtime process identity was verified after that build; current R2A parser /
+  normalization / evidence / scorer are 3.5.2 / 3.5.2 / 3.1.0 / 2.2.0. After staging,
+  `npm run preflight` passed doctor, schema-12 database status (pending 0 / integrity PASS / FK 0),
+  privacy audit, profile validation, and source readiness with one staged capability / no blockers.
+  `git diff --check` passed; private configuration and backups remain ignored. Full lint, typecheck,
+  unit, integration, release, and final R2 validation remain deferred until the owner-gated wave is
+  complete; no application code changed.
+- **Human Gate #1:** pending owner action. The owner must open `/sources`, verify the exact tenant,
+  host, path, and LIST_JOBS-only operation, then submit APPROVE once and the separate RUN once.
+  Codex did not interact with the forms. After the owner returns, inspect the durable DB first; if a
+  START receipt or run already exists, continue from that exact run and do not rerun. Do not stage
+  Kogan while Lyrebird is awaiting owner action.
+
+### Human Gate #1 returned; exact existing Lyrebird run found (2026-09-30)
+
+- **Read-only durable verification:** Lyrebird v1 row exists with the staged digest. Its APPROVE
+  receipt `7d6e1786-722a-42b3-bcad-c697eeb0c1d3` is CONSUMED. Its START receipt
+  `8812669d-9d8d-4b94-993e-1ddcb2fa3562` is CONSUMED and bound to LIST_JOBS with the exact v1
+  digest. Exactly one owner binding exists, for run `61e3d30f-792f-410f-9f26-a2acc9f17706`, and
+  references both exact receipts, the same digest, and LIST_JOBS. That existing run is COMPLETE:
+  1 request, 1 page, 7 records. It started at `2026-09-30T08:09:08.976Z` and completed at
+  `2026-09-30T08:09:12.052Z`. No new receipt or run was created by the audit.
+- **Next authorized action:** continue only from run `61e3d30f-792f-410f-9f26-a2acc9f17706`.
+  Before analysis, immediately create/persist the exact family v2 REVOKED / OWNER_REVOKED through
+  the normal `SourceEnablementRepository` revocation flow, preserving the v1 digest and receipt/run
+  lineage. Then update the canonical ignored allowlist to the exact persisted v2 revoked head and
+  prove active readiness is zero. Never rerun Lyrebird and do not issue GET_JOB.
+
+### Lyrebird v2 durable revocation before private head reconciliation (2026-09-30)
+
+- **Run outcome verified:** the exact owner-bound v1 run completed with 1 request, 1 page, 7 records,
+  68,425 bytes, 0 retries, and 0 redirects. The v1 row remains digest-bound to the consumed APPROVE
+  and START receipts and the single owner binding. No second START or run was created.
+- **Revocation:** `SourceEnablementRepository.persistCapabilityVersion()` persisted exact v2 as
+  `REVOKED` / `OWNER_REVOKED`, predecessor v1 row
+  `55ad79e1-8bfa-4d86-b400-685b5a7a7bfc`. V2 row is
+  `af29bc39-26d3-470d-8980-73bcf037c01a`, digest
+  `bc5db719c03d3803dcdca7915e21475ffcb1142fb56578b835697a311b603a97`, revoked at
+  `2026-09-30T08:15:02.146Z`. Active receipts and running runs for Lyrebird are both 0. The app
+  wrapper could not be loaded by standalone CLI because `server-only` is unavailable there; that
+  attempt failed before mutation. The same canonical repository revocation method then succeeded.
+- **Next:** before further analysis, make a fresh ignored byte-identical backup of the current v1
+  allowlist, reconstruct exact v2 from its persisted database row, confirm the v1 digest and lineage,
+  and atomically replace only this family head in the canonical allowlist. Verify canonical load,
+  source readiness 0, and unchanged database history before R2 analysis. Do not issue another source
+  request, GET_JOB, or owner action.
+
+### Lyrebird v2 reconciled; exact-run analysis complete (2026-09-30)
+
+- **Private head reconciliation:** the canonical schema-v2 allowlist was backed up byte-for-byte,
+  then only the Lyrebird v1 entry was replaced by the exact persisted v2 `REVOKED` /
+  `OWNER_REVOKED` head. The loader confirms one Lyrebird family head at v2, the persisted digest
+  matches, raw and latest-family active counts are 0, and the database snapshot remained unchanged.
+  No source request or owner action occurred during reconciliation.
+- **Existing run only:** full accounting was performed from exact run
+  `61e3d30f-792f-410f-9f26-a2acc9f17706`, which is `COMPLETE` / `LIST_JOBS`: 1 request, 1 page,
+  7 provider records, 7 ACCEPTED / QUALIFIED, 0 unusable, 7 distinct external IDs, 7 canonical jobs,
+  7 new observations, 0 reused observations, 7 new job versions, 0 reused versions, and 0 broken
+  or null references. Page totals reconcile to 1 request, 7 records, and 68,425 bytes; retries and
+  redirects are 0. No additional source request, GET_JOB, or run was made.
+- **Current R2A/R2:** all 7 canonical jobs have current R2A normalization (parser 3.5.2,
+  normalization 3.5.2, evidence contract 3.1.0), current active-profile R2 evaluation and CURRENT
+  queue decision (scorer 2.2.0). Melbourne roles: 5; explicit Victoria/Australia location matches:
+  0 (the source locations say Melbourne without those words); engineering/software/data/ML roles: 3. Eligibility: REVIEW_REQUIRED 7. Scores: 0 for all 7 (maximum/mean/median 0); coverage: 0:1,
+  33:4, 50:2 (maximum 50); recommended: 0; duplicate state: CLEAR 6, UNRESOLVED 1. Deterministic
+  detail candidates: 0. All 5 Melbourne rows are REVIEW_REQUIRED, not recommended, and not detail
+  justified; scores are 0 and blockers include eligibility, scope, extraction coverage, and below-
+  threshold reasons. One of those five has an unresolved duplicate. No packet-gate candidate exists:
+  `LYREBIRD_NO_PACKET_CANDIDATE`. No packet was created and no GET_JOB was issued.
+- **Next objective:** because the original task makes Kogan conditional on no Lyrebird packet-gate
+  candidate, proceed to one Kogan v1 staging wave, then stop at Human Gate #2. This is a distinct
+  source wave; do not repeat Lyrebird or create any Lyrebird receipt/run.
+
+### Kogan v1 staging blueprint before private configuration change (2026-09-30)
+
+- **Starting state and objective:** branch `chore/m2-source-authority-and-next-wave` is at merged
+  main `df3db4cad99cb4fbc90251f7282105e3a3010559`; `PROJECT_PLAN.md` is the only tracked change.
+  Lyrebird v2 is persisted and is the reconciled private family head, with no active source
+  authority. The Lyrebird exact-run audit produced `LYREBIRD_NO_PACKET_CANDIDATE`. Stage Kogan only
+  if a fresh read-only gate again proves (a) no Kogan family in config or DB, (b) raw and latest-head
+  active config count 0 before staging, (c) effective DB authority, active owner receipts, RUNNING
+  runs, target authority, and pending application operations all 0, and (d) Lyrebird v2 remains the
+  exact revoked head. If any condition fails or lineage is uncertain, stop without staging.
+- **Exact proposed capability:** one new LEVER / GLOBAL Kogan v1, predecessor null, alias
+  `Kogan broader discovery`, tenant `kogan`, host `api.lever.co`, path `/v0/postings/kogan`, and
+  `LIST_JOBS` only. Limits: request budget 4; record cap 150; page cap 50; response bytes at most
+  5,000,000; request timeout at most 30,000 ms; run timeout at most 180,000 ms; redirects 0;
+  retries 0; concurrency 1. Use the reviewed `m2-live-readiness-v1` policy, current reviewed
+  Lever parser binding from merged main, and a 24-hour policy/capability window. The exact unique
+  capability ID, UTC timestamps, digest, and private backup basename will be generated from the
+  fresh pre-stage manifest and recorded here before the canonical allowlist is changed. File-level
+  `APPROVED` is policy metadata only; a separate human APPROVE receipt is mandatory.
+- **Architecture/data flow:** canonical private loader and schema-v2 parser -> read-only Kogan and
+  global authority/DB audit -> exact bounded capability plus ignored backup/manifest -> full schema
+  validation and digest verification -> same-directory atomic private allowlist replacement ->
+  canonical loader/readiness and DB read-back -> stop at `/sources` Human Gate #2. Do not insert a
+  capability row or create APPROVE/START receipts, run bindings, or runs. Do not resolve DNS or
+  contact Lever until the owner completes the separate UI gates.
+- **Proposed files/dependencies:** no application source, migration, or tracked configuration
+  change. Ignored files may include a read-only/pre-stage helper, one byte-identical private backup,
+  and one safe staging manifest under `data/private/authority-reconciliation`; the one canonical
+  change is `data/private/source-allowlist.json` (or the configured canonical filename). Use only
+  the existing `SourceCapabilityV2Schema`, `SourceAllowlistV2Schema`,
+  `sourceCapabilityDigest`, `sourceCapabilityReadiness`, canonical private loader, and read-only
+  schema-12 database queries.
+- **Security/privacy/risk controls:** no provider request, employer navigation, candidate-data
+  transmission, credential, cookie, auth, or application action. Never expose raw allowlist JSON or
+  unrelated private tenant values in logs/plan. Verify a byte-identical ignored backup before any
+  atomic replacement; abort on hash, schema, family uniqueness, digest, runtime-head, DB, or gate
+  mismatch. After the human APPROVE receipt exists, preserve immutable history and revoke only via
+  the canonical lineage flow; do not restore an active backup.
+- **Validation/acceptance:** before change, prove the exact pre-stage guard above. After staging,
+  require schema-v2 canonical reload; exactly one Kogan v1 family entry, exact host/path/operation
+  and bounds, `SOURCE_ENABLED` configuration; zero Kogan DB capability rows, APPROVE/START receipts,
+  bindings, and runs; owner status `APPROVAL_REQUIRED` and `canOwnerStart=false`; global DB
+  effective active families, active receipts, and RUNNING runs still 0; source request delta 0.
+  Preflight and DB status must pass before leaving the task at the human gate. No test suite is
+  applicable to a private configuration-only stage; final preflight/privacy/migration/diff/fsck/R2
+  validations belong after the owner-gated source waves as specified in Part R.
+- **Rollback and exact steps:** before any owner action, restore only from the verified byte-copy
+  if the one staged Kogan entry must be removed; verify it restores the audited hash and zero active
+  config. After any owner receipt, never erase history or restore active authority; use the exact
+  canonical v2 revocation lineage. Steps: (1) fresh read-only pre-stage audit; (2) stop on any
+  discrepancy; (3) generate manifest and backup; (4) record exact manifest identity/digest here;
+  (5) atomically stage through schema-checked helper; (6) prove post-stage state and run preflight;
+  (7) stop and ask the owner to APPROVE and separately RUN once in `/sources`; on return inspect
+  durable state before any continuation, never duplicate a receipt or run.
+- **Stop boundary:** current task ends at `HUMAN_GATE_2_PENDING`. Codex does not click either owner
+  control and does not execute a Kogan source request.
+
+#### Fresh gate and exact manifest identity (before staging)
+
+- **Fresh pre-stage audit:** `npx tsx data/private/authority-reconciliation/kogan-prestage-audit.ts`
+  returned schema-v2 config with 14 entries / 14 families / raw active 0; Lyrebird config is exact
+  v2 REVOKED digest `bc5db719c03d3803dcdca7915e21475ffcb1142fb56578b835697a311b603a97`; Kogan config
+  entries 0. The database is schema 12 / integrity `ok` / FK 0; effective source and target
+  authority 0; active APPROVE and START receipts 0; RUNNING runs 0; pending application operations 0. Kogan DB family/version, receipt, binding, and run counts are all 0. Lyrebird DB has the
+  exact v1->v2 lineage, v2 REVOKED / OWNER_REVOKED, 2 historical receipts, 1 owner binding, and 1
+  completed run. Lifetime totals before Kogan are LIST_JOBS 30 requests / 17 runs and GET_JOB 1 /
+  1; the Kogan pre-stage action adds no request.
+- **Verified backup:** private backup
+  `authority-pre-kogan-20260930082816-8e7f21af.json.bak` is byte-identical to the canonical
+  pre-stage allowlist (SHA-256
+  `3F2ED4E1A05118BC6A7FBDD900F8321F3FA40A8E4E4043B60DEEDE403787A4C2`). The safe manifest is
+  `kogan-stage-manifest-20260930082816-8e7f21af.json`; no canonical file/database mutation occurred
+  when creating either private evidence artifact.
+- **Exact candidate:** capability
+  `m2_source_kogan_df3db4cad99c_1790843296995`, v1 / predecessor null; LEVER / GLOBAL; alias
+  `Kogan broader discovery`; tenant `kogan`; host `api.lever.co`; path `/v0/postings/kogan`;
+  LIST_JOBS only. Bounds: request budget 4, record cap 150, page size 50, response-byte limit
+  5,000,000, request timeout 30,000 ms, run timeout 180,000 ms, redirects/retries 0, concurrency 1.
+  Policy `m2-live-readiness-v1`; parser binding
+  `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`; reviewed/created at
+  `2026-09-30T08:28:16.995Z`; policy/capability expiry `2026-10-01T08:28:16.995Z`; digest
+  `eefa2abc0aa8584ae916c9140a36b9cf0bcaf926d9e05d6cfe0929928e1b578e`. The fully validated
+  15-entry schema preview is SOURCE_ENABLED. This is private configuration metadata only; no
+  durable capability row or owner receipt exists, and human owner approval/run remain mandatory.
+- **Next exact step:** after this blueprint, stage only the manifest-bound capability by
+  schema-validating the current file and candidate, checking its digest and backup hash, confirming
+  current file hash/head/global gates again, then atomically replacing the private allowlist. Reload
+  through the canonical loader and verify the owner gate is closed and all Kogan database row counts
+  remain zero. Do not contact the source. Then run preflight and DB status and stop at Human Gate #2.
+
+### Kogan v1 staged; Human Gate #2 pending (2026-09-30)
+
+- **Private allowlist update:** stage helper rechecked the exact pre-stage manifest and backup
+  hashes, merged-main head, schema-v2 14-entry source file, zero-active baseline, exact Lyrebird v2
+  REVOKED head, and fresh global DB gates. It schema-validated and atomically appended only Kogan
+  v1. Canonical loader read-back confirms 15 entries and exactly one SOURCE_ENABLED config entry,
+  the exact Kogan ID/digest/bounds listed above, and zero active entries for every other family.
+  The real DB snapshot before/after the private config change is identical. Kogan capability rows,
+  APPROVE/START receipts, bindings, and runs remain 0; owner status is
+  `APPROVAL_REQUIRED` / `canOwnerStart=false`. No source request was made.
+- **Guard failure and repair:** the first execution of the staging helper stopped before modifying
+  the allowlist because a joined read-only SQL query selected unqualified `id` and SQLite returned
+  `ambiguous column name: id`. The helper was corrected to select `r.id`; the successful guarded
+  execution then completed once. The failed attempt created no receipt, DB row, source request, or
+  allowlist change.
+- **Checks and actual results:** `npx tsx
+data/private/authority-reconciliation/kogan-prestage-audit.ts` passed with Kogan absent from
+  config/DB and all global authority/pending counts 0. `npx tsx
+data/private/authority-reconciliation/prepare-kogan-stage.ts` returned
+  `KOGAN_PRESTAGE_READY`, verified byte-identical private backup
+  `authority-pre-kogan-20260930082816-8e7f21af.json.bak`, and manifest
+  `kogan-stage-manifest-20260930082816-8e7f21af.json`. After the blueprint and exact identity were
+  recorded above, `npx tsx data/private/authority-reconciliation/stage-kogan.ts` returned
+  `KOGAN_V1_STAGED_HUMAN_APPROVAL_REQUIRED`, database unchanged, and no source request. `npm run
+preflight` exited 0: doctor PASS, schema 12 / pending 0 / integrity PASS / FK 0, privacy audit
+  PASS, private profile VALID, source readiness 15 / active 1, and preflight PASS with no blockers.
+  `git diff --check` exited 0. No application source or migration changed; unit/integration/build
+  checks are not applicable to this private configuration-only operation and final Part R checks
+  remain after the human-gated wave.
+- **Owner UI endpoint:** the existing loopback listener on port 3000 served
+  `http://127.0.0.1:3000/sources` with HTTP 200 and title `Source approvals and recovery | ApplyPilot`.
+- **Current stop/next step:** `HUMAN_GATE_2_PENDING`. The owner must open the local `/sources` page,
+  find `Kogan broader discovery`, verify tenant `kogan`, host `api.lever.co`, path
+  `/v0/postings/kogan`, and LIST_JOBS only; then submit the APPROVAL form once and the separate RUN
+  form once. Codex must not interact with those controls. After the owner returns, query the durable
+  database before any action; if a START receipt/run already exists, continue from that exact run
+  only and do not create another receipt or rerun. The only permitted Kogan operation is the exact
+  bounded LIST_JOBS read; never GET_JOB or perform employer/application actions.
+
+### Kogan APPROVE receipt verified; separate RUN gate pending (2026-09-30)
+
+- **Human response and read-only verification:** after the owner replied `APPROVED`,
+  `npx tsx data/private/authority-reconciliation/verify-kogan-approval.ts` verified database row
+  `a4596551-bbd9-44b3-900a-fb1e1a4dcb57`, capability v1 / `APPROVED`, and exact digest
+  `eefa2abc0aa8584ae916c9140a36b9cf0bcaf926d9e05d6cfe0929928e1b578e`. One exact APPROVE receipt
+  `521d8ace-f377-499c-a481-82bfc22e82ac` is `ACTIVE`, with matching capability-version row,
+  capability/version/digest/reference/source/tenant/policy binding, `SOURCE_CAPABILITY_APPROVE`
+  nonce action, loopback/session/nonce/owner confirmation gates all true, and no predecessor receipt.
+- **Current owner gate:** `getOwnerApprovalStatus()` returns `CURRENT`, that exact receipt ID, and
+  `canStart=true`. Kogan START receipt count is 0; owner binding count is 0; run count is 0. The
+  audit used a read-only/query-only database connection and made no source request.
+- **Next step:** owner may now use the separate `/sources` RUN form once for this exact v1. The UI
+  requires its owner-confirmation checkbox and exact text `RUN
+m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion, inspect durable
+  receipt/run state first and continue only from the exact existing run. Do not create receipts,
+  bindings, or runs in code and do not repeat the RUN action.
+
+### Human Gate #2 RUN returned; exact completed Kogan run found (2026-09-30)
+
+- **Read-only durable verification:** Kogan v1 remains the exact persisted `APPROVED` capability,
+  row `a4596551-bbd9-44b3-900a-fb1e1a4dcb57`, digest
+  `eefa2abc0aa8584ae916c9140a36b9cf0bcaf926d9e05d6cfe0929928e1b578e`. APPROVE receipt
+  `521d8ace-f377-499c-a481-82bfc22e82ac` and START receipt
+  `eb42437b-7981-4890-a20c-06075282708d` are both `CONSUMED`. The START is `LIST_JOBS`, has the
+  APPROVE receipt as predecessor, and both receipts bind the exact capability-version ID and
+  digest. All owner/session/loopback/nonce-confirmation flags are true.
+- **Exact existing run:** one owner binding points to run
+  `90dbd19a-9e60-455a-b487-d3538e22eb64`, references those exact receipts, digest, and `LIST_JOBS`.
+  The run is `COMPLETE`: 1 request, 1 page, 20 provider records, 218,461 bytes, 0 retries, and 0
+  redirects. The persisted page totals agree: 1 request, 1 page, 20 records, 218,461 bytes.
+  Verification ledger: 20 ACCEPTED / QUALIFIED, 0 unusable. Lifetime totals after this run are
+  LIST_JOBS 31 requests / 18 runs and GET_JOB 1 request / 1 historical run. The inspection used
+  read-only/query-only DB access and created no receipt or run.
+- **Immediate next action before analysis:** persist only this exact Kogan family v2 as
+  `REVOKED` / `OWNER_REVOKED` via `SourceEnablementRepository.persistCapabilityVersion`, with v1 as
+  predecessor. Validate the run/receipt/binding identity again in the revocation helper; verify the
+  new durable row, digest, revocation reason, and zero active receipts/runs. Then back up the current
+  private allowlist byte-for-byte and atomically replace only Kogan v1 with the exact persisted v2
+  head. Canonically reload and prove zero raw/latest-family active readiness and unchanged DB during
+  allowlist reconciliation. Do not issue another source request or GET_JOB. After both revocation
+  steps, perform Part P’s full membership and current-R2 analysis for run
+  `90dbd19a-9e60-455a-b487-d3538e22eb64` only.
+
+### Kogan v2 durably revoked and canonical private head reconciled (2026-09-30)
+
+- **Durable revocation:** using `SourceEnablementRepository.persistCapabilityVersion()` after
+  revalidating the exact v1 configuration, both consumed owner receipts, exact owner binding, and
+  terminal run, persisted v2 `REVOKED / OWNER_REVOKED`. V2 row
+  `b33b8012-aaed-4465-b329-208021ee942e` has predecessor v1 row
+  `a4596551-bbd9-44b3-900a-fb1e1a4dcb57`, digest
+  `4aa83d7c64f75a0bbd8027fed8e6a6e4b2c337f60b4adae6dadfe95ce2bb5c95`, and revoked at
+  `2026-09-30T09:01:57.180Z`. The exact existing run remains COMPLETE with 1 request, 1 page, 20
+  records / bytes 218,461 / 0 retries / 0 redirects. Active Kogan receipts and RUNNING Kogan runs
+  are 0.
+- **Private head reconciliation:** only after the durable revocation, a byte-identical private
+  backup was created: `authority-pre-kogan-revoke-20260930090437-bd994883.json.bak`, 18,930 bytes,
+  SHA-256 `FB39D5ABD725D5B392A38EAC0CD92A4A73754EDF799955B3A7B0413E55D132ED`. The canonical
+  allowlist now has exactly one Kogan head, v2 REVOKED, with the exact persisted digest. A
+  read-only/query-only confirmation found the owner receipts consumed, exact v1 run/binding intact,
+  Kogan readiness SOURCE_DISABLED, active receipts 0, RUNNING runs 0, and effective database source
+  authority 0. No additional source request or GET_JOB was made.
+- **Next:** reconcile all 20 canonical members of the exact run and perform the current R2A/R2 and
+  queue audit required by Part P. Do not replay the source run or inspect job detail via GET_JOB.
+
+### Lyrebird current-queue refresh blueprint before private database write (2026-09-30)
+
+- **Current state:** both exact owner-directed source runs are terminal COMPLETE LIST_JOBS runs;
+  both source families have exact persisted v2 REVOKED / OWNER_REVOKED heads and reconciled private
+  allowlist entries. Kogan's exact 20-job run has 20 current evaluations and queues. Lyrebird's
+  exact 7-job run has 7 current evaluations but 6 current queues. Its one stale queue belongs to
+  `source-job-b2264c07ebf53a292d4bd5d612dec150` (Account Executive, Richmond); its current
+  evaluation is ID-bound to the latest job version and active profile, while the duplicate state is
+  UNRESOLVED. The seven accepted ledger rows are all QUALIFIED; the exact membership audit reports
+  7 new observations/job versions and 0 broken references. The five Melbourne rows already have
+  current queues and all are score 0 / REVIEW_REQUIRED / not recommended.
+- **Objective:** complete Part L's current queue requirement for each canonical Lyrebird run job
+  using the current evaluation and the canonical `R2Repository.recordQueueDecision()` only for the
+  one stale queue. Then rerun both exact-run reports read-only and complete the final source outcome
+  and Part R/S validation. No source action or authority mutation is in scope.
+- **Requirements and assumptions:** use only Lyrebird run
+  `61e3d30f-792f-410f-9f26-a2acc9f17706`; never repeat a source request, call GET_JOB, create a
+  receipt/binding/run, inspect employer pages, or create a packet. The canonical
+  `SourceEnablementRepository.pipelineWorkForCompletedRun()` calls `reconcileCompletedRun()`, which
+  only promotes accepted PAGE_PERSISTED rows to QUALIFIED for a COMPLETE run. Preflight must prove
+  there are no Lyrebird PAGE_PERSISTED rows before invoking it. Its exact work list must contain
+  only the identified job and a non-null current evaluation ID; any mismatch stops without queue
+  writes. The unresolved duplicate remains unresolved and is only bound into the refreshed queue.
+- **Architecture and data flow:** private schema-12 DB -> exact run/ledger and no-pending-qualification
+  guards -> verified database backup through `createDatabaseBackup()` under `data/private/backups`
+  -> canonical completed-run pipeline work list -> current persisted evaluation/duplicate-version
+  binding -> `recordQueueDecision()` with `REVIEWING`, actor `SYSTEM`, and the established
+  `SOURCE_R2_REVIEW_REQUIRED` reason -> read-only post-write verification. Since the evaluation is
+  already current, no candidate profile is read and no new evaluation is generated.
+- **Proposed files and dependencies:** only this blueprint and final evidence will be tracked in
+  `PROJECT_PLAN.md`. One ignored helper may be added under
+  `data/private/authority-reconciliation/` and will import the existing database backup and R2
+  repository APIs. No application code, migration, tracked script, or dependency change is planned.
+- **Privacy and safety:** helper output is restricted to run/job/evaluation/queue IDs, enum states,
+  counts, and backup manifest metadata; it must not print candidate profile data or source payloads.
+  The work uses the local DB only. Source authority remains revoked, and there is no network call.
+- **Risks and rollback:** a new append-only queue version changes currentness. Take and verify a
+  private SQLite backup first. If the canonical repository rejects a binding or any precondition
+  changes, stop before recording a decision and preserve the backup. Do not restore the backup over
+  a database that may have received newer activity; any correction must use the canonical append-only
+  repository after a fresh currentness audit.
+- **Validation strategy:** verify exact ledger/run membership and v2 source revocation; assert
+  `pipelineWorkForCompletedRun()` returns exactly one stale Lyrebird queue item and none for Kogan;
+  refresh the queue once; rerun both read-only audits and require 7/7 Lyrebird plus 20/20 Kogan
+  current evaluations/queues, zero broken references, zero detail candidates, and zero packet-gate
+  candidates. Then run Part R preflight, DB status, privacy audit, migration immutability check,
+  `git diff --check`, `git fsck --strict`, and current R2 checks. No application-code test suite is
+  applicable because no application code changes are planned.
+- **Acceptance criteria:** exact Lyrebird run membership remains unchanged; only its stale job gets
+  a new current queue decision bound to its existing current evaluation and latest duplicate
+  resolution version; all 27 canonical jobs across both runs have current evaluations and queues;
+  source/target authority, active runs, and pending application operations remain zero; final
+  broader-source result and all required evidence are recorded; exactly one open, unmerged evidence
+  PR is created.
+- **Implementation steps:** (1) create and verify the private database backup; (2) guard the exact
+  run, source v2 revocation, seven QUALIFIED ledger rows, and zero pending qualifications; (3) call
+  canonical completed-run work discovery and assert the exact one-item work list; (4) verify the
+  stored evaluation remains current and bind its current eligibility/recommendation plus latest
+  duplicate-resolution version; (5) record one REVIEWING queue decision through the repository;
+  (6) verify current queue and run-wide completeness; (7) rerun read-only Lyrebird/Kogan analyses;
+  (8) perform Part R/S checks and update this plan with actual results; (9) create one open evidence
+  PR and wait for exact-head CI/review status without merging.
+
+### Lyrebird queue refresh and exact-run analyses completed (2026-09-30)
+
+- **Database backup:** `createDatabaseBackup()` created and verified private backup
+  `backup-2026-09-30T09-19-52.748Z-4dedaeca`, schema 12, integrity PASS, FK 0, 74,989,568 bytes,
+  SHA-256 `3bea5034157eb65dd133506d89b601e6ec9d971d0d8dddafb8fd3e52f381d717`.
+- **Guarded queue refresh:** the ignored helper
+  `data/private/authority-reconciliation/refresh-lyrebird-queue.ts` validated the exact Lyrebird
+  COMPLETE LIST_JOBS run, v2 REVOKED / OWNER_REVOKED family head, 7/7 ACCEPTED/QUALIFIED ledger
+  rows, 0 PAGE_PERSISTED rows, zero current Lyrebird authority, and zero RUNNING source runs. The
+  canonical completed-run work list contained exactly the stale job
+  `source-job-b2264c07ebf53a292d4bd5d612dec150` with existing current evaluation
+  `b5b00452-3343-469b-ba58-1baf55e83fc2`. It wrote exactly one canonical queue decision:
+  `55c7bf7e-3205-4d76-a862-899851b6d0c6`, v2, REVIEWING / CURRENT, bound to that evaluation and
+  duplicate-resolution version
+  `r2-duplicate-1:d0b98dc85d6dabdc60e55b973975f0430370695f0de73eb991841ce80571aef2`. The exact run
+  now has 0 pending pipeline work. No evaluation, receipt, binding, source run, or network request
+  was created.
+- **Lyrebird post-refresh result:** exact run `61e3d30f-792f-410f-9f26-a2acc9f17706` remains
+  COMPLETE, 1 request / 1 page / 7 provider records / 68,425 bytes / 0 retries / 0 redirects. Its
+  7 accepted records are all QUALIFIED, 7 distinct external IDs, 7 canonical jobs, 7 new
+  observations/job versions, 0 reused observations/versions, and 0 broken/null references. All
+  7/7 now have current R2 evaluation and queue; versions are parser/normalization/evidence/scorer
+  3.5.2/3.5.2/3.1.0/2.2.0. Location/title aggregates: Melbourne 5, explicit VIC/Australia 0,
+  engineering-family titles 3. Eligibility is REVIEW_REQUIRED 7/7, score 0 for 7/7 (max/mean/median
+  0), coverage 0:1 / 33:4 / 50:2 (max 50), duplicates CLEAR 6 / UNRESOLVED 1, recommended 0, and
+  detail candidates 0. The five Melbourne rows are in the private audit output; each has score 0 /
+  threshold 50, coverage 50 / 33 / 33 / 33 / 0, REVIEW_REQUIRED, not recommended, duplicate CLEAR,
+  detail unjustified, and blockers `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`,
+  `EXTRACTION_COVERAGE_INSUFFICIENT`, and `SCORE_BELOW_THRESHOLD`. Result:
+  `LYREBIRD_NO_PACKET_CANDIDATE`.
+- **Kogan exact-run result:** run `90dbd19a-9e60-455a-b487-d3538e22eb64` remains COMPLETE,
+  1 request / 1 page / 20 provider records / 218,461 bytes / 0 retries / 0 redirects. All 20 accepted
+  rows are QUALIFIED, 20 distinct external IDs, 20 canonical jobs, 20 new observations/job
+  versions, 0 reused observations/versions, 0 broken/null references, and 20/20 current R2
+  evaluations/queues at 3.5.2/3.5.2/3.1.0/2.2.0. All 20 jobs are South Melbourne, Melbourne, and
+  explicit Victoria/Australia matches. Titles: engineering 6, software 2, data 1, ML 1. Eligibility
+  REVIEW_REQUIRED 20/20; scores 0 for 20/20 (max/mean/median 0); coverage 20:1 / 25:11 / 33:5 /
+  50:3 (max 50); duplicate UNRESOLVED 20/20; recommended 0; detail/packet-gate candidates 0.
+  Counts within 10/20/30 points of threshold are 0/0/0. Every job has blockers
+  `ELIGIBILITY_NOT_ELIGIBLE`, `MATERIAL_SCOPE_PARTIAL`, `EXTRACTION_COVERAGE_INSUFFICIENT`, and
+  `SCORE_BELOW_THRESHOLD`. Result: `KOGAN_NO_PACKET_CANDIDATE`.
+- **Combined outcome:** `BROADER_DISCOVERY_NO_PACKET_CANDIDATE`. Per tenant, max score is 0 and
+  highest coverage is 50. No jobs are within 10/20/30 points of the score threshold. Blocker counts
+  in Kogan are 20 for each of the four codes above. No qualifying jobs; no detail reads and no
+  packet were created. Safe detailed role tables are recorded in the ignored audit helper outputs
+  and will be summarized in final closeout.
+- **Evidence PR opened:** [PR #64](https://github.com/adeel1608/applypilot/pull/64) is OPEN /
+  UNMERGED on `chore/m2-source-authority-and-next-wave`, base `main`; its first head was
+  `c9a5ce4ffccb2d01b427638370d6e51f581ac3ff`, with only `PROJECT_PLAN.md` changed. The push and PR
+  `quality` checks at that head both failed in `format:check` because this plan needed Prettier
+  formatting; no subsequent quality step ran. Applied `npx prettier --write PROJECT_PLAN.md` to
+  correct the stated cause, and targeted `npx prettier --check PROJECT_PLAN.md` now passes. Local
+  full `npm run format:check` still reports 64 pre-existing tracked files; a representative source
+  file passes with CRLF formatting and fails with LF formatting, consistent with this Windows
+  checkout's `core.autocrlf=true` versus Prettier's LF default. No unrelated file was reformatted.
+  Formatting was committed as `401ec57925d3865d23a6b20ae74bc15fa6f1bd87`. At that exact head, both
+  the push quality run `36696981048` and PR quality run `36696987931` passed, including formatting,
+  lint, typecheck, unit/integration tests, production build, and browser tests. PR #64 remained
+  OPEN / UNMERGED with 0 reviews and 0 comments. This plan status update itself will trigger a new
+  exact-head check; report that final head's status in closeout and keep the PR open/unmerged.
+
+### Final Part R/S validation and evidence PR (2026-09-30)
+
+- `npm run preflight` exited 0: doctor PASS; schema 12 / pending migrations 0 / integrity PASS /
+  FK 0; privacy audit PASS; private profile VALID; source allowlist schema v2 with 15 configured
+  capabilities and active count 0; preflight PASS with no blockers. Source-enabled Personal Beta
+  reports READY with 0 active capabilities. Real-target state remains TARGET_APPROVAL_REQUIRED;
+  Personal Live V1 remains NOT_READY.
+- Standalone `npm run db:status` and `npm run migration:status` both exited 0 and independently
+  reported schema 12, pending migrations 0, integrity PASS, and FK 0. `npm run privacy:audit`
+  exited 0: 354 tracked files, 1,565 history paths, 1,348 history blobs, 1,930 build/test artifacts,
+  and 11 private canaries checked.
+- Migration immutability check `git diff --exit-code origin/main -- packages/database` exited 0;
+  no tracked database code or migration differs from synchronized main. `git diff --check` exited 0.
+  `git fsck --strict` exited 0; it reported dangling unreachable blobs/trees but no integrity error.
+- Read-only final invariant audit: effective source authority 0; active APPROVE receipts 0; active
+  START receipts 0; RUNNING source runs 0; active real-target capabilities 0; RUNNING application
+  runs 0; CLAIMED application operations 0; final consent rows 0. Exact new Lyrebird and Kogan
+  latest heads are both version 2 / REVOKED / OWNER_REVOKED. Run status totals are COMPLETE 10 /
+  STOPPED 9. Lifetime totals: LIST_JOBS 31 requests / 18 runs / 25 pages / 783 records; GET_JOB 1
+  request / 1 run / 1 page / 1 record.
+- External deltas from the Part D pre-wave baseline (LIST_JOBS 29 requests, GET_JOB 1 request,
+  employer inspection bindings 9, application operations 0, final consents 0): LIST_JOBS +2
+  requests/+2 runs (one Lyrebird and one Kogan); GET_JOB +0; employer inspections +0; form changes
+  +0; uploads +0; submissions +0. No source traffic beyond the two human-authorized bounded
+  LIST_JOBS requests occurred.
+- **Evidence PR:** PR #64 is OPEN / UNMERGED at
+  `https://github.com/adeel1608/applypilot/pull/64`, base `main`, head branch
+  `chore/m2-source-authority-and-next-wave`; tracked scope is `PROJECT_PLAN.md` only. The original
+  head's formatting failure and correction are documented above. At `401ec57925d3865d23a6b20ae74bc15fa6f1bd87`,
+  both exact-head `quality` checks passed and the PR had 0 reviews / 0 comments. The final plan
+  evidence commit triggers another pair of checks; those checks are the remaining closeout gate.
+  No merge is authorized.
