@@ -14,6 +14,7 @@ export default defineConfig([
   },
   globalIgnores([
     "**/.next/**",
+    "**/.next-validation-*/**",
     "**/coverage/**",
     "**/out/**",
     "**/build/**",

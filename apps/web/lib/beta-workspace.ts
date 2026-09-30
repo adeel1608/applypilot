@@ -1291,8 +1291,7 @@ export async function preparePrivatePacket(
       .get(),
   );
   if (!hasVerificationLedger) throw new Error("PREPARATION_VERIFICATION_LEDGER_REQUIRED");
-  const verification = beta.getLatestQualifiedVerification(jobId, detail.jobVersionId);
-  if (!verification) throw new Error("PREPARATION_VERIFICATION_REQUIRED");
+  const verification = beta.requireLatestQualifiedVerification(jobId, detail.jobVersionId);
   const freshness = assessVerificationFreshness({
     verifiedAt: verification.verifiedAt,
     evidenceQualified: true,

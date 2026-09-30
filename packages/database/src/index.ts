@@ -13,6 +13,7 @@ export * from "./r2-repository";
 export * from "./r2-readiness-summary";
 export * from "./r2-corrections";
 export * from "./source-enablement-repository";
+export * from "./stopped-run-inspection";
 export * from "./runner-enablement-repository";
 export * from "./green-banner-repository";
 export * from "./non-submit-run-store";

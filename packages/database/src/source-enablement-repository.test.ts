@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import BetterSqlite3 from "better-sqlite3";
@@ -22,11 +23,14 @@ import { testProfile } from "../../../tests/fixture-data";
 import { R2ARepository } from "./r2a-repository";
 import { BetaRepository } from "./beta-repository";
 import { R2Repository } from "./r2-repository";
+import { loadPersistedApplicationPacket } from "./persisted-packet";
+import { evaluatePersistedSourceInspection } from "./stopped-run-inspection";
 import {
   SourceEnablementRepository,
   runLeverDetailToQueue as runLeverDetailToQueueWithOwnerReceipts,
   runLeverSourceToQueue as runLeverSourceToQueueWithOwnerReceipts,
 } from "./source-enablement-repository";
+import type { QualifiedVerificationEvidence } from "./beta-repository";
 
 const instant = new Date("2026-09-10T00:00:00.000Z");
 
@@ -332,6 +336,106 @@ function fixturePipeline(
       queued.push([jobId, evaluationId]);
     },
   };
+}
+
+async function stoppedInspectionFixture(input?: { workplaceType?: string }) {
+  const sqlite = database();
+  const approved = capability({ requestBudget: 3, recordCap: 5, pageSizeCap: 2 });
+  const repository = new SourceEnablementRepository(sqlite, () => instant);
+  const record = {
+    ...posting(321),
+    ...(input?.workplaceType ? { workplaceType: input.workplaceType } : {}),
+  };
+  const dependencies: SecureSourceTransportDependencies = {
+    resolveHost: vi.fn(async () => ["8.8.8.8"]),
+    request: vi.fn(async ({ pinnedAddress }) => ({
+      status: 200,
+      headers: { "content-type": "application/json", "content-encoding": "identity" },
+      body: Buffer.from(JSON.stringify([record])),
+      connectedAddress: pinnedAddress,
+    })),
+  };
+  const result = await runLeverSourceToQueue({
+    capability: approved,
+    repository,
+    now: () => instant,
+    dependencies,
+    evaluateJob: async () => null,
+    queueJob: () => undefined,
+  });
+  const runId = result.runId;
+  sqlite
+    .prepare(
+      "UPDATE source_run_checkpoints SET status='STOPPED',safe_error_code='RUN_TIMEOUT',completed_at=?,updated_at=? WHERE id=?",
+    )
+    .run(instant.toISOString(), instant.toISOString(), runId);
+  sqlite
+    .prepare(
+      "UPDATE source_record_verifications SET qualification_state='PAGE_PERSISTED' WHERE run_id=?",
+    )
+    .run(runId);
+  sqlite
+    .prepare(
+      "DELETE FROM audit_events WHERE entity_type='source_run' AND entity_id=? AND event_type='source.run.completed'",
+    )
+    .run(runId);
+  sqlite
+    .prepare(
+      `INSERT INTO audit_events
+       (id,event_type,entity_type,entity_id,actor,redacted_metadata_json,occurred_at)
+       VALUES (?,?,?,?, 'SYSTEM', ?, ?)`,
+    )
+    .run(
+      "inspection-fixture-stop",
+      "source.run.stopped",
+      "source_run",
+      runId,
+      JSON.stringify({ runId, code: "RUN_TIMEOUT", requestCount: 1, recordCount: 1 }),
+      instant.toISOString(),
+    );
+  const verification = sqlite
+    .prepare(
+      `SELECT v.id,jv.job_id AS jobId,v.job_version_id AS jobVersionId
+       FROM source_record_verifications v JOIN job_versions jv ON jv.id=v.job_version_id
+       WHERE v.run_id=?`,
+    )
+    .get(runId) as { id: string; jobId: string; jobVersionId: string };
+  return { sqlite, repository, runId, verification, profile: installFixtureProfile(sqlite) };
+}
+
+const inspectionSnapshotTables = [
+  "source_run_checkpoints",
+  "source_run_pages",
+  "source_record_verifications",
+  "source_observations",
+  "source_observation_payloads",
+  "jobs",
+  "job_versions",
+  "job_field_evidence_v2",
+  "requirement_evidence_v2",
+  "job_normalization_coverage",
+  "source_derivation_bindings",
+  "r2_evaluation_versions",
+  "r2_queue_decision_versions",
+  "application_packets",
+  "source_owner_action_receipts",
+  "source_run_owner_bindings",
+  "audit_events",
+] as const;
+
+function inspectionStateSnapshot(sqlite: BetterSqlite3.Database) {
+  return Object.fromEntries(
+    inspectionSnapshotTables.map((table) => {
+      const rows = sqlite.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all();
+      return [
+        table,
+        {
+          count: rows.length,
+          digest: createHash("sha256").update(JSON.stringify(rows)).digest("hex"),
+        },
+      ];
+    }),
+  );
 }
 
 describe("offline source-to-R2 queue persistence", () => {
@@ -2878,5 +2982,460 @@ describe("offline source-to-R2 queue persistence", () => {
       count: 0,
     });
     sqlite.close();
+  });
+});
+
+describe("stopped-run persisted-source inspection", () => {
+  it("reconstructs a valid RUN_TIMEOUT record in memory and keeps the packet gate closed", async () => {
+    const fixture = await stoppedInspectionFixture();
+    const { sqlite, repository, runId, verification, profile } = fixture;
+    const profileVersionId = "profile-version:source-restart-fixture";
+    const before = inspectionStateSnapshot(sqlite);
+    const inspection = repository.inspectPersistedLeverVerification({
+      verificationId: verification.id,
+    });
+    const diagnostic = evaluatePersistedSourceInspection({
+      inspection,
+      profile,
+      profileVersionId,
+      activeProfileVersionId: profileVersionId,
+      activeProfileContentHash: candidateProfileContentHash(profile),
+      duplicateState: "CLEAR",
+    });
+    const replay = repository.inspectPersistedLeverVerification({
+      verificationId: verification.id,
+    });
+    const replayDiagnostic = evaluatePersistedSourceInspection({
+      inspection: replay,
+      profile,
+      profileVersionId,
+      activeProfileVersionId: profileVersionId,
+      activeProfileContentHash: candidateProfileContentHash(profile),
+      duplicateState: "CLEAR",
+    });
+    const after = inspectionStateSnapshot(sqlite);
+
+    expect(inspection).toMatchObject({
+      marker: "PAGE_PERSISTED_INSPECTION_ONLY",
+      inspectionOnly: true,
+      sourceQualificationState: "PAGE_PERSISTED",
+      sourceRunStatus: "STOPPED",
+      sourceStopCode: "RUN_TIMEOUT",
+      source: "LEVER",
+      tenant: "fictional",
+      jobId: verification.jobId,
+      parentJobVersionId: verification.jobVersionId,
+      providerDriftWarnings: [],
+      normalization: {
+        parserVersion: "3.5.2",
+        normalizationVersion: "3.5.2",
+        evidenceContractVersion: "3.1.0",
+      },
+    });
+    expect(diagnostic).toMatchObject({
+      marker: "PAGE_PERSISTED_INSPECTION_ONLY",
+      sourceQualificationState: "PAGE_PERSISTED",
+      sourceRunStatus: "STOPPED",
+      sourceStopCode: "RUN_TIMEOUT",
+      parserVersion: "3.5.2",
+      normalizationVersion: "3.5.2",
+      evidenceContractVersion: "3.1.0",
+      scorerVersion: "2.2.0",
+      weightVersion: "r2-weights-1",
+      scoreThreshold: 50,
+      minimumCoverageThreshold: 60,
+      duplicateState: "CLEAR",
+    });
+    expect(diagnostic).toEqual(replayDiagnostic);
+    expect(inspection.normalization.fieldEvidence.length).toBeGreaterThan(0);
+    const pointers = [
+      ...inspection.normalization.fieldEvidence.map(({ source }) => source),
+      ...inspection.normalization.requirementEvidence.map(({ source }) => source),
+      ...inspection.normalization.coverage.flatMap(({ unparsedSpans }) => unparsedSpans),
+    ];
+    expect(inspection.normalization.sourceLength).toBeGreaterThan(0);
+    for (const pointer of pointers) {
+      expect(pointer.start).toBeGreaterThanOrEqual(0);
+      expect(pointer.end).toBeGreaterThan(pointer.start);
+      expect(pointer.end).toBeLessThanOrEqual(inspection.normalization.sourceLength);
+      expect(pointer.end - pointer.start).toBe(pointer.excerpt.length);
+      expect(createHash("sha256").update(pointer.excerpt).digest("hex")).toBe(pointer.excerptHash);
+    }
+    expect(
+      new BetaRepository(sqlite).getLatestQualifiedVerification(
+        verification.jobId,
+        verification.jobVersionId,
+      ),
+    ).toBeNull();
+    expect(() =>
+      new BetaRepository(sqlite).requireLatestQualifiedVerification(
+        verification.jobId,
+        verification.jobVersionId,
+      ),
+    ).toThrow("PREPARATION_VERIFICATION_REQUIRED");
+    expect(() =>
+      loadPersistedApplicationPacket({ sqlite, packetId: "inspection-only-packet" }),
+    ).toThrow("PACKET_NOT_FOUND");
+    expect(sqlite.prepare("SELECT count(*) AS count FROM application_packets").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM r2_evaluation_versions").get()).toEqual({
+      count: 0,
+    });
+    expect(
+      sqlite
+        .prepare("SELECT count(*) AS count FROM r2_queue_decision_versions WHERE state='PREPARING'")
+        .get(),
+    ).toEqual({ count: 0 });
+    expect(
+      sqlite
+        .prepare("SELECT status,safe_error_code AS stopCode FROM source_run_checkpoints WHERE id=?")
+        .get(runId),
+    ).toEqual({
+      status: "STOPPED",
+      stopCode: "RUN_TIMEOUT",
+    });
+    expect(
+      sqlite
+        .prepare("SELECT qualification_state AS state FROM source_record_verifications WHERE id=?")
+        .get(verification.id),
+    ).toEqual({
+      state: "PAGE_PERSISTED",
+    });
+    expect(after).toEqual(before);
+
+    // Inspection results are deliberately not structurally usable as packet verification evidence.
+    // @ts-expect-error inspection-only data omits qualified evidence bindings
+    const qualifiedEvidence: QualifiedVerificationEvidence = inspection;
+    void qualifiedEvidence;
+    sqlite.close();
+  });
+
+  it("accepts only the known optional workplaceType enum warning for its exact record", async () => {
+    const fixture = await stoppedInspectionFixture({ workplaceType: "provider-new-enum" });
+    try {
+      const inspection = fixture.repository.inspectPersistedLeverVerification({
+        verificationId: fixture.verification.id,
+      });
+      expect(inspection.providerDriftWarnings).toEqual([
+        {
+          issueCategory: "PROVIDER_ENUM_DRIFT",
+          field: "workplaceType",
+          expectedStructuralType: "enum",
+          recordIndex: 0,
+        },
+      ]);
+      expect(inspection.job).not.toHaveProperty("workplaceType");
+      expect(inspection.normalization.parserVersion).toBe("3.5.2");
+    } finally {
+      fixture.sqlite.close();
+    }
+  });
+
+  it("blocks non-timeout, non-stopped, and schema/security stop states", async () => {
+    const cases = [
+      {
+        name: "RUNNING",
+        mutate: (db: BetterSqlite3.Database, runId: string) =>
+          db
+            .prepare(
+              "UPDATE source_run_checkpoints SET status='RUNNING',safe_error_code=NULL WHERE id=?",
+            )
+            .run(runId),
+      },
+      {
+        name: "OUTCOME_UNKNOWN",
+        mutate: (db: BetterSqlite3.Database, runId: string) =>
+          db
+            .prepare(
+              "UPDATE source_run_checkpoints SET safe_error_code='NETWORK_OUTCOME_UNKNOWN' WHERE id=?",
+            )
+            .run(runId),
+      },
+      {
+        name: "SCHEMA_CHANGED",
+        mutate: (db: BetterSqlite3.Database, runId: string) =>
+          db
+            .prepare(
+              "UPDATE source_run_checkpoints SET safe_error_code='SCHEMA_CHANGED' WHERE id=?",
+            )
+            .run(runId),
+      },
+      {
+        name: "PERSISTENCE_FAILED",
+        mutate: (db: BetterSqlite3.Database, runId: string) =>
+          db
+            .prepare(
+              "UPDATE source_run_checkpoints SET safe_error_code='PERSISTENCE_FAILED' WHERE id=?",
+            )
+            .run(runId),
+      },
+      {
+        name: "OWNER_CANCELLED",
+        mutate: (db: BetterSqlite3.Database, runId: string) =>
+          db
+            .prepare(
+              "UPDATE source_run_checkpoints SET safe_error_code='OWNER_CANCELLED' WHERE id=?",
+            )
+            .run(runId),
+      },
+    ];
+    for (const testCase of cases) {
+      const fixture = await stoppedInspectionFixture();
+      try {
+        testCase.mutate(fixture.sqlite, fixture.runId);
+        expect(
+          () =>
+            fixture.repository.inspectPersistedLeverVerification({
+              verificationId: fixture.verification.id,
+            }),
+          testCase.name,
+        ).toThrow("STOPPED_RUN_INSPECTION_RUN_NOT_ALLOWED");
+      } finally {
+        fixture.sqlite.close();
+      }
+    }
+  });
+
+  it("refuses QUALIFIED and UNUSABLE rows on the page-persisted path", async () => {
+    for (const [state, mutation] of [
+      [
+        "QUALIFIED",
+        "UPDATE source_record_verifications SET qualification_state='QUALIFIED' WHERE id=?",
+      ],
+      ["UNUSABLE", "UPDATE source_record_verifications SET disposition='UNUSABLE' WHERE id=?"],
+    ] as const) {
+      const fixture = await stoppedInspectionFixture();
+      try {
+        fixture.sqlite.prepare(mutation).run(fixture.verification.id);
+        expect(
+          () =>
+            fixture.repository.inspectPersistedLeverVerification({
+              verificationId: fixture.verification.id,
+            }),
+          state,
+        ).toThrow("STOPPED_RUN_INSPECTION_VERIFICATION_STATE_NOT_ALLOWED");
+      } finally {
+        fixture.sqlite.close();
+      }
+    }
+  });
+
+  it("fails closed on page, record-index, observation, payload, parent, and owner mismatches", async () => {
+    const cases: Array<{
+      name: string;
+      mutate: (db: BetterSqlite3.Database, verificationId: string, runId: string) => void;
+      error: string;
+    }> = [
+      {
+        name: "page digest mismatch",
+        mutate: (db, verificationId) =>
+          db
+            .prepare("UPDATE source_record_verifications SET page_digest=? WHERE id=?")
+            .run("f".repeat(64), verificationId),
+        error: "STOPPED_RUN_INSPECTION_PAGE_OR_RUN_BINDING_MISMATCH",
+      },
+      {
+        name: "record index outside the page",
+        mutate: (db, verificationId) =>
+          db
+            .prepare("UPDATE source_record_verifications SET record_index=99 WHERE id=?")
+            .run(verificationId),
+        error: "STOPPED_RUN_INSPECTION_PAGE_OR_RUN_BINDING_MISMATCH",
+      },
+      {
+        name: "observation hash mismatch",
+        mutate: (db, _verificationId, runId) =>
+          db
+            .prepare("UPDATE source_observations SET content_hash=? WHERE run_id=?")
+            .run("f".repeat(64), runId),
+        error: "STOPPED_RUN_INSPECTION_IMMUTABLE_IDENTITY_MISMATCH",
+      },
+      {
+        name: "payload digest mismatch",
+        mutate: (db, _verificationId, runId) =>
+          db
+            .prepare(
+              "UPDATE source_observation_payloads SET content_digest=? WHERE observation_id=(SELECT source_observation_id FROM source_record_verifications WHERE run_id=?)",
+            )
+            .run("f".repeat(64), runId),
+        error: "STOPPED_RUN_INSPECTION_IMMUTABLE_IDENTITY_MISMATCH",
+      },
+      {
+        name: "parent version no longer binds the observation",
+        mutate: (db, verificationId) =>
+          db
+            .prepare(
+              "UPDATE job_versions SET source_observation_id=NULL WHERE id=(SELECT job_version_id FROM source_record_verifications WHERE id=?)",
+            )
+            .run(verificationId),
+        error: "STOPPED_RUN_INSPECTION_IMMUTABLE_IDENTITY_MISMATCH",
+      },
+      {
+        name: "payload bytes changed without a new digest",
+        mutate: (db, _verificationId, runId) =>
+          db
+            .prepare(
+              "UPDATE source_observation_payloads SET payload_json=payload_json || ' ' WHERE observation_id=(SELECT source_observation_id FROM source_record_verifications WHERE run_id=?)",
+            )
+            .run(runId),
+        error: "STOPPED_RUN_INSPECTION_IMMUTABLE_IDENTITY_MISMATCH",
+      },
+      {
+        name: "owner run binding missing",
+        mutate: (db, _verificationId, runId) =>
+          db.prepare("DELETE FROM source_run_owner_bindings WHERE run_id=?").run(runId),
+        error: "STOPPED_RUN_INSPECTION_OWNER_PROVENANCE_REQUIRED",
+      },
+      {
+        name: "run and receipt capability digest differ",
+        mutate: (db, _verificationId, runId) =>
+          db
+            .prepare("UPDATE source_run_checkpoints SET capability_digest=? WHERE id=?")
+            .run("f".repeat(64), runId),
+        error: "STOPPED_RUN_INSPECTION_OWNER_PROVENANCE_REQUIRED",
+      },
+      {
+        name: "verification binds another capability version",
+        mutate: (db, verificationId) =>
+          db
+            .prepare(
+              "UPDATE source_record_verifications SET capability_version_id=(SELECT id FROM source_capability_versions WHERE capability_id='source-lever-alt-fixture') WHERE id=?",
+            )
+            .run(verificationId),
+        error: "STOPPED_RUN_INSPECTION_PAGE_OR_RUN_BINDING_MISMATCH",
+      },
+      {
+        name: "capability configuration digest differs from the run digest",
+        mutate: (db, verificationId) =>
+          db
+            .prepare(
+              "UPDATE source_capability_versions SET configuration_digest=? WHERE id=(SELECT capability_version_id FROM source_record_verifications WHERE id=?)",
+            )
+            .run("f".repeat(64), verificationId),
+        error: "STOPPED_RUN_INSPECTION_CAPABILITY_BINDING_MISMATCH",
+      },
+    ];
+    for (const testCase of cases) {
+      const fixture = await stoppedInspectionFixture();
+      try {
+        if (testCase.name === "verification binds another capability version") {
+          fixture.repository.persistCapabilityVersion(
+            capability({
+              capabilityId: "source-lever-alt-fixture",
+              tenant: "other-fictional",
+              allowedPathPrefix: "/v0/postings/other-fictional",
+            }),
+          );
+        }
+        testCase.mutate(fixture.sqlite, fixture.verification.id, fixture.runId);
+        expect(
+          () =>
+            fixture.repository.inspectPersistedLeverVerification({
+              verificationId: fixture.verification.id,
+            }),
+          testCase.name,
+        ).toThrow(testCase.error);
+      } finally {
+        fixture.sqlite.close();
+      }
+    }
+  });
+
+  it("rechecks provider identity after Lever reparse and rejects unscoped drift", async () => {
+    const mismatch = await stoppedInspectionFixture();
+    try {
+      mismatch.sqlite
+        .prepare("UPDATE source_record_verifications SET external_id='changed' WHERE id=?")
+        .run(mismatch.verification.id);
+      mismatch.sqlite
+        .prepare("UPDATE source_observations SET external_id='changed' WHERE run_id=?")
+        .run(mismatch.runId);
+      expect(() =>
+        mismatch.repository.inspectPersistedLeverVerification({
+          verificationId: mismatch.verification.id,
+        }),
+      ).toThrow("STOPPED_RUN_INSPECTION_REPARSED_IDENTITY_OR_DRIFT_MISMATCH");
+    } finally {
+      mismatch.sqlite.close();
+    }
+
+    const unscoped = await stoppedInspectionFixture({ workplaceType: "provider-new-enum" });
+    try {
+      unscoped.sqlite
+        .prepare(
+          `UPDATE audit_events SET redacted_metadata_json=?
+           WHERE entity_type='source_run' AND entity_id=? AND event_type='source.provider.drift'`,
+        )
+        .run(
+          JSON.stringify({
+            issueCategory: "PROVIDER_ENUM_DRIFT",
+            field: "workplaceType",
+            expectedStructuralType: "enum",
+          }),
+          unscoped.runId,
+        );
+      expect(() =>
+        unscoped.repository.inspectPersistedLeverVerification({
+          verificationId: unscoped.verification.id,
+        }),
+      ).toThrow("STOPPED_RUN_INSPECTION_UNSCOPED_PROVIDER_DRIFT");
+    } finally {
+      unscoped.sqlite.close();
+    }
+  });
+
+  it("reconstructs current 3.5.2 evidence over an older 3.2.0 parent without rewriting it", async () => {
+    const fixture = await stoppedInspectionFixture();
+    try {
+      const { sqlite, repository, verification } = fixture;
+      sqlite
+        .prepare(
+          "UPDATE job_normalization_coverage SET parser_version='3.2.0',normalization_version='3.2.0' WHERE job_version_id=?",
+        )
+        .run(verification.jobVersionId);
+      sqlite
+        .prepare(
+          "UPDATE job_field_evidence_v2 SET extractor_version='3.2.0' WHERE job_version_id=?",
+        )
+        .run(verification.jobVersionId);
+      sqlite
+        .prepare(
+          "UPDATE requirement_evidence_v2 SET extractor_version='3.2.0' WHERE job_version_id=?",
+        )
+        .run(verification.jobVersionId);
+      const before = inspectionStateSnapshot(sqlite);
+      const inspection = repository.inspectPersistedLeverVerification({
+        verificationId: verification.id,
+      });
+      const after = inspectionStateSnapshot(sqlite);
+      expect(inspection.normalization).toMatchObject({
+        parserVersion: "3.5.2",
+        normalizationVersion: "3.5.2",
+        evidenceContractVersion: "3.1.0",
+      });
+      expect(
+        sqlite
+          .prepare(
+            "SELECT DISTINCT parser_version AS parserVersion,normalization_version AS normalizationVersion FROM job_normalization_coverage WHERE job_version_id=?",
+          )
+          .all(verification.jobVersionId),
+      ).toEqual([{ parserVersion: "3.2.0", normalizationVersion: "3.2.0" }]);
+      expect(
+        sqlite
+          .prepare("SELECT count(*) AS count FROM job_versions WHERE job_id=?")
+          .get(verification.jobId),
+      ).toEqual({ count: 1 });
+      expect(
+        sqlite
+          .prepare(
+            "SELECT count(*) AS count FROM source_derivation_bindings WHERE verification_id=?",
+          )
+          .get(verification.id),
+      ).toEqual({ count: 0 });
+      expect(after).toEqual(before);
+    } finally {
+      fixture.sqlite.close();
+    }
   });
 });

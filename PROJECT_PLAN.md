@@ -1,16 +1,39 @@
 # ApplyPilot Production Verification Project Plan
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `7e8534d196cec6b2e62f0bda78e0f7a29312472e`
+Expected current main: `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 > This is the active production-readiness checklist. Historical evidence must be preserved separately and never rewritten as current state.
 
 ## 1. Resume here
 
-### Current work checkpoint (2026-09-29)
+### Current work checkpoint (2026-09-30)
+
+- PR #62 was exact-guarded and squash-merged as `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`;
+  local `main` and `origin/main` match. The active evidence branch is
+  `chore/m2-broader-source-discovery-wave`; only this plan is tracked as modified.
+- The pre-stage real DB baseline passed schema 12, migrations 0, integrity PASS, FK 0, lifetime
+  counters `21/9/0/0`, historical source requests 20 LIST_JOBS + 1 GET_JOB, and zero active
+  source/target authority, source runs, pending app operations, or active owner START receipts.
+  Shield AI v7 is REVOKED. After staging, configured source readiness is 1 for the pending Quad Lock
+  capability; target authority, source runs, pending app operations, and its owner receipts remain
+  zero. Current parser/normalization is 3.5.2, evidence 3.1.0, scorer 2.2.0, weights
+  `r2-weights-1`, thresholds 50/60.
+- Quad Lock v1 is staged only in ignored private configuration, capability
+  `m2_source_quadlock_a901a80a3621_1790726425925`, digest
+  `444c4c1024f08b7a261f86db3cbc083ce2d9519f3c974c077fe2024a1ba3d463`. Its exact limits and fresh
+  24-hour policy/capability binding are in section 57. It is SOURCE_ENABLED configuration, while
+  durable APPROVE and START receipts, database capability row, run binding, and run count are all
+  zero. No network or database write has occurred for this family.
+- Stop at `QUADLOCK_OWNER_ACTION_PENDING`. The owner must use the exact `/sources` APPROVE form and
+  then its separate RUN form for this capability once each. Until the resulting exact receipt chain
+  and run binding are verified, do not make a source request or stage TSMG. Personal Live V1 remains
+  NOT_READY. The evidence PR is deferred until executed discovery waves are complete.
+
+### Completed Shield AI v6 source-authority checkpoint (2026-09-29)
 
 - The long-window v6 Shield AI source-authority task started from synchronized `main` /
   `origin/main` at `7e8534d196cec6b2e62f0bda78e0f7a29312472e`; the plan-only evidence branch is
@@ -5579,3 +5602,683 @@ format:check` reports 53 checkout-format files; the Windows-aware full check in 
   Personal Beta remains READY with 0 active capabilities. Personal Live V1 remains NOT_READY.
   Exactly one recommended task: stage broader source discovery with an owner-approved supported
   tenant/provider.
+
+## 57. M2 PR #62 merge / broader Lever discovery wave blueprint (2026-09-30)
+
+### Starting state and guarded PR #62 acceptance
+
+- Starting checkout was the exact reviewed PR #62 head. Live GitHub re-fetch confirmed PR #62 open,
+  unmerged, non-draft, mergeable, base `e4e1a5650c5db55681958645d293be1737eced12`, head
+  `53eee1bda479fc28382561f35c1653ee1075b23c`, tree
+  `cf1d3e4309852ea121d8f1e26484b92a8b4a7d46`, 1 commit, 7 files, +403/-11, ahead 1/behind 0,
+  no reviews or unresolved threads. Exact-head push run `36642893324` and PR run `36642945573`
+  both completed successfully. PR #62 was squash-merged as `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`;
+  its parent is the reviewed base and its tree is the reviewed head tree. Local `main` and
+  `origin/main` were fast-forwarded to that SHA. Work branch:
+  `chore/m2-broader-source-discovery-wave`.
+- The prior verified runtime record is schema 12, counters `21/9/0/0`, 20 LIST_JOBS and 1 GET_JOB,
+  zero source/target authority, zero active runs and pending application operations, and Shield AI
+  v7 revoked. Recheck these values against the real local DB before staging. Current expected engine
+  is parser/normalization 3.5.2, evidence 3.1.0, scorer 2.2.0, weights `r2-weights-1`, thresholds
+  50/60. Any material mismatch stops with `BROADER_SOURCE_PREFLIGHT_MISMATCH`.
+
+### Read-only preflight and policy selection (before private staging)
+
+- `npm run db:status` and `npm run preflight` PASS: schema 12, pending migrations 0, integrity PASS,
+  FK issues 0, doctor PASS, privacy audit PASS, valid private-profile state, and source-enabled beta
+  READY with 0 active source capabilities. The existing private v2 allowlist has 12/20 entries and
+  no LEVER family for either `quadlock` or `tsmg`; Quad Lock v1 plus its later v2 revocation fits,
+  and the remaining capacity also permits a conditional TSMG v1/v2 pair. No private allowlist
+  values were dumped. The latest Shield AI family remains v7 REVOKED. Its old policy identity is
+  `m2-live-readiness-v1`; section 52 already records that policy identity as reviewable/reusable.
+  Its old expiry is not copied. This task generates fresh policy/capability times at T0 and binds
+  parser identity to merged current main `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`.
+- Read-only database aggregates confirm lifetime counters `21/9/0/0`; historical source requests
+  are 20 LIST_JOBS plus 1 GET_JOB (14 LIST runs and 1 GET run), with no task delta. Source run
+  states are 7 COMPLETE / 8 STOPPED and 0 RUNNING. Active source authority is 0, active current
+  target capability authority is 0, pending application operations are 0, and final-action consents
+  are 0. The two historical source owner receipts are CONSUMED; active START receipts are 0; the
+  one historical source-run owner binding is not active. The latest Shield AI database capability
+  is v7 REVOKED. No source or target request was made during this task.
+- Current code constants match the expected engine: parser/normalization 3.5.2, evidence 3.1.0,
+  scorer 2.2.0, weights `r2-weights-1`, score threshold 50, and minimum extraction coverage 60.
+
+### Quad Lock v1 staging and Human Gate #1 checkpoint (2026-09-30)
+
+- Staged exactly one new configuration in ignored `data/private/source-allowlist.json` using the
+  repository's `SourceCapabilityV2Schema`, `SourceAllowlistV2Schema`, canonical digest, and
+  readiness function. Capability: `m2_source_quadlock_a901a80a3621_1790726425925`, version 1,
+  predecessor null; LEVER / `quadlock` / GLOBAL; alias `Quad Lock broader discovery`; host
+  `api.lever.co`; path `/v0/postings/quadlock`; LIST_JOBS only. Configuration digest:
+  `444c4c1024f08b7a261f86db3cbc083ce2d9519f3c974c077fe2024a1ba3d463`.
+- Exact limits: request budget 5, record cap 200, page-size cap 50, response limit 5,000,000 bytes,
+  request timeout 30,000 ms, run timeout 180,000 ms, redirects 0, retries 0, concurrency 1. Policy
+  is `m2-live-readiness-v1`; parser binding is
+  `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`. T0 is
+  `2026-09-30T00:00:25.925Z`; policy review, policy expiry, and capability expiry are respectively
+  T0, `2026-10-01T00:00:25.925Z`, and `2026-10-01T00:00:25.925Z`. Readiness is SOURCE_ENABLED.
+  The configuration `APPROVED` state/reference is not a human receipt.
+- Allowlist count moved from 12 to 13, preserving every existing capability entry; the file remains
+  ignored. Post-stage `npm run preflight` PASSes schema 12 / pending 0 / integrity PASS / FK 0 and
+  privacy audit PASS. Its one active configured source capability is this staged Quad Lock v1;
+  no human approval is implied. Read-only DB binding checks show 0 receipts for either action,
+  0 persisted capability-version rows for this family, 0 source runs, and 0 run bindings. Lifetime
+  requests remain 21 total / 20 LIST_JOBS / 1 GET_JOB. Source request delta and DB writes for staging
+  are 0. The staged digest and configuration read back exactly after atomic write. The canonical
+  `SourceEnablementRepository.getOwnerApprovalStatus()` read returns `APPROVAL_REQUIRED`, null
+  receipt, and `canOwnerStart=false`; the approval form is enabled and the RUN form is disabled.
+- Human Gate #1 is pending: `QUADLOCK_OWNER_ACTION_PENDING`. No UI control was submitted. The owner
+  must verify the capability in `/sources`, then use its human APPROVE form and separate human RUN
+  form once each. TSMG remains unstaged. Wait for the exact APPROVE receipt, START receipt, and
+  source-run binding to appear in the real DB before any request. Do not create an evidence PR while
+  the discovery wave is awaiting owner action.
+- This checkpoint changed no application code and added no migration. No test suite/build was run;
+  final discovery-wave validation remains deferred until the owner-gated wave(s) terminate,
+  reconcile, and complete R2 analysis. `npm run db:status`, `npm run preflight`, safe read-only
+  receipt/run/counter aggregates, private ignore check, migration immutability check, and an initial
+  `git diff --check` passed. Re-run diff checking after this checkpoint entry; `git fsck --strict`
+  remains for final wave validation.
+
+### Objective, assumptions, requirements, and architecture
+
+- Objective: continue beyond the exhausted Shield AI corpus using only the owner-selected bounded
+  Lever discovery candidates `quadlock` first and `tsmg` only if Quad Lock yields zero packet-gate
+  candidates. A packet-gate candidate is a current, duplicate-clear, ELIGIBLE, recommended job with
+  current R2 evaluation/queue and sufficiently current source verification. Do not change facts,
+  parsers, scoring, thresholds, duplicate linking, or eligibility.
+- Tenant names are candidates, not authorization. Each request is forbidden until the exact staged
+  capability has a durable human APPROVE receipt, a separate durable human START receipt, and a
+  database-proven exact run binding. Codex must not produce receipts, submit owner UI forms, or run
+  before those human actions.
+- Wave 1 stages only a new version-1 Lever/GLOBAL family for `quadlock`, alias `Quad Lock broader
+discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only, request budget 5,
+  record cap 200, page size 50, response limit 5,000,000 bytes, request timeout at most 30 seconds,
+  run timeout at most 180 seconds (or a lower currently required policy bound), zero redirects and
+  retries, concurrency 1, and a fresh 24-hour policy/capability lifetime. Preserve the repository's
+  current reviewed M2 policy version and parser-binding convention after verifying them against the
+  existing private configuration. The source capability's `APPROVED` state is configuration
+  readiness only, not the durable human decision.
+- Wave 2 is conditional. Only after a completed Quad Lock run and full R2 analysis proves zero
+  packet-gate candidates may a new TSMG version-1 family be staged with request budget 10, record
+  cap 500, page size 50, response limit 5,000,000 bytes, request timeout 30 seconds, run timeout
+  300 seconds, zero redirects/retries, concurrency 1, and the same 24-hour identity/policy rules.
+  Stop at the second separate human approval/run gate; do not stage/run TSMG automatically while
+  Quad Lock is awaiting owner action or has a candidate.
+- Both waves use the current source-capability v2/schema-12 database architecture and the `/sources`
+  human flow. Only bounded HTTPS GETs to `api.lever.co` are allowed, using LIST_JOBS. No GET_JOB,
+  employer page navigation, target action, candidate data, credentials, cookies, retries, redirects,
+  or blind retry. Never exceed the exact request/record/page/byte/time limits.
+- After any source run reaches a safe terminal state, immediately stage/persist family version 2,
+  predecessor 1, same identity and policy, `REVOKED`, `OWNER_REVOKED`; verify version 1 cannot start,
+  latest authority is zero, and no start-capable owner receipt remains. Then reconcile the complete
+  canonical membership of the run through existing local services, never manual SQL fabrication,
+  and evaluate/queue every canonical job under the current R2 engine.
+
+### Proposed files, private state, and data flow
+
+- Tracked changes for this task are limited to this `PROJECT_PLAN.md` evidence/blueprint. Do not
+  modify application code unless a required canonical local reconciliation is missing; if new
+  engineering is required, stop with the specified `*_LOCAL_RECONCILIATION_ENGINEERING_REQUIRED`
+  status and revise the blueprint before code changes.
+- Runtime-only staging edits the existing ignored `data/private/source-allowlist.json` through its
+  current v2 schema. Inspect it in memory first; do not print, stage, commit, or otherwise expose its
+  private contents. Confirm no existing exact tenant family and capacity for the staged family plus
+  its revocation version under the 20-version allowlist cap. Require first version 1 and null
+  predecessor; do not fabricate lineage. Never edit the real DB directly or persist approval/start
+  receipts outside `/sources`.
+- Data flow: exact PR guard -> guarded merge and main sync -> real DB/engine read-only preflight ->
+  sanitized private-allowlist uniqueness/capacity/policy check -> stage Quad Lock v1 only -> owner
+  human APPROVE and separate RUN in `/sources` -> verify exact receipt chain/binding -> one bounded
+  Lever LIST_JOBS run -> immediate v2 revocation -> full run-membership reconciliation -> current
+  R2 evaluation/queue and packet-gate decision -> if and only if zero candidates, stage TSMG v1 and
+  stop at its owner gate -> after authorized TSMG run, revoke and repeat reconciliation/analysis ->
+  update this plan with safe aggregate evidence.
+- Dependencies are local SQLite schema 12, ignored private allowlist v2, `/sources` owner controls,
+  durable Lever v2 runner/persistence, current local evaluation/queue services, and owner action.
+  No new third-party service or database migration is in scope.
+
+### Risks, privacy, validation, rollback, acceptance, and exact steps
+
+- Risks include stale DB/runtime state, pre-existing tenant lineage, exceeding allowlist capacity,
+  policy or parser binding drift, incorrect receipt/run binding, out-of-bound requests, transport
+  ambiguity, incomplete run membership, stale evaluations/queues, cross-source duplicates, and
+  disclosure of provider/candidate content. Stop on any mismatch, drift, transport uncertainty,
+  invalid receipt chain, membership inconsistency, or need for manual SQL. Report only safe IDs,
+  capability metadata, counters, aggregate distributions, and approved safe job fields; never report
+  raw provider payloads, application URLs, candidate values, secrets, DB files, or receipt text.
+- No source call is permitted before the separate human receipts are durable and bound to the exact
+  staged digest/version/policy. If owner action is pending, stop at that gate and leave Wave 2
+  unstaged. If the owner declines, do not run. Do not create an evidence PR until every wave that
+  actually ran has reached safe terminal state, been revoked, reconciled, and analyzed.
+- Validation after executed wave(s): read-only DB status/preflight and final action counters; exact
+  source receipt/binding/run and full membership reconciliation; current R2/queue checks; privacy
+  audit; migration immutability against `origin/main`; `git diff --check`; and `git fsck --strict`.
+  Run focused source recovery/persistence tests only if a local reconciliation code path was
+  exercised. No application/employer action is permitted. Record unavailable or failed checks
+  verbatim; do not claim unrun validation.
+- Rollback: before a capability is written, abort with no change on any guard mismatch. If private
+  staging validation fails before owner action, preserve the original ignored file and stop without
+  submitting a UI action. After a run, use the required immutable revoked v2 lineage rather than
+  deleting history. Do not reset, clean, or overwrite user work. Any application-code repair would
+  require a separate documented blueprint and scoped commit.
+- Acceptance: PR #62 is merged with exact parent/tree and synchronized `main`; baseline and engine
+  preflight pass; Quad Lock v1 is staged exactly and independently verified with zero owner receipts,
+  bindings, and runs; then stop at Human Gate #1 with no network activity. Later acceptance for each
+  run requires the exact human receipt chain, one bounded LIST_JOBS operation, immediate revocation,
+  exact run membership accounting, current all-job R2/queue analysis, and one of the required
+  packet-gate/score-gate/no-candidate outcomes. Evidence PR remains open/unmerged and is deferred
+  until executed wave(s) are complete with exact-head push/PR CI success.
+- Exact steps: (1) finish PR #62 merge verification; (2) sync local `main`, create the suggested
+  work branch; (3) perform read-only real DB and engine preflight; (4) inspect private config
+  in-memory, check identity/policy/capacity; (5) append this blueprint before staging; (6) stage
+  Quad Lock v1 and verify digest/config/zero receipts-bindings-runs; (7) stop at Human Gate #1; (8)
+  after a human response, verify durable receipt chain before any run; (9) run once within bounds,
+  immediately revoke v2, reconcile and analyze all run jobs; (10) stop before TSMG if any packet
+  candidate exists, otherwise stage TSMG v1 and stop at Human Gate #2; (11) after any TSMG human
+  run, revoke/reconcile/analyze; (12) record final safe evidence and validations, then create one
+  open evidence PR.
+
+### Continuation amendment — consumed owner run and current-engine reconciliation (2026-09-30)
+
+- The owner has confirmed the `/sources` APPROVE and RUN actions were each submitted once. Before
+  any new provider request, the exact durable chain was read from the local schema-12 database:
+  Quad Lock v1 digest `444c4c1024f08b7a261f86db3cbc083ce2d9519f3c974c077fe2024a1ba3d463`;
+  APPROVE receipt `4eab4d14-fadc-4c11-b145-2408b44ef237`; START receipt
+  `7796c7d1-0eac-4200-9de2-a291d5846af7`, predecessor-bound to that APPROVE; run binding and run
+  `5b83b77f-13a5-4bf1-b488-50a60aea96da`. Both receipts are consumed and the run is COMPLETE,
+  LIST_JOBS, one request/one page/six provider records, with `OWNER_RECEIPTS_BOUND` provenance.
+  The run is already present; never rerun or recreate either receipt.
+- Immediately after the completed run, capability v2 was persisted as the immutable successor of
+  v1: digest `63d771342a284b063fcdae1b087da938a7d4efaa90f618afa25ae1b2c32c94bc`, predecessor v1,
+  state REVOKED, reason OWNER_REVOKED, timestamp `2026-09-30T00:15:35.357Z`. The private
+  allowlist and database lineage match; v1 cannot start and active Quad Lock authority is zero.
+  No further network call occurred.
+- Canonical `jobIdsForRun(runId)` reconciled the completed ledger. Six accepted and six qualified
+  source-verification rows resolve to six distinct canonical jobs; there are six distinct external
+  IDs, six new observations and six new job versions, zero reused prior observations/versions, and
+  zero broken/null accepted references. `pipelineWorkForCompletedRun()` reports no missing/stale
+  evaluation or queue under its existing binding test.
+- A separate read-only version audit found that these six job versions still have parser and
+  normalization 3.2.0, and their active-profile evaluations bind normalization 3.2.0/scorer 2.1.0.
+  The required current engine is parser/normalization 3.5.2, evidence 3.1.0, eligibility engine
+  2.1.0, scorer 2.2.0, weights `r2-weights-1`. Therefore the earlier queue-current result does not
+  establish current-engine readiness, and packet-gate analysis is not accepted until corrected.
+- Before local mutation, preserve a verified private SQLite backup under the ignored
+  `data/private/backups` directory. Use the repository's existing
+  `SourceEnablementRepository.rederiveLeverObservation()` once for each accepted current
+  verification, which validates the immutable stored provider-payload digest and creates the
+  current normalization through the established derivation binding. This is transport-free and
+  does not alter receipt/run membership or historical observations. A direct standalone import of
+  the web-only `reevaluateBetaJob()` wrapper is unavailable because the Node runner cannot resolve
+  `server-only`; this was an import-resolution failure before any DB mutation. Instead use the
+  established offline R2 recovery pattern in `scripts/green-banner-source-recover.ts`: current
+  `evaluateR2Eligibility()`, `scoreR2JobFit()` (including normalized commute inputs), and
+  `R2Repository.recordEvaluation()` / `recordQueueDecision()`. Match the normal source queue
+  transition (`REVIEWING`, reason `SOURCE_R2_READY`) and do not manually insert SQL or invoke the
+  source runner. If payload identity, verification currentness, derivation, or a supported local
+  repository/engine call fails, stop with
+  `QUADLOCK_LOCAL_RECONCILIATION_ENGINEERING_REQUIRED`, preserve the backup, and record the exact
+  safe error.
+- Re-read every run job's latest version, normalization/evidence/eligibility/scorer/weight versions,
+  active-profile evaluation, current queue, duplicate state, score, threshold, recommendation,
+  coverage/material state counts, positive contribution count, blockers, and source-verification
+  binding. Do not make a provider request during this repair. Only after all six rows prove current
+  may the original packet-gate rule decide whether TSMG v1 can be staged; any candidate stops before
+  Wave 2. This amendment authorizes no GET_JOB, packet creation, target action, application action,
+  or candidate-data transmission.
+- Rollback for this local replay is the verified ignored backup. If a replay or post-check fails,
+  stop without deleting history or changing source receipts; retain both the database state and
+  backup for diagnosis, and use only the repository's verified database-recovery path if integrity
+  requires restoration. Acceptance is all six jobs current under the required engine, all queues
+  current for their active-profile evaluations, zero source authority, and the packet-gate decision
+  based on that reconciled population.
+
+### Quad Lock current-engine outcome and conditional TSMG staging blueprint (2026-09-30)
+
+- Verified pre-reconciliation backup `backup-2026-09-30T00-30-30.310Z-7bb8bad2` is schema 12,
+  integrity PASS, FK issues 0. The six source verifications were rederived through
+  `SourceEnablementRepository.rederiveLeverObservation()` from their hash-verified persisted
+  provider payloads: six current derived job versions were created; no source request occurred.
+  Current eligibility/scoring and queue records were written through `R2Repository` and the existing
+  R2 engine with commute inputs from the normalized job. All six evaluations and queues now bind
+  the current active profile and latest job version. Provider receipts, source run membership, and
+  original observations were not recreated or rerun.
+- Quad Lock R2A is parser/normalization 3.5.2 and evidence 3.1.0. Current evaluations use eligibility
+  engine 2.1.0, scorer 2.2.0, weights `r2-weights-1`, threshold 50. Six jobs: location distribution
+  Melbourne 5 / Shanghai 1; Australia 5; engineering/test/product/software-like roles 1;
+  eligibility REVIEW_REQUIRED 6; recommended 0; score distribution 0:6; maximum score 0;
+  coverage buckets 20-39:1 and 40-59:5; maximum coverage 50; duplicate state UNRESOLVED 6;
+  deterministic detail candidates 0; positive contributions 0; aggregate material counts
+  COMPLETE/PARTIAL/UNKNOWN = 11/14/35. All six current job versions retain current qualified
+  source verification. Cross-source duplicate candidates: 516 SUGGESTED pairs against Shield AI,
+  0 auto-linked. These are not auto-decided.
+- The safe Melbourne/relevant-role table contains five Melbourne roles, all score 0/50, REVIEW_REQUIRED,
+  not recommended, and detail unjustified. Four are non-engineering/test/product/software titles;
+  the one matching the requested role family is Senior Product Engineer (Contract). All five have
+  40-50% coverage, duplicate UNRESOLVED, and blockers
+  `ELIGIBILITY_NOT_ELIGIBLE`, `EXTRACTION_COVERAGE_INSUFFICIENT`, `MATERIAL_SCOPE_PARTIAL`,
+  `R2_EXTRACTION_COVERAGE_INSUFFICIENT`, `R2_MATERIAL_SCOPE_PARTIAL`, and
+  `SCORE_BELOW_THRESHOLD`. One provider-listed “Quad Lock | Expression of Interest” remains a
+  Melbourne row with the same non-qualifying state; it is not treated as a packet candidate.
+- Decision: `QUADLOCK_NO_PACKET_CANDIDATE`. The original conditional Part L therefore applies.
+  Before writing any TSMG configuration, inspect the private allowlist in memory only; prove there is
+  no existing TSMG family in either allowlist or DB; confirm room for both TSMG v1 and its required
+  v2 revocation version under the 20-entry maximum; and verify zero TSMG receipts, bindings, and
+  runs. Abort staging on any mismatch.
+- Conditional staging specification: one new Lever/GLOBAL TSMG family, version 1/predecessor null,
+  alias `TSMG broader discovery`, host `api.lever.co`, prefix `/v0/postings/tsmg`, LIST_JOBS only,
+  policy `m2-live-readiness-v1`, parser binding
+  `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`, fresh policy/capability T0 and expiry T0 +
+  24 hours, request budget 10, record cap 500, page-size cap 50, response-byte limit 5,000,000,
+  request timeout 30,000 ms, run timeout 300,000 ms, redirects 0, retries 0, concurrency 1. Persist
+  with the existing private allowlist schema/digest/readiness conventions. Do not make a request or
+  create an owner receipt, run binding, or source run during staging. Verify exact identity/digest,
+  SOURCE_ENABLED configuration readiness, zero owner receipts/bindings/runs, and no source request;
+  then stop at Human Gate #2 for the human APPROVE and separate RUN once each. No evidence PR until
+  the owner-gated TSMG wave is completed, revoked, reconciled, and analyzed.
+- The post-revocation private allowlist keeps the latest Quad Lock v2 entry rather than a duplicate
+  v1 entry. Use that latest entry only as the current policy/parser template, after verifying those
+  exact bindings. Give TSMG its own syntactically valid configuration reference; the reference and
+  `approvalState=APPROVED` describe configuration readiness only and must not be represented as a
+  human receipt or as owner action.
+
+### TSMG Human Gate #2 checkpoint (2026-09-30)
+
+- Completed the current-engine Quad Lock repair from the preserved backup:
+  `SourceEnablementRepository.rederiveLeverObservation()` created six v3.5.2 derived job versions;
+  canonical R2 eligibility/scoring wrote six active-profile evaluations and six current queues.
+  Exact currentness checks passed for all six job versions and source-verification bindings. Current
+  engine is parser/normalization 3.5.2, evidence 3.1.0, eligibility 2.1.0, scorer 2.2.0, weights
+  `r2-weights-1`. Scores are all 0; eligibility is REVIEW_REQUIRED for all six; recommendations
+  and deterministic detail candidates are 0; maximum coverage is 50%. The six job locations are
+  Melbourne 5 / Shanghai 1; Australia count 5; engineering/test/product/software-like title count
+  1. Duplicate state is UNRESOLVED for all six; 516 cross-source pairs against Shield AI remain
+     SUGGESTED and 0 were auto-linked. Therefore packet-gate state is `QUADLOCK_NO_PACKET_CANDIDATE`.
+- Staged one TSMG v1 configuration in ignored `data/private/source-allowlist.json` after confirming
+  no prior TSMG LEVER family in that file or database, zero DB capabilities/receipts/runs/bindings,
+  and capacity for v1 plus its required v2 revocation successor. Capability
+  `m2_source_tsmg_a901a80a3621_1790728977950`, version 1/predecessor null, LEVER/GLOBAL, tenant
+  `tsmg`, alias `TSMG broader discovery`, host `api.lever.co`, path `/v0/postings/tsmg`, LIST_JOBS
+  only. Digest `916e20a8634d5975ecb1ce4fcee90c5edc661aa41689b8125d55b7a8e707e55a`. Policy
+  `m2-live-readiness-v1`; parser binding
+  `lever-v2:a901a80a36212fb50e184ef94d1c91bdf2a2c26f`; T0
+  `2026-09-30T00:42:57.950Z`; policy and capability expiry
+  `2026-10-01T00:42:57.950Z`; limits 10 requests / 500 records / 50 per page / 5,000,000 bytes /
+  30,000 ms request / 300,000 ms run / zero redirects / zero retries / concurrency 1. Readiness is
+  SOURCE_ENABLED configuration state. The allowlist now has 14 of 20 entries, leaving room for the
+  required v2 successor and five additional entries afterward. No TSMG owner receipt, DB capability
+  version, run binding, or source run exists. Canonical owner status is APPROVAL_REQUIRED and
+  `canStart=false`. No TSMG network request occurred.
+- Final source request history after the one existing Quad Lock run is 21 LIST_JOBS requests and
+  1 historical GET_JOB request (22 total); LIST history sums to 15 pages / 356 provider records.
+  Quad Lock run `5b83b77f-13a5-4bf1-b488-50a60aea96da` is COMPLETE with 1 request, 1 page, 6
+  provider records, 6 accepted, 0 unusable, 6 distinct external IDs, 6 qualified canonical jobs,
+  six new observations/job versions, zero reused observations/job versions, and zero broken/null
+  accepted references; it transferred 93,379 bytes with zero retry/redirect. Counters are now
+  source/employer/application/final-consent `22/9/0/0`: one LIST_JOBS request delta, GET_JOB delta
+  0, employer/application/form/upload/submission deltas 0. Latest Quad Lock v2 is REVOKED with
+  OWNER_REVOKED; current source authority 0, target authority 0, active source runs 0, pending
+  application operations 0, and active final consents 0.
+- Validation performed: `npm run preflight` PASS (schema 12, pending migrations 0, integrity PASS,
+  FK 0, privacy audit PASS, profile valid, source-enabled beta READY); targeted
+  `npm exec -- vitest run packages/database/src/source-enablement-repository.test.ts` PASS (1 file,
+  27 tests); read-only R2 currentness and source-run audit PASS for six jobs; migration immutability
+  check PASS; `git diff --check` PASS; `git fsck --strict` exit 0 (existing dangling Git objects
+  reported). `git status` showed only this plan tracked as modified; private source allowlist and
+  database backup remain ignored. No application code or migrations changed. Full integration,
+  full-suite/build, and evidence PR remain deferred until the owner-gated TSMG wave is completed and
+  analyzed.
+- At this checkpoint, Human Gate #2 was pending. In `/sources`, the owner was asked to verify the
+  exact capability, then use APPROVE once and RUN once. Do not recreate receipts or restart an
+  existing run.
+- Seven-milestone state at this gate: Foundations COMPLETE; current real role/fresh packet IN
+  PROGRESS / BROADER SOURCE DISCOVERY CONTINUES; real-target MAP/FILL/UPLOAD/VERIFY ENGINEERING /
+  NOT LIVE VERIFIED; final-review/submission safeguards BLOCKED; reproducible release COMPLETE;
+  controlled real fill-preview BLOCKED; final readiness/Green-banner review NOT STARTED.
+  Source-enabled Personal Beta is READY; Personal Live V1 remains NOT_READY. Exactly one next task
+  at this checkpoint: complete the TSMG human APPROVE and separate RUN gate, then verify the durable
+  receipt chain before continuing the existing source run.
+
+### TSMG RUN_TIMEOUT continuation blueprint and checkpoint (2026-09-30)
+
+- Updated current state: the owner completed APPROVE and RUN in `/sources`. Read-only database
+  verification proved APPROVE receipt `1d70b1eb-f05a-4eec-8ecc-1cd746383913` and START receipt
+  `7d016052-afcc-41d3-8cf2-bcdc54fb0043` are both CONSUMED; START points to that exact APPROVE.
+  Both bind capability version row `02451ac9-124e-4ccb-a0a4-a53973b21d1c`, capability
+  `m2_source_tsmg_a901a80a3621_1790728977950`, version 1, digest
+  `916e20a8634d5975ecb1ce4fcee90c5edc661aa41689b8125d55b7a8e707e55a`, tenant `tsmg`, and
+  operation LIST_JOBS. `source_run_owner_bindings` and repository provenance verify that the START
+  was consumed by exact run `c4a1f23a-e9d8-4173-b407-8811e5a80548`. No receipt was recreated and
+  no second run was started.
+- Run `c4a1f23a-e9d8-4173-b407-8811e5a80548` terminated STOPPED / RUN_TIMEOUT at
+  `2026-09-30T01:19:10.542Z`: 8 requests, 8 pages, 400 provider records, 2,537,833 bytes, zero
+  retries and redirects. Treat it as partial; do not resume, retry, or claim a complete tenant
+  crawl. Existing run membership has 400 canonical jobs and 400 distinct accepted external IDs;
+  all 400 source verification rows are accepted but PAGE_PERSISTED (0 QUALIFIED), with 0 broken
+  accepted references, 400 new observations/job versions, and 0 reused prior observations/job
+  versions.
+- Required objective: revoke the source family immediately after terminal state, then use only the
+  existing local pipeline and this run's persisted members for transport-free R2 reconciliation and
+  reporting. Preserve PAGE_PERSISTED qualification state because the run is STOPPED. No extra
+  source fetch, approval, START, GET_JOB, employer/application action, or packet creation is allowed.
+- Revocation is now durable: version 2 row `4749edcf-1b49-4ad1-8059-7ae24191c033`, predecessor
+  version 1 row `02451ac9-124e-4ccb-a0a4-a53973b21d1c`, TSMG / LEVER / GLOBAL, host `api.lever.co`,
+  path `/v0/postings/tsmg`, LIST_JOBS only, state REVOKED, reason OWNER_REVOKED, digest
+  `2fcecb055dedae40dbc792da58a046ca89225f2b5fdf16b21f73a258365301b9`. Keep the private
+  allowlist and database out of Git.
+- Reconciliation blueprint: read the exact run membership through
+  `SourceEnablementRepository.jobIdsForRun`; require the run to remain STOPPED / RUN_TIMEOUT,
+  owner provenance `OWNER_RECEIPTS_BOUND`, 400 accepted ledger rows, zero broken references, and
+  version 2 REVOKED. Confirm all current job versions have available R2A 3.5.2 / evidence 3.1.0
+  normalization. For missing/stale current-active-profile evaluations and queues only, use
+  `R2ARepository`, `R2Repository`, the existing eligibility engine, and scorer with the active local
+  candidate truth profile; do not edit facts, scoring rules, or duplicate decisions. Report aggregate
+  and safe role/location views without application URLs, payloads, or private candidate values.
+- Data flow: run verification ledger -> canonical run job IDs -> current normalization -> current
+  active-profile R2 evaluation -> current R2 queue decision -> aggregate/candidate-gate audit. The
+  STOPPED run's PAGE_PERSISTED source verifications remain unqualified; a score or recommendation
+  alone cannot satisfy the packet gate.
+- Dependencies/risks: current schema-12 local DB, the existing private profile and active profile
+  version, current normalization rows, and current R2 repository. The run ended at its five-minute
+  bound; this constrains conclusions to the 400 persisted records. Stop without writing if the
+  receipts, digest, membership, profile binding, or current normalization checks drift. Do not expose
+  profile facts or raw payloads.
+- Validation/rollback: verify DB integrity and foreign keys, currentness of every R2 evaluation and
+  queue, source/target authority and pending-operation counts, privacy audit, migration immutability,
+  `git diff --check`, and `git fsck --strict`. No schema or application code changes are planned.
+  If a local repository invariant fails, stop and record the exact blocker; preserve the DB and its
+  existing backup rather than attempting a partial/manual SQL repair.
+- Acceptance: all 400 canonical run jobs are reconciled or an exact per-job blocker is recorded;
+  TSMG v2 remains latest and REVOKED; no active source run/authority remains; source verification
+  qualification remains unchanged; safe aggregates and packet-gate result are documented; only safe
+  operational evidence is added to this plan before any evidence PR.
+- Exact next implementation steps: (1) reconcile current R2 evaluation/queue only through existing
+  repositories; (2) compute full-run membership, currentness, duplicate, location/title and score
+  aggregates; (3) inspect any score/recommended roles while enforcing source-verification gate; (4)
+  run required final validations; (5) update this plan with actual results, limitations and one next
+  task. No new network requests or owner receipts.
+
+### TSMG terminal-run audit and current-R2 blocker (2026-09-30)
+
+- Durable gate audit passed: APPROVE receipt `1d70b1eb-f05a-4eec-8ecc-1cd746383913` and START
+  receipt `7d016052-afcc-41d3-8cf2-bcdc54fb0043` are CONSUMED and form the exact predecessor chain.
+  Capability v1 row `02451ac9-124e-4ccb-a0a4-a53973b21d1c`, ID
+  `m2_source_tsmg_a901a80a3621_1790728977950`, digest
+  `916e20a8634d5975ecb1ce4fcee90c5edc661aa41689b8125d55b7a8e707e55a`, tenant `tsmg`, and
+  LIST_JOBS operation match both receipts, the owner binding, and run
+  `c4a1f23a-e9d8-4173-b407-8811e5a80548`. Repository provenance is `OWNER_RECEIPTS_BOUND`.
+- That one existing run terminated STOPPED / RUN_TIMEOUT at `2026-09-30T01:19:10.542Z`: 8
+  requests, 8 pages, 400 provider records, 2,537,833 bytes, zero retries/redirects. The 400
+  verification rows are ACCEPTED / PAGE_PERSISTED, 0 QUALIFIED, 400 distinct external IDs, 400
+  canonical job IDs, 0 unusable rows, 0 broken/null accepted references, 400 new observations and
+  400 new job versions, and 0 reused prior observations/job versions. The run is partial; no rerun
+  or completion claim is allowed.
+- Immediately revoked the TSMG family through the existing repository persistence method. Latest
+  version 2 row `4749edcf-1b49-4ad1-8059-7ae24191c033` descends from v1 row
+  `02451ac9-124e-4ccb-a0a4-a53973b21d1c`, is REVOKED / OWNER_REVOKED, and has digest
+  `2fcecb055dedae40dbc792da58a046ca89225f2b5fdf16b21f73a258365301b9`. No START receipt or source
+  request was created by Codex. Latest DB source authority, active source runs, active owner
+  receipts, latest target authority, pending application operations, and active final consents are
+  all zero. The preflight's one active capability count is configuration readiness from the
+  ignored allowlist's old TSMG v1 entry; the durable latest DB version is v2 REVOKED and blocks v1
+  from starting.
+- Current R2 reconciliation is blocked. All 400 latest job versions have available stored R2A
+  normalization, but it is parser/normalization 3.2.0 with evidence contract 3.1.0; current required
+  code is parser/normalization 3.5.2 with evidence contract 3.1.0. The run has 0 current R2
+  evaluations and 0 current queues. The existing transport-free
+  `SourceEnablementRepository.rederiveLeverObservation()` explicitly requires ACCEPTED / QUALIFIED
+  verification and refuses PAGE_PERSISTED rows. A preflight-only reconciliation attempt stopped at
+  the first 3.2.0 version check before any evaluation/queue writes. Do not score the stale
+  normalization, manually qualify rows, alter verification state, or resume the stopped run.
+- Stop code: `TSMG_LOCAL_RECONCILIATION_ENGINEERING_REQUIRED`. No broader packet-gate candidate or
+  no-candidate conclusion can be claimed for TSMG until current-R2 analysis is safely supported;
+  the 400 persisted TSMG rows remain unqualified and no R2 metrics were written. Do not create an
+  evidence PR yet because the executed discovery analysis is incomplete.
+- Final source-run request history is 29 LIST_JOBS requests and 1 historical GET_JOB request: 30
+  total. TSMG contributed exactly 8 LIST_JOBS requests; GET_JOB, employer, application, upload,
+  submission, and final-consent deltas are zero. Schema 12, zero pending migrations, integrity
+  PASS, and foreign-key issues 0. `npm run preflight` PASS, including privacy audit; `git diff
+--check` PASS (line-ending warning only); `git fsck --strict` exit 0 with existing dangling
+  objects. Full tests/build and evidence PR are deferred: no application code changed and the
+  required current-R2 path is blocked.
+- Revised next task: add and test a transport-free R2A derivation path for accepted PAGE_PERSISTED
+  observations from safely STOPPED source runs. It must preserve the source verification's
+  PAGE_PERSISTED state and keep packet/detail gates restricted to qualified current evidence. Then
+  reconcile current R2 evaluations/queues for this existing run and finish safe aggregate analysis;
+  do not create a new receipt or rerun TSMG without a newly authorized capability/run workflow.
+
+### Stopped-run inspection engineering blueprint (2026-09-30)
+
+- **Starting state:** task starts from PR #62 merge `a901a80a36212fb50e184ef94d1c91bdf2a2c26f`,
+  tree `cf1d3e4309852ea121d8f1e26484b92a8b4a7d46`. The expected prior broad-discovery checkpoint is
+  preserved on branch `feat/m2-stopped-run-inspection`; the only tracked change at branch creation
+  was the existing `PROJECT_PLAN.md` checkpoint. No application-code change, reset, migration, or
+  source action has occurred. This new blueprint is the required plan-first authorization for the
+  implementation below.
+- **Read-only real-database baseline:** schema 12, pending migrations 0, integrity PASS, FK issues 0.
+  Lifetime source requests are 29 LIST_JOBS + 1 historical GET_JOB (30 total); employer inspection
+  bindings 9; application operations and final-action consents 0. Latest-version source and target
+  authority, active owner receipts, active source runs, pending application operations, and active
+  final consents are all 0. TSMG run
+  `c4a1f23a-e9d8-4173-b407-8811e5a80548` is STOPPED / RUN_TIMEOUT, 8 requests / 8 pages / 400
+  records / 2,537,833 bytes, retries 0, redirects 0. APPROVE
+  `1d70b1eb-f05a-4eec-8ecc-1cd746383913` and START
+  `7d016052-afcc-41d3-8cf2-bcdc54fb0043` are CONSUMED and the exact owner binding joins that run,
+  capability v1 row `02451ac9-124e-4ccb-a0a4-a53973b21d1c`, LIST_JOBS, and digest
+  `916e20a8634d5975ecb1ce4fcee90c5edc661aa41689b8125d55b7a8e707e55a`. Its 400 verification rows
+  are ACCEPTED / PAGE_PERSISTED, 0 QUALIFIED, 0 UNUSABLE; latest TSMG v2 row
+  `4749edcf-1b49-4ad1-8059-7ae24191c033` is REVOKED / OWNER_REVOKED. No real-DB state may be
+  changed by this task.
+- **Normalization-version discrepancy audit:** a read-only join of this run's verification parent
+  versions to normalization rows returns exactly 400 parent versions at parser 3.2.0 /
+  normalization 3.2.0 / evidence 3.1.0; missing/current-3.5.2/other-version counts are all 0. The
+  current source persistence path calls `normalizeR2AJobEvidence()` directly and the 400 observations
+  are newly created (not reused). Current source constants are 3.5.2/3.5.2, introduced at merged
+  commit `a901a80` on 2026-09-30 09:45 +10:00. The local `next start --port 3100` process was created
+  2026-09-29 08:38 +10:00 and remained alive when the run completed at 2026-09-30 11:19 +10:00;
+  the current `.next` production build is dated 2026-09-30 08:57 +10:00. The process therefore
+  predates both current source changes and the build now on disk. Preliminary reason code:
+  `TSMG_RUNTIME_BUILD_STALE`; retain this as the final reason only if the post-backup audit confirms
+  these identities and the persisted normalization distribution.
+- **Provider-drift boundary found:** the run has 255 safe audit warnings, all
+  `PROVIDER_ENUM_DRIFT / workplaceType / enum`, with record indexes. There are no schema-stop audit
+  events and no unusable-record audit events. Lever explicitly accepts this optional enum drift while
+  representing an unrecognized workplace type as null; the inspection will preserve it as unknown,
+  associate diagnostics to the exact page/record index, and never treat it as verified workplace
+  evidence. Any schema stop, unsupported diagnostic shape, unscoped or contradictory record
+  diagnostic, digest/identity mismatch, or drift that changes record acceptance will block that
+  record. This is the only drift class eligible for this run's diagnostic.
+- **Objective:** add a transport-free, non-authoritative in-memory inspection of one persisted Lever
+  verification from STOPPED / RUN_TIMEOUT runs, reconstruct current R2A 3.5.2 evidence from the
+  exact immutable payload, and calculate current eligibility/fit against the active verified profile.
+  Use that diagnostic to decide whether a fresh owner-authorized complete TSMG run is worthwhile.
+  Do not change qualification, run state, capability authority, source receipts, evaluations, queues,
+  job versions, derivation bindings, packets, or the source/employer/application counters.
+- **Assumptions and requirements:** schema remains 12; current parser/normalizer/evidence/scorer/
+  weights/thresholds remain 3.5.2 / 3.5.2 / 3.1.0 / 2.2.0 / `r2-weights-1` / 50 / 60. Only
+  STOPPED + RUN_TIMEOUT + ACCEPTED + PAGE_PERSISTED + exact owner-bound Lever evidence is eligible.
+  RUNNING, OUTCOME_UNKNOWN, all other stop codes, QUALIFIED, UNUSABLE, non-Lever rows, and every
+  provenance/identity/page/payload/parent mismatch are refused by this inspection API. The database
+  type must expose no mutation or persistence method through the result. No packet/detail/currentness
+  gate accepts an inspection result.
+- **Architecture and proposed tracked files:**
+  1. Extend `packages/database/src/source-enablement-repository.ts` with a read-only
+     `inspectPersistedLeverVerification({ verificationId })` API and an explicit
+     `PersistedSourceInspection` return type. It will bind the verification to its STOPPED run,
+     exact historical capability row/digest/version, consumed owner receipt chain and run binding;
+     validate the page id/digest/record bounds; resolve page-scoped unusable/provider-drift audit
+     metadata; verify observation/verification/job-version lineage, SHA-256 of immutable payload
+     bytes and reparsed Lever external id/content digest; reconstruct the historical
+     `SourceCapabilityV2`; and call current structured-job/R2A normalization in memory. It will
+     validate source pointers/excerpt hashes before return. It must not call
+     `rederiveLeverObservation()`, `recordJobVersion()`, `recordNormalization()`, or any SQL write.
+     Schema 12 does not retain every timestamp field included in the original capability digest,
+     so inspection treats the stored configuration digest as a binding root and requires exact
+     equality with the run, consumed owner receipts, and owner binding; it does not recompute a
+     digest from an incomplete reconstructed DTO.
+  2. Add `packages/database/src/stopped-run-inspection.ts` with a pure deterministic evaluator and
+     closed result marker `PAGE_PERSISTED_INSPECTION_ONLY`. It receives the reconstructed job and
+     normalization, a caller-verified active profile/version, and duplicate state read-only; it calls
+     canonical `evaluateR2Eligibility()` and `scoreR2JobFit()` only in memory. The result is diagnostic
+     and type-separated from `QualifiedVerificationEvidence`, and uses `RERUN_CANDIDATE`/
+     `INSPECTION_CANDIDATE` language only.
+  3. Export that pure evaluator in `packages/database/src/index.ts`; add focused fictional regressions
+     in `packages/database/src/source-enablement-repository.test.ts` and packet/verification gate
+     tests in their existing database test files. Make the packet preparation requirement explicit through
+     `BetaRepository.requireLatestQualifiedVerification()` and use it in
+     `apps/web/lib/beta-workspace.ts`; the method returns the same qualified evidence or preserves
+     the existing `PREPARATION_VERIFICATION_REQUIRED` error. Add an app-level regression in
+     `apps/web/lib/beta-workspace.test.ts`; expose the existing `@web` source alias to Vitest through
+     `vitest.config.mts` so the private preparation call path can be exercised without a server.
+     Add an optional `APPLYPILOT_VALIDATION_DIST_DIR` to `apps/web/next.config.ts`, restricted to a
+     safe `.next-validation-*` basename and defaulting to `.next`, so local E2E/build validation can
+     use a separate artifact directory while an existing production server remains available.
+     Ignore `.next-validation-*/` output in Git and ESLint so isolated local validation builds do
+     not enter source linting or disturb the active `.next` service.
+     The 400-job analysis driver will be temporary and ignored under `data/private`, not a production
+     route or authority surface.
+  4. Update this plan with backup/restore identity, exact implementation/test outcomes, safe TSMG
+     aggregates/table, final real-DB proof, full validation, and PR metadata only after all gates pass.
+- **Data flow:** disposable restored DB -> one exact ACCEPTED/PAGE_PERSISTED ledger row -> provenance,
+  page, record, payload and parent checks -> immutable Lever reparse -> current R2A normalization in
+  memory -> active-profile eligibility and fit in memory -> safe aggregates/table and rerun decision.
+  There is no transition from this diagnostic to source qualification, R2 persistence, queue
+  preparation, packet creation, employer action, or application action.
+- **Dependencies:** existing SQLite schema-12 tables and audit metadata; stored SourceCapabilityV2
+  history; immutable raw Lever payload; current Lever reader, job importer, R2A schemas and source
+  pointer validation; candidate profile file plus exact active profile-version/content-hash match in
+  the disposable DB; eligibility engine, fit scorer and read-only duplicate state. No migration,
+  network dependency, allowlist, new owner action, or external integration is planned.
+- **Risks / privacy / security:** the run is partial and stopped; its 400 records cannot be called a
+  completed tenant crawl. The 255 optional workplace-type drift warnings must remain unknown and
+  page/record scoped. Current R2 results do not qualify source evidence and cannot imply packet
+  readiness or safe employer action. Do not print payloads, source/application URLs, requirement
+  prose, candidate facts, or private profile content. Keep canonical backup, restored DB, private
+  profile, scripts and detailed working output ignored under `data/private`. No DNS/TCP/TLS or
+  employer navigation is allowed.
+- **Backup and rollback:** after baseline validation, create one fresh canonical `npm run backup`
+  backup under ignored `data/private/backups`; verify manifest schema/integrity/FK/counts. Copy its
+  bytes and manifest to the corresponding ignored disposable backup root, use the canonical
+  `restoreDatabase()` path to restore into a separate disposable DB, and recheck TSMG and integrity
+  facts there. Never pass the real DB path to a mutation-capable operation. Rollback for code is a
+  normal branch revert; preserve backup and disposable DB for diagnosis, and never restore over the
+  real DB as part of this task.
+- **Testing strategy:** fixture matrix A–T from the request covers the valid stop; RUNNING,
+  OUTCOME_UNKNOWN and unsafe stops; QUALIFIED/UNUSABLE; page, index, digest, payload, external-ID,
+  owner, capability and parent mismatches; current 3.5.2 reconstruction atop a 3.2.0 historical
+  parent; pointer/hash validity; determinism; zero writes; packet/current-qualified refusal; and
+  unchanged COMPLETE/QUALIFIED behavior. Capture before/after row counts and stable table digests for
+  all specified source, observation, job/evidence, derivation, R2 evaluation/queue, packet and owner
+  tables on fictional DBs. Prove the current latest-qualified query and private packet preparation
+  still refuse PAGE_PERSISTED, no PREPARING queue appears, and the inspection type cannot satisfy
+  qualified packet evidence. Then inspect exactly the 400 TSMG rows on the restored disposable DB,
+  require zero durable deltas and 400 attempts; any mismatch is reported as an integrity failure,
+  not repaired.
+- **Validation:** focused database ledger/source tests, R2A normalization, eligibility, scorer,
+  packet persistence/verification, and source-to-preview safety regression; then typecheck, lint,
+  changed-file formatting, `git diff --check`; only after these pass, the 400-row shadow; if that
+  passes, the full unit, integration, fictional E2E, typecheck, lint, formatting, local/showcase
+  build/audit, privacy/dependency/release checks, migration immutability, diff and fsck checks. Finish
+  with a read-only real DB comparison: schema/health, exact counters, TSMG run/ledger/version state,
+  active authorities and zero task deltas. No source/employer network.
+- **Dependency-audit follow-up:** the first full `npm audit` found one high-severity dev-only
+  `brace-expansion` advisory; `npm audit --omit=dev` is clean. `npm audit fix --dry-run` indicates
+  compatible patch releases for the two vulnerable transitive versions. Apply only the semver-safe
+  lockfile update if its real diff stays scoped to that remediation, then rerun the affected checks
+  and both dependency audits; if npm expands the change beyond a narrow compatible update, record
+  the dev-only advisory as the explicit release blocker instead.
+- **Acceptance criteria:** API accepts only valid STOPPED / RUN_TIMEOUT PAGE_PERSISTED Lever evidence
+  and reconstructs current parser/normalization 3.5.2 with exact observation and valid pointers;
+  unsafe and tampered evidence fails closed; inspection/evaluator are deterministic and create zero
+  durable writes; real run remains STOPPED and its 400 rows remain PAGE_PERSISTED with 0 QUALIFIED;
+  packet gate stays closed; disposable shadow has 400 attempts and no R2/job/queue/qualification
+  writes; safe aggregates support exactly one outcome A/B/C/D; all required validation passes or is
+  explicitly blocked; and one PR to main is left OPEN / UNMERGED with exact-head CI and review state
+  recorded.
+- **Exact steps:** (1) finish source/API and packet-gate inspection; (2) create and verify canonical
+  backup and isolated restore; (3) implement the plan-listed read-only API and pure evaluator; (4) add
+  fictional tests and run focused checks; (5) if all pass, run exactly-400 disposable inspection and
+  gather only safe aggregates/table; (6) decide the one rerun outcome; (7) run full checks and final
+  read-only real DB comparison; (8) update this checkpoint; (9) commit/push the feature branch, open
+  exactly one PR, attach it, and leave it unmerged pending exact-head CI/reviews. Schema changes,
+  migrations, new source authority, and reruns are out of scope; if a migration is necessary, stop
+  with `STOPPED_RUN_INSPECTION_SCHEMA_REVIEW_REQUIRED`.
+
+### Execution evidence and closeout checkpoint (2026-09-30)
+
+- **Starting state:** expected `main` SHA/tree were `a901a80a36212fb50e184ef94d1c91bdf2a2c26f` /
+  `cf1d3e4309852ea121d8f1e26484b92a8b4a7d46`. The prior broader-discovery `PROJECT_PLAN.md`
+  checkpoint was preserved. Work is on `feat/m2-stopped-run-inspection`; no unexpected application
+  edits were present. No schema or migration file changed.
+- **Real DB and source-run proof:** schema 12, pending migrations 0, integrity PASS, FK issues 0.
+  Lifetime source request totals remain LIST_JOBS 29 and historical GET_JOB 1; employer inspection
+  bindings 9; application run operations 0; final consents 0. TSMG run
+  `c4a1f23a-e9d8-4173-b407-8811e5a80548` remains STOPPED / RUN_TIMEOUT, LIST_JOBS, 8 requests / 8
+  pages / 400 records / 2,537,833 bytes / 0 retries / 0 redirects, with one owner binding,
+  OWNER_RECEIPTS_BOUND provenance, 400 ACCEPTED/PAGE_PERSISTED, 0 QUALIFIED, and no unusable rows.
+  Latest TSMG capability is v2 REVOKED / OWNER_REVOKED. Active source runs 0. No request, authority,
+  qualification, or run-state changes were made.
+- **Readiness discrepancy:** final private `preflight-summary.ts` reported 14 configured source
+  allowlist entries and 1 active capability (`SOURCE_ENABLED_PERSONAL_BETA` READY), whereas the
+  task baseline expected active source authority 0. The TSMG latest stored capability row remains
+  revoked, but the aggregate allowlist readiness count is nonzero. The private allowlist was parsed
+  only to obtain the readiness count; its capability details were not disclosed, changed, or used
+  for source/network activity. Record this
+  as an external-state mismatch; do not claim that the global source authority count is 0 or change
+  the authority without a separately authorized task.
+- **Normalization discrepancy:** the 400 distinct TSMG parent job versions all report R2A parser
+  3.2.0 and normalization 3.2.0; missing normalization 0; other versions 0. Repository current
+  constants are parser/normalization 3.5.2 and evidence contract 3.1.0. The prior `/sources`
+  runtime identity inspected for this task was PID 97728, started 2026-09-29 08:38 local, before the
+  current 3.5.2 build. No source request was made to investigate further. Reason code:
+  `TSMG_RUNTIME_BUILD_STALE`; historical parent rows were not rewritten.
+- **Backup and restore:** canonical backup `backup-2026-09-30T02-28-45.872Z-2ae821c5`, schema 12,
+  integrity PASS, FK 0, backup SHA-256
+  `595513c72d9e0e82008e0f34c034704510ba3282a73ef376a9b4b78fd2a2b004`. Restored only into the
+  ignored/disposable shadow DB; restore health schema 12 / integrity PASS / FK 0. All TSMG run,
+  capability, 400-row ledger, and authority facts matched. The inspection shadow opened this copy
+  read-only and compared row counts and SHA-256 digests for all 16 specified durable tables before
+  and after; state was unchanged.
+- **Inspection implementation:** `PersistedSourceInspection` plus
+  `PAGE_PERSISTED_INSPECTION_ONLY`, accepted only for LEVER + STOPPED + RUN_TIMEOUT + accepted
+  PAGE_PERSISTED evidence with exact immutable observation/page/payload/job-version lineage and
+  consumed owner receipt/capability/run binding. RUNNING, OUTCOME_UNKNOWN, SCHEMA_CHANGED,
+  PERSISTENCE_FAILED, other unsafe stops, qualified rows, and unusable rows are blocked. Current
+  R2A 3.5.2 is reconstructed in memory; no qualification, run, job-version, derivation, R2
+  evaluation, queue, or packet write path is called. Capability digest validation binds stored
+  configuration digest to the run and owner receipts; schema 12 does not preserve all timestamp
+  inputs required to recompute the original digest DTO, which is documented in the API blueprint.
+- **Fictional regressions:** valid stopped-run inspection, stop/state/identity/digest/provenance
+  rejection matrix, older 3.2.0 parent/current 3.5.2 reconstruction, pointers and hashes,
+  deterministic replay, and zero-write snapshots pass. Latest-qualified lookup and private packet
+  preparation still require canonical qualified evidence; packet-gate type boundary is preserved;
+  COMPLETE + QUALIFIED workflow remains unchanged.
+- **TSMG shadow:** exactly 400 attempted / 400 successful / 0 integrity failures. Eligibility:
+  REVIEW_REQUIRED 391, ELIGIBLE 9. Score distribution: 0=258, 1–9=139, 10–19=3, all bands 20+=0;
+  max 11, mean 2.52, median 0; score >=50 = 0; current-R2 recommendations 0. Coverage: 0–39=10,
+  40–59=213, 60–79=136, 80–99=1, 100=40; >=60=177; maximum coverage 100. Location counts:
+  Melbourne 0, Victoria 0, Australia 1. Title keyword groups (overlapping): autonomous vehicle 128,
+  ADAS 44, test/operator 30, robotics/autonomy 128, project/program management 10, engineering 0,
+  other (exclusive remainder) 213. Material totals: complete 1,092 / partial 770 / unknown 2,138.
+  Blocker code counts: ELIGIBILITY_NOT_ELIGIBLE 391, EXTRACTION_COVERAGE_INSUFFICIENT 223,
+  MATERIAL_CONDITIONAL 89, MATERIAL_SCOPE_PARTIAL 360, MATERIAL_UNKNOWN 125,
+  SCORE_BELOW_THRESHOLD 400. Duplicate state SUGGESTED 400. Positive contributions:
+  R2_REQUIRED_SKILL_VERIFIED_MATCH 142, R2_EDUCATION_VERIFIED_MATCH 3. No safe relevant roles met
+  the requested location/score filters; table empty. Decision `TSMG_COMPLETE_RERUN_NOT_JUSTIFIED`;
+  within 10 / 20 / 30 points of the 50 threshold: 0 / 0 / 0. Do not rerun TSMG; next source task
+  must use a separately owner-approved source tenant/provider and must preserve its human gates.
+- **Validation:** focused database/R2/packet suite 192 tests across 10 files passed; source-to-preview
+  E2E 3/3; typecheck and lint passed; changed-file formatting passed. Full unit 675/675 across 60
+  files, integration 21/21 across 3 files, fictional local E2E 47/47, typecheck, lint, Windows-aware
+  repository formatting (`prettier --check . --end-of-line auto`), web and showcase production
+  builds, public showcase audit, privacy audit, `npm audit --audit-level=high`, production audit,
+  release fixture, `git diff --check`, and `git fsck --strict` all passed. The first plain
+  `npm run format:check` had 53 repository-baseline CRLF warnings; all changed files passed and the
+  full Windows-aware formatter subsequently passed. A narrow compatible `brace-expansion` lockfile
+  patch removed the sole dev-only high advisory; both audits now report 0 vulnerabilities. Release
+  fixture used isolated validation output and alternate E2E ports; the preexisting ignored E2E
+  database/profile/documents were restored afterward. `git fsck` reports preexisting dangling
+  objects while exiting successfully.
+- **Remaining:** final source-authority readiness count mismatch above must remain visible in closeout.
+  PR creation/review metadata is pending. No source/employer network, source request, or live
+  application action was made. Personal Live V1 remains NOT_READY.

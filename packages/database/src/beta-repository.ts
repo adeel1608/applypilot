@@ -247,6 +247,15 @@ export class BetaRepository {
     return row;
   }
 
+  requireLatestQualifiedVerification(
+    jobId: string,
+    jobVersionId: string,
+  ): QualifiedVerificationEvidence {
+    const evidence = this.getLatestQualifiedVerification(jobId, jobVersionId);
+    if (!evidence) throw new Error("PREPARATION_VERIFICATION_REQUIRED");
+    return evidence;
+  }
+
   recordSourceObservation(
     input: SourceObservation & {
       sourceRecordId?: string | null;
