@@ -2673,6 +2673,60 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     }
   }
 
+  private resolveOrCreateJobSource(input: {
+    preferredId: string;
+    name: string;
+    capabilitiesJson: string;
+    observedAt: string;
+  }): string {
+    const existingByName = this.sqlite
+      .prepare("SELECT id FROM job_sources WHERE name=?")
+      .get(input.name) as { id: string } | undefined;
+    const preferredIdOwner = this.sqlite
+      .prepare("SELECT name FROM job_sources WHERE id=?")
+      .get(input.preferredId) as { name: string } | undefined;
+    if (preferredIdOwner && preferredIdOwner.name !== input.name) {
+      throw new Error("JOB_SOURCE_IDENTITY_CONFLICT");
+    }
+    if (existingByName) {
+      this.sqlite
+        .prepare("UPDATE job_sources SET capabilities_json=?,updated_at=? WHERE id=?")
+        .run(input.capabilitiesJson, input.observedAt, existingByName.id);
+      return existingByName.id;
+    }
+
+    try {
+      this.sqlite
+        .prepare(
+          `INSERT INTO job_sources (id,name,capabilities_json,enabled,created_at,updated_at)
+           VALUES (?,?,?,1,?,?) ON CONFLICT(name) DO NOTHING`,
+        )
+        .run(
+          input.preferredId,
+          input.name,
+          input.capabilitiesJson,
+          input.observedAt,
+          input.observedAt,
+        );
+    } catch (error) {
+      const conflictingOwner = this.sqlite
+        .prepare("SELECT name FROM job_sources WHERE id=?")
+        .get(input.preferredId) as { name: string } | undefined;
+      if (conflictingOwner && conflictingOwner.name !== input.name) {
+        throw new Error("JOB_SOURCE_IDENTITY_CONFLICT", { cause: error });
+      }
+      throw error;
+    }
+    const resolved = this.sqlite
+      .prepare("SELECT id FROM job_sources WHERE name=?")
+      .get(input.name) as { id: string } | undefined;
+    if (!resolved) throw new Error("JOB_SOURCE_IDENTITY_RESOLUTION_FAILED");
+    this.sqlite
+      .prepare("UPDATE job_sources SET capabilities_json=?,updated_at=? WHERE id=?")
+      .run(input.capabilitiesJson, input.observedAt, resolved.id);
+    return resolved.id;
+  }
+
   private persistProviderObservation(
     record: LeverPostingRecordV2 | GreenhousePostingRecordV2,
     capability: SourceCapabilityV2,
@@ -2756,26 +2810,17 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       },
       jobId,
     );
-    const sourceDigest = sha256(`${capability.region}\n${capability.tenant}`).slice(0, 24);
-    const sourceId = isLever ? `source-lever-${sourceDigest}` : `source-greenhouse-${sourceDigest}`;
     const sourceName = `${record.source}:${capability.region}:${capability.tenant}`;
-    this.sqlite
-      .prepare(
-        `INSERT INTO job_sources (id, name, capabilities_json, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, 1, ?, ?)
-         ON CONFLICT(name) DO UPDATE SET capabilities_json = excluded.capabilities_json,
-           updated_at = excluded.updated_at`,
-      )
-      .run(
-        sourceId,
-        sourceName,
-        JSON.stringify({
-          reader: isLever ? "R1B" : "GREENHOUSE_V2",
-          version: capability.parserVersion,
-        }),
-        observedAt,
-        observedAt,
-      );
+    const sourceDigest = sha256(`${capability.region}\n${capability.tenant}`).slice(0, 24);
+    const sourceId = this.resolveOrCreateJobSource({
+      preferredId: isLever ? `source-lever-${sourceDigest}` : `source-greenhouse-${sourceDigest}`,
+      name: sourceName,
+      capabilitiesJson: JSON.stringify({
+        reader: isLever ? "R1B" : "GREENHOUSE_V2",
+        version: capability.parserVersion,
+      }),
+      observedAt,
+    });
     const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(jobId);
     if (!exists) {
       this.sqlite
