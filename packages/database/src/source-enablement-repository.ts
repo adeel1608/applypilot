@@ -29,7 +29,14 @@ import {
 } from "@applypilot/job-sources";
 import { readLeverPostingV2FromPayload } from "@applypilot/job-sources";
 import { ParsedJobFieldsSchema, normalizeR2AJobEvidence } from "@applypilot/job-importer";
-import { JobSchema, R2A_NORMALIZATION_VERSION, R2A_PARSER_VERSION } from "@applypilot/job-model";
+import {
+  JobSchema,
+  R2A_NORMALIZATION_VERSION,
+  R2A_PARSER_VERSION,
+  assertR2ASourcePointers,
+  type Job,
+  type R2ANormalization,
+} from "@applypilot/job-model";
 import { ObservationIdentitySchema, type ObservationIdentity } from "@applypilot/job-normalizer";
 
 import { normalizeImportedJob } from "./job-import-repository";
@@ -176,6 +183,38 @@ export interface R2ADerivationResult {
   normalizationVersion: string;
   derivationDigest: string;
   created: boolean;
+}
+
+/**
+ * Ephemeral reconstruction from immutable source bytes. This is intentionally
+ * not a QualifiedVerificationEvidence and has no persistence/authority fields.
+ */
+export interface PersistedSourceInspection {
+  readonly marker: "PAGE_PERSISTED_INSPECTION_ONLY";
+  readonly inspectionOnly: true;
+  readonly verificationId: string;
+  readonly runId: string;
+  readonly source: "LEVER";
+  readonly tenant: string;
+  readonly externalId: string;
+  readonly capabilityId: string;
+  readonly capabilityVersion: number;
+  readonly capabilityDigest: string;
+  readonly sourceObservationId: string;
+  readonly jobId: string;
+  readonly parentJobVersionId: string;
+  readonly sourceQualificationState: "PAGE_PERSISTED";
+  readonly sourceRunStatus: "STOPPED";
+  readonly sourceStopCode: "RUN_TIMEOUT";
+  readonly verifiedAt: string;
+  readonly providerDriftWarnings: readonly {
+    readonly issueCategory: "PROVIDER_ENUM_DRIFT";
+    readonly field: "workplaceType";
+    readonly expectedStructuralType: "enum";
+    readonly recordIndex: number;
+  }[];
+  readonly job: Job;
+  readonly normalization: R2ANormalization;
 }
 
 export class SourceEnablementRepository implements SourceRunSink {
@@ -484,6 +523,471 @@ export class SourceEnablementRepository implements SourceRunSink {
       normalizationVersion: R2A_NORMALIZATION_VERSION,
       derivationDigest,
       created: derived.created,
+    };
+  }
+
+  /**
+   * Reconstruct current R2A evidence for exactly one accepted page-persisted
+   * Lever record from a safely stopped, owner-bound run. This method is
+   * inspection-only: it issues SELECT statements and invokes pure parsers; it
+   * never changes qualification, source history, normalization, evaluation,
+   * queue, packet, or authority state.
+   */
+  inspectPersistedLeverVerification(input: { verificationId: string }): PersistedSourceInspection {
+    const row = this.sqlite
+      .prepare(
+        `SELECT v.id AS verificationId,v.run_id AS runId,v.capability_version_id AS capabilityVersionId,
+                v.page_id AS pageId,v.source,v.tenant,v.external_id AS externalId,
+                v.record_index AS recordIndex,v.page_digest AS pageDigest,v.content_hash AS contentHash,
+                v.source_observation_id AS sourceObservationId,v.job_version_id AS parentJobVersionId,
+                v.disposition,v.qualification_state AS qualificationState,v.parser_version AS parserVersion,
+                v.policy_version AS verificationPolicyVersion,v.verified_at AS verifiedAt,
+                r.status AS runStatus,r.safe_error_code AS stopCode,r.operation AS operation,
+                r.capability_version_id AS runCapabilityVersionId,r.capability_digest AS runCapabilityDigest,
+                p.page_number AS pageNumber,p.page_digest AS persistedPageDigest,p.record_count AS pageRecordCount,
+                o.id AS observationId,o.job_id AS observationJobId,o.run_id AS observationRunId,
+                o.source AS observationSource,o.tenant AS observationTenant,o.external_id AS observationExternalId,
+                o.content_hash AS observationContentHash,o.parser_version AS observationParserVersion,
+                o.policy_version AS observationPolicyVersion,
+                payload.payload_json AS payloadJson,payload.content_digest AS payloadDigest,
+                jv.id AS jobVersionId,jv.job_id AS jobVersionJobId,
+                jv.source_observation_id AS jobVersionObservationId,jv.content_digest AS jobVersionContentDigest
+         FROM source_record_verifications v
+         JOIN source_run_checkpoints r ON r.id=v.run_id
+         JOIN source_run_pages p ON p.id=v.page_id AND p.run_id=v.run_id
+         JOIN source_capability_versions c ON c.id=v.capability_version_id
+         JOIN source_observations o ON o.id=v.source_observation_id
+         JOIN source_observation_payloads payload ON payload.observation_id=o.id
+         JOIN job_versions jv ON jv.id=v.job_version_id
+         WHERE v.id=?`,
+      )
+      .get(input.verificationId) as
+      | {
+          verificationId: string;
+          runId: string;
+          capabilityVersionId: string;
+          pageId: string;
+          source: string;
+          tenant: string | null;
+          externalId: string | null;
+          recordIndex: number;
+          pageDigest: string;
+          contentHash: string | null;
+          sourceObservationId: string | null;
+          parentJobVersionId: string | null;
+          disposition: string;
+          qualificationState: string;
+          parserVersion: string;
+          verificationPolicyVersion: string | null;
+          verifiedAt: string;
+          runStatus: string;
+          stopCode: string | null;
+          operation: string;
+          runCapabilityVersionId: string;
+          runCapabilityDigest: string;
+          pageNumber: number;
+          persistedPageDigest: string;
+          pageRecordCount: number;
+          observationId: string;
+          observationJobId: string;
+          observationRunId: string | null;
+          observationSource: string;
+          observationTenant: string | null;
+          observationExternalId: string | null;
+          observationContentHash: string;
+          observationParserVersion: string;
+          observationPolicyVersion: string | null;
+          payloadJson: string;
+          payloadDigest: string;
+          jobVersionId: string;
+          jobVersionJobId: string;
+          jobVersionObservationId: string | null;
+          jobVersionContentDigest: string;
+        }
+      | undefined;
+    if (!row) throw new Error("STOPPED_RUN_INSPECTION_VERIFICATION_NOT_FOUND");
+    if (
+      row.disposition !== "ACCEPTED" ||
+      row.qualificationState !== "PAGE_PERSISTED" ||
+      row.source !== "LEVER" ||
+      !row.tenant ||
+      !row.externalId ||
+      !row.sourceObservationId ||
+      !row.parentJobVersionId
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_VERIFICATION_STATE_NOT_ALLOWED");
+    }
+    if (row.runStatus !== "STOPPED" || row.stopCode !== "RUN_TIMEOUT") {
+      throw new Error("STOPPED_RUN_INSPECTION_RUN_NOT_ALLOWED");
+    }
+    if (this.getRunOwnerProvenance(row.runId) !== "OWNER_RECEIPTS_BOUND") {
+      throw new Error("STOPPED_RUN_INSPECTION_OWNER_PROVENANCE_REQUIRED");
+    }
+    if (
+      row.runCapabilityVersionId !== row.capabilityVersionId ||
+      row.runCapabilityDigest.length !== 64 ||
+      row.pageDigest !== row.persistedPageDigest ||
+      row.recordIndex < 0 ||
+      row.recordIndex >= row.pageRecordCount
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_PAGE_OR_RUN_BINDING_MISMATCH");
+    }
+    if (
+      row.observationId !== row.sourceObservationId ||
+      row.observationRunId !== row.runId ||
+      row.source !== row.observationSource ||
+      row.tenant !== row.observationTenant ||
+      row.externalId !== row.observationExternalId ||
+      row.contentHash !== row.observationContentHash ||
+      row.contentHash !== row.payloadDigest ||
+      row.parentJobVersionId !== row.jobVersionId ||
+      row.jobVersionJobId !== row.observationJobId ||
+      row.jobVersionObservationId !== row.sourceObservationId ||
+      row.jobVersionContentDigest !== row.contentHash ||
+      sha256(row.payloadJson) !== row.payloadDigest
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_IMMUTABLE_IDENTITY_MISMATCH");
+    }
+
+    const capabilityRow = this.sqlite
+      .prepare(
+        `SELECT c.id,c.capability_id AS capabilityId,c.version,c.predecessor_id AS predecessorId,
+                predecessor.version AS predecessorVersion,c.source,c.alias,c.tenant,c.region,
+                c.allowed_host AS allowedHost,c.allowed_path_prefix AS allowedPathPrefix,
+                c.allowed_operations_json AS allowedOperationsJson,c.approval_state AS approvalState,
+                c.approval_reference AS approvalReference,c.approved_at AS approvedAt,
+                c.policy_version AS policyVersion,c.policy_reviewed_at AS policyReviewedAt,
+                c.policy_expires_at AS policyExpiresAt,c.capability_expires_at AS capabilityExpiresAt,
+                c.request_budget AS requestBudget,c.record_cap AS recordCap,c.page_size_cap AS pageSizeCap,
+                c.response_byte_limit AS responseByteLimit,c.request_timeout_ms AS requestTimeoutMs,
+                c.run_timeout_ms AS runTimeoutMs,c.max_redirects AS maxRedirects,c.max_retries AS maxRetries,
+                c.max_concurrency AS maxConcurrency,c.parser_version AS capabilityParserVersion,
+                c.configuration_digest AS configurationDigest,c.created_at AS createdAt,
+                c.revoked_at AS revokedAt,c.revocation_reason AS revocationReason
+         FROM source_capability_versions c
+         LEFT JOIN source_capability_versions predecessor ON predecessor.id=c.predecessor_id
+         WHERE c.id=?`,
+      )
+      .get(row.capabilityVersionId) as
+      | {
+          id: string;
+          capabilityId: string;
+          version: number;
+          predecessorId: string | null;
+          predecessorVersion: number | null;
+          source: string;
+          alias: string;
+          tenant: string;
+          region: string;
+          allowedHost: string;
+          allowedPathPrefix: string;
+          allowedOperationsJson: string;
+          approvalState: string;
+          approvalReference: string | null;
+          approvedAt: string | null;
+          policyVersion: string;
+          policyReviewedAt: string;
+          policyExpiresAt: string;
+          capabilityExpiresAt: string;
+          requestBudget: number;
+          recordCap: number;
+          pageSizeCap: number;
+          responseByteLimit: number;
+          requestTimeoutMs: number;
+          runTimeoutMs: number;
+          maxRedirects: number;
+          maxRetries: number;
+          maxConcurrency: number;
+          capabilityParserVersion: string;
+          configurationDigest: string;
+          createdAt: string;
+          revokedAt: string | null;
+          revocationReason: string | null;
+        }
+      | undefined;
+    if (!capabilityRow) throw new Error("STOPPED_RUN_INSPECTION_CAPABILITY_NOT_FOUND");
+    let capability: SourceCapabilityV2;
+    try {
+      capability = SourceCapabilityV2Schema.parse({
+        schemaVersion: 2,
+        capabilityId: capabilityRow.capabilityId,
+        version: capabilityRow.version,
+        predecessorVersion: capabilityRow.predecessorVersion,
+        source: capabilityRow.source,
+        alias: capabilityRow.alias,
+        tenant: capabilityRow.tenant,
+        region: capabilityRow.region,
+        allowedHost: capabilityRow.allowedHost,
+        allowedPathPrefix: capabilityRow.allowedPathPrefix,
+        allowedOperations: JSON.parse(capabilityRow.allowedOperationsJson) as unknown,
+        approvalState: capabilityRow.approvalState,
+        approvalReference: capabilityRow.approvalReference,
+        approvedAt: capabilityRow.approvedAt,
+        policyVersion: capabilityRow.policyVersion,
+        policyReviewedAt: capabilityRow.policyReviewedAt,
+        policyExpiresAt: capabilityRow.policyExpiresAt,
+        capabilityExpiresAt: capabilityRow.capabilityExpiresAt,
+        requestBudget: capabilityRow.requestBudget,
+        recordCap: capabilityRow.recordCap,
+        pageSizeCap: capabilityRow.pageSizeCap,
+        responseByteLimit: capabilityRow.responseByteLimit,
+        requestTimeoutMs: capabilityRow.requestTimeoutMs,
+        runTimeoutMs: capabilityRow.runTimeoutMs,
+        maxRedirects: capabilityRow.maxRedirects,
+        maxRetries: capabilityRow.maxRetries,
+        maxConcurrency: capabilityRow.maxConcurrency,
+        parserVersion: capabilityRow.capabilityParserVersion,
+        createdAt: capabilityRow.createdAt,
+        updatedAt: capabilityRow.createdAt,
+        revokedAt: capabilityRow.revokedAt,
+        revocationReason: capabilityRow.revocationReason,
+      });
+    } catch {
+      throw new Error("STOPPED_RUN_INSPECTION_CAPABILITY_INVALID");
+    }
+    // The capability digest was calculated from the original validated capability before
+    // persistence. The schema stores created_at but does not store updatedAt independently,
+    // so recomputing the digest from this reconstructed view can silently change its inputs.
+    // Bind the inspection to the persisted digest roots instead: capability version row,
+    // run, owner receipts, and owner binding are checked against the same immutable digest.
+    const capabilityDigest = capabilityRow.configurationDigest;
+    if (
+      capabilityRow.id !== row.capabilityVersionId ||
+      capabilityRow.source !== "LEVER" ||
+      capabilityRow.tenant !== row.tenant ||
+      capabilityRow.version < 1 ||
+      !/^[a-f0-9]{64}$/.test(capabilityDigest) ||
+      row.runCapabilityDigest !== capabilityDigest ||
+      row.operation !== "LIST_JOBS" ||
+      !capability.allowedOperations.includes(row.operation) ||
+      row.parserVersion !== capability.parserVersion ||
+      row.verificationPolicyVersion !== capability.policyVersion ||
+      row.observationParserVersion !== capability.parserVersion ||
+      row.observationPolicyVersion !== capability.policyVersion
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_CAPABILITY_BINDING_MISMATCH");
+    }
+
+    const pageRecordCounts = new Map(
+      (
+        this.sqlite
+          .prepare(
+            "SELECT page_number AS pageNumber,record_count AS recordCount FROM source_run_pages WHERE run_id=?",
+          )
+          .all(row.runId) as Array<{ pageNumber: number; recordCount: number }>
+      ).map(({ pageNumber, recordCount }) => [pageNumber, recordCount]),
+    );
+    const auditRows = this.sqlite
+      .prepare(
+        `SELECT event_type AS eventType,redacted_metadata_json AS metadataJson
+         FROM audit_events WHERE entity_type='source_run' AND entity_id=?
+           AND event_type IN ('source.page.persisted','source.record.unusable',
+             'source.provider.drift','source.run.stopped')
+         ORDER BY rowid`,
+      )
+      .all(row.runId) as Array<{ eventType: string; metadataJson: string }>;
+    let auditedPageNumber: number | null = null;
+    let stoppedAuditCount = 0;
+    const auditedProviderDrift: Array<{
+      issueCategory: "PROVIDER_ENUM_DRIFT";
+      field: "workplaceType";
+      expectedStructuralType: "enum";
+      recordIndex: number;
+    }> = [];
+    for (const audit of auditRows) {
+      let metadata: Record<string, unknown>;
+      try {
+        const parsed: unknown = JSON.parse(audit.metadataJson);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+        metadata = parsed as Record<string, unknown>;
+      } catch {
+        throw new Error("STOPPED_RUN_INSPECTION_AUDIT_INVALID");
+      }
+      if (audit.eventType === "source.page.persisted") {
+        const pageNumber = metadata.pageNumber;
+        if (
+          typeof pageNumber !== "number" ||
+          !Number.isInteger(pageNumber) ||
+          !pageRecordCounts.has(pageNumber)
+        ) {
+          throw new Error("STOPPED_RUN_INSPECTION_AUDIT_PAGE_MISMATCH");
+        }
+        auditedPageNumber = pageNumber;
+      } else if (audit.eventType === "source.run.stopped") {
+        stoppedAuditCount += 1;
+        if (metadata.code !== "RUN_TIMEOUT" || metadata.schemaDiagnostic !== undefined) {
+          throw new Error("STOPPED_RUN_INSPECTION_SCHEMA_OR_STOP_DIAGNOSTIC");
+        }
+      } else if (audit.eventType === "source.record.unusable") {
+        const diagnostic = SourceRecordUnusableDiagnosticSchema.safeParse(metadata);
+        if (!diagnostic.success || auditedPageNumber === null) {
+          throw new Error("STOPPED_RUN_INSPECTION_AUDIT_INVALID");
+        }
+        const pageCount = pageRecordCounts.get(auditedPageNumber);
+        if (diagnostic.data.recordIndex >= (pageCount ?? 0)) {
+          throw new Error("STOPPED_RUN_INSPECTION_AUDIT_INDEX_OUT_OF_RANGE");
+        }
+        if (
+          auditedPageNumber === row.pageNumber &&
+          diagnostic.data.recordIndex === row.recordIndex
+        ) {
+          throw new Error("STOPPED_RUN_INSPECTION_ACCEPTED_UNUSABLE_CONFLICT");
+        }
+      } else if (audit.eventType === "source.provider.drift") {
+        const diagnostic = SourceProviderDriftDiagnosticSchema.safeParse(metadata);
+        if (!diagnostic.success || auditedPageNumber === null) {
+          throw new Error("STOPPED_RUN_INSPECTION_AUDIT_INVALID");
+        }
+        const pageCount = pageRecordCounts.get(auditedPageNumber);
+        if (
+          diagnostic.data.recordIndex === undefined ||
+          diagnostic.data.recordIndex >= (pageCount ?? 0)
+        ) {
+          throw new Error("STOPPED_RUN_INSPECTION_UNSCOPED_PROVIDER_DRIFT");
+        }
+        if (
+          auditedPageNumber === row.pageNumber &&
+          diagnostic.data.recordIndex === row.recordIndex
+        ) {
+          auditedProviderDrift.push({ ...diagnostic.data, recordIndex: row.recordIndex });
+        }
+      }
+    }
+    if (stoppedAuditCount !== 1) throw new Error("STOPPED_RUN_INSPECTION_STOP_AUDIT_REQUIRED");
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(row.payloadJson) as unknown;
+    } catch {
+      throw new Error("STOPPED_RUN_INSPECTION_PAYLOAD_INVALID");
+    }
+    let record: LeverPostingRecordV2;
+    try {
+      record = readLeverPostingV2FromPayload({ payload, capability });
+    } catch {
+      throw new Error("STOPPED_RUN_INSPECTION_REPARSE_FAILED");
+    }
+    const observedDrift = [...record.providerDriftDiagnostics]
+      .map(({ issueCategory, field, expectedStructuralType }) => ({
+        issueCategory,
+        field,
+        expectedStructuralType,
+      }))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    const auditedDrift = [...auditedProviderDrift]
+      .map(({ issueCategory, field, expectedStructuralType }) => ({
+        issueCategory,
+        field,
+        expectedStructuralType,
+      }))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    if (
+      record.externalId !== row.externalId ||
+      record.contentDigest !== row.contentHash ||
+      JSON.stringify(observedDrift) !== JSON.stringify(auditedDrift) ||
+      record.providerDriftDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.issueCategory !== "PROVIDER_ENUM_DRIFT" ||
+          diagnostic.field !== "workplaceType" ||
+          diagnostic.expectedStructuralType !== "enum" ||
+          diagnostic.recordIndex !== 0,
+      )
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_REPARSED_IDENTITY_OR_DRIFT_MISMATCH");
+    }
+    const identity = `${record.source}\n${record.region}\n${record.tenant}\n${record.externalId}`;
+    const expectedJobId = `source-job-${sha256(identity).slice(0, 32)}`;
+    if (expectedJobId !== row.jobVersionJobId || row.observationJobId !== expectedJobId) {
+      throw new Error("STOPPED_RUN_INSPECTION_OBSERVATION_JOB_MISMATCH");
+    }
+    const location = record.location ?? record.allLocations[0] ?? null;
+    if (!location || !record.description.trim()) {
+      throw new Error("STOPPED_RUN_INSPECTION_REQUIRED_SOURCE_FIELD_MISSING");
+    }
+    const structured = structuredLeverRecord(record, capability);
+    const fields = ParsedJobFieldsSchema.parse({
+      externalId: record.externalId,
+      sourceUrl: record.sourceUrl,
+      applicationUrl: record.applicationUrl,
+      requisitionId: null,
+      title: record.title,
+      company: capability.alias,
+      location,
+      category:
+        [record.department, record.team].find(
+          (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
+        ) ?? null,
+      description: record.description,
+      salaryText: null,
+      employmentType: employmentType(record.commitment),
+      requirements: evidenceLines(record, "REQUIREMENTS"),
+      responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
+      datePosted: record.postedAt,
+      coverLetterRequired: null,
+    });
+    const job = normalizeImportedJob(
+      fields,
+      "LEVER",
+      {
+        importId: `INSPECTION_ONLY:${row.verificationId}`,
+        recordId: row.sourceObservationId,
+        parserVersion: capability.parserVersion,
+        acquisitionMethod: "APPROVED_SOURCE_FETCH",
+        contentHash: record.contentDigest,
+        now: row.verifiedAt,
+        editedFields: [],
+      },
+      row.jobVersionJobId,
+    );
+    const sourceText = JSON.stringify(structured);
+    const normalization = normalizeR2AJobEvidence({
+      sourceText,
+      sourceObservationId: row.sourceObservationId,
+      structured,
+      explicitLocation: location,
+    });
+    assertR2ASourcePointers(normalization, sourceText);
+    const allPointers = [
+      ...normalization.fieldEvidence.map(({ source }) => source),
+      ...normalization.requirementEvidence.map(({ source }) => source),
+      ...normalization.coverage.flatMap(({ unparsedSpans }) => unparsedSpans),
+    ];
+    if (
+      allPointers.some((pointer) => sha256(pointer.excerpt) !== pointer.excerptHash) ||
+      normalization.sourceObservationId !== row.sourceObservationId ||
+      normalization.parserVersion !== R2A_PARSER_VERSION ||
+      normalization.normalizationVersion !== R2A_NORMALIZATION_VERSION
+    ) {
+      throw new Error("STOPPED_RUN_INSPECTION_R2A_POINTER_OR_VERSION_INVALID");
+    }
+    return {
+      marker: "PAGE_PERSISTED_INSPECTION_ONLY",
+      inspectionOnly: true,
+      verificationId: row.verificationId,
+      runId: row.runId,
+      source: "LEVER",
+      tenant: row.tenant,
+      externalId: row.externalId,
+      capabilityId: capability.capabilityId,
+      capabilityVersion: capability.version,
+      capabilityDigest,
+      sourceObservationId: row.sourceObservationId,
+      jobId: row.jobVersionJobId,
+      parentJobVersionId: row.parentJobVersionId,
+      sourceQualificationState: "PAGE_PERSISTED",
+      sourceRunStatus: "STOPPED",
+      sourceStopCode: "RUN_TIMEOUT",
+      verifiedAt: row.verifiedAt,
+      providerDriftWarnings: auditedProviderDrift.map(
+        ({ issueCategory, field, expectedStructuralType, recordIndex }) => ({
+          issueCategory,
+          field,
+          expectedStructuralType,
+          recordIndex,
+        }),
+      ),
+      job: JobSchema.parse(job),
+      normalization,
     };
   }
 

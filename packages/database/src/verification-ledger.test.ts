@@ -215,6 +215,12 @@ describe("qualified verification lookup", () => {
         sourcePolicyVersion: "fixture-policy",
       });
       expect(
+        repository.requireLatestQualifiedVerification(
+          "job:verification",
+          "job-version:verification",
+        ),
+      ).toMatchObject({ verificationId: "verification:qualified" });
+      expect(
         repository.getLatestQualifiedVerification("job:verification", "job-version:other"),
       ).toBeNull();
 
@@ -222,6 +228,12 @@ describe("qualified verification lookup", () => {
       expect(
         repository.getLatestQualifiedVerification("job:verification", "job-version:verification"),
       ).toBeNull();
+      expect(() =>
+        repository.requireLatestQualifiedVerification(
+          "job:verification",
+          "job-version:verification",
+        ),
+      ).toThrow("PREPARATION_VERIFICATION_REQUIRED");
       sqlite.prepare("UPDATE source_run_checkpoints SET status='COMPLETE'").run();
 
       sqlite
@@ -230,6 +242,12 @@ describe("qualified verification lookup", () => {
       expect(
         repository.getLatestQualifiedVerification("job:verification", "job-version:verification"),
       ).toBeNull();
+      expect(() =>
+        repository.requireLatestQualifiedVerification(
+          "job:verification",
+          "job-version:verification",
+        ),
+      ).toThrow("PREPARATION_VERIFICATION_REQUIRED");
       sqlite
         .prepare("UPDATE source_record_verifications SET qualification_state='QUALIFIED'")
         .run();
