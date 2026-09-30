@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   consumeLocalMutationNonce: vi.fn(),
   approveOwnerSourceCapability: vi.fn(),
-  runOwnerApprovedLeverSource: vi.fn(),
+  runOwnerApprovedSource: vi.fn(),
   cancelSourceRun: vi.fn(),
   revokeSourceCapability: vi.fn(),
   revalidatePath: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("@web/lib/source-workspace", () => ({
   approveOwnerSourceCapability: mocks.approveOwnerSourceCapability,
   cancelSourceRun: mocks.cancelSourceRun,
   revokeSourceCapability: mocks.revokeSourceCapability,
-  runOwnerApprovedLeverSource: mocks.runOwnerApprovedLeverSource,
+  runOwnerApprovedSource: mocks.runOwnerApprovedSource,
 }));
 
 import { approveSourceCapabilityAction, startSourceRunAction } from "./actions";
@@ -62,7 +62,7 @@ describe("source owner action gates", () => {
       formData,
     );
     expect(mocks.approveOwnerSourceCapability).toHaveBeenCalledWith(capabilityId, gateProof);
-    expect(mocks.runOwnerApprovedLeverSource).not.toHaveBeenCalled();
+    expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -74,7 +74,7 @@ describe("source owner action gates", () => {
     );
 
     expect(mocks.approveOwnerSourceCapability).not.toHaveBeenCalled();
-    expect(mocks.runOwnerApprovedLeverSource).not.toHaveBeenCalled();
+    expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
   });
 
   it("rejects approval when its fresh nonce gate fails before workspace writes", async () => {
@@ -94,7 +94,7 @@ describe("source owner action gates", () => {
     await expect(startSourceRunAction(formData)).rejects.toThrow("REDIRECT:/sources");
 
     expect(mocks.consumeLocalMutationNonce).toHaveBeenCalledWith("SOURCE_RUN_START", formData);
-    expect(mocks.runOwnerApprovedLeverSource).toHaveBeenCalledWith(capabilityId, {
+    expect(mocks.runOwnerApprovedSource).toHaveBeenCalledWith(capabilityId, {
       ...gateProof,
       action: "SOURCE_RUN_START",
     });
@@ -111,7 +111,7 @@ describe("source owner action gates", () => {
         "EXACT_OWNER_CONFIRMATION_REQUIRED",
       );
 
-      expect(mocks.runOwnerApprovedLeverSource).not.toHaveBeenCalled();
+      expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
       expect(mocks.approveOwnerSourceCapability).not.toHaveBeenCalled();
     },
   );
@@ -123,6 +123,6 @@ describe("source owner action gates", () => {
       "INVALID_MUTATION_NONCE",
     );
 
-    expect(mocks.runOwnerApprovedLeverSource).not.toHaveBeenCalled();
+    expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ import {
   approveOwnerSourceCapability,
   cancelSourceRun,
   revokeSourceCapability,
-  runOwnerApprovedLeverSource,
+  runOwnerApprovedSource,
 } from "@web/lib/source-workspace";
 
 const capabilityId = (formData: FormData) =>
@@ -28,7 +28,7 @@ export async function startSourceRunAction(formData: FormData) {
   const gateProof = await consumeLocalMutationNonce("SOURCE_RUN_START", formData);
   const id = capabilityId(formData);
   confirm(formData, `RUN ${id}`);
-  await runOwnerApprovedLeverSource(id, gateProof);
+  await runOwnerApprovedSource(id, gateProof);
   revalidatePath("/sources");
   revalidatePath("/jobs");
   revalidatePath("/dashboard");

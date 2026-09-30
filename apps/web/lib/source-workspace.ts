@@ -11,7 +11,11 @@ import {
   type SourceCapabilityV2,
   type SourceSchemaDiagnostic,
 } from "@applypilot/job-sources";
-import { runLeverSourceToQueue, type SourceOwnerActionGateProof } from "@applypilot/database";
+import {
+  runGreenhouseSourceToQueue,
+  runLeverSourceToQueue,
+  type SourceOwnerActionGateProof,
+} from "@applypilot/database";
 
 import { reevaluateBetaJob, setBetaQueueState } from "./beta-workspace";
 import { getLocalDatabase, getSourceEnablementRepository } from "./local-database";
@@ -208,7 +212,9 @@ export async function approveOwnerSourceCapability(
   gateProof: SourceOwnerActionGateProof,
 ): Promise<void> {
   const capability = await exactPrivateCapability(capabilityId);
-  if (capability.source !== "LEVER") throw new Error("LEVER_CAPABILITY_REQUIRED");
+  if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
+    throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
+  }
   if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED")
     throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
   const repository = getSourceEnablementRepository();
@@ -223,12 +229,14 @@ export async function approveOwnerSourceCapability(
   });
 }
 
-export async function runOwnerApprovedLeverSource(
+export async function runOwnerApprovedSource(
   capabilityId: string,
   gateProof: SourceOwnerActionGateProof,
 ) {
   const capability = await exactPrivateCapability(capabilityId);
-  if (capability.source !== "LEVER") throw new Error("LEVER_CAPABILITY_REQUIRED");
+  if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
+    throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
+  }
   if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED")
     throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
   const repository = getSourceEnablementRepository();
@@ -242,13 +250,16 @@ export async function runOwnerApprovedLeverSource(
     gateProof,
     ownerConfirmed: true,
   });
-  return runLeverSourceToQueue({
+  const runInput = {
     capability,
     repository,
     ownerReceiptChain,
     evaluateJob: reevaluateBetaJob,
-    queueJob: (jobId) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
-  });
+    queueJob: (jobId: string) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
+  };
+  return capability.source === "GREENHOUSE"
+    ? runGreenhouseSourceToQueue(runInput)
+    : runLeverSourceToQueue(runInput);
 }
 
 export async function revokeSourceCapability(capabilityId: string): Promise<void> {

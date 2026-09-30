@@ -9,6 +9,8 @@ import {
   SourceRecordUnusableDiagnosticSchema,
   runLeverDetailSourceDiscovery,
   runLeverSourceDiscovery,
+  runGreenhouseDetailSourceDiscovery,
+  runGreenhouseSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   SourceSchemaDiagnosticSchema,
@@ -18,6 +20,10 @@ import {
   type LeverPageV2,
   type LeverPostingRecordV2,
   type LeverDetailSourceRunResult,
+  type GreenhouseDetailV2,
+  type GreenhousePageV2,
+  type GreenhousePostingRecordV2,
+  type GreenhouseSourceRunSink,
   type SourceCapabilityV2,
   type SourceRunBudget,
   type SourceRunSink,
@@ -27,7 +33,10 @@ import {
   type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
 } from "@applypilot/job-sources";
-import { readLeverPostingV2FromPayload } from "@applypilot/job-sources";
+import {
+  readGreenhousePostingV2FromPayload,
+  readLeverPostingV2FromPayload,
+} from "@applypilot/job-sources";
 import { ParsedJobFieldsSchema, normalizeR2AJobEvidence } from "@applypilot/job-importer";
 import {
   JobSchema,
@@ -73,7 +82,10 @@ export interface SourceOwnerApprovalStatusResult {
   canStart: boolean;
 }
 
-function detailPageDigest(externalId: string, record: LeverPostingRecordV2): string {
+function detailPageDigest(
+  externalId: string,
+  record: LeverPostingRecordV2 | GreenhousePostingRecordV2,
+): string {
   return sha256(`GET_JOB\n${externalId}\n${record.externalId}\n${record.contentDigest}`);
 }
 
@@ -133,6 +145,28 @@ function structuredLeverRecord(
     requirementTexts: evidenceLines(record, "REQUIREMENTS"),
     responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
     benefitTexts: sections.filter(({ kind }) => kind === "BENEFITS").map(({ content }) => content),
+  };
+}
+
+function structuredGreenhouseRecord(
+  record: GreenhousePostingRecordV2,
+  capability: SourceCapabilityV2,
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    identifier: { name: capability.tenant, value: record.externalId },
+    title: record.title,
+    hiringOrganization: { name: capability.alias },
+    jobLocation: [{ address: record.location }],
+    description: record.description,
+    datePosted: null,
+    dateModified: record.updatedAt,
+    sourceUrl: record.sourceUrl,
+    applicationUrl: record.applicationUrl,
+    departments: record.departments,
+    offices: record.offices,
+    providerMetadata: record.metadata,
   };
 }
 
@@ -217,7 +251,7 @@ export interface PersistedSourceInspection {
   readonly normalization: R2ANormalization;
 }
 
-export class SourceEnablementRepository implements SourceRunSink {
+export class SourceEnablementRepository implements SourceRunSink, GreenhouseSourceRunSink {
   constructor(
     private readonly sqlite: BetterSqlite3.Database,
     private readonly now: () => Date = () => new Date(),
@@ -245,6 +279,21 @@ export class SourceEnablementRepository implements SourceRunSink {
    * verification row or mutates historical observations/job versions.
    */
   rederiveLeverObservation(input: { verificationId: string; now?: string }): R2ADerivationResult {
+    return this.rederiveSourceObservation(input, "LEVER");
+  }
+
+  rederiveGreenhouseObservation(input: {
+    verificationId: string;
+    now?: string;
+  }): R2ADerivationResult {
+    return this.rederiveSourceObservation(input, "GREENHOUSE");
+  }
+
+  /** Provider-neutral immutable-payload rederivation, transport-free. */
+  private rederiveSourceObservation(
+    input: { verificationId: string; now?: string },
+    expectedSource: "LEVER" | "GREENHOUSE",
+  ): R2ADerivationResult {
     const bindingTable = Boolean(
       this.sqlite
         .prepare(
@@ -333,6 +382,7 @@ export class SourceEnablementRepository implements SourceRunSink {
         })
       | undefined;
     if (!row) throw new Error("R2A_VERIFICATION_NOT_FOUND");
+    if (row.source !== expectedSource) throw new Error("R2A_SOURCE_REDERIVATION_MISMATCH");
     if (row.disposition !== "ACCEPTED" || row.qualificationState !== "QUALIFIED") {
       throw new Error("R2A_VERIFICATION_NOT_QUALIFIED");
     }
@@ -343,7 +393,7 @@ export class SourceEnablementRepository implements SourceRunSink {
       row.externalId !== row.observationExternalId ||
       row.contentHash !== row.observationContentHash ||
       row.payloadDigest !== row.observationContentHash ||
-      sha256(row.payloadJson) !== row.payloadDigest
+      (expectedSource === "LEVER" && sha256(row.payloadJson) !== row.payloadDigest)
     ) {
       throw new Error("R2A_IMMUTABLE_PAYLOAD_IDENTITY_MISMATCH");
     }
@@ -388,6 +438,22 @@ export class SourceEnablementRepository implements SourceRunSink {
       revokedAt: row.revokedAt,
       revocationReason: row.revocationReason,
     });
+    if (capability.source !== expectedSource || capability.tenant !== row.tenant) {
+      throw new Error("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
+    }
+    const record =
+      expectedSource === "GREENHOUSE"
+        ? readGreenhousePostingV2FromPayload({
+            payload: JSON.parse(row.payloadJson),
+            capability,
+          })
+        : readLeverPostingV2FromPayload({
+            payload: JSON.parse(row.payloadJson),
+            capability,
+          });
+    if (record.externalId !== row.externalId || record.contentDigest !== row.contentHash) {
+      throw new Error("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
+    }
     const existing = this.sqlite
       .prepare(
         "SELECT source_observation_id AS sourceObservationId,parent_job_version_id AS parentJobVersionId,derived_job_version_id AS derivedJobVersionId,derivation_digest AS derivationDigest FROM source_derivation_bindings WHERE verification_id=? AND source_observation_id=? AND parser_version=? AND normalization_version=?",
@@ -433,17 +499,15 @@ export class SourceEnablementRepository implements SourceRunSink {
         created: false,
       };
     }
-    const record = readLeverPostingV2FromPayload({
-      payload: JSON.parse(row.payloadJson),
-      capability,
-    });
-    if (record.externalId !== row.externalId || record.contentDigest !== row.contentHash) {
-      throw new Error("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
-    }
-    const location = record.location ?? record.allLocations[0] ?? null;
+    const isLever = record.source === "LEVER";
+    const location = isLever
+      ? (record.location ?? record.allLocations[0] ?? null)
+      : record.location;
     if (!location || !record.description.trim())
       throw new Error("SOURCE_RECORD_REQUIRED_FIELD_MISSING");
-    const structured = structuredLeverRecord(record, capability);
+    const structured = isLever
+      ? structuredLeverRecord(record, capability)
+      : structuredGreenhouseRecord(record, capability);
     const fields = ParsedJobFieldsSchema.parse({
       externalId: record.externalId,
       sourceUrl: record.sourceUrl,
@@ -452,21 +516,22 @@ export class SourceEnablementRepository implements SourceRunSink {
       title: record.title,
       company: capability.alias,
       location,
-      category:
-        [record.department, record.team].find(
-          (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
-        ) ?? null,
+      category: isLever
+        ? ([record.department, record.team].find(
+            (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
+          ) ?? null)
+        : null,
       description: record.description,
       salaryText: null,
-      employmentType: employmentType(record.commitment),
-      requirements: evidenceLines(record, "REQUIREMENTS"),
-      responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
-      datePosted: record.postedAt,
+      employmentType: isLever ? employmentType(record.commitment) : "UNKNOWN",
+      requirements: isLever ? evidenceLines(record, "REQUIREMENTS") : [],
+      responsibilities: isLever ? evidenceLines(record, "RESPONSIBILITIES") : [],
+      datePosted: isLever ? record.postedAt : null,
       coverLetterRequired: null,
     });
     const job = normalizeImportedJob(
       fields,
-      "LEVER",
+      record.source,
       {
         importId: "R2A_REDERIVATION:" + row.verificationId,
         recordId: row.sourceObservationId,
@@ -1725,7 +1790,7 @@ export class SourceEnablementRepository implements SourceRunSink {
   persistPage(input: {
     runId: string;
     capability: SourceCapabilityV2;
-    page: LeverPageV2;
+    page: LeverPageV2 | GreenhousePageV2;
     budget: SourceRunBudget;
     observedAt: string;
   }): void {
@@ -1764,9 +1829,9 @@ export class SourceEnablementRepository implements SourceRunSink {
       const createdJobIds: string[] = [];
       let duplicateObservationCount = 0;
       const persistedRecords: Array<{
-        record: LeverPostingRecordV2;
+        record: LeverPostingRecordV2 | GreenhousePostingRecordV2;
         recordIndex: number;
-        persisted: ReturnType<SourceEnablementRepository["persistLeverObservation"]>;
+        persisted: ReturnType<SourceEnablementRepository["persistProviderObservation"]>;
       }> = [];
       const unusableIndexes = new Set(
         input.page.safeUnusableDiagnostics.map(({ recordIndex }) => recordIndex),
@@ -1783,7 +1848,7 @@ export class SourceEnablementRepository implements SourceRunSink {
           });
         })();
       for (const { record, recordIndex } of acceptedEntries) {
-        const persisted = this.persistLeverObservation(
+        const persisted = this.persistProviderObservation(
           record,
           capability,
           input.runId,
@@ -1882,6 +1947,8 @@ export class SourceEnablementRepository implements SourceRunSink {
           input.observedAt,
           input.runId,
         );
+      const providerDriftDiagnostics =
+        "providerDriftDiagnostics" in input.page ? input.page.providerDriftDiagnostics : [];
       const audit = validateSourceAuditMetadata("source.page.persisted", {
         runId: input.runId,
         pageNumber,
@@ -1890,7 +1957,7 @@ export class SourceEnablementRepository implements SourceRunSink {
         providerRecordCount: input.page.providerRecordCount,
         acceptedRecordCount: input.page.acceptedRecords.length,
         unusableRecordCount: input.page.unusableRecordCount,
-        providerDriftWarningCount: input.page.providerDriftDiagnostics.length,
+        providerDriftWarningCount: providerDriftDiagnostics.length,
         persistedObservationCount: createdJobIds.length,
         byteCount: input.page.byteCount,
       });
@@ -1900,7 +1967,7 @@ export class SourceEnablementRepository implements SourceRunSink {
         const unusableAudit = validateSourceAuditMetadata("source.record.unusable", safeDiagnostic);
         this.audit("source.record.unusable", "source_run", input.runId, unusableAudit);
       }
-      for (const diagnostic of input.page.providerDriftDiagnostics) {
+      for (const diagnostic of providerDriftDiagnostics) {
         const safeDiagnostic = SourceProviderDriftDiagnosticSchema.parse(diagnostic);
         const driftAudit = validateSourceAuditMetadata("source.provider.drift", safeDiagnostic);
         this.audit("source.provider.drift", "source_run", input.runId, driftAudit);
@@ -1910,17 +1977,28 @@ export class SourceEnablementRepository implements SourceRunSink {
     void result;
   }
 
+  persistGreenhousePage(input: {
+    runId: string;
+    capability: SourceCapabilityV2;
+    page: GreenhousePageV2;
+    budget: SourceRunBudget;
+    observedAt: string;
+  }): void {
+    if (input.capability.source !== "GREENHOUSE") throw new Error("SOURCE_MISMATCH");
+    this.persistPage(input);
+  }
+
   persistDetail(input: {
     runId: string;
     capability: SourceCapabilityV2;
     externalId: string;
-    record: LeverPostingRecordV2;
+    record: LeverPostingRecordV2 | GreenhousePostingRecordV2;
     pageDigest: string;
     budget: SourceRunBudget;
     observedAt: string;
   }): void {
     const capability = SourceCapabilityV2Schema.parse(input.capability);
-    if (capability.source !== "LEVER") throw new Error("SOURCE_MISMATCH");
+    if (capability.source !== input.record.source) throw new Error("SOURCE_MISMATCH");
     if (input.record.externalId !== input.externalId) {
       throw new Error("SOURCE_DETAIL_ID_MISMATCH");
     }
@@ -1954,7 +2032,7 @@ export class SourceEnablementRepository implements SourceRunSink {
           throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
         return;
       }
-      const persisted = this.persistLeverObservation(
+      const persisted = this.persistProviderObservation(
         input.record,
         capability,
         input.runId,
@@ -2032,6 +2110,26 @@ export class SourceEnablementRepository implements SourceRunSink {
       });
       this.audit("source.page.persisted", "source_run", input.runId, audit);
     })();
+  }
+
+  persistGreenhouseDetail(input: {
+    runId: string;
+    capability: SourceCapabilityV2;
+    externalId: string;
+    detail: GreenhouseDetailV2;
+    budget: SourceRunBudget;
+    observedAt: string;
+  }): void {
+    if (input.capability.source !== "GREENHOUSE") throw new Error("SOURCE_MISMATCH");
+    this.persistDetail({
+      runId: input.runId,
+      capability: input.capability,
+      externalId: input.externalId,
+      record: input.detail.record,
+      pageDigest: input.detail.pageDigest,
+      budget: input.budget,
+      observedAt: input.observedAt,
+    });
   }
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
@@ -2575,8 +2673,8 @@ export class SourceEnablementRepository implements SourceRunSink {
     }
   }
 
-  private persistLeverObservation(
-    record: LeverPostingRecordV2,
+  private persistProviderObservation(
+    record: LeverPostingRecordV2 | GreenhousePostingRecordV2,
     capability: SourceCapabilityV2,
     runId: string,
     observedAt: string,
@@ -2586,7 +2684,17 @@ export class SourceEnablementRepository implements SourceRunSink {
     observationId: string;
     jobVersionId: string | null;
   } {
-    const location = record.location ?? record.allLocations[0] ?? null;
+    if (
+      record.source !== capability.source ||
+      record.region !== capability.region ||
+      record.tenant !== capability.tenant
+    ) {
+      throw new Error("SOURCE_RECORD_CAPABILITY_MISMATCH");
+    }
+    const isLever = record.source === "LEVER";
+    const location = isLever
+      ? (record.location ?? record.allLocations[0] ?? null)
+      : record.location;
     if (!location || !record.description.trim())
       throw new Error("SOURCE_RECORD_REQUIRED_FIELD_MISSING");
     const identity = `${record.source}\n${record.region}\n${record.tenant}\n${record.externalId}`;
@@ -2609,7 +2717,9 @@ export class SourceEnablementRepository implements SourceRunSink {
         jobVersionId: existingVersion?.id ?? null,
       };
     }
-    const structured = structuredLeverRecord(record, capability);
+    const structured = isLever
+      ? structuredLeverRecord(record, capability)
+      : structuredGreenhouseRecord(record, capability);
     const sourceText = JSON.stringify(structured);
     const fields = ParsedJobFieldsSchema.parse({
       externalId: record.externalId,
@@ -2619,21 +2729,22 @@ export class SourceEnablementRepository implements SourceRunSink {
       title: record.title,
       company: capability.alias,
       location,
-      category:
-        [record.department, record.team].find(
-          (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
-        ) ?? null,
+      category: isLever
+        ? ([record.department, record.team].find(
+            (value): value is string => typeof value === "string" && value.length <= 128 * 1_024,
+          ) ?? null)
+        : null,
       description: record.description,
       salaryText: null,
-      employmentType: employmentType(record.commitment),
-      requirements: evidenceLines(record, "REQUIREMENTS"),
-      responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
-      datePosted: record.postedAt,
+      employmentType: isLever ? employmentType(record.commitment) : "UNKNOWN",
+      requirements: isLever ? evidenceLines(record, "REQUIREMENTS") : [],
+      responsibilities: isLever ? evidenceLines(record, "RESPONSIBILITIES") : [],
+      datePosted: isLever ? record.postedAt : null,
       coverLetterRequired: null,
     });
     const job = normalizeImportedJob(
       fields,
-      "LEVER",
+      record.source,
       {
         importId: runId,
         recordId: observationId,
@@ -2645,8 +2756,9 @@ export class SourceEnablementRepository implements SourceRunSink {
       },
       jobId,
     );
-    const sourceId = `source-lever-${sha256(`${capability.region}\n${capability.tenant}`).slice(0, 24)}`;
-    const sourceName = `LEVER:${capability.region}:${capability.tenant}`;
+    const sourceDigest = sha256(`${capability.region}\n${capability.tenant}`).slice(0, 24);
+    const sourceId = isLever ? `source-lever-${sourceDigest}` : `source-greenhouse-${sourceDigest}`;
+    const sourceName = `${record.source}:${capability.region}:${capability.tenant}`;
     this.sqlite
       .prepare(
         `INSERT INTO job_sources (id, name, capabilities_json, enabled, created_at, updated_at)
@@ -2657,7 +2769,10 @@ export class SourceEnablementRepository implements SourceRunSink {
       .run(
         sourceId,
         sourceName,
-        JSON.stringify({ reader: "R1B", version: capability.parserVersion }),
+        JSON.stringify({
+          reader: isLever ? "R1B" : "GREENHOUSE_V2",
+          version: capability.parserVersion,
+        }),
         observedAt,
         observedAt,
       );
@@ -2745,19 +2860,20 @@ export class SourceEnablementRepository implements SourceRunSink {
           (id,job_id,source_record_id,source,tenant,external_id,source_url,acquisition_method,
            content_hash,raw_snapshot_reference,observed_at,posted_at,expires_at,parser_version,
            policy_version,run_id,supersedes_observation_id)
-         VALUES (?, ?, ?, 'LEVER', ?, ?, ?, 'APPROVED_SOURCE_FETCH', ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'APPROVED_SOURCE_FETCH', ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
       )
       .run(
         observationId,
         jobId,
         persistedSourceRecord.id,
+        record.source,
         capability.tenant,
         record.externalId,
         record.sourceUrl,
         record.contentDigest,
         `source_observation_payloads:${observationId}`,
         observedAt,
-        record.postedAt,
+        isLever ? record.postedAt : null,
         capability.parserVersion,
         capability.policyVersion,
         runId,
@@ -3004,6 +3120,82 @@ export async function runLeverDetailToQueue(input: {
       if (!evaluationId) continue;
       await input.queueJob(work.jobId, evaluationId);
       queuedJobIds.push(work.jobId);
+    }
+  }
+  return { ...result, queuedJobIds };
+}
+
+export async function runGreenhouseSourceToQueue(input: {
+  capability: SourceCapabilityV2;
+  repository: SourceEnablementRepository;
+  ownerReceiptChain: SourceOwnerReceiptChain;
+  evaluateJob(jobId: string): Promise<string | null>;
+  queueJob(jobId: string, evaluationId: string): Promise<void> | void;
+  now?: () => Date;
+  signal?: AbortSignal;
+  dependencies?: SecureSourceTransportDependencies;
+}) {
+  let result;
+  try {
+    result = await runGreenhouseSourceDiscovery({
+      capability: input.capability,
+      sink: input.repository,
+      ownerReceiptChain: input.ownerReceiptChain,
+      now: input.now,
+      signal: input.signal,
+      dependencies: input.dependencies,
+    });
+  } catch (error) {
+    input.repository.failOwnerStartReceipt(input.ownerReceiptChain.startReceiptId);
+    throw error;
+  }
+  const queuedJobIds: string[] = [];
+  if (result.status === "COMPLETE") {
+    for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
+      const { jobId } = work;
+      const evaluationId = work.evaluationId ?? (await input.evaluateJob(jobId));
+      if (!evaluationId) continue;
+      await input.queueJob(jobId, evaluationId);
+      queuedJobIds.push(jobId);
+    }
+  }
+  return { ...result, queuedJobIds };
+}
+
+export async function runGreenhouseDetailToQueue(input: {
+  capability: SourceCapabilityV2;
+  repository: SourceEnablementRepository;
+  ownerReceiptChain: SourceOwnerReceiptChain;
+  externalId: string;
+  evaluateJob(jobId: string): Promise<string | null>;
+  queueJob(jobId: string, evaluationId: string): Promise<void> | void;
+  now?: () => Date;
+  signal?: AbortSignal;
+  dependencies?: SecureSourceTransportDependencies;
+}) {
+  let result;
+  try {
+    result = await runGreenhouseDetailSourceDiscovery({
+      capability: input.capability,
+      sink: input.repository,
+      ownerReceiptChain: input.ownerReceiptChain,
+      externalId: input.externalId,
+      now: input.now,
+      signal: input.signal,
+      dependencies: input.dependencies,
+    });
+  } catch (error) {
+    input.repository.failOwnerStartReceipt(input.ownerReceiptChain.startReceiptId);
+    throw error;
+  }
+  const queuedJobIds: string[] = [];
+  if (result.status === "COMPLETE") {
+    for (const work of input.repository.pipelineWorkForCompletedRun(result.runId)) {
+      const { jobId } = work;
+      const evaluationId = work.evaluationId ?? (await input.evaluateJob(jobId));
+      if (!evaluationId) continue;
+      await input.queueJob(jobId, evaluationId);
+      queuedJobIds.push(jobId);
     }
   }
   return { ...result, queuedJobIds };

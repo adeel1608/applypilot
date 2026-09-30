@@ -272,6 +272,31 @@ function validateLeverRequestSemantics(
   }
 }
 
+function validateGreenhouseRequestSemantics(
+  url: URL,
+  capability: SourceCapabilityV2,
+  operation: SourceOperation,
+): void {
+  const root = capability.allowedPathPrefix.endsWith("/")
+    ? capability.allowedPathPrefix.slice(0, -1)
+    : capability.allowedPathPrefix;
+  if (operation === "LIST_JOBS") {
+    if (
+      url.pathname !== root + "/jobs" ||
+      url.searchParams.size !== 1 ||
+      exactlyOne(url.searchParams, "content") !== "true"
+    ) {
+      throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+    }
+    return;
+  }
+  const jobsPrefix = root + "/jobs/";
+  const suffix = url.pathname.startsWith(jobsPrefix) ? url.pathname.slice(jobsPrefix.length) : "";
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(suffix) || url.searchParams.size !== 0) {
+    throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
+  }
+}
+
 export async function validateSecureSourceUrl(
   value: string,
   capabilityInput: SourceCapabilityV2,
@@ -300,6 +325,9 @@ export async function validateSecureSourceUrl(
     throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
   }
   if (capability.source === "LEVER") validateLeverRequestSemantics(url, capability, operation);
+  if (capability.source === "GREENHOUSE") {
+    validateGreenhouseRequestSemantics(url, capability, operation);
+  }
   let resolvedAddresses: string[];
   try {
     resolvedAddresses = await resolveHost(url.hostname);
@@ -374,6 +402,9 @@ export async function boundedSecureJsonGet(input: {
     }
     if (!sameNetworkAddress(response.connectedAddress, pinnedAddress)) {
       throw new SecureSourceError("PINNED_ADDRESS_MISMATCH");
+    }
+    if (response.body.byteLength > capability.responseByteLimit) {
+      throw new SecureSourceError("RESPONSE_TOO_LARGE", null, "RESPONSE_BODY");
     }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       if (localRedirects >= capability.maxRedirects)

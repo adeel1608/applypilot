@@ -85,6 +85,8 @@ export * from "./seek/index";
 export * from "./public-postings";
 export * from "./private-allowlist";
 export * from "./greenhouse/reader";
+export * from "./greenhouse/v2-reader";
+export * from "./greenhouse/v2-runner";
 export * from "./lever/reader";
 export * from "./lever/v2-reader";
 export * from "./source-capability";
