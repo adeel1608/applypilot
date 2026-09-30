@@ -505,6 +505,499 @@ function inspectionStateSnapshot(sqlite: BetterSqlite3.Database) {
 }
 
 describe("offline source-to-R2 queue persistence", () => {
+  it("persists with the actual source ID when the exact name already has another ID", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      tenant: "ncinoinc",
+      allowedPathPrefix: "/v1/boards/ncinoinc/",
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    repository.persistCapabilityVersion(approved);
+    const sourceName = "GREENHOUSE:GLOBAL:ncinoinc";
+    const actualSourceId = "fixture-greenhouse-existing-source-id";
+    const preferredSourceId = `source-greenhouse-${createHash("sha256")
+      .update(`${approved.region}\n${approved.tenant}`)
+      .digest("hex")
+      .slice(0, 24)}`;
+    expect(preferredSourceId).toBe("source-greenhouse-c6494f14f2f7690b96e83615");
+    sqlite
+      .prepare(
+        `INSERT INTO job_sources
+         (id,name,capabilities_json,enabled,created_at,updated_at)
+         VALUES (?,?,?,1,?,?)`,
+      )
+      .run(
+        actualSourceId,
+        sourceName,
+        JSON.stringify({ reader: "FIXTURE", version: "fixture" }),
+        instant.toISOString(),
+        instant.toISOString(),
+      );
+
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(
+            JSON.stringify({
+              jobs: [
+                {
+                  ...greenhousePosting("fictional-ncinoinc-1"),
+                  absolute_url: "https://boards.greenhouse.io/ncinoinc/jobs/fictional-ncinoinc-1",
+                },
+              ],
+            }),
+          ),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      stopCode: null,
+      providerRecordCount: 1,
+      acceptedRecordCount: 1,
+    });
+    expect(sqlite.prepare("SELECT id FROM job_sources WHERE name=?").get(sourceName)).toEqual({
+      id: actualSourceId,
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT r.source_id AS sourceId FROM job_source_records r
+           JOIN source_observations o ON o.source_record_id=r.id WHERE o.run_id=?`,
+        )
+        .get(result.runId),
+    ).toEqual({ sourceId: actualSourceId });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_pages").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT qualification_state AS state FROM source_record_verifications WHERE run_id=?",
+        )
+        .get(result.runId),
+    ).toEqual({ state: "QUALIFIED" });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("fails closed when the preferred source ID belongs to a different source name", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      tenant: "ncinoinc",
+      allowedPathPrefix: "/v1/boards/ncinoinc/",
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const preferredSourceId = `source-greenhouse-${createHash("sha256")
+      .update(`${approved.region}\n${approved.tenant}`)
+      .digest("hex")
+      .slice(0, 24)}`;
+    sqlite
+      .prepare(
+        `INSERT INTO job_sources
+         (id,name,capabilities_json,enabled,created_at,updated_at)
+         VALUES (?,?,?,1,?,?)`,
+      )
+      .run(
+        preferredSourceId,
+        "GREENHOUSE:GLOBAL:another-fictional-tenant",
+        JSON.stringify({ reader: "FIXTURE", version: "fixture" }),
+        instant.toISOString(),
+        instant.toISOString(),
+      );
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(
+            JSON.stringify({
+              jobs: [
+                {
+                  ...greenhousePosting("fictional-ncinoinc-2"),
+                  absolute_url: "https://boards.greenhouse.io/ncinoinc/jobs/fictional-ncinoinc-2",
+                },
+              ],
+            }),
+          ),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({ status: "STOPPED", stopCode: "JOB_SOURCE_IDENTITY_CONFLICT" });
+    for (const table of [
+      "job_source_records",
+      "source_run_pages",
+      "source_observations",
+      "source_observation_payloads",
+      "job_versions",
+      "source_record_verifications",
+    ]) {
+      expect(sqlite.prepare(`SELECT count(*) AS count FROM ${table}`).get()).toEqual({ count: 0 });
+    }
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("preserves a pre-existing source row when its ID matches the deterministic preference", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      tenant: "ncinoinc",
+      allowedPathPrefix: "/v1/boards/ncinoinc/",
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    repository.persistCapabilityVersion(approved);
+    const sourceName = "GREENHOUSE:GLOBAL:ncinoinc";
+    const preferredSourceId = `source-greenhouse-${createHash("sha256")
+      .update(`${approved.region}\n${approved.tenant}`)
+      .digest("hex")
+      .slice(0, 24)}`;
+    sqlite
+      .prepare(
+        `INSERT INTO job_sources
+         (id,name,capabilities_json,enabled,created_at,updated_at)
+         VALUES (?,?,?,1,?,?)`,
+      )
+      .run(
+        preferredSourceId,
+        sourceName,
+        JSON.stringify({ reader: "FIXTURE", version: "fixture" }),
+        instant.toISOString(),
+        instant.toISOString(),
+      );
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(
+            JSON.stringify({
+              jobs: [
+                {
+                  ...greenhousePosting("fictional-ncinoinc-same-id"),
+                  absolute_url:
+                    "https://boards.greenhouse.io/ncinoinc/jobs/fictional-ncinoinc-same-id",
+                },
+              ],
+            }),
+          ),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result.status).toBe("COMPLETE");
+    expect(sqlite.prepare("SELECT id FROM job_sources WHERE name=?").get(sourceName)).toEqual({
+      id: preferredSourceId,
+    });
+    expect(
+      sqlite.prepare("SELECT DISTINCT source_id AS sourceId FROM job_source_records").all(),
+    ).toEqual([{ sourceId: preferredSourceId }]);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("reuses an existing Greenhouse source record for unchanged content across runs", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from(
+          JSON.stringify({ jobs: [greenhousePosting("fictional-greenhouse-reuse")] }),
+        ),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const execute = () =>
+      runGreenhouseSourceToQueue({
+        capability: approved,
+        repository,
+        now: () => instant,
+        dependencies,
+        evaluateJob: async () => null,
+        queueJob: () => undefined,
+      });
+
+    const first = await execute();
+    const second = await execute();
+    expect(first.status).toBe("COMPLETE");
+    expect(second.status).toBe("COMPLETE");
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_source_records").get()).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_observations").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_observation_payloads").get(),
+    ).toEqual({
+      count: 1,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM source_record_verifications WHERE qualification_state='QUALIFIED'",
+        )
+        .get(),
+    ).toEqual({ count: 2 });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("uses the resolved existing source ID for Greenhouse GET_JOB detail persistence", async () => {
+    const sqlite = database();
+    const externalId = "fictional-ncinoinc-detail-7";
+    const approved = greenhouseCapability({
+      tenant: "ncinoinc",
+      allowedPathPrefix: "/v1/boards/ncinoinc/",
+      allowedOperations: ["GET_JOB"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    repository.persistCapabilityVersion(approved);
+    const sourceName = "GREENHOUSE:GLOBAL:ncinoinc";
+    const actualSourceId = "fixture-greenhouse-detail-source-id";
+    sqlite
+      .prepare(
+        `INSERT INTO job_sources
+         (id,name,capabilities_json,enabled,created_at,updated_at)
+         VALUES (?,?,?,1,?,?)`,
+      )
+      .run(
+        actualSourceId,
+        sourceName,
+        JSON.stringify({ reader: "FIXTURE", version: "fixture" }),
+        instant.toISOString(),
+        instant.toISOString(),
+      );
+    const result = await runGreenhouseDetailToQueue({
+      capability: approved,
+      repository,
+      externalId,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ url, pinnedAddress }) => {
+          expect(url.pathname).toBe(`/v1/boards/ncinoinc/jobs/${externalId}`);
+          return {
+            status: 200,
+            headers: { "content-type": "application/json", "content-encoding": "identity" },
+            body: Buffer.from(
+              JSON.stringify({
+                ...greenhousePosting(externalId),
+                absolute_url: `https://boards.greenhouse.io/ncinoinc/jobs/${externalId}`,
+              }),
+            ),
+            connectedAddress: pinnedAddress,
+          };
+        }),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({ status: "COMPLETE", externalId });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT DISTINCT r.source_id AS sourceId FROM job_source_records r
+           JOIN source_observations o ON o.source_record_id=r.id WHERE o.external_id=?`,
+        )
+        .get(externalId),
+    ).toEqual({ sourceId: actualSourceId });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("uses the provider-neutral source resolver for Lever records", async () => {
+    const sqlite = database();
+    const approved = capability();
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    repository.persistCapabilityVersion(approved);
+    const sourceName = "LEVER:GLOBAL:fictional";
+    const actualSourceId = "fixture-lever-existing-source-id";
+    sqlite
+      .prepare(
+        `INSERT INTO job_sources
+         (id,name,capabilities_json,enabled,created_at,updated_at)
+         VALUES (?,?,?,1,?,?)`,
+      )
+      .run(
+        actualSourceId,
+        sourceName,
+        JSON.stringify({ reader: "FIXTURE", version: "fixture" }),
+        instant.toISOString(),
+        instant.toISOString(),
+      );
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: pagedTransport(),
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result.status).toBe("COMPLETE");
+    expect(
+      sqlite.prepare("SELECT DISTINCT source_id AS sourceId FROM job_source_records").all(),
+    ).toEqual([{ sourceId: actualSourceId }]);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("persists and qualifies a fictional 28-record Greenhouse page with exact replay idempotence", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      requestBudget: 1,
+      recordCap: 100,
+      pageSizeCap: 100,
+      responseByteLimit: 2_000_000,
+    });
+    let id = 0;
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `greenhouse-28:${++id}`,
+    );
+    const originalPersistPage = repository.persistPage.bind(repository);
+    let exactReplay = false;
+    const persistPage = vi.spyOn(repository, "persistPage").mockImplementation((input) => {
+      originalPersistPage(input);
+      if (!exactReplay) {
+        exactReplay = true;
+        originalPersistPage(input);
+      }
+    });
+    const originalComplete = repository.complete.bind(repository);
+    const complete = vi.spyOn(repository, "complete").mockImplementation((input) => {
+      expect(
+        sqlite
+          .prepare(
+            `SELECT qualification_state AS state,count(*) AS count
+             FROM source_record_verifications WHERE run_id=? GROUP BY qualification_state`,
+          )
+          .all(input.runId),
+      ).toEqual([{ state: "PAGE_PERSISTED", count: 28 }]);
+      originalComplete(input);
+    });
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(
+            JSON.stringify({
+              jobs: Array.from({ length: 28 }, (_, index) =>
+                greenhousePosting(`fictional-greenhouse-28-${index + 1}`),
+              ),
+            }),
+          ),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      requestCount: 1,
+      pageCount: 1,
+      providerRecordCount: 28,
+      acceptedRecordCount: 28,
+      unusableRecordCount: 0,
+    });
+    expect(persistPage).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT page_number AS pageNumber,request_count AS requestCount,
+             record_count AS recordCount FROM source_run_pages WHERE run_id=?`,
+        )
+        .all(result.runId),
+    ).toEqual([{ pageNumber: 1, requestCount: 1, recordCount: 28 }]);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_source_records").get()).toEqual({
+      count: 28,
+    });
+    expect(
+      sqlite
+        .prepare("SELECT count(*) AS count FROM source_observations WHERE run_id=?")
+        .get(result.runId),
+    ).toEqual({
+      count: 28,
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT qualification_state AS state,count(*) AS count
+           FROM source_record_verifications WHERE run_id=? GROUP BY qualification_state`,
+        )
+        .all(result.runId),
+    ).toEqual([{ state: "QUALIFIED", count: 28 }]);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_observation_payloads").get(),
+    ).toEqual({
+      count: 28,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
+      count: 28,
+    });
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(12);
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("persists and qualifies a Greenhouse page under the exact consumed owner receipt chain", async () => {
     const sqlite = database();
     const approved = greenhouseCapability({ requestBudget: 1, recordCap: 10, pageSizeCap: 10 });
