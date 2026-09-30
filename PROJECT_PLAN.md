@@ -6279,6 +6279,12 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   fixture used isolated validation output and alternate E2E ports; the preexisting ignored E2E
   database/profile/documents were restored afterward. `git fsck` reports preexisting dangling
   objects while exiting successfully.
-- **Remaining:** final source-authority readiness count mismatch above must remain visible in closeout.
-  PR creation/review metadata is pending. No source/employer network, source request, or live
-  application action was made. Personal Live V1 remains NOT_READY.
+- **PR:** opened exactly one PR, [#63](https://github.com/adeel1608/applypilot/pull/63), base
+  `main`, branch `feat/m2-stopped-run-inspection`, intentionally OPEN / UNMERGED. It was created at
+  commit `4aef54217b81634f8bc6498974360e97f9bc124e` / tree
+  `52dd05d0b17affc290a389986e483a9391dd1d2d`. At this checkpoint the push and PR `quality` checks
+  were both IN_PROGRESS and there were no reviews. This plan update will be pushed as a follow-up;
+  recheck CI and review state against the resulting exact PR head before closeout.
+- **Remaining:** keep the final source-authority readiness count mismatch above visible in closeout.
+  Recheck exact-head push/PR CI and reviews after the plan checkpoint push. No source/employer
+  network, source request, or live application action was made. Personal Live V1 remains NOT_READY.
