@@ -27,6 +27,8 @@ import { loadPersistedApplicationPacket } from "./persisted-packet";
 import { evaluatePersistedSourceInspection } from "./stopped-run-inspection";
 import {
   SourceEnablementRepository,
+  runGreenhouseDetailToQueue as runGreenhouseDetailToQueueWithOwnerReceipts,
+  runGreenhouseSourceToQueue as runGreenhouseSourceToQueueWithOwnerReceipts,
   runLeverDetailToQueue as runLeverDetailToQueueWithOwnerReceipts,
   runLeverSourceToQueue as runLeverSourceToQueueWithOwnerReceipts,
 } from "./source-enablement-repository";
@@ -133,6 +135,44 @@ async function runLeverDetailToQueue(
   });
 }
 
+type GreenhouseRunInput = Parameters<typeof runGreenhouseSourceToQueueWithOwnerReceipts>[0];
+async function runGreenhouseSourceToQueue(
+  input: Omit<GreenhouseRunInput, "ownerReceiptChain"> & {
+    ownerReceiptChain?: GreenhouseRunInput["ownerReceiptChain"];
+  },
+) {
+  return runGreenhouseSourceToQueueWithOwnerReceipts({
+    ...input,
+    ownerReceiptChain:
+      input.ownerReceiptChain ??
+      fictionalOwnerReceiptChain(
+        input.repository,
+        input.capability,
+        "LIST_JOBS",
+        (input.now?.() ?? instant).toISOString(),
+      ),
+  });
+}
+
+type GreenhouseDetailRunInput = Parameters<typeof runGreenhouseDetailToQueueWithOwnerReceipts>[0];
+async function runGreenhouseDetailToQueue(
+  input: Omit<GreenhouseDetailRunInput, "ownerReceiptChain"> & {
+    ownerReceiptChain?: GreenhouseDetailRunInput["ownerReceiptChain"];
+  },
+) {
+  return runGreenhouseDetailToQueueWithOwnerReceipts({
+    ...input,
+    ownerReceiptChain:
+      input.ownerReceiptChain ??
+      fictionalOwnerReceiptChain(
+        input.repository,
+        input.capability,
+        "GET_JOB",
+        (input.now?.() ?? instant).toISOString(),
+      ),
+  });
+}
+
 function startFictionalOwnerBoundRun(
   repository: SourceEnablementRepository,
   sourceCapability: SourceCapabilityV2,
@@ -191,6 +231,32 @@ function capability(overrides: Partial<SourceCapabilityV2> = {}) {
     revocationReason: null,
     ...overrides,
   });
+}
+
+function greenhouseCapability(overrides: Partial<SourceCapabilityV2> = {}) {
+  return capability({
+    capabilityId: "source-greenhouse-fictional",
+    source: "GREENHOUSE",
+    allowedHost: "boards-api.greenhouse.io",
+    allowedPathPrefix: "/v1/boards/fictional/",
+    allowedOperations: ["LIST_JOBS", "GET_JOB"],
+    parserVersion: "greenhouse-v2-fixture",
+    ...overrides,
+  });
+}
+
+function greenhousePosting(id = "fictional-greenhouse-1") {
+  return {
+    id,
+    title: "Fictional Customer Support Specialist",
+    absolute_url: `https://boards.greenhouse.io/fictional/jobs/${id}`,
+    location: { name: "Melbourne VIC" },
+    content: "<section><h2>Role</h2><p>Fictional customer support role in Melbourne.</p></section>",
+    updated_at: "2026-09-09T00:00:00Z",
+    departments: [{ id: 1, name: "Fictional Operations" }],
+    offices: [{ id: 2, name: "Melbourne" }],
+    metadata: [],
+  };
 }
 
 function posting(id: number) {
@@ -439,6 +505,153 @@ function inspectionStateSnapshot(sqlite: BetterSqlite3.Database) {
 }
 
 describe("offline source-to-R2 queue persistence", () => {
+  it("persists and qualifies a Greenhouse page under the exact consumed owner receipt chain", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({ requestBudget: 1, recordCap: 10, pageSizeCap: 10 });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ url, pinnedAddress }) => {
+        expect(url.toString()).toBe(
+          "https://boards-api.greenhouse.io/v1/boards/fictional/jobs?content=true",
+        );
+        return {
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify({ jobs: [greenhousePosting()] })),
+          connectedAddress: pinnedAddress,
+        };
+      }),
+    };
+
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies,
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      requestCount: 1,
+      pageCount: 1,
+      providerRecordCount: 1,
+      acceptedRecordCount: 1,
+      queuedJobIds: [],
+    });
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite
+        .prepare(
+          `SELECT r.status,c.source,r.request_count AS requestCount,r.page_count AS pageCount,
+             r.record_count AS recordCount,b.operation,b.capability_digest AS capabilityDigest,
+             a.state AS approvalState,s.state AS startState,s.operation AS startOperation
+           FROM source_run_checkpoints r
+           JOIN source_capability_versions c ON c.id=r.capability_version_id
+           JOIN source_run_owner_bindings b ON b.run_id=r.id
+           JOIN source_owner_action_receipts a ON a.id=b.approval_receipt_id
+           JOIN source_owner_action_receipts s ON s.id=b.start_receipt_id
+           WHERE r.id=?`,
+        )
+        .get(result.runId),
+    ).toMatchObject({
+      status: "COMPLETE",
+      source: "GREENHOUSE",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+      operation: "LIST_JOBS",
+      capabilityDigest: sourceCapabilityDigest(approved),
+      approvalState: "CONSUMED",
+      startState: "CONSUMED",
+      startOperation: "LIST_JOBS",
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT o.source,o.tenant,o.external_id AS externalId,o.content_hash AS contentHash,
+             v.qualification_state AS qualificationState,jv.content_digest AS jobContentDigest
+           FROM source_observations o
+           JOIN source_record_verifications v ON v.source_observation_id=o.id
+           JOIN job_versions jv ON jv.id=v.job_version_id
+           WHERE o.run_id=?`,
+        )
+        .get(result.runId),
+    ).toMatchObject({
+      source: "GREENHOUSE",
+      tenant: "fictional",
+      externalId: "fictional-greenhouse-1",
+      qualificationState: "QUALIFIED",
+    });
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    sqlite.close();
+  });
+
+  it("persists Greenhouse GET_JOB only for the exact requested external ID", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+      allowedOperations: ["GET_JOB"],
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const requestedId = "fictional-greenhouse-detail-7";
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ url, pinnedAddress }) => {
+        expect(url.toString()).toBe(
+          `https://boards-api.greenhouse.io/v1/boards/fictional/jobs/${requestedId}`,
+        );
+        return {
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify(greenhousePosting(requestedId))),
+          connectedAddress: pinnedAddress,
+        };
+      }),
+    };
+    const result = await runGreenhouseDetailToQueue({
+      capability: approved,
+      repository,
+      externalId: requestedId,
+      now: () => instant,
+      dependencies,
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      terminalState: "COMPLETE",
+      externalId: requestedId,
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+    });
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite
+        .prepare(
+          `SELECT r.operation,p.cursor,p.page_digest AS pageDigest,v.external_id AS externalId,
+             v.qualification_state AS qualificationState
+           FROM source_run_checkpoints r
+           JOIN source_run_pages p ON p.run_id=r.id
+           JOIN source_record_verifications v ON v.run_id=r.id
+           WHERE r.id=?`,
+        )
+        .get(result.runId),
+    ).toMatchObject({
+      operation: "GET_JOB",
+      cursor: `GET_JOB:${requestedId}`,
+      externalId: requestedId,
+      qualificationState: "QUALIFIED",
+    });
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    sqlite.close();
+  });
+
   it("persists immutable pages, observations, normalization, evaluation handoff and queue handoff", async () => {
     const sqlite = database();
     const profile = CandidateProfileSchema.parse({
@@ -2563,6 +2776,96 @@ describe("offline source-to-R2 queue persistence", () => {
     ).toEqual({
       count: 1,
     });
+    sqlite.close();
+  });
+
+  it("re-derives Greenhouse R2A from its immutable payload and preserves run lineage", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    let id = 0;
+    const approved = greenhouseCapability({
+      allowedOperations: ["GET_JOB"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `greenhouse-rederive:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const externalId = "fictional-greenhouse-rederive-100";
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from(JSON.stringify(greenhousePosting(externalId))),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const pipeline = fixturePipeline(sqlite, profile, () => `r2:greenhouse-rederive:${++id}`);
+    await runGreenhouseDetailToQueue({
+      capability: approved,
+      repository,
+      externalId,
+      now: () => instant,
+      dependencies,
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    const verification = sqlite
+      .prepare(
+        "SELECT id,job_version_id AS jobVersionId FROM source_record_verifications WHERE source='GREENHOUSE'",
+      )
+      .get() as { id: string; jobVersionId: string };
+    sqlite.prepare("UPDATE job_normalization_coverage SET parser_version='3.1.0'").run();
+    sqlite.prepare("UPDATE job_field_evidence_v2 SET extractor_version='3.1.0'").run();
+    sqlite.prepare("UPDATE requirement_evidence_v2 SET extractor_version='3.1.0'").run();
+
+    const derived = repository.rederiveGreenhouseObservation({ verificationId: verification.id });
+    expect(derived).toMatchObject({
+      parserVersion: "3.5.2",
+      normalizationVersion: "3.5.2",
+      parentJobVersionId: verification.jobVersionId,
+      created: true,
+    });
+    expect(
+      new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
+    ).toBe("3.5.2");
+    const jobId = (
+      sqlite
+        .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
+        .get(verification.jobVersionId) as { jobId: string }
+    ).jobId;
+    expect(pipeline.queued).toHaveLength(1);
+    expect(
+      new BetaRepository(sqlite).getLatestQualifiedVerification(jobId, derived.derivedJobVersionId)
+        ?.jobVersionId,
+    ).toBe(derived.derivedJobVersionId);
+    expect(
+      repository.rederiveGreenhouseObservation({ verificationId: verification.id }).created,
+    ).toBe(false);
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_derivation_bindings").get(),
+    ).toEqual({ count: 1 });
+
+    const payload = sqlite
+      .prepare(
+        "SELECT payload_json AS payloadJson FROM source_observation_payloads WHERE observation_id=(SELECT source_observation_id FROM source_record_verifications WHERE id=?)",
+      )
+      .get(verification.id) as { payloadJson: string };
+    const tamperedPayload = JSON.parse(payload.payloadJson) as Record<string, unknown>;
+    tamperedPayload.title = "Tampered fictional role";
+    sqlite
+      .prepare(
+        "UPDATE source_observation_payloads SET payload_json=? WHERE observation_id=(SELECT source_observation_id FROM source_record_verifications WHERE id=?)",
+      )
+      .run(JSON.stringify(tamperedPayload), verification.id);
+    expect(() =>
+      repository.rederiveGreenhouseObservation({ verificationId: verification.id }),
+    ).toThrow("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
     sqlite.close();
   });
 

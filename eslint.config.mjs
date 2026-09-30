@@ -21,6 +21,7 @@ export default defineConfig([
     "**/playwright-report/**",
     "**/test-results/**",
     "**/next-env.d.ts",
+    "data/private/**",
     "packages/database/drizzle/**",
   ]),
 ]);
