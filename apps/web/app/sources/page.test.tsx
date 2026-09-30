@@ -42,6 +42,16 @@ const capability = {
   responseByteLimit: 2_000_000,
 };
 
+const greenhouseCapability = {
+  ...capability,
+  capabilityId: "fictional-greenhouse-capability",
+  source: "GREENHOUSE",
+  alias: "Fictional Greenhouse Board",
+  tenant: "fictional-greenhouse",
+  host: "boards-api.greenhouse.io",
+  pathPrefix: "/v1/boards/fictional-greenhouse/",
+};
+
 function elements(node: ReactNode): Array<ReactElement<Record<string, unknown>>> {
   if (Array.isArray(node)) return node.flatMap((child) => elements(child));
   if (!isValidElement(node)) return [];
@@ -143,5 +153,60 @@ describe("source receipt UI", () => {
       "/sources",
     );
     expect(mocks.issueLocalMutationNonce).toHaveBeenCalledWith("SOURCE_RUN_START", "/sources");
+  });
+
+  it("enables Greenhouse approval while keeping RUN blocked until its receipt is current", async () => {
+    mocks.getSourceEnablementView.mockResolvedValueOnce({
+      status: "SOURCE_ALLOWLIST_V2_READY",
+      capabilities: [
+        {
+          ...greenhouseCapability,
+          ownerApprovalState: "APPROVAL_REQUIRED",
+          ownerApprovalReceiptId: null,
+          canOwnerStart: false,
+        },
+      ],
+      recentRuns: [],
+    });
+
+    const tree = await SourcesPage();
+    const buttons = elements(tree).filter((element) => element.type === "button");
+    const approvalButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes("Approve exact source capability"),
+    );
+    const runButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes("Start bounded source read"),
+    );
+
+    expect(textContent(tree)).toContain("GREENHOUSE · Fictional Greenhouse Board");
+    expect(textContent(tree)).toContain("APPROVE fictional-greenhouse-capability");
+    expect(approvalButton?.props.disabled).toBe(false);
+    expect(runButton?.props.disabled).toBe(true);
+  });
+
+  it("enables Greenhouse RUN only after the exact approval receipt is current", async () => {
+    mocks.getSourceEnablementView.mockResolvedValueOnce({
+      status: "SOURCE_ALLOWLIST_V2_READY",
+      capabilities: [
+        {
+          ...greenhouseCapability,
+          ownerApprovalState: "CURRENT",
+          ownerApprovalReceiptId: "fictional-greenhouse-approval",
+          canOwnerStart: true,
+        },
+      ],
+      recentRuns: [],
+    });
+
+    const tree = await SourcesPage();
+    const runButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        textContent(element.props.children as ReactNode).includes("Start bounded source read"),
+    );
+
+    expect(textContent(tree)).toContain("Durable owner approval: CURRENT");
+    expect(textContent(tree)).toContain("RUN fictional-greenhouse-capability");
+    expect(runButton?.props.disabled).toBe(false);
   });
 });

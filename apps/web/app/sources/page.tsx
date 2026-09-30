@@ -61,8 +61,8 @@ export default async function SourcesPage() {
         )}
 
         {view.capabilities.map((capability, index) => {
-          const enabled =
-            capability.source === "LEVER" && capability.readiness === "SOURCE_ENABLED";
+          const supported = capability.source === "LEVER" || capability.source === "GREENHOUSE";
+          const enabled = supported && capability.readiness === "SOURCE_ENABLED";
           const canApprove = enabled && capability.ownerApprovalState !== "CURRENT";
           const canRun = enabled && capability.canOwnerStart;
           return (
