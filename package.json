@@ -59,7 +59,7 @@
     "better-sqlite3": "13.0.3",
     "docx": "9.7.1",
     "drizzle-orm": "0.45.2",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.5.4"
@@ -71,7 +71,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "9.39.1",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.8",
     "pdfjs-dist": "6.3.289",
     "playwright": "1.63.0",
     "prettier": "3.6.2",
