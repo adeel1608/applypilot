@@ -46,10 +46,9 @@ Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> u
   valid private profile, 15 configured capabilities / 1 configured active entry, no blockers;
   privacy audit passed. `git diff --check` passed. Current lifetime totals are LIST_JOBS 30
   requests / 17 runs and historical GET_JOB 1 request / 1 run. Pre-stage/post-stage DB checks showed
-  source/target authority 0, active receipts 0, RUNNING runs 0, and pending application operations
-  0. The owner approval subsequently created the exact approved Kogan v1 row and one active APPROVE
+  source/target authority 0, active receipts 0, RUNNING runs 0, and pending application operations 0. The owner approval subsequently created the exact approved Kogan v1 row and one active APPROVE
   receipt; there is still no START, binding, or run.
-- **Current status:** `FINAL_VALIDATION_AND_EVIDENCE_PR_PENDING`. Both exact owner-directed runs are
+- **Current status:** `EVIDENCE_PR_OPEN_CI_RECHECK_PENDING`. Both exact owner-directed runs are
   complete; both new source families are revoked; the private allowlist is reconciled; all 27
   canonical run jobs have current R2 evaluations and queues; and no packet-gate candidate exists.
   The only remaining steps are Part R/S validation and one open, unmerged evidence PR. Do not repeat
@@ -6543,8 +6542,7 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
 - **Current R2A/R2:** all 7 canonical jobs have current R2A normalization (parser 3.5.2,
   normalization 3.5.2, evidence contract 3.1.0), current active-profile R2 evaluation and CURRENT
   queue decision (scorer 2.2.0). Melbourne roles: 5; explicit Victoria/Australia location matches:
-  0 (the source locations say Melbourne without those words); engineering/software/data/ML roles:
-  3. Eligibility: REVIEW_REQUIRED 7. Scores: 0 for all 7 (maximum/mean/median 0); coverage: 0:1,
+  0 (the source locations say Melbourne without those words); engineering/software/data/ML roles: 3. Eligibility: REVIEW_REQUIRED 7. Scores: 0 for all 7 (maximum/mean/median 0); coverage: 0:1,
   33:4, 50:2 (maximum 50); recommended: 0; duplicate state: CLEAR 6, UNRESOLVED 1. Deterministic
   detail candidates: 0. All 5 Melbourne rows are REVIEW_REQUIRED, not recommended, and not detail
   justified; scores are 0 and blockers include eligibility, scope, extraction coverage, and below-
@@ -6617,8 +6615,7 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   returned schema-v2 config with 14 entries / 14 families / raw active 0; Lyrebird config is exact
   v2 REVOKED digest `bc5db719c03d3803dcdca7915e21475ffcb1142fb56578b835697a311b603a97`; Kogan config
   entries 0. The database is schema 12 / integrity `ok` / FK 0; effective source and target
-  authority 0; active APPROVE and START receipts 0; RUNNING runs 0; pending application operations
-  0. Kogan DB family/version, receipt, binding, and run counts are all 0. Lyrebird DB has the
+  authority 0; active APPROVE and START receipts 0; RUNNING runs 0; pending application operations 0. Kogan DB family/version, receipt, binding, and run counts are all 0. Lyrebird DB has the
   exact v1->v2 lineage, v2 REVOKED / OWNER_REVOKED, 2 historical receipts, 1 owner binding, and 1
   completed run. Lifetime totals before Kogan are LIST_JOBS 30 requests / 17 runs and GET_JOB 1 /
   1; the Kogan pre-stage action adds no request.
@@ -6661,15 +6658,15 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   execution then completed once. The failed attempt created no receipt, DB row, source request, or
   allowlist change.
 - **Checks and actual results:** `npx tsx
-  data/private/authority-reconciliation/kogan-prestage-audit.ts` passed with Kogan absent from
+data/private/authority-reconciliation/kogan-prestage-audit.ts` passed with Kogan absent from
   config/DB and all global authority/pending counts 0. `npx tsx
-  data/private/authority-reconciliation/prepare-kogan-stage.ts` returned
+data/private/authority-reconciliation/prepare-kogan-stage.ts` returned
   `KOGAN_PRESTAGE_READY`, verified byte-identical private backup
   `authority-pre-kogan-20260930082816-8e7f21af.json.bak`, and manifest
   `kogan-stage-manifest-20260930082816-8e7f21af.json`. After the blueprint and exact identity were
   recorded above, `npx tsx data/private/authority-reconciliation/stage-kogan.ts` returned
   `KOGAN_V1_STAGED_HUMAN_APPROVAL_REQUIRED`, database unchanged, and no source request. `npm run
-  preflight` exited 0: doctor PASS, schema 12 / pending 0 / integrity PASS / FK 0, privacy audit
+preflight` exited 0: doctor PASS, schema 12 / pending 0 / integrity PASS / FK 0, privacy audit
   PASS, private profile VALID, source readiness 15 / active 1, and preflight PASS with no blockers.
   `git diff --check` exited 0. No application source or migration changed; unit/integration/build
   checks are not applicable to this private configuration-only operation and final Part R checks
@@ -6698,7 +6695,7 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   audit used a read-only/query-only database connection and made no source request.
 - **Next step:** owner may now use the separate `/sources` RUN form once for this exact v1. The UI
   requires its owner-confirmation checkbox and exact text `RUN
-  m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion, inspect durable
+m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion, inspect durable
   receipt/run state first and continue only from the exact existing run. Do not create receipts,
   bindings, or runs in code and do not repeat the RUN action.
 
@@ -6858,8 +6855,17 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   in Kogan are 20 for each of the four codes above. No qualifying jobs; no detail reads and no
   packet were created. Safe detailed role tables are recorded in the ignored audit helper outputs
   and will be summarized in final closeout.
-- **Remaining:** Part R/S final validation and create exactly one open/unmerged evidence PR. Do not
-  merge it. Confirm exact-head push/PR CI and reviews/threads after PR creation.
+- **Evidence PR opened:** [PR #64](https://github.com/adeel1608/applypilot/pull/64) is OPEN /
+  UNMERGED on `chore/m2-source-authority-and-next-wave`, base `main`; its first head was
+  `c9a5ce4ffccb2d01b427638370d6e51f581ac3ff`, with only `PROJECT_PLAN.md` changed. The push and PR
+  `quality` checks at that head both failed in `format:check` because this plan needed Prettier
+  formatting; no subsequent quality step ran. Applied `npx prettier --write PROJECT_PLAN.md` to
+  correct the stated cause, and targeted `npx prettier --check PROJECT_PLAN.md` now passes. Local
+  full `npm run format:check` still reports 64 pre-existing tracked files; a representative source
+  file passes with CRLF formatting and fails with LF formatting, consistent with this Windows
+  checkout's `core.autocrlf=true` versus Prettier's LF default. No unrelated file was reformatted.
+  There were 0 reviews and 0 comments at the first status check. Commit the plan correction and wait
+  for new exact-head push/PR checks; keep this PR open/unmerged.
 
 ### Final Part R/S validation before evidence PR (2026-09-30)
 
@@ -6886,9 +6892,8 @@ discovery`, host `api.lever.co`, prefix `/v0/postings/quadlock`, LIST_JOBS only,
   requests/+2 runs (one Lyrebird and one Kogan); GET_JOB +0; employer inspections +0; form changes
   +0; uploads +0; submissions +0. No source traffic beyond the two human-authorized bounded
   LIST_JOBS requests occurred.
-- Current worktree before PR: branch `chore/m2-source-authority-and-next-wave`, base/main at
-  `df3db4cad99cb4fbc90251f7282105e3a3010559`; only tracked change is this plan. Private backups and
-  analysis helpers are ignored. No existing open PR targets this branch.
-- **Next:** commit only `PROJECT_PLAN.md`, push the evidence branch, create one PR titled
-  `docs: reconcile source authority and record next discovery wave`, leave it OPEN / UNMERGED, and
-  record exact-head push/PR CI plus review/thread status.
+- **Evidence PR:** PR #64 is open/unmerged at `https://github.com/adeel1608/applypilot/pull/64`,
+  base `main`, head branch `chore/m2-source-authority-and-next-wave`. Its original commit
+  `c9a5ce4ffccb2d01b427638370d6e51f581ac3ff` changes only this plan. The formatter correction is
+  ready for a follow-up evidence commit; latest exact-head CI and final review/thread status remain
+  to be verified. No merge is authorized.
