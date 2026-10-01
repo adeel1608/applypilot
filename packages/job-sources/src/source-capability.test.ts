@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SecureSourceError,
   SourceCapabilityV2Schema,
+  SourceAllowlistV2Schema,
   SourceRunBudget,
   SourcePersistenceDiagnosticSchema,
   createSourcePersistenceDiagnostic,
@@ -234,6 +235,62 @@ describe("R1A source capability and transport", () => {
     expect(() => latestSourceCapabilityHeads([enabledPredecessor, enabledPredecessor])).toThrow(
       "DUPLICATE_CAPABILITY_VERSION",
     );
+  });
+
+  it("preserves approved immutable history while resolving only the approved latest head", () => {
+    const approvedHistory = capability({
+      capabilityId: "cap-fictional-002",
+      version: 3,
+      predecessorVersion: 2,
+    });
+    const revokedSuccessor = capability({
+      capabilityId: "cap-fictional-002",
+      version: 4,
+      predecessorVersion: 3,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      revokedAt: "2026-09-09T00:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+    const current = capability({
+      capabilityId: "cap-fictional-002",
+      version: 5,
+      predecessorVersion: 4,
+    });
+    const parsed = SourceAllowlistV2Schema.parse({
+      schemaVersion: 2,
+      capabilities: [approvedHistory, revokedSuccessor, current],
+    });
+
+    expect(latestSourceCapabilityHeads(parsed.capabilities)).toEqual([current]);
+    expect(sourceCapabilityReadiness(approvedHistory, instant).status).toBe("SOURCE_ENABLED");
+    expect(() =>
+      resolveCurrentSourceCapabilityHead(parsed.capabilities, {
+        capabilityId: approvedHistory.capabilityId,
+        version: approvedHistory.version,
+        capabilityDigest: sourceCapabilityDigest(approvedHistory),
+      }),
+    ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
+  });
+
+  it("continues to reject duplicate capability version identities in the allowlist", () => {
+    const duplicate = capability({
+      capabilityId: "cap-fictional-002",
+      version: 2,
+      predecessorVersion: 1,
+    });
+    const result = SourceAllowlistV2Schema.safeParse({
+      schemaVersion: 2,
+      capabilities: [duplicate, duplicate],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(({ message }) => message)).toContain(
+        "DUPLICATE_CAPABILITY_VERSION",
+      );
+    }
   });
 
   it("accepts only the exact current capability ID, version, and digest binding", () => {
