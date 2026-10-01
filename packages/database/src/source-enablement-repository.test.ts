@@ -15,6 +15,7 @@ import {
   resolveCurrentSourceCapabilityHead,
   sourceCapabilityDigest,
   type SourceCapabilityV2,
+  type SourcePersistencePhase,
   type SourceOperation,
   type SourceOwnerReceiptChain,
   type SecureSourceTransportDependencies,
@@ -506,6 +507,171 @@ function inspectionStateSnapshot(sqlite: BetterSqlite3.Database) {
 }
 
 describe("offline source-to-R2 queue persistence", () => {
+  it("rolls back each page persistence phase and retains only its safe diagnostic", async () => {
+    const pagePhases: SourcePersistencePhase[] = [
+      "UNKNOWN_PERSISTENCE",
+      "CAPABILITY_ASSERT",
+      "SOURCE_IDENTITY",
+      "JOB_NORMALIZATION",
+      "JOB_UPSERT",
+      "SOURCE_RECORD_UPSERT",
+      "SOURCE_RECORD_LOOKUP",
+      "OBSERVATION_INSERT",
+      "PAYLOAD_INSERT",
+      "JOB_VERSION_INSERT",
+      "R2A_NORMALIZATION",
+      "R2A_PERSIST",
+      "DUPLICATE_IDENTITY",
+      "DUPLICATE_SUGGESTION",
+      "PAGE_INSERT",
+      "VERIFICATION_INSERT",
+      "CHECKPOINT_UPDATE",
+      "PAGE_AUDIT",
+    ];
+    const completionPhases: SourcePersistencePhase[] = [
+      "COMPLETE_STATUS",
+      "COMPLETE_QUALIFICATION",
+    ];
+    const pageEvidenceTables = [
+      "job_sources",
+      "jobs",
+      "job_source_records",
+      "source_run_pages",
+      "source_observations",
+      "source_observation_payloads",
+      "job_versions",
+      "source_record_verifications",
+      "job_field_evidence_v2",
+      "requirement_evidence_v2",
+      "evidence_derivations",
+      "job_normalization_coverage",
+      "r2_duplicate_candidates",
+      "r2_duplicate_decision_versions",
+    ];
+
+    for (const phase of [...pagePhases, ...completionPhases]) {
+      const sqlite = database();
+      const approved = greenhouseCapability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+      const repository = new SourceEnablementRepository(sqlite, () => instant, undefined, {
+        beforePersistencePhase: (currentPhase) => {
+          if (currentPhase === phase) {
+            throw Object.assign(new Error("PRIVATE_SQL_AND_FIXTURE_CONTENT"), {
+              code: "SQLITE_CONSTRAINT_UNIQUE",
+            });
+          }
+        },
+      });
+      const result = await runGreenhouseSourceToQueue({
+        capability: approved,
+        repository,
+        now: () => instant,
+        dependencies: {
+          resolveHost: vi.fn(async () => ["8.8.8.8"]),
+          request: vi.fn(async ({ pinnedAddress }) => ({
+            status: 200,
+            headers: { "content-type": "application/json", "content-encoding": "identity" },
+            body: Buffer.from(JSON.stringify({ jobs: [greenhousePosting()] })),
+            connectedAddress: pinnedAddress,
+          })),
+        },
+        evaluateJob: async () => null,
+        queueJob: () => undefined,
+      });
+
+      expect(result).toMatchObject({ status: "STOPPED", stopCode: "PERSISTENCE_FAILED" });
+      const recovery = repository.recovery(result.runId);
+      expect(recovery?.status).toBe("STOPPED");
+      expect(recovery?.persistenceDiagnostic).toMatchObject({
+        phase,
+        sqliteCodeClass: "SQLITE_CONSTRAINT_UNIQUE",
+        transactionRolledBack: true,
+        pageProviderRecordCount: 1,
+        acceptedRecordCount: 1,
+        unusableRecordCount: 0,
+      });
+      const serialized = JSON.stringify(recovery?.persistenceDiagnostic);
+      expect(serialized).not.toContain("PRIVATE_SQL_AND_FIXTURE_CONTENT");
+      expect(serialized).not.toMatch(/\b(sql|title|description|url|rawPayload|profile)\b/i);
+
+      const counts = Object.fromEntries(
+        pageEvidenceTables.map((table) => [
+          table,
+          Number(sqlite.prepare(`SELECT count(*) FROM "${table}"`).pluck().get()),
+        ]),
+      );
+      if (completionPhases.includes(phase)) {
+        expect(counts).toMatchObject({
+          jobs: 1,
+          source_run_pages: 1,
+          source_observations: 1,
+          source_observation_payloads: 1,
+          job_versions: 1,
+          source_record_verifications: 1,
+        });
+        expect(
+          sqlite
+            .prepare("SELECT qualification_state FROM source_record_verifications WHERE run_id=?")
+            .get(result.runId),
+        ).toEqual({ qualification_state: "PAGE_PERSISTED" });
+      } else {
+        expect(Object.values(counts).every((count) => count === 0)).toBe(true);
+      }
+      expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+      expect((sqlite.pragma("integrity_check") as Array<{ integrity_check: string }>)[0]).toEqual({
+        integrity_check: "ok",
+      });
+      sqlite.close();
+    }
+  });
+
+  it("stops and rolls back a page containing duplicate Greenhouse external IDs", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({ requestBudget: 1, recordCap: 2, pageSizeCap: 2 });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const duplicate = greenhousePosting("duplicate-provider-id");
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify({ jobs: [duplicate, duplicate] })),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "SOURCE_PAGE_DUPLICATE_EXTERNAL_ID",
+    });
+    expect(repository.recovery(result.runId)?.persistenceDiagnostic).toMatchObject({
+      phase: "SOURCE_IDENTITY",
+      recordIndex: 1,
+      provider: "GREENHOUSE",
+      safeDomainCode: "SOURCE_PAGE_DUPLICATE_EXTERNAL_ID",
+      transactionRolledBack: true,
+    });
+    for (const table of [
+      "jobs",
+      "job_source_records",
+      "source_run_pages",
+      "source_observations",
+      "source_observation_payloads",
+      "job_versions",
+      "source_record_verifications",
+    ]) {
+      expect(Number(sqlite.prepare(`SELECT count(*) FROM "${table}"`).pluck().get())).toBe(0);
+    }
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("persists with the actual source ID when the exact name already has another ID", async () => {
     const sqlite = database();
     const approved = greenhouseCapability({
@@ -995,6 +1161,78 @@ describe("offline source-to-R2 queue persistence", () => {
     });
     expect(sqlite.pragma("user_version", { simple: true })).toBe(12);
     expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("persists reader-limit Greenhouse descriptions and nested provider metadata", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+      responseByteLimit: 2_000_000,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const maximumDescription = "x".repeat(128 * 1024);
+    const rawMetadata = {
+      ...greenhousePosting("greenhouse-reader-limit-1"),
+      content: maximumDescription,
+      departments: [
+        { id: 41, name: "Fictional Engineering", parent: { id: 4, name: "Technology" } },
+      ],
+      offices: [
+        { id: 51, name: "Melbourne", location: { country: "AU", regions: ["VIC", "NSW"] } },
+      ],
+      metadata: [
+        { id: 61, name: "workplace", value: { mode: "hybrid", days: ["Tuesday", "Thursday"] } },
+      ],
+    };
+
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify({ jobs: [rawMetadata] })),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      providerRecordCount: 1,
+      acceptedRecordCount: 1,
+    });
+    const stored = sqlite
+      .prepare(
+        `SELECT jv.normalized_json AS normalizedJson,p.payload_json AS payloadJson
+         FROM source_observations o JOIN job_versions jv ON jv.source_observation_id=o.id
+         JOIN source_observation_payloads p ON p.observation_id=o.id WHERE o.run_id=?`,
+      )
+      .get(result.runId) as { normalizedJson: string; payloadJson: string };
+    const normalized = JobSchema.parse(JSON.parse(stored.normalizedJson));
+    const payload = JSON.parse(stored.payloadJson) as Record<string, unknown>;
+    expect(normalized.description).toHaveLength(128 * 1024);
+    expect(payload).toMatchObject({
+      departments: rawMetadata.departments,
+      offices: rawMetadata.offices,
+      metadata: rawMetadata.metadata,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT content_digest AS digest FROM source_observation_payloads WHERE observation_id=(SELECT id FROM source_observations WHERE run_id=?)",
+        )
+        .get(result.runId),
+    ).toMatchObject({ digest: expect.stringMatching(/^[a-f0-9]{64}$/) });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

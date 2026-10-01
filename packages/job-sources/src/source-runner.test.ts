@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SecureSourceError,
   SourceCapabilityV2Schema,
+  SourcePersistenceError,
   type SourceCapabilityV2,
+  type SourcePersistenceDiagnostic,
   type SourceRunSink,
   type SecureSourceTransportDependencies,
 } from "./index";
@@ -208,5 +210,44 @@ describe("durable Lever GET_JOB source runner", () => {
     expect(result.stopCode).toBe("NETWORK_OUTCOME_UNKNOWN");
     expect(request).toHaveBeenCalledTimes(1);
     expect(target.calls.persisted).toBe(0);
+  });
+
+  it("retains a database persistence diagnostic through Lever GET_JOB stop", async () => {
+    const target = sink();
+    const persistenceDiagnostic: SourcePersistenceDiagnostic = {
+      phase: "SOURCE_RECORD_UPSERT",
+      recordIndex: 0,
+      externalIdHashPrefix: "abcdef012345",
+      provider: "LEVER",
+      sqliteCodeClass: "SQLITE_CONSTRAINT_UNIQUE",
+      safeDomainCode: null,
+      transactionRolledBack: true,
+      pageProviderRecordCount: 1,
+      acceptedRecordCount: 1,
+      unusableRecordCount: 0,
+    };
+    vi.mocked(target.implementation.persistDetail).mockImplementationOnce(() => {
+      throw new SourcePersistenceError(persistenceDiagnostic);
+    });
+
+    const result = await runLeverDetailSourceDiscovery({
+      capability: capability(),
+      sink: target.implementation,
+      ownerReceiptChain: fictionalOwnerReceiptChain,
+      externalId: "fixture-1",
+      now: () => instant,
+      dependencies: transport(posting()),
+    });
+
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "PERSISTENCE_FAILED",
+      terminalState: "PERSISTENCE_FAILED",
+    });
+    expect(target.implementation.stop).toHaveBeenCalledOnce();
+    expect(vi.mocked(target.implementation.stop).mock.calls[0]?.[0]).toMatchObject({
+      persistenceDiagnostic,
+    });
+    expect(target.calls.complete).toBe(0);
   });
 });

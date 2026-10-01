@@ -14,6 +14,7 @@ import {
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   SourceSchemaDiagnosticSchema,
+  SourcePersistenceDiagnosticSchema,
   SourceStopCodeSchema,
   SourceTransportLifecycleStageSchema,
   validateSourceAuditMetadata,
@@ -30,8 +31,12 @@ import {
   type SourceOwnerReceiptChain,
   type SourceOperation,
   type SourceSchemaDiagnostic,
+  type SourcePersistenceDiagnostic,
+  type SourcePersistencePhase,
   type SourceTransportLifecycleStage,
   type SecureSourceTransportDependencies,
+  SourcePersistenceError,
+  createSourcePersistenceDiagnostic,
 } from "@applypilot/job-sources";
 import {
   readGreenhousePostingV2FromPayload,
@@ -58,6 +63,16 @@ function sha256(value: string): string {
 }
 
 const SOURCE_OWNER_START_RECEIPT_TTL_MS = 5 * 60 * 1000;
+
+interface PersistenceContext {
+  phase: SourcePersistencePhase;
+  recordIndex: number | null;
+  externalId: string | null;
+  provider: "LEVER" | "GREENHOUSE";
+  pageProviderRecordCount: number;
+  acceptedRecordCount: number;
+  unusableRecordCount: number;
+}
 
 export interface SourceOwnerActionGateProof {
   action: "SOURCE_CAPABILITY_APPROVE" | "SOURCE_RUN_START";
@@ -256,8 +271,38 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     private readonly sqlite: BetterSqlite3.Database,
     private readonly now: () => Date = () => new Date(),
     private readonly id: () => string = randomUUID,
-    private readonly hooks: { beforeQualification?: (runId: string) => void } = {},
+    private readonly hooks: {
+      beforeQualification?: (runId: string) => void;
+      beforePersistencePhase?: (phase: SourcePersistencePhase, recordIndex: number | null) => void;
+    } = {},
   ) {}
+
+  private setPersistencePhase(
+    context: PersistenceContext,
+    phase: SourcePersistencePhase,
+    recordIndex: number | null,
+    externalId: string | null,
+  ): void {
+    context.phase = phase;
+    context.recordIndex = recordIndex;
+    context.externalId = externalId;
+    this.hooks.beforePersistencePhase?.(phase, recordIndex);
+  }
+
+  private persistenceFailure(error: unknown, context: PersistenceContext): SourcePersistenceError {
+    return new SourcePersistenceError(
+      createSourcePersistenceDiagnostic({
+        phase: context.phase,
+        recordIndex: context.recordIndex,
+        externalId: context.externalId,
+        provider: context.provider,
+        error,
+        pageProviderRecordCount: context.pageProviderRecordCount,
+        acceptedRecordCount: context.acceptedRecordCount,
+        unusableRecordCount: context.unusableRecordCount,
+      }),
+    );
+  }
 
   available(): boolean {
     return Boolean(
@@ -1795,186 +1840,235 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     observedAt: string;
   }): void {
     const capability = SourceCapabilityV2Schema.parse(input.capability);
-    const result = this.sqlite.transaction(() => {
-      this.assertCapabilityCurrent({
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-        capabilityVersion: capability.version,
-        capabilityDigest: sourceCapabilityDigest(capability),
-      });
-      const capabilityRow = this.sqlite
-        .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
-        .get(capability.capabilityId, capability.version) as { id: string } | undefined;
-      if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
-      const pageNumber = input.budget.pages;
-      const logicalPage = this.sqlite
-        .prepare(
-          `SELECT id, page_digest AS pageDigest FROM source_run_pages
+    const persistenceContext: PersistenceContext = {
+      phase: "UNKNOWN_PERSISTENCE",
+      recordIndex: null,
+      externalId: null,
+      provider: capability.source,
+      pageProviderRecordCount: input.page.providerRecordCount,
+      acceptedRecordCount: input.page.acceptedRecords.length,
+      unusableRecordCount: input.page.unusableRecordCount,
+    };
+    try {
+      const result = this.sqlite.transaction(() => {
+        this.setPersistencePhase(persistenceContext, "UNKNOWN_PERSISTENCE", null, null);
+        this.setPersistencePhase(persistenceContext, "CAPABILITY_ASSERT", null, null);
+        this.assertCapabilityCurrent({
+          runId: input.runId,
+          capabilityId: capability.capabilityId,
+          capabilityVersion: capability.version,
+          capabilityDigest: sourceCapabilityDigest(capability),
+        });
+        const capabilityRow = this.sqlite
+          .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
+          .get(capability.capabilityId, capability.version) as { id: string } | undefined;
+        if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
+        const pageNumber = input.budget.pages;
+        const logicalPage = this.sqlite
+          .prepare(
+            `SELECT id, page_digest AS pageDigest FROM source_run_pages
            WHERE run_id=? AND page_number=? AND cursor=? AND next_cursor IS ?`,
-        )
-        .get(
-          input.runId,
-          pageNumber,
-          String(input.page.cursor),
-          input.page.nextCursor === null ? null : String(input.page.nextCursor),
-        ) as { id: string; pageDigest: string } | undefined;
-      // Replay is keyed by the logical request/cursor, not by content alone.
-      // A different cursor returning identical content is a distinct operation.
-      if (logicalPage) {
-        if (logicalPage.pageDigest !== input.page.pageDigest) {
-          throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
+          )
+          .get(
+            input.runId,
+            pageNumber,
+            String(input.page.cursor),
+            input.page.nextCursor === null ? null : String(input.page.nextCursor),
+          ) as { id: string; pageDigest: string } | undefined;
+        // Replay is keyed by the logical request/cursor, not by content alone.
+        // A different cursor returning identical content is a distinct operation.
+        if (logicalPage) {
+          if (logicalPage.pageDigest !== input.page.pageDigest) {
+            throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
+          }
+          return {
+            createdJobIds: [],
+            duplicateObservationCount: input.page.acceptedRecords.length,
+          };
         }
-        return { createdJobIds: [], duplicateObservationCount: input.page.acceptedRecords.length };
-      }
-      const createdJobIds: string[] = [];
-      let duplicateObservationCount = 0;
-      const persistedRecords: Array<{
-        record: LeverPostingRecordV2 | GreenhousePostingRecordV2;
-        recordIndex: number;
-        persisted: ReturnType<SourceEnablementRepository["persistProviderObservation"]>;
-      }> = [];
-      const unusableIndexes = new Set(
-        input.page.safeUnusableDiagnostics.map(({ recordIndex }) => recordIndex),
-      );
-      const acceptedEntries =
-        input.page.acceptedRecordEntries ??
-        (() => {
-          let providerIndex = 0;
-          return input.page.acceptedRecords.map((record) => {
-            while (unusableIndexes.has(providerIndex)) providerIndex += 1;
-            const entry = { record, recordIndex: providerIndex };
-            providerIndex += 1;
-            return entry;
-          });
-        })();
-      for (const { record, recordIndex } of acceptedEntries) {
-        const persisted = this.persistProviderObservation(
-          record,
-          capability,
-          input.runId,
-          input.observedAt,
+        const createdJobIds: string[] = [];
+        let duplicateObservationCount = 0;
+        const persistedRecords: Array<{
+          record: LeverPostingRecordV2 | GreenhousePostingRecordV2;
+          recordIndex: number;
+          persisted: ReturnType<SourceEnablementRepository["persistProviderObservation"]>;
+        }> = [];
+        const unusableIndexes = new Set(
+          input.page.safeUnusableDiagnostics.map(({ recordIndex }) => recordIndex),
         );
-        persistedRecords.push({ record, recordIndex, persisted });
-        if (persisted.created) createdJobIds.push(persisted.jobId);
-        else duplicateObservationCount += 1;
-      }
-      const pageId = this.id();
-      this.sqlite
-        .prepare(
-          `INSERT INTO source_run_pages
+        const acceptedEntries =
+          input.page.acceptedRecordEntries ??
+          (() => {
+            let providerIndex = 0;
+            return input.page.acceptedRecords.map((record) => {
+              while (unusableIndexes.has(providerIndex)) providerIndex += 1;
+              const entry = { record, recordIndex: providerIndex };
+              providerIndex += 1;
+              return entry;
+            });
+          })();
+        const pageExternalIds = new Set<string>();
+        for (const { record, recordIndex } of acceptedEntries) {
+          this.setPersistencePhase(
+            persistenceContext,
+            "SOURCE_IDENTITY",
+            recordIndex,
+            record.externalId,
+          );
+          if (pageExternalIds.has(record.externalId)) {
+            throw new Error("SOURCE_PAGE_DUPLICATE_EXTERNAL_ID");
+          }
+          pageExternalIds.add(record.externalId);
+          const persisted = this.persistProviderObservation(
+            record,
+            capability,
+            input.runId,
+            input.observedAt,
+            persistenceContext,
+            recordIndex,
+          );
+          persistedRecords.push({ record, recordIndex, persisted });
+          if (persisted.created) createdJobIds.push(persisted.jobId);
+          else duplicateObservationCount += 1;
+        }
+        this.setPersistencePhase(persistenceContext, "PAGE_INSERT", null, null);
+        const pageId = this.id();
+        this.sqlite
+          .prepare(
+            `INSERT INTO source_run_pages
             (id, run_id, page_number, cursor, next_cursor, page_digest, request_count,
              record_count, byte_count, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          pageId,
-          input.runId,
-          pageNumber,
-          String(input.page.cursor),
-          input.page.nextCursor === null ? null : String(input.page.nextCursor),
-          input.page.pageDigest,
-          input.page.requestCount,
-          input.page.providerRecordCount,
-          input.page.byteCount,
-          input.observedAt,
-        );
-      if (this.hasVerificationLedger()) {
-        for (const { record, recordIndex, persisted } of persistedRecords) {
-          this.recordVerification({
-            id: this.id(),
-            runId: input.runId,
-            capabilityVersionId: capabilityRow.id,
+          )
+          .run(
             pageId,
-            source: capability.source,
-            tenant: capability.tenant,
-            externalId: record.externalId,
-            recordIndex,
-            pageDigest: input.page.pageDigest,
-            contentHash: record.contentDigest,
-            sourceObservationId: persisted.observationId,
-            jobVersionId: persisted.jobVersionId,
-            disposition: "ACCEPTED",
-            qualificationState: "PAGE_PERSISTED",
-            parserVersion: capability.parserVersion,
-            policyVersion: capability.policyVersion,
-            verifiedAt: input.observedAt,
-            createdAt: input.observedAt,
-          });
+            input.runId,
+            pageNumber,
+            String(input.page.cursor),
+            input.page.nextCursor === null ? null : String(input.page.nextCursor),
+            input.page.pageDigest,
+            input.page.requestCount,
+            input.page.providerRecordCount,
+            input.page.byteCount,
+            input.observedAt,
+          );
+        if (this.hasVerificationLedger()) {
+          for (const { record, recordIndex, persisted } of persistedRecords) {
+            this.setPersistencePhase(
+              persistenceContext,
+              "VERIFICATION_INSERT",
+              recordIndex,
+              record.externalId,
+            );
+            this.recordVerification({
+              id: this.id(),
+              runId: input.runId,
+              capabilityVersionId: capabilityRow.id,
+              pageId,
+              source: capability.source,
+              tenant: capability.tenant,
+              externalId: record.externalId,
+              recordIndex,
+              pageDigest: input.page.pageDigest,
+              contentHash: record.contentDigest,
+              sourceObservationId: persisted.observationId,
+              jobVersionId: persisted.jobVersionId,
+              disposition: "ACCEPTED",
+              qualificationState: "PAGE_PERSISTED",
+              parserVersion: capability.parserVersion,
+              policyVersion: capability.policyVersion,
+              verifiedAt: input.observedAt,
+              createdAt: input.observedAt,
+            });
+          }
+          for (const diagnostic of input.page.safeUnusableDiagnostics) {
+            this.setPersistencePhase(
+              persistenceContext,
+              "VERIFICATION_INSERT",
+              diagnostic.recordIndex,
+              null,
+            );
+            this.recordVerification({
+              id: this.id(),
+              runId: input.runId,
+              capabilityVersionId: capabilityRow.id,
+              pageId,
+              source: capability.source,
+              tenant: capability.tenant,
+              externalId: null,
+              recordIndex: diagnostic.recordIndex,
+              pageDigest: input.page.pageDigest,
+              contentHash: null,
+              sourceObservationId: null,
+              jobVersionId: null,
+              disposition: "UNUSABLE",
+              qualificationState: "PAGE_PERSISTED",
+              parserVersion: capability.parserVersion,
+              policyVersion: capability.policyVersion,
+              verifiedAt: input.observedAt,
+              createdAt: input.observedAt,
+            });
+          }
         }
-        for (const diagnostic of input.page.safeUnusableDiagnostics) {
-          this.recordVerification({
-            id: this.id(),
-            runId: input.runId,
-            capabilityVersionId: capabilityRow.id,
-            pageId,
-            source: capability.source,
-            tenant: capability.tenant,
-            externalId: null,
-            recordIndex: diagnostic.recordIndex,
-            pageDigest: input.page.pageDigest,
-            contentHash: null,
-            sourceObservationId: null,
-            jobVersionId: null,
-            disposition: "UNUSABLE",
-            qualificationState: "PAGE_PERSISTED",
-            parserVersion: capability.parserVersion,
-            policyVersion: capability.policyVersion,
-            verifiedAt: input.observedAt,
-            createdAt: input.observedAt,
-          });
-        }
-      }
-      const digests = this.sqlite
-        .prepare("SELECT page_digest FROM source_run_pages WHERE run_id = ? ORDER BY page_number")
-        .all(input.runId)
-        .map((row) => (row as { page_digest: string }).page_digest);
-      this.sqlite
-        .prepare(
-          `UPDATE source_run_checkpoints SET current_cursor = ?, next_cursor = ?,
+        this.setPersistencePhase(persistenceContext, "CHECKPOINT_UPDATE", null, null);
+        const digests = this.sqlite
+          .prepare("SELECT page_digest FROM source_run_pages WHERE run_id = ? ORDER BY page_number")
+          .all(input.runId)
+          .map((row) => (row as { page_digest: string }).page_digest);
+        this.sqlite
+          .prepare(
+            `UPDATE source_run_checkpoints SET current_cursor = ?, next_cursor = ?,
              seen_page_digests_json = ?, request_count = ?, page_count = ?, record_count = ?,
              byte_count = ?, retry_count = ?, redirect_count = ?, updated_at = ? WHERE id = ?`,
-        )
-        .run(
-          String(input.page.cursor),
-          input.page.nextCursor === null ? null : String(input.page.nextCursor),
-          JSON.stringify(digests),
-          input.budget.attempts,
-          input.budget.pages,
-          input.budget.records,
-          input.budget.bytes,
-          input.budget.retries,
-          input.budget.redirects,
-          input.observedAt,
-          input.runId,
-        );
-      const providerDriftDiagnostics =
-        "providerDriftDiagnostics" in input.page ? input.page.providerDriftDiagnostics : [];
-      const audit = validateSourceAuditMetadata("source.page.persisted", {
-        runId: input.runId,
-        pageNumber,
-        requestCount: input.page.requestCount,
-        recordCount: input.page.providerRecordCount,
-        providerRecordCount: input.page.providerRecordCount,
-        acceptedRecordCount: input.page.acceptedRecords.length,
-        unusableRecordCount: input.page.unusableRecordCount,
-        providerDriftWarningCount: providerDriftDiagnostics.length,
-        persistedObservationCount: createdJobIds.length,
-        byteCount: input.page.byteCount,
-      });
-      this.audit("source.page.persisted", "source_run", input.runId, audit);
-      for (const diagnostic of input.page.safeUnusableDiagnostics) {
-        const safeDiagnostic = SourceRecordUnusableDiagnosticSchema.parse(diagnostic);
-        const unusableAudit = validateSourceAuditMetadata("source.record.unusable", safeDiagnostic);
-        this.audit("source.record.unusable", "source_run", input.runId, unusableAudit);
-      }
-      for (const diagnostic of providerDriftDiagnostics) {
-        const safeDiagnostic = SourceProviderDriftDiagnosticSchema.parse(diagnostic);
-        const driftAudit = validateSourceAuditMetadata("source.provider.drift", safeDiagnostic);
-        this.audit("source.provider.drift", "source_run", input.runId, driftAudit);
-      }
-      return { createdJobIds, duplicateObservationCount };
-    })();
-    void result;
+          )
+          .run(
+            String(input.page.cursor),
+            input.page.nextCursor === null ? null : String(input.page.nextCursor),
+            JSON.stringify(digests),
+            input.budget.attempts,
+            input.budget.pages,
+            input.budget.records,
+            input.budget.bytes,
+            input.budget.retries,
+            input.budget.redirects,
+            input.observedAt,
+            input.runId,
+          );
+        const providerDriftDiagnostics =
+          "providerDriftDiagnostics" in input.page ? input.page.providerDriftDiagnostics : [];
+        this.setPersistencePhase(persistenceContext, "PAGE_AUDIT", null, null);
+        const audit = validateSourceAuditMetadata("source.page.persisted", {
+          runId: input.runId,
+          pageNumber,
+          requestCount: input.page.requestCount,
+          recordCount: input.page.providerRecordCount,
+          providerRecordCount: input.page.providerRecordCount,
+          acceptedRecordCount: input.page.acceptedRecords.length,
+          unusableRecordCount: input.page.unusableRecordCount,
+          providerDriftWarningCount: providerDriftDiagnostics.length,
+          persistedObservationCount: createdJobIds.length,
+          byteCount: input.page.byteCount,
+        });
+        this.audit("source.page.persisted", "source_run", input.runId, audit);
+        for (const diagnostic of input.page.safeUnusableDiagnostics) {
+          const safeDiagnostic = SourceRecordUnusableDiagnosticSchema.parse(diagnostic);
+          const unusableAudit = validateSourceAuditMetadata(
+            "source.record.unusable",
+            safeDiagnostic,
+          );
+          this.audit("source.record.unusable", "source_run", input.runId, unusableAudit);
+        }
+        for (const diagnostic of providerDriftDiagnostics) {
+          const safeDiagnostic = SourceProviderDriftDiagnosticSchema.parse(diagnostic);
+          const driftAudit = validateSourceAuditMetadata("source.provider.drift", safeDiagnostic);
+          this.audit("source.provider.drift", "source_run", input.runId, driftAudit);
+        }
+        return { createdJobIds, duplicateObservationCount };
+      })();
+      void result;
+    } catch (error) {
+      throw this.persistenceFailure(error, persistenceContext);
+    }
   }
 
   persistGreenhousePage(input: {
@@ -2005,111 +2099,132 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     if (detailPageDigest(input.externalId, input.record) !== input.pageDigest) {
       throw new Error("SOURCE_DETAIL_DIGEST_MISMATCH");
     }
-    this.sqlite.transaction(() => {
-      this.assertCapabilityCurrent({
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-        capabilityVersion: capability.version,
-        capabilityDigest: sourceCapabilityDigest(capability),
-      });
-      const run = this.sqlite
-        .prepare("SELECT operation FROM source_run_checkpoints WHERE id=?")
-        .get(input.runId) as { operation: string } | undefined;
-      if (!run || run.operation !== "GET_JOB") throw new Error("SOURCE_OPERATION_MISMATCH");
-      const capabilityRow = this.sqlite
-        .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
-        .get(capability.capabilityId, capability.version) as { id: string } | undefined;
-      if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
-      const cursor = `GET_JOB:${input.externalId}`;
-      const existingPage = this.sqlite
-        .prepare(
-          `SELECT id, page_digest AS pageDigest FROM source_run_pages
+    const persistenceContext: PersistenceContext = {
+      phase: "UNKNOWN_PERSISTENCE",
+      recordIndex: 0,
+      externalId: input.externalId,
+      provider: capability.source,
+      pageProviderRecordCount: 1,
+      acceptedRecordCount: 1,
+      unusableRecordCount: 0,
+    };
+    try {
+      this.sqlite.transaction(() => {
+        this.setPersistencePhase(persistenceContext, "UNKNOWN_PERSISTENCE", null, null);
+        this.setPersistencePhase(persistenceContext, "CAPABILITY_ASSERT", null, null);
+        this.assertCapabilityCurrent({
+          runId: input.runId,
+          capabilityId: capability.capabilityId,
+          capabilityVersion: capability.version,
+          capabilityDigest: sourceCapabilityDigest(capability),
+        });
+        const run = this.sqlite
+          .prepare("SELECT operation FROM source_run_checkpoints WHERE id=?")
+          .get(input.runId) as { operation: string } | undefined;
+        if (!run || run.operation !== "GET_JOB") throw new Error("SOURCE_OPERATION_MISMATCH");
+        const capabilityRow = this.sqlite
+          .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
+          .get(capability.capabilityId, capability.version) as { id: string } | undefined;
+        if (!capabilityRow) throw new Error("SOURCE_CAPABILITY_VERSION_REQUIRED");
+        const cursor = `GET_JOB:${input.externalId}`;
+        const existingPage = this.sqlite
+          .prepare(
+            `SELECT id, page_digest AS pageDigest FROM source_run_pages
            WHERE run_id=? AND page_number=1 AND cursor=? AND next_cursor IS NULL`,
-        )
-        .get(input.runId, cursor) as { id: string; pageDigest: string } | undefined;
-      if (existingPage) {
-        if (existingPage.pageDigest !== input.pageDigest)
-          throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
-        return;
-      }
-      const persisted = this.persistProviderObservation(
-        input.record,
-        capability,
-        input.runId,
-        input.observedAt,
-      );
-      if (!persisted.jobVersionId) throw new Error("SOURCE_JOB_VERSION_REQUIRED");
-      const pageId = this.id();
-      this.sqlite
-        .prepare(
-          `INSERT INTO source_run_pages
+          )
+          .get(input.runId, cursor) as { id: string; pageDigest: string } | undefined;
+        if (existingPage) {
+          if (existingPage.pageDigest !== input.pageDigest)
+            throw new Error("SOURCE_PAGE_REPLAY_CONFLICT");
+          return;
+        }
+        const persisted = this.persistProviderObservation(
+          input.record,
+          capability,
+          input.runId,
+          input.observedAt,
+          persistenceContext,
+          0,
+        );
+        if (!persisted.jobVersionId) throw new Error("SOURCE_JOB_VERSION_REQUIRED");
+        this.setPersistencePhase(persistenceContext, "PAGE_INSERT", 0, input.externalId);
+        const pageId = this.id();
+        this.sqlite
+          .prepare(
+            `INSERT INTO source_run_pages
             (id,run_id,page_number,cursor,next_cursor,page_digest,request_count,record_count,byte_count,created_at)
            VALUES (?,?,?,?,NULL,?,?,?,?,?)`,
-        )
-        .run(
+          )
+          .run(
+            pageId,
+            input.runId,
+            1,
+            cursor,
+            input.pageDigest,
+            input.budget.attempts,
+            1,
+            input.budget.bytes,
+            input.observedAt,
+          );
+        if (!this.hasVerificationLedger()) throw new Error("SOURCE_VERIFICATION_LEDGER_REQUIRED");
+        this.setPersistencePhase(persistenceContext, "VERIFICATION_INSERT", 0, input.externalId);
+        this.recordVerification({
+          id: this.id(),
+          runId: input.runId,
+          capabilityVersionId: capabilityRow.id,
           pageId,
-          input.runId,
-          1,
-          cursor,
-          input.pageDigest,
-          input.budget.attempts,
-          1,
-          input.budget.bytes,
-          input.observedAt,
-        );
-      if (!this.hasVerificationLedger()) throw new Error("SOURCE_VERIFICATION_LEDGER_REQUIRED");
-      this.recordVerification({
-        id: this.id(),
-        runId: input.runId,
-        capabilityVersionId: capabilityRow.id,
-        pageId,
-        source: capability.source,
-        tenant: capability.tenant,
-        externalId: input.externalId,
-        recordIndex: 0,
-        pageDigest: input.pageDigest,
-        contentHash: input.record.contentDigest,
-        sourceObservationId: persisted.observationId,
-        jobVersionId: persisted.jobVersionId,
-        disposition: "ACCEPTED",
-        qualificationState: "PAGE_PERSISTED",
-        parserVersion: capability.parserVersion,
-        policyVersion: capability.policyVersion,
-        verifiedAt: input.observedAt,
-        createdAt: input.observedAt,
-      });
-      this.sqlite
-        .prepare(
-          `UPDATE source_run_checkpoints SET current_cursor=?, next_cursor=NULL,
+          source: capability.source,
+          tenant: capability.tenant,
+          externalId: input.externalId,
+          recordIndex: 0,
+          pageDigest: input.pageDigest,
+          contentHash: input.record.contentDigest,
+          sourceObservationId: persisted.observationId,
+          jobVersionId: persisted.jobVersionId,
+          disposition: "ACCEPTED",
+          qualificationState: "PAGE_PERSISTED",
+          parserVersion: capability.parserVersion,
+          policyVersion: capability.policyVersion,
+          verifiedAt: input.observedAt,
+          createdAt: input.observedAt,
+        });
+        this.setPersistencePhase(persistenceContext, "CHECKPOINT_UPDATE", null, null);
+        this.sqlite
+          .prepare(
+            `UPDATE source_run_checkpoints SET current_cursor=?, next_cursor=NULL,
              seen_page_digests_json=?, request_count=?, page_count=?, record_count=?, byte_count=?,
              retry_count=?, redirect_count=?, updated_at=? WHERE id=?`,
-        )
-        .run(
-          cursor,
-          JSON.stringify([input.pageDigest]),
-          input.budget.attempts,
-          input.budget.pages,
-          input.budget.records,
-          input.budget.bytes,
-          input.budget.retries,
-          input.budget.redirects,
-          input.observedAt,
-          input.runId,
-        );
-      const audit = validateSourceAuditMetadata("source.page.persisted", {
-        runId: input.runId,
-        pageNumber: 1,
-        requestCount: input.budget.attempts,
-        recordCount: 1,
-        providerRecordCount: 1,
-        acceptedRecordCount: 1,
-        unusableRecordCount: 0,
-        providerDriftWarningCount: 0,
-        persistedObservationCount: persisted.created ? 1 : 0,
-        byteCount: input.budget.bytes,
-      });
-      this.audit("source.page.persisted", "source_run", input.runId, audit);
-    })();
+          )
+          .run(
+            cursor,
+            JSON.stringify([input.pageDigest]),
+            input.budget.attempts,
+            input.budget.pages,
+            input.budget.records,
+            input.budget.bytes,
+            input.budget.retries,
+            input.budget.redirects,
+            input.observedAt,
+            input.runId,
+          );
+        this.setPersistencePhase(persistenceContext, "PAGE_AUDIT", null, null);
+        const audit = validateSourceAuditMetadata("source.page.persisted", {
+          runId: input.runId,
+          pageNumber: 1,
+          requestCount: input.budget.attempts,
+          recordCount: 1,
+          providerRecordCount: 1,
+          acceptedRecordCount: 1,
+          unusableRecordCount: 0,
+          providerDriftWarningCount: 0,
+          persistedObservationCount: persisted.created ? 1 : 0,
+          byteCount: input.budget.bytes,
+        });
+        this.audit("source.page.persisted", "source_run", input.runId, audit);
+      })();
+    } catch (error) {
+      throw this.persistenceFailure(error, persistenceContext);
+    }
   }
 
   persistGreenhouseDetail(input: {
@@ -2133,19 +2248,60 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
   }
 
   complete(input: { runId: string; budget: SourceRunBudget; completedAt: string }): void {
-    this.sqlite.transaction(() => {
-      this.finish(input.runId, "COMPLETE", input.budget, null, null, null, null, input.completedAt);
-      this.hooks.beforeQualification?.(input.runId);
-      if (this.hasVerificationLedger()) {
-        this.sqlite
-          .prepare(
-            `UPDATE source_record_verifications
-             SET qualification_state='QUALIFIED'
-             WHERE run_id=? AND disposition='ACCEPTED' AND qualification_state='PAGE_PERSISTED'`,
-          )
-          .run(input.runId);
-      }
-    })();
+    const persistenceContext: PersistenceContext = {
+      phase: "UNKNOWN_PERSISTENCE",
+      recordIndex: null,
+      externalId: null,
+      provider: input.budget.capability.source,
+      pageProviderRecordCount: input.budget.records,
+      acceptedRecordCount: 0,
+      unusableRecordCount: input.budget.records,
+    };
+    try {
+      this.sqlite.transaction(() => {
+        this.setPersistencePhase(persistenceContext, "UNKNOWN_PERSISTENCE", null, null);
+        persistenceContext.acceptedRecordCount = Number(
+          this.sqlite
+            .prepare("SELECT count(*) FROM source_observations WHERE run_id=?")
+            .pluck()
+            .get(input.runId),
+        );
+        persistenceContext.unusableRecordCount = this.hasVerificationLedger()
+          ? Number(
+              this.sqlite
+                .prepare(
+                  "SELECT count(*) FROM source_record_verifications WHERE run_id=? AND disposition='UNUSABLE'",
+                )
+                .pluck()
+                .get(input.runId),
+            )
+          : Math.max(0, input.budget.records - persistenceContext.acceptedRecordCount);
+        this.setPersistencePhase(persistenceContext, "COMPLETE_STATUS", null, null);
+        this.finish(
+          input.runId,
+          "COMPLETE",
+          input.budget,
+          null,
+          null,
+          null,
+          null,
+          input.completedAt,
+        );
+        this.setPersistencePhase(persistenceContext, "COMPLETE_QUALIFICATION", null, null);
+        this.hooks.beforeQualification?.(input.runId);
+        if (this.hasVerificationLedger()) {
+          this.sqlite
+            .prepare(
+              `UPDATE source_record_verifications
+               SET qualification_state='QUALIFIED'
+               WHERE run_id=? AND disposition='ACCEPTED' AND qualification_state='PAGE_PERSISTED'`,
+            )
+            .run(input.runId);
+        }
+      })();
+    } catch (error) {
+      throw this.persistenceFailure(error, persistenceContext);
+    }
   }
 
   stop(input: {
@@ -2155,6 +2311,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     retryAfter: string | null;
     transportStage: SourceTransportLifecycleStage | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
+    persistenceDiagnostic?: SourcePersistenceDiagnostic;
     stoppedAt: string;
   }): void {
     this.finish(
@@ -2166,6 +2323,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       input.transportStage,
       input.schemaDiagnostic,
       input.stoppedAt,
+      input.persistenceDiagnostic ?? null,
     );
   }
 
@@ -2294,7 +2452,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
                 (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
                  FROM audit_events a WHERE a.event_type='source.run.stopped'
                    AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex,
+                (SELECT json_extract(a.redacted_metadata_json, '$.persistenceDiagnostic')
+                 FROM audit_events a WHERE a.event_type='source.run.stopped'
+                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS persistenceDiagnosticJson
          FROM source_run_checkpoints WHERE id = ?`,
       )
       .get(runId) as
@@ -2314,6 +2476,17 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       issueCategory: row.schemaIssueCategory,
       ...(row.schemaRecordIndex === null ? {} : { recordIndex: row.schemaRecordIndex }),
     });
+    let persistenceDiagnostic: SourcePersistenceDiagnostic | null = null;
+    if (typeof row.persistenceDiagnosticJson === "string") {
+      try {
+        const parsed = SourcePersistenceDiagnosticSchema.safeParse(
+          JSON.parse(row.persistenceDiagnosticJson),
+        );
+        if (parsed.success) persistenceDiagnostic = parsed.data;
+      } catch {
+        persistenceDiagnostic = null;
+      }
+    }
     return {
       status: row.status,
       operation: row.operation,
@@ -2333,6 +2506,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       retryAfter: row.retryAfter,
       transportStage: stage.success ? stage.data : null,
       schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+      persistenceDiagnostic,
     };
   }
 
@@ -2732,12 +2906,15 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     capability: SourceCapabilityV2,
     runId: string,
     observedAt: string,
+    persistenceContext: PersistenceContext,
+    recordIndex: number,
   ): {
     jobId: string;
     created: boolean;
     observationId: string;
     jobVersionId: string | null;
   } {
+    this.setPersistencePhase(persistenceContext, "SOURCE_IDENTITY", recordIndex, record.externalId);
     if (
       record.source !== capability.source ||
       record.region !== capability.region ||
@@ -2754,6 +2931,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     const identity = `${record.source}\n${record.region}\n${record.tenant}\n${record.externalId}`;
     const jobId = `source-job-${sha256(identity).slice(0, 32)}`;
     const observationId = `source-observation-${sha256(`${identity}\n${record.contentDigest}`)}`;
+    this.setPersistencePhase(persistenceContext, "SOURCE_IDENTITY", recordIndex, record.externalId);
     const existingObservation = this.sqlite
       .prepare("SELECT 1 FROM source_observations WHERE id = ?")
       .get(observationId);
@@ -2771,6 +2949,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         jobVersionId: existingVersion?.id ?? null,
       };
     }
+    this.setPersistencePhase(
+      persistenceContext,
+      "JOB_NORMALIZATION",
+      recordIndex,
+      record.externalId,
+    );
     const structured = isLever
       ? structuredLeverRecord(record, capability)
       : structuredGreenhouseRecord(record, capability);
@@ -2812,6 +2996,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     );
     const sourceName = `${record.source}:${capability.region}:${capability.tenant}`;
     const sourceDigest = sha256(`${capability.region}\n${capability.tenant}`).slice(0, 24);
+    this.setPersistencePhase(persistenceContext, "SOURCE_IDENTITY", recordIndex, record.externalId);
     const sourceId = this.resolveOrCreateJobSource({
       preferredId: isLever ? `source-lever-${sourceDigest}` : `source-greenhouse-${sourceDigest}`,
       name: sourceName,
@@ -2821,6 +3006,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       }),
       observedAt,
     });
+    this.setPersistencePhase(persistenceContext, "JOB_UPSERT", recordIndex, record.externalId);
     const exists = this.sqlite.prepare("SELECT 1 FROM jobs WHERE id = ?").get(jobId);
     if (!exists) {
       this.sqlite
@@ -2864,6 +3050,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         );
     }
     const sourceRecordId = `source-record-${sha256(identity)}`;
+    this.setPersistencePhase(
+      persistenceContext,
+      "SOURCE_RECORD_UPSERT",
+      recordIndex,
+      record.externalId,
+    );
     this.sqlite
       .prepare(
         `INSERT INTO job_source_records
@@ -2886,6 +3078,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         observedAt,
         record.externalId,
       );
+    this.setPersistencePhase(
+      persistenceContext,
+      "SOURCE_RECORD_LOOKUP",
+      recordIndex,
+      record.externalId,
+    );
     const persistedSourceRecord = this.sqlite
       .prepare(
         `SELECT id FROM job_source_records
@@ -2899,6 +3097,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
          WHERE source_record_id=? ORDER BY observed_at DESC,rowid DESC LIMIT 1`,
       )
       .get(persistedSourceRecord.id) as { id: string } | undefined;
+    this.setPersistencePhase(
+      persistenceContext,
+      "OBSERVATION_INSERT",
+      recordIndex,
+      record.externalId,
+    );
     this.sqlite
       .prepare(
         `INSERT INTO source_observations
@@ -2924,6 +3128,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         runId,
         previousObservation?.id ?? null,
       );
+    this.setPersistencePhase(persistenceContext, "PAYLOAD_INSERT", recordIndex, record.externalId);
     this.sqlite
       .prepare(
         `INSERT INTO source_observation_payloads
@@ -2937,6 +3142,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         .get(jobId),
     );
     const jobVersionId = `source-job-version-${sha256(`${jobId}\n${version}\n${record.contentDigest}`)}`;
+    this.setPersistencePhase(
+      persistenceContext,
+      "JOB_VERSION_INSERT",
+      recordIndex,
+      record.externalId,
+    );
     this.sqlite
       .prepare(
         `INSERT INTO job_versions
@@ -2952,18 +3163,44 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         observationId,
         observedAt,
       );
+    this.setPersistencePhase(
+      persistenceContext,
+      "R2A_NORMALIZATION",
+      recordIndex,
+      record.externalId,
+    );
     const normalization = normalizeR2AJobEvidence({
       sourceText,
       sourceObservationId: observationId,
       structured,
       explicitLocation: location,
     });
+    this.setPersistencePhase(persistenceContext, "R2A_PERSIST", recordIndex, record.externalId);
     new R2ARepository(this.sqlite, this.now).recordNormalization(jobVersionId, normalization);
-    this.suggestCrossSourceDuplicates(observationId, capability.source, capability.tenant);
+    this.setPersistencePhase(
+      persistenceContext,
+      "DUPLICATE_SUGGESTION",
+      recordIndex,
+      record.externalId,
+    );
+    this.suggestCrossSourceDuplicates(
+      observationId,
+      capability.source,
+      capability.tenant,
+      persistenceContext,
+      recordIndex,
+      record.externalId,
+    );
     return { jobId, created: true, observationId, jobVersionId };
   }
 
-  private observationIdentity(observationId: string): ObservationIdentity {
+  private observationIdentity(
+    observationId: string,
+    persistenceContext: PersistenceContext,
+    recordIndex: number,
+    externalId: string,
+  ): ObservationIdentity {
+    this.setPersistencePhase(persistenceContext, "DUPLICATE_IDENTITY", recordIndex, externalId);
     const row = this.sqlite
       .prepare(
         `SELECT o.id AS observationId,o.source,o.tenant,o.external_id AS externalId,
@@ -3003,6 +3240,9 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     observationId: string,
     source: string,
     tenant: string,
+    persistenceContext: PersistenceContext,
+    recordIndex: number,
+    externalId: string,
   ): void {
     const r2 = new R2Repository(this.sqlite, this.now);
     if (!r2.available()) return;
@@ -3013,9 +3253,18 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
          ORDER BY observed_at DESC,rowid DESC LIMIT 200`,
       )
       .all(observationId, source, tenant) as Array<{ id: string }>;
-    const current = this.observationIdentity(observationId);
+    const current = this.observationIdentity(
+      observationId,
+      persistenceContext,
+      recordIndex,
+      externalId,
+    );
     for (const candidate of candidateIds) {
-      r2.suggestDuplicate(current, this.observationIdentity(candidate.id));
+      this.setPersistencePhase(persistenceContext, "DUPLICATE_SUGGESTION", recordIndex, externalId);
+      r2.suggestDuplicate(
+        current,
+        this.observationIdentity(candidate.id, persistenceContext, recordIndex, externalId),
+      );
     }
   }
 
@@ -3028,6 +3277,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     transportStage: SourceTransportLifecycleStage | null,
     schemaDiagnostic: SourceSchemaDiagnostic | null,
     completedAt: string,
+    persistenceDiagnostic: SourcePersistenceDiagnostic | null = null,
   ): void {
     const result = this.sqlite
       .prepare(
@@ -3062,6 +3312,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         code: SourceStopCodeSchema.safeParse(code).success ? code : "PERSISTENCE_FAILED",
         transportStage,
         ...(code === "SCHEMA_CHANGED" && schemaDiagnostic ? { schemaDiagnostic } : {}),
+        ...(persistenceDiagnostic
+          ? {
+              persistenceDiagnostic: SourcePersistenceDiagnosticSchema.parse(persistenceDiagnostic),
+            }
+          : {}),
         requestCount: budget.attempts,
         recordCount: budget.records,
       });

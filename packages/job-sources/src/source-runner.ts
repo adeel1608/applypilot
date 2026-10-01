@@ -10,8 +10,10 @@ import {
   type SourceProviderDriftDiagnostic,
   type SourceRecordUnusableDiagnostic,
   type SourceSchemaDiagnostic,
+  type SourcePersistenceDiagnostic,
   type SourceTransportLifecycleStage,
 } from "./source-capability";
+import { SourcePersistenceError } from "./source-capability";
 import {
   SecureSourceError,
   type SecureSourceTransportDependencies,
@@ -66,6 +68,7 @@ export interface SourceRunSink {
     retryAfter: string | null;
     transportStage: SourceTransportLifecycleStage | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
+    persistenceDiagnostic?: SourcePersistenceDiagnostic;
     stoppedAt: string;
   }): Promise<void> | void;
 }
@@ -161,7 +164,8 @@ export async function runLeverSourceDiscovery(input: {
           budget,
           observedAt: now().toISOString(),
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof SourcePersistenceError) throw error;
         throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
       }
       records.push(...page.acceptedRecords);
@@ -174,7 +178,8 @@ export async function runLeverSourceDiscovery(input: {
     budget.assertCurrent(now());
     try {
       await input.sink.complete({ runId, budget, completedAt: now().toISOString() });
-    } catch {
+    } catch (error) {
+      if (error instanceof SourcePersistenceError) throw error;
       throw new SecureSourceError("PERSISTENCE_FAILED", null, "PERSISTENCE");
     }
     return {
@@ -198,8 +203,16 @@ export async function runLeverSourceDiscovery(input: {
       budget,
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
-      transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
+      transportStage:
+        error instanceof SecureSourceError
+          ? error.lifecycleStage
+          : error instanceof SourcePersistenceError
+            ? "PERSISTENCE"
+            : null,
       schemaDiagnostic: error instanceof SecureSourceError ? error.schemaDiagnostic : null,
+      ...(error instanceof SourcePersistenceError
+        ? { persistenceDiagnostic: error.persistenceDiagnostic }
+        : {}),
       stoppedAt: now().toISOString(),
     });
     return {
@@ -337,8 +350,16 @@ export async function runLeverDetailSourceDiscovery(input: {
       budget,
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
-      transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
+      transportStage:
+        error instanceof SecureSourceError
+          ? error.lifecycleStage
+          : error instanceof SourcePersistenceError
+            ? "PERSISTENCE"
+            : null,
       schemaDiagnostic: error instanceof SecureSourceError ? error.schemaDiagnostic : null,
+      ...(error instanceof SourcePersistenceError
+        ? { persistenceDiagnostic: error.persistenceDiagnostic }
+        : {}),
       stoppedAt: now().toISOString(),
     });
     const terminalState: LeverDetailTerminalState =

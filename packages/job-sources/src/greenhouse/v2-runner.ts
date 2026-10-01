@@ -8,8 +8,10 @@ import {
   type SourceCapabilityV2,
   type SourceOperation,
   type SourceSchemaDiagnostic,
+  type SourcePersistenceDiagnostic,
   type SourceTransportLifecycleStage,
 } from "../source-capability";
+import { SourcePersistenceError } from "../source-capability";
 import {
   SecureSourceError,
   type SecureSourceTransportDependencies,
@@ -64,6 +66,7 @@ export interface GreenhouseSourceRunSink {
     retryAfter: string | null;
     transportStage: SourceTransportLifecycleStage | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
+    persistenceDiagnostic?: SourcePersistenceDiagnostic;
     stoppedAt: string;
   }): Promise<void> | void;
 }
@@ -199,8 +202,16 @@ export async function runGreenhouseSourceDiscovery(input: {
       budget,
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
-      transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
+      transportStage:
+        error instanceof SecureSourceError
+          ? error.lifecycleStage
+          : error instanceof SourcePersistenceError
+            ? "PERSISTENCE"
+            : null,
       schemaDiagnostic: error instanceof SecureSourceError ? error.schemaDiagnostic : null,
+      ...(error instanceof SourcePersistenceError
+        ? { persistenceDiagnostic: error.persistenceDiagnostic }
+        : {}),
       stoppedAt: now().toISOString(),
     });
     return {
@@ -298,8 +309,16 @@ export async function runGreenhouseDetailSourceDiscovery(input: {
       budget,
       code,
       retryAfter: error instanceof SecureSourceError ? error.retryAfter : null,
-      transportStage: error instanceof SecureSourceError ? error.lifecycleStage : null,
+      transportStage:
+        error instanceof SecureSourceError
+          ? error.lifecycleStage
+          : error instanceof SourcePersistenceError
+            ? "PERSISTENCE"
+            : null,
       schemaDiagnostic: error instanceof SecureSourceError ? error.schemaDiagnostic : null,
+      ...(error instanceof SourcePersistenceError
+        ? { persistenceDiagnostic: error.persistenceDiagnostic }
+        : {}),
       stoppedAt: now().toISOString(),
     });
     const terminalState: GreenhouseDetailTerminalState =

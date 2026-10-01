@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 
 import {
   SourceSchemaDiagnosticSchema,
+  SourcePersistenceDiagnosticSchema,
   SourceTransportLifecycleStageSchema,
   loadPrivateSourceAllowlistV2,
   latestSourceCapabilityHeads,
@@ -13,6 +14,7 @@ import {
   type SourceCapabilityV2,
   type SourceCapabilityViewBinding,
   type SourceSchemaDiagnostic,
+  type SourcePersistenceDiagnostic,
 } from "@applypilot/job-sources";
 import {
   runGreenhouseSourceToQueue,
@@ -71,6 +73,7 @@ export interface SourceEnablementView {
     safeErrorCode: string | null;
     transportStage: string | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
+    persistenceDiagnostic: SourcePersistenceDiagnostic | null;
     retryAfter: string | null;
     startedAt: string;
     completedAt: string | null;
@@ -146,6 +149,9 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
      (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
         AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex,
+     (SELECT json_extract(a.redacted_metadata_json, '$.persistenceDiagnostic')
+      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS persistenceDiagnosticJson,
      r.retry_after AS retryAfter,r.owner_started_at AS startedAt,r.completed_at AS completedAt
      FROM source_run_checkpoints r JOIN source_capability_versions c ON c.id=r.capability_version_id
      ORDER BY r.owner_started_at DESC LIMIT 20`,
@@ -153,7 +159,11 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
     .all() as Array<
     Omit<
       SourceEnablementView["recentRuns"][number],
-      "transportStage" | "schemaDiagnostic" | "providerRecordCount" | "acceptedRecordCount"
+      | "transportStage"
+      | "schemaDiagnostic"
+      | "persistenceDiagnostic"
+      | "providerRecordCount"
+      | "acceptedRecordCount"
     > & {
       transportStage: unknown;
       persistedPageProviderRecordCount: number;
@@ -161,6 +171,7 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       schemaExpectedType: unknown;
       schemaIssueCategory: unknown;
       schemaRecordIndex: unknown;
+      persistenceDiagnosticJson: unknown;
     }
   >;
   const recentRuns = recentRows.map((run) => {
@@ -171,6 +182,19 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       issueCategory: run.schemaIssueCategory,
       ...(run.schemaRecordIndex === null ? {} : { recordIndex: run.schemaRecordIndex }),
     });
+    let persistenceDiagnostic: SourcePersistenceDiagnostic | null = null;
+    if (run.persistenceDiagnosticJson !== null && run.persistenceDiagnosticJson !== undefined) {
+      try {
+        const parsed = SourcePersistenceDiagnosticSchema.safeParse(
+          typeof run.persistenceDiagnosticJson === "string"
+            ? JSON.parse(run.persistenceDiagnosticJson)
+            : run.persistenceDiagnosticJson,
+        );
+        if (parsed.success) persistenceDiagnostic = parsed.data;
+      } catch {
+        persistenceDiagnostic = null;
+      }
+    }
     return {
       id: run.id,
       status: run.status,
@@ -190,6 +214,7 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       safeErrorCode: run.safeErrorCode,
       transportStage: stage.success ? stage.data : null,
       schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+      persistenceDiagnostic,
       retryAfter: run.retryAfter,
       startedAt: run.startedAt,
       completedAt: run.completedAt,

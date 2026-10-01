@@ -8,6 +8,8 @@ import {
   SecureSourceError,
   SourceCapabilityV2Schema,
   SourceRunBudget,
+  SourcePersistenceDiagnosticSchema,
+  createSourcePersistenceDiagnostic,
   boundedSecureJsonGet,
   classifySecureSourceTransportError,
   createPinnedSourceLookup,
@@ -100,6 +102,93 @@ function posting(index: number) {
 }
 
 describe("R1A source capability and transport", () => {
+  it("keeps persistence diagnostics to the strict redacted allowlist", () => {
+    const secretMessage = "SQL INSERT INTO private_jobs VALUES ('PRIVATE_TITLE')";
+    const diagnostic = createSourcePersistenceDiagnostic({
+      phase: "JOB_UPSERT",
+      recordIndex: 7,
+      externalId: "fictional-private-record-id",
+      provider: "GREENHOUSE",
+      error: Object.assign(new Error(secretMessage), { code: "SQLITE_CONSTRAINT_UNIQUE" }),
+      pageProviderRecordCount: 28,
+      acceptedRecordCount: 28,
+      unusableRecordCount: 0,
+    });
+
+    expect(diagnostic).toMatchObject({
+      phase: "JOB_UPSERT",
+      recordIndex: 7,
+      provider: "GREENHOUSE",
+      sqliteCodeClass: "SQLITE_CONSTRAINT_UNIQUE",
+      safeDomainCode: null,
+      transactionRolledBack: true,
+      pageProviderRecordCount: 28,
+      acceptedRecordCount: 28,
+      unusableRecordCount: 0,
+    });
+    expect(diagnostic.externalIdHashPrefix).toMatch(/^[a-f0-9]{12}$/);
+    expect(JSON.stringify(diagnostic)).not.toContain(secretMessage);
+    expect(JSON.stringify(diagnostic)).not.toContain("fictional-private-record-id");
+    expect(
+      SourcePersistenceDiagnosticSchema.safeParse({
+        ...diagnostic,
+        sql: "PRIVATE_SQL_MUST_BE_REJECTED",
+      }).success,
+    ).toBe(false);
+    expect(
+      validateSourceAuditMetadata("source.run.stopped", {
+        runId: "run:persistence-diagnostic",
+        code: "PERSISTENCE_FAILED",
+        transportStage: "PERSISTENCE",
+        persistenceDiagnostic: diagnostic,
+        requestCount: 1,
+        recordCount: 28,
+      }),
+    ).toBeDefined();
+
+    const classifications = [
+      ["SQLITE_CONSTRAINT_FOREIGNKEY", "SQLITE_CONSTRAINT_FOREIGNKEY"],
+      ["SQLITE_CONSTRAINT_UNIQUE", "SQLITE_CONSTRAINT_UNIQUE"],
+      ["SQLITE_CONSTRAINT_CHECK", "SQLITE_CONSTRAINT_CHECK"],
+      ["SQLITE_CONSTRAINT_NOTNULL", "SQLITE_CONSTRAINT_NOTNULL"],
+      ["SQLITE_BUSY", "SQLITE_BUSY"],
+      ["SQLITE_READONLY", "SQLITE_READONLY"],
+      ["SQLITE_CONSTRAINT", "SQLITE_OTHER"],
+      ["EACCES", "NOT_SQLITE"],
+    ] as const;
+    for (const [code, expected] of classifications) {
+      expect(
+        createSourcePersistenceDiagnostic({
+          phase: "UNKNOWN_PERSISTENCE",
+          recordIndex: null,
+          externalId: null,
+          provider: "GREENHOUSE",
+          error: Object.assign(new Error("hidden internal details"), { code }),
+          pageProviderRecordCount: 1,
+          acceptedRecordCount: 1,
+          unusableRecordCount: 0,
+        }).sqliteCodeClass,
+      ).toBe(expected);
+    }
+
+    expect(
+      createSourcePersistenceDiagnostic({
+        phase: "UNKNOWN_PERSISTENCE",
+        recordIndex: null,
+        externalId: null,
+        provider: "LEVER",
+        error: new Error("raw message must never be copied"),
+        pageProviderRecordCount: 1,
+        acceptedRecordCount: 1,
+        unusableRecordCount: 0,
+      }),
+    ).toMatchObject({
+      sqliteCodeClass: "NOT_SQLITE",
+      safeDomainCode: null,
+      externalIdHashPrefix: null,
+    });
+  });
+
   it("selects one deterministic maximum-version head per family without mutation", () => {
     const old = capability({
       capabilityId: "cap-fictional-002",
