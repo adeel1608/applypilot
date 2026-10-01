@@ -11,12 +11,14 @@ import {
   boundedSecureJsonGet,
   classifySecureSourceTransportError,
   createPinnedSourceLookup,
+  latestSourceCapabilityHeads,
   loadPrivateSourceAllowlistV2,
   readLeverDetailV2,
   readLeverPostingV2FromPayload,
   readLeverPageV2,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
+  resolveCurrentSourceCapabilityHead,
   validateSecureSourceUrl,
   validateSourceAuditMetadata,
   type SecureSourceTransportDependencies,
@@ -98,6 +100,89 @@ function posting(index: number) {
 }
 
 describe("R1A source capability and transport", () => {
+  it("selects one deterministic maximum-version head per family without mutation", () => {
+    const old = capability({
+      capabilityId: "cap-fictional-002",
+      version: 1,
+      predecessorVersion: null,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      revokedAt: "2026-09-09T00:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+    const latest = capability({
+      capabilityId: "cap-fictional-002",
+      version: 3,
+      predecessorVersion: 2,
+    });
+    const secondFamily = capability({ capabilityId: "cap-fictional-001", version: 1 });
+    const input = [old, latest, secondFamily];
+    const snapshot = structuredClone(input);
+
+    expect(latestSourceCapabilityHeads(input)).toEqual([secondFamily, latest]);
+    expect(input).toEqual(snapshot);
+  });
+
+  it("keeps a disabled maximum-version head and rejects duplicate version identities", () => {
+    const enabledPredecessor = capability({
+      capabilityId: "cap-fictional-002",
+      version: 2,
+      predecessorVersion: 1,
+    });
+    const revokedHead = capability({
+      capabilityId: "cap-fictional-002",
+      version: 3,
+      predecessorVersion: 2,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      revokedAt: "2026-09-09T00:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+
+    expect(latestSourceCapabilityHeads([enabledPredecessor, revokedHead])).toEqual([revokedHead]);
+    expect(() => latestSourceCapabilityHeads([enabledPredecessor, enabledPredecessor])).toThrow(
+      "DUPLICATE_CAPABILITY_VERSION",
+    );
+  });
+
+  it("accepts only the exact current capability ID, version, and digest binding", () => {
+    const predecessor = capability({
+      capabilityId: "cap-fictional-002",
+      version: 2,
+      predecessorVersion: 1,
+    });
+    const head = capability({
+      capabilityId: "cap-fictional-002",
+      version: 3,
+      predecessorVersion: 2,
+    });
+    const binding = {
+      capabilityId: head.capabilityId,
+      version: head.version,
+      capabilityDigest: sourceCapabilityDigest(head),
+    };
+
+    expect(resolveCurrentSourceCapabilityHead([predecessor, head], binding)).toEqual(head);
+    expect(() =>
+      resolveCurrentSourceCapabilityHead([predecessor, head], {
+        ...binding,
+        version: predecessor.version,
+        capabilityDigest: sourceCapabilityDigest(predecessor),
+      }),
+    ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
+    expect(() =>
+      resolveCurrentSourceCapabilityHead([predecessor, head], {
+        ...binding,
+        capabilityDigest: "0".repeat(64),
+      }),
+    ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
+    expect(() => resolveCurrentSourceCapabilityHead([predecessor, head], {})).toThrow(
+      "SOURCE_CAPABILITY_VIEW_STALE",
+    );
+  });
+
   it("binds an immutable approved capability and rejects extra or inconsistent fields", () => {
     const approved = capability();
     expect(sourceCapabilityDigest(approved)).toMatch(/^[a-f0-9]{64}$/);

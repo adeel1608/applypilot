@@ -114,6 +114,31 @@ describe("operational source readiness", () => {
     });
   });
 
+  it("does not count an approved predecessor when its latest family head is revoked", async () => {
+    const directory = await root();
+    const approvedV2 = capability({ version: 2, predecessorVersion: 1 });
+    const revokedV3 = capability({
+      version: 3,
+      predecessorVersion: 2,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      revokedAt: "2026-09-10T23:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+    await writeAllowlist(directory, {
+      schemaVersion: 2,
+      capabilities: [approvedV2, revokedV3],
+    });
+
+    await expect(operationalSourceReadiness(directory, now)).resolves.toEqual({
+      state: "SOURCE_ALLOWLIST_V2_READY",
+      configuredCapabilityCount: 2,
+      activeCapabilityCount: 0,
+      inactiveReasons: [{ status: "SOURCE_DISABLED", reason: "REVOKED" }],
+    });
+  });
+
   it("rejects the legacy or malformed document instead of reporting source authority", async () => {
     const directory = await root();
     await writeAllowlist(directory, { version: 1, capabilities: [] });

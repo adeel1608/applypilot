@@ -24,6 +24,7 @@ import SourcesPage from "./page";
 const capability = {
   capabilityId: "fictional-source-capability",
   version: 3,
+  configurationDigest: "a".repeat(64),
   source: "LEVER",
   alias: "Fictional Tenant",
   tenant: "fictional-tenant",
@@ -123,6 +124,61 @@ describe("source receipt UI", () => {
         (input) => input.props.checked !== true && input.props.defaultChecked !== true,
       ),
     ).toBe(true);
+  });
+
+  it("binds every owner form to the same exact displayed capability head", async () => {
+    const tree = await SourcesPage();
+    const sourceForms = elements(tree).filter(
+      (element) => element.type === "form" && element.props.className === "import-form",
+    );
+
+    expect(sourceForms).toHaveLength(3);
+    for (const form of sourceForms) {
+      const inputs = elements(form);
+      expect(inputs.find((input) => input.props.name === "capabilityId")?.props.value).toBe(
+        capability.capabilityId,
+      );
+      expect(inputs.find((input) => input.props.name === "capabilityVersion")?.props.value).toBe(
+        capability.version,
+      );
+      expect(inputs.find((input) => input.props.name === "capabilityDigest")?.props.value).toBe(
+        capability.configurationDigest,
+      );
+    }
+  });
+
+  it("keeps a revoked latest head visible but disables APPROVE and RUN without predecessor fallback", async () => {
+    mocks.getSourceEnablementView.mockResolvedValueOnce({
+      status: "SOURCE_ALLOWLIST_V2_READY",
+      capabilities: [
+        {
+          ...capability,
+          version: 3,
+          readiness: "SOURCE_DISABLED",
+          ownerApprovalState: "REVOKED",
+          ownerApprovalReceiptId: null,
+          canOwnerStart: false,
+        },
+      ],
+      recentRuns: [],
+    });
+
+    const tree = await SourcesPage();
+    const buttons = elements(tree).filter((element) => element.type === "button");
+    const approvalButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes("Approve exact source capability"),
+    );
+    const runButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes("Start bounded source read"),
+    );
+    const formVersions = elements(tree)
+      .filter((element) => element.type === "input" && element.props.name === "capabilityVersion")
+      .map((input) => input.props.value);
+
+    expect(textContent(tree)).toContain("Durable owner approval: REVOKED");
+    expect(approvalButton?.props.disabled).toBe(true);
+    expect(runButton?.props.disabled).toBe(true);
+    expect(formVersions).toEqual([3, 3, 3]);
   });
 
   it("enables a fresh bounded start only for a current exact-version approval receipt", async () => {

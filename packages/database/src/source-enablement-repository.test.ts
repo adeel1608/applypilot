@@ -12,6 +12,7 @@ import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
   readLeverPageV2,
+  resolveCurrentSourceCapabilityHead,
   sourceCapabilityDigest,
   type SourceCapabilityV2,
   type SourceOperation,
@@ -3359,6 +3360,128 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(() =>
       repository.rederiveGreenhouseObservation({ verificationId: verification.id }),
     ).toThrow("R2A_REDERIVED_RECORD_IDENTITY_MISMATCH");
+    sqlite.close();
+  });
+
+  it("approves and binds the exact latest v3 head in a fictional schema-12 database", () => {
+    const sqlite = database();
+    let id = 0;
+    const familyId = "source-lever-versioned-family";
+    const tenant = "versioned-family-fixture";
+    const v1 = capability({
+      capabilityId: familyId,
+      tenant,
+      allowedPathPrefix: `/v0/postings/${tenant}`,
+      version: 1,
+      predecessorVersion: null,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      revokedAt: "2026-09-01T00:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+    const v2 = capability({
+      capabilityId: familyId,
+      tenant,
+      allowedPathPrefix: `/v0/postings/${tenant}`,
+      version: 2,
+      predecessorVersion: 1,
+      approvalState: "REVOKED",
+      approvalReference: null,
+      approvedAt: null,
+      createdAt: "2026-09-05T00:00:00.000Z",
+      updatedAt: "2026-09-05T00:00:00.000Z",
+      revokedAt: "2026-09-05T00:00:00.000Z",
+      revocationReason: "OWNER_REVOKED",
+    });
+    const v3 = capability({
+      capabilityId: familyId,
+      tenant,
+      allowedPathPrefix: `/v0/postings/${tenant}`,
+      version: 3,
+      predecessorVersion: 2,
+      approvalReference: "fixture-owner-approval-v3",
+      approvedAt: "2026-09-09T00:00:00.000Z",
+      createdAt: "2026-09-09T00:00:00.000Z",
+      updatedAt: "2026-09-09T00:00:00.000Z",
+      revokedAt: null,
+      revocationReason: null,
+    });
+    const current = resolveCurrentSourceCapabilityHead([v1, v2, v3], {
+      capabilityId: familyId,
+      version: 3,
+      capabilityDigest: sourceCapabilityDigest(v3),
+    });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `versioned-owner:${++id}`,
+    );
+    for (const version of [v1, v2, v3]) repository.persistCapabilityVersion(version);
+
+    const approval = repository.recordOwnerApprovalReceipt({
+      capability: current,
+      gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+      ownerConfirmed: true,
+    });
+    expect(repository.getOwnerApprovalStatus(current)).toMatchObject({
+      state: "CURRENT",
+      receiptId: approval.id,
+      canStart: true,
+    });
+
+    const runId = startFictionalOwnerBoundRun(repository, current, "LIST_JOBS");
+    const receipts = sqlite
+      .prepare(
+        `SELECT id,action,state,capability_version AS version,capability_digest AS digest,
+                predecessor_receipt_id AS predecessorReceiptId
+         FROM source_owner_action_receipts ORDER BY rowid`,
+      )
+      .all() as Array<{
+      id: string;
+      action: string;
+      state: string;
+      version: number;
+      digest: string;
+      predecessorReceiptId: string | null;
+    }>;
+    const startReceipt = receipts.find(({ action }) => action === "START");
+    expect(receipts).toHaveLength(2);
+    expect(receipts[0]).toMatchObject({
+      id: approval.id,
+      action: "APPROVE",
+      state: "CONSUMED",
+      version: 3,
+      digest: sourceCapabilityDigest(v3),
+    });
+    expect(startReceipt).toMatchObject({
+      action: "START",
+      state: "CONSUMED",
+      version: 3,
+      digest: sourceCapabilityDigest(v3),
+      predecessorReceiptId: approval.id,
+    });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT approval_receipt_id AS approvalReceiptId,start_receipt_id AS startReceiptId,
+                  capability_digest AS digest,operation
+           FROM source_run_owner_bindings WHERE run_id=?`,
+        )
+        .get(runId),
+    ).toEqual({
+      approvalReceiptId: approval.id,
+      startReceiptId: startReceipt?.id,
+      digest: sourceCapabilityDigest(v3),
+      operation: "LIST_JOBS",
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT status,request_count AS requests,page_count AS pages FROM source_run_checkpoints WHERE id=?",
+        )
+        .get(runId),
+    ).toEqual({ status: "RUNNING", requests: 0, pages: 0 });
     sqlite.close();
   });
 
