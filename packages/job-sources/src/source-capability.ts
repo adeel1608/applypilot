@@ -192,21 +192,15 @@ export const SourceAllowlistV2Schema = z
     capabilities: z.array(SourceCapabilityV2Schema).max(20),
   })
   .strict()
+  // Older APPROVED entries remain immutable history; current authority is the latest family head.
   .superRefine(({ capabilities }, context) => {
     const identities = new Set<string>();
-    const active = new Set<string>();
     for (const capability of capabilities) {
       const identity = `${capability.capabilityId}:${capability.version}`;
       if (identities.has(identity)) {
         context.addIssue({ code: "custom", message: "DUPLICATE_CAPABILITY_VERSION" });
       }
       identities.add(identity);
-      if (capability.approvalState === "APPROVED") {
-        if (active.has(capability.capabilityId)) {
-          context.addIssue({ code: "custom", message: "MULTIPLE_ACTIVE_CAPABILITY_VERSIONS" });
-        }
-        active.add(capability.capabilityId);
-      }
     }
   });
 
