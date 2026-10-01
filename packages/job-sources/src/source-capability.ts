@@ -138,6 +138,54 @@ export const SourceCapabilityV2Schema = z
 
 export type SourceCapabilityV2 = z.infer<typeof SourceCapabilityV2Schema>;
 
+export const SourceCapabilityViewBindingSchema = z
+  .object({
+    capabilityId: SourceCapabilityV2Schema.shape.capabilityId,
+    version: z.number().int().positive(),
+    capabilityDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+export type SourceCapabilityViewBinding = z.infer<typeof SourceCapabilityViewBindingSchema>;
+
+/** Selects the immutable highest-version head for every capability family. */
+export function latestSourceCapabilityHeads(input: readonly unknown[]): SourceCapabilityV2[] {
+  const identities = new Set<string>();
+  const heads = new Map<string, SourceCapabilityV2>();
+  for (const item of input) {
+    const capability = SourceCapabilityV2Schema.parse(item);
+    const identity = `${capability.capabilityId}\u0000${capability.version}`;
+    if (identities.has(identity)) throw new Error("DUPLICATE_CAPABILITY_VERSION");
+    identities.add(identity);
+    const current = heads.get(capability.capabilityId);
+    if (!current || capability.version > current.version) {
+      heads.set(capability.capabilityId, capability);
+    }
+  }
+  return [...heads.values()].sort((left, right) =>
+    left.capabilityId < right.capabilityId ? -1 : left.capabilityId > right.capabilityId ? 1 : 0,
+  );
+}
+
+/** Resolves a posted UI binding only when it still names the exact current private head. */
+export function resolveCurrentSourceCapabilityHead(
+  capabilities: readonly unknown[],
+  bindingInput: unknown,
+): SourceCapabilityV2 {
+  const binding = SourceCapabilityViewBindingSchema.safeParse(bindingInput);
+  if (!binding.success) throw new Error("SOURCE_CAPABILITY_VIEW_STALE");
+  const current = latestSourceCapabilityHeads(capabilities).find(
+    ({ capabilityId }) => capabilityId === binding.data.capabilityId,
+  );
+  if (
+    !current ||
+    current.version !== binding.data.version ||
+    sourceCapabilityDigest(current) !== binding.data.capabilityDigest
+  ) {
+    throw new Error("SOURCE_CAPABILITY_VIEW_STALE");
+  }
+  return current;
+}
+
 export const SourceAllowlistV2Schema = z
   .object({
     schemaVersion: z.literal(2),

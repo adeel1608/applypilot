@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { SourceCapabilityViewBindingSchema } from "@applypilot/job-sources";
 import { consumeLocalMutationNonce } from "@web/lib/local-mutation-security";
 import {
   approveOwnerSourceCapability,
@@ -12,11 +13,20 @@ import {
   runOwnerApprovedSource,
 } from "@web/lib/source-workspace";
 
-const capabilityId = (formData: FormData) =>
-  z
-    .string()
-    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,79}$/)
-    .parse(formData.get("capabilityId"));
+function capabilityBinding(formData: FormData) {
+  const rawVersion = formData.get("capabilityVersion");
+  const version =
+    typeof rawVersion === "string" && /^[1-9]\d*$/.test(rawVersion)
+      ? Number(rawVersion)
+      : Number.NaN;
+  const parsed = SourceCapabilityViewBindingSchema.safeParse({
+    capabilityId: formData.get("capabilityId"),
+    version,
+    capabilityDigest: formData.get("capabilityDigest"),
+  });
+  if (!parsed.success) throw new Error("SOURCE_CAPABILITY_VIEW_STALE");
+  return parsed.data;
+}
 
 function confirm(formData: FormData, phrase: string): void {
   if (formData.get("ownerConfirmed") !== "yes" || formData.get("confirmationText") !== phrase) {
@@ -26,9 +36,9 @@ function confirm(formData: FormData, phrase: string): void {
 
 export async function startSourceRunAction(formData: FormData) {
   const gateProof = await consumeLocalMutationNonce("SOURCE_RUN_START", formData);
-  const id = capabilityId(formData);
-  confirm(formData, `RUN ${id}`);
-  await runOwnerApprovedSource(id, gateProof);
+  const binding = capabilityBinding(formData);
+  confirm(formData, `RUN ${binding.capabilityId}`);
+  await runOwnerApprovedSource(binding, gateProof);
   revalidatePath("/sources");
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
@@ -37,18 +47,18 @@ export async function startSourceRunAction(formData: FormData) {
 
 export async function approveSourceCapabilityAction(formData: FormData) {
   const gateProof = await consumeLocalMutationNonce("SOURCE_CAPABILITY_APPROVE", formData);
-  const id = capabilityId(formData);
-  confirm(formData, `APPROVE ${id}`);
-  await approveOwnerSourceCapability(id, gateProof);
+  const binding = capabilityBinding(formData);
+  confirm(formData, `APPROVE ${binding.capabilityId}`);
+  await approveOwnerSourceCapability(binding, gateProof);
   revalidatePath("/sources");
   redirect("/sources");
 }
 
 export async function revokeSourceAction(formData: FormData) {
   await consumeLocalMutationNonce("SOURCE_REVOKE", formData);
-  const id = capabilityId(formData);
-  confirm(formData, `REVOKE ${id}`);
-  await revokeSourceCapability(id);
+  const binding = capabilityBinding(formData);
+  confirm(formData, `REVOKE ${binding.capabilityId}`);
+  await revokeSourceCapability(binding);
   revalidatePath("/sources");
   redirect("/sources");
 }

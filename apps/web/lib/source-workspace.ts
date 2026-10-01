@@ -3,12 +3,15 @@ import "server-only";
 import { dirname } from "node:path";
 
 import {
-  SourceCapabilityV2Schema,
   SourceSchemaDiagnosticSchema,
   SourceTransportLifecycleStageSchema,
   loadPrivateSourceAllowlistV2,
+  latestSourceCapabilityHeads,
+  resolveCurrentSourceCapabilityHead,
+  sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
+  type SourceCapabilityViewBinding,
   type SourceSchemaDiagnostic,
 } from "@applypilot/job-sources";
 import {
@@ -34,6 +37,7 @@ export interface SourceEnablementView {
   capabilities: Array<{
     capabilityId: string;
     version: number;
+    configurationDigest: string;
     source: string;
     alias: string;
     tenant: string;
@@ -91,11 +95,12 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
     return { status: "CONFIGURATION_REJECTED", capabilities: [], recentRuns: [] };
   }
   const capabilities = ownerReceiptSchemaAvailable
-    ? allowlist.capabilities.map((capability) => {
+    ? latestSourceCapabilityHeads(allowlist.capabilities).map((capability) => {
         const ownerApproval = repository.getOwnerApprovalStatus(capability);
         return {
           capabilityId: capability.capabilityId,
           version: capability.version,
+          configurationDigest: sourceCapabilityDigest(capability),
           source: capability.source,
           alias: capability.alias,
           tenant: capability.tenant,
@@ -198,20 +203,19 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
   };
 }
 
-async function exactPrivateCapability(capabilityId: string): Promise<SourceCapabilityV2> {
-  const value = SourceCapabilityV2Schema.shape.capabilityId.parse(capabilityId);
+async function exactPrivateCapability(
+  binding: SourceCapabilityViewBinding,
+): Promise<SourceCapabilityV2> {
   const allowlist = await loadPrivateSourceAllowlistV2(repositoryRoot(), allowlistFilename());
   if (allowlist.status !== "SOURCE_ALLOWLIST_V2_READY") throw new Error("APPROVED_TENANT_REQUIRED");
-  const matches = allowlist.capabilities.filter(({ capabilityId: id }) => id === value);
-  if (matches.length !== 1) throw new Error("SOURCE_CAPABILITY_NOT_UNIQUE");
-  return SourceCapabilityV2Schema.parse(matches[0]);
+  return resolveCurrentSourceCapabilityHead(allowlist.capabilities, binding);
 }
 
 export async function approveOwnerSourceCapability(
-  capabilityId: string,
+  binding: SourceCapabilityViewBinding,
   gateProof: SourceOwnerActionGateProof,
 ): Promise<void> {
-  const capability = await exactPrivateCapability(capabilityId);
+  const capability = await exactPrivateCapability(binding);
   if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
     throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
   }
@@ -230,10 +234,10 @@ export async function approveOwnerSourceCapability(
 }
 
 export async function runOwnerApprovedSource(
-  capabilityId: string,
+  binding: SourceCapabilityViewBinding,
   gateProof: SourceOwnerActionGateProof,
 ) {
-  const capability = await exactPrivateCapability(capabilityId);
+  const capability = await exactPrivateCapability(binding);
   if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
     throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
   }
@@ -262,8 +266,8 @@ export async function runOwnerApprovedSource(
     : runLeverSourceToQueue(runInput);
 }
 
-export async function revokeSourceCapability(capabilityId: string): Promise<void> {
-  const capability = await exactPrivateCapability(capabilityId);
+export async function revokeSourceCapability(binding: SourceCapabilityViewBinding): Promise<void> {
+  const capability = await exactPrivateCapability(binding);
   const repository = getSourceEnablementRepository();
   if (!repository) throw new Error("DATABASE_MIGRATION_REQUIRED");
   repository.persistCapabilityVersion(capability);

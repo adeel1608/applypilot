@@ -23,9 +23,12 @@ vi.mock("@web/lib/source-workspace", () => ({
   runOwnerApprovedSource: mocks.runOwnerApprovedSource,
 }));
 
-import { approveSourceCapabilityAction, startSourceRunAction } from "./actions";
+import { approveSourceCapabilityAction, revokeSourceAction, startSourceRunAction } from "./actions";
 
 const capabilityId = "capability_123";
+const capabilityVersion = 3;
+const capabilityDigest = "a".repeat(64);
+const capabilityBinding = { capabilityId, version: capabilityVersion, capabilityDigest };
 const gateProof = {
   action: "SOURCE_CAPABILITY_APPROVE",
   consumedAt: "2026-09-28T00:00:00.000Z",
@@ -37,6 +40,8 @@ const gateProof = {
 function ownerForm(phrase: string, confirmed = "yes"): FormData {
   const formData = new FormData();
   formData.set("capabilityId", capabilityId);
+  formData.set("capabilityVersion", String(capabilityVersion));
+  formData.set("capabilityDigest", capabilityDigest);
   formData.set("ownerConfirmed", confirmed);
   formData.set("confirmationText", phrase);
   formData.set("mutationNonce", "fictional-one-use-nonce");
@@ -61,7 +66,7 @@ describe("source owner action gates", () => {
       "SOURCE_CAPABILITY_APPROVE",
       formData,
     );
-    expect(mocks.approveOwnerSourceCapability).toHaveBeenCalledWith(capabilityId, gateProof);
+    expect(mocks.approveOwnerSourceCapability).toHaveBeenCalledWith(capabilityBinding, gateProof);
     expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
   });
 
@@ -87,6 +92,21 @@ describe("source owner action gates", () => {
     expect(mocks.approveOwnerSourceCapability).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["missing version", (form: FormData) => form.delete("capabilityVersion")],
+    ["malformed version", (form: FormData) => form.set("capabilityVersion", "03")],
+    ["missing digest", (form: FormData) => form.delete("capabilityDigest")],
+    ["malformed digest", (form: FormData) => form.set("capabilityDigest", "not-a-digest")],
+  ])("rejects %s before workspace writes", async (_case, mutate) => {
+    const form = ownerForm(`APPROVE ${capabilityId}`);
+    mutate(form);
+
+    await expect(approveSourceCapabilityAction(form)).rejects.toThrow(
+      "SOURCE_CAPABILITY_VIEW_STALE",
+    );
+    expect(mocks.approveOwnerSourceCapability).not.toHaveBeenCalled();
+  });
+
   it("starts only after the separate exact RUN confirmation and start nonce pass", async () => {
     const formData = ownerForm(`RUN ${capabilityId}`);
     mocks.consumeLocalMutationNonce.mockResolvedValue({ ...gateProof, action: "SOURCE_RUN_START" });
@@ -94,7 +114,7 @@ describe("source owner action gates", () => {
     await expect(startSourceRunAction(formData)).rejects.toThrow("REDIRECT:/sources");
 
     expect(mocks.consumeLocalMutationNonce).toHaveBeenCalledWith("SOURCE_RUN_START", formData);
-    expect(mocks.runOwnerApprovedSource).toHaveBeenCalledWith(capabilityId, {
+    expect(mocks.runOwnerApprovedSource).toHaveBeenCalledWith(capabilityBinding, {
       ...gateProof,
       action: "SOURCE_RUN_START",
     });
@@ -124,5 +144,12 @@ describe("source owner action gates", () => {
     );
 
     expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
+  });
+
+  it("passes the full exact view binding through the REVOKE action", async () => {
+    const form = ownerForm(`REVOKE ${capabilityId}`);
+    await expect(revokeSourceAction(form)).rejects.toThrow("REDIRECT:/sources");
+    expect(mocks.consumeLocalMutationNonce).toHaveBeenCalledWith("SOURCE_REVOKE", form);
+    expect(mocks.revokeSourceCapability).toHaveBeenCalledWith(capabilityBinding);
   });
 });

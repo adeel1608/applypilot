@@ -104,6 +104,12 @@ export default async function SourcesPage() {
                 >
                   <input type="hidden" name="mutationNonce" value={nonces[index]?.approve} />
                   <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                  <input type="hidden" name="capabilityVersion" value={capability.version} />
+                  <input
+                    type="hidden"
+                    name="capabilityDigest"
+                    value={capability.configurationDigest}
+                  />
                   <p id={`source-approval-help-${index}`}>
                     This records an owner approval receipt for this exact capability version and
                     makes no source request. Type <code>APPROVE {capability.capabilityId}</code>.
@@ -127,6 +133,12 @@ export default async function SourcesPage() {
                 >
                   <input type="hidden" name="mutationNonce" value={nonces[index]?.start} />
                   <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                  <input type="hidden" name="capabilityVersion" value={capability.version} />
+                  <input
+                    type="hidden"
+                    name="capabilityDigest"
+                    value={capability.configurationDigest}
+                  />
                   <p id={`source-run-help-${index}`}>
                     This starts one bounded source read after a separate current owner approval
                     receipt. Type <code>RUN {capability.capabilityId}</code>.
@@ -150,6 +162,12 @@ export default async function SourcesPage() {
                 >
                   <input type="hidden" name="mutationNonce" value={nonces[index]?.revoke} />
                   <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                  <input type="hidden" name="capabilityVersion" value={capability.version} />
+                  <input
+                    type="hidden"
+                    name="capabilityDigest"
+                    value={capability.configurationDigest}
+                  />
                   <p id={`source-revoke-help-${index}`}>
                     Revocation is an immutable new version and prevents later runs. Type{" "}
                     <code>REVOKE {capability.capabilityId}</code>.

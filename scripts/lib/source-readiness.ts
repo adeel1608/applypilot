@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 
 import {
+  latestSourceCapabilityHeads,
   loadPrivateSourceAllowlistV2,
   sourceCapabilityReadiness,
   type SourceCapabilityReadiness,
@@ -104,9 +105,8 @@ export async function operationalSourceReadiness(
   filename = process.env.APPLYPILOT_SOURCE_ALLOWLIST_FILENAME ?? "source-allowlist.json",
 ): Promise<OperationalSourceReadiness> {
   const source = await loadPrivateSourceAllowlistV2(repositoryRoot, filename);
-  const readiness = source.capabilities.map((capability) =>
-    sourceCapabilityReadiness(capability, now),
-  );
+  const currentHeads = latestSourceCapabilityHeads(source.capabilities);
+  const readiness = currentHeads.map((capability) => sourceCapabilityReadiness(capability, now));
   return {
     state: source.status,
     configuredCapabilityCount: source.capabilities.length,
