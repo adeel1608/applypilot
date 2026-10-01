@@ -32,7 +32,11 @@ vi.mock("./local-data-directory", () => ({
   resolveLocalDataDirectory: () => "C:/fictional/applypilot/data/private",
 }));
 
-import { SourceCapabilityV2Schema, sourceCapabilityDigest } from "@applypilot/job-sources";
+import {
+  SourceCapabilityV2Schema,
+  sourceCapabilityDigest,
+  type SourcePersistenceDiagnostic,
+} from "@applypilot/job-sources";
 
 import {
   approveOwnerSourceCapability,
@@ -127,6 +131,56 @@ describe("source workspace current capability lookup", () => {
 
     expect(view.capabilities).toHaveLength(1);
     expect(view.capabilities[0]).toMatchObject({ version: 3, readiness: "SOURCE_DISABLED" });
+  });
+
+  it("projects only strict safe persistence diagnostics in recent runs", async () => {
+    const persistenceDiagnostic: SourcePersistenceDiagnostic = {
+      phase: "JOB_UPSERT",
+      recordIndex: 5,
+      externalIdHashPrefix: "1234567890ab",
+      provider: "GREENHOUSE",
+      sqliteCodeClass: "SQLITE_CONSTRAINT_UNIQUE",
+      safeDomainCode: null,
+      transactionRolledBack: true,
+      pageProviderRecordCount: 28,
+      acceptedRecordCount: 28,
+      unusableRecordCount: 0,
+    };
+    const recentRow = {
+      id: "run:persistence",
+      status: "STOPPED",
+      source: "GREENHOUSE",
+      alias: "Fictional Board",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 28,
+      persistedPageProviderRecordCount: 0,
+      unusableRecordCount: 0,
+      providerDriftWarningCount: 0,
+      persistedObservationCount: 0,
+      safeErrorCode: "PERSISTENCE_FAILED",
+      transportStage: "PERSISTENCE",
+      schemaField: null,
+      schemaExpectedType: null,
+      schemaIssueCategory: null,
+      schemaRecordIndex: null,
+      persistenceDiagnosticJson: JSON.stringify(persistenceDiagnostic),
+      retryAfter: null,
+      startedAt: "2026-10-01T00:00:00.000Z",
+      completedAt: "2026-10-01T00:00:01.000Z",
+    };
+    mocks.getLocalDatabase.mockReturnValue({
+      sqlite: { prepare: () => ({ all: () => [recentRow] }) },
+    });
+    mocks.loadPrivateSourceAllowlistV2.mockResolvedValue({
+      status: "SOURCE_ALLOWLIST_V2_READY",
+      capabilities: [],
+    });
+
+    const view = await getSourceEnablementView();
+
+    expect(view.recentRuns[0]?.persistenceDiagnostic).toEqual(persistenceDiagnostic);
+    expect(JSON.stringify(view.recentRuns[0]?.persistenceDiagnostic)).not.toContain("SQL ");
   });
 
   it("approves the exact current head after reloading the private allowlist", async () => {

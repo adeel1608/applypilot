@@ -402,6 +402,7 @@ export const SourceStopCodeSchema = z.enum([
   "SCHEMA_CHANGED",
   "DESTINATION_FORBIDDEN",
   "PERSISTENCE_FAILED",
+  "SOURCE_PAGE_DUPLICATE_EXTERNAL_ID",
   "DNS_RESOLUTION_FAILED",
   "NETWORK_ROUTE_UNAVAILABLE",
   "CONNECTION_REFUSED",
@@ -429,6 +430,149 @@ export const SourceStopCodeSchema = z.enum([
   "SOURCE_DETAIL_ID_INVALID",
   "SOURCE_DETAIL_ID_MISMATCH",
 ]);
+
+export const SourcePersistencePhaseSchema = z.enum([
+  "CAPABILITY_ASSERT",
+  "SOURCE_IDENTITY",
+  "JOB_NORMALIZATION",
+  "JOB_UPSERT",
+  "SOURCE_RECORD_UPSERT",
+  "SOURCE_RECORD_LOOKUP",
+  "OBSERVATION_INSERT",
+  "PAYLOAD_INSERT",
+  "JOB_VERSION_INSERT",
+  "R2A_NORMALIZATION",
+  "R2A_PERSIST",
+  "DUPLICATE_IDENTITY",
+  "DUPLICATE_SUGGESTION",
+  "PAGE_INSERT",
+  "VERIFICATION_INSERT",
+  "CHECKPOINT_UPDATE",
+  "PAGE_AUDIT",
+  "COMPLETE_STATUS",
+  "COMPLETE_QUALIFICATION",
+  "UNKNOWN_PERSISTENCE",
+]);
+export type SourcePersistencePhase = z.infer<typeof SourcePersistencePhaseSchema>;
+
+export const SourcePersistenceProviderSchema = z.enum(["LEVER", "GREENHOUSE"]);
+export const SourcePersistenceSqliteCodeClassSchema = z.enum([
+  "SQLITE_CONSTRAINT_FOREIGNKEY",
+  "SQLITE_CONSTRAINT_UNIQUE",
+  "SQLITE_CONSTRAINT_CHECK",
+  "SQLITE_CONSTRAINT_NOTNULL",
+  "SQLITE_BUSY",
+  "SQLITE_READONLY",
+  "SQLITE_OTHER",
+  "NOT_SQLITE",
+]);
+export const SourcePersistenceDomainCodeSchema = z.union([
+  SourceStopCodeSchema,
+  z.enum([
+    "JOB_SOURCE_IDENTITY_CONFLICT",
+    "JOB_SOURCE_IDENTITY_RESOLUTION_FAILED",
+    "QUALIFICATION_INTERRUPTED",
+    "R2_DUPLICATE_OBSERVATION_VERSION_REQUIRED",
+    "R2_SCHEMA_REQUIRED",
+    "R2A_DERIVATION_BINDING_CONFLICT",
+    "R2A_DERIVATION_INPUT_NOT_FOUND",
+    "R2A_DERIVATION_SCHEMA_REQUIRED",
+    "R2A_EVIDENCE_OBSERVATION_MISMATCH",
+    "R2A_EXCERPT_HASH_MISMATCH",
+    "R2A_IMMUTABLE_PAYLOAD_IDENTITY_MISMATCH",
+    "R2A_IMMUTABLE_VERSION_CONFLICT",
+    "R2A_JOB_VERSION_NOT_FOUND",
+    "R2A_NORMALIZATION_MISSING",
+    "R2A_OBSERVATION_VERSION_MISMATCH",
+    "R2A_SCHEMA_NOT_AVAILABLE",
+    "SOURCE_JOB_VERSION_REQUIRED",
+    "SOURCE_OPERATION_MISMATCH",
+    "SOURCE_PAGE_REPLAY_CONFLICT",
+    "SOURCE_RECORD_CAPABILITY_MISMATCH",
+    "SOURCE_RECORD_REQUIRED_FIELD_MISSING",
+    "SOURCE_VERIFICATION_CONFLICT",
+    "SOURCE_VERIFICATION_LEDGER_REQUIRED",
+  ]),
+]);
+
+export const SourcePersistenceDiagnosticSchema = z
+  .object({
+    phase: SourcePersistencePhaseSchema,
+    recordIndex: z.number().int().nonnegative().max(1_000_000).nullable(),
+    externalIdHashPrefix: z
+      .string()
+      .regex(/^[a-f0-9]{12}$/)
+      .nullable(),
+    provider: SourcePersistenceProviderSchema,
+    sqliteCodeClass: SourcePersistenceSqliteCodeClassSchema,
+    safeDomainCode: SourcePersistenceDomainCodeSchema.nullable(),
+    transactionRolledBack: z.literal(true),
+    pageProviderRecordCount: z.number().int().nonnegative().max(1_000_000),
+    acceptedRecordCount: z.number().int().nonnegative().max(1_000_000),
+    unusableRecordCount: z.number().int().nonnegative().max(1_000_000),
+  })
+  .strict();
+export type SourcePersistenceDiagnostic = z.infer<typeof SourcePersistenceDiagnosticSchema>;
+
+function persistenceSqliteCodeClass(
+  error: unknown,
+): z.infer<typeof SourcePersistenceSqliteCodeClassSchema> {
+  const code =
+    error && typeof error === "object" && "code" in error && typeof error.code === "string"
+      ? error.code
+      : null;
+  if (code === "SQLITE_CONSTRAINT_FOREIGNKEY") return "SQLITE_CONSTRAINT_FOREIGNKEY";
+  if (code === "SQLITE_CONSTRAINT_UNIQUE" || code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
+    return "SQLITE_CONSTRAINT_UNIQUE";
+  }
+  if (code === "SQLITE_CONSTRAINT_CHECK") return "SQLITE_CONSTRAINT_CHECK";
+  if (code === "SQLITE_CONSTRAINT_NOTNULL") return "SQLITE_CONSTRAINT_NOTNULL";
+  if (code === "SQLITE_BUSY" || code?.startsWith("SQLITE_BUSY_")) return "SQLITE_BUSY";
+  if (code === "SQLITE_READONLY" || code?.startsWith("SQLITE_READONLY_")) {
+    return "SQLITE_READONLY";
+  }
+  return code?.startsWith("SQLITE_") ? "SQLITE_OTHER" : "NOT_SQLITE";
+}
+
+export function createSourcePersistenceDiagnostic(input: {
+  phase: SourcePersistencePhase;
+  recordIndex: number | null;
+  externalId: string | null;
+  provider: z.infer<typeof SourcePersistenceProviderSchema>;
+  error: unknown;
+  pageProviderRecordCount: number;
+  acceptedRecordCount: number;
+  unusableRecordCount: number;
+}): SourcePersistenceDiagnostic {
+  const candidateDomainCode = input.error instanceof Error ? input.error.message : null;
+  const parsedDomainCode = SourcePersistenceDomainCodeSchema.safeParse(candidateDomainCode);
+  const safeDomainCode = parsedDomainCode.success ? parsedDomainCode.data : null;
+  return SourcePersistenceDiagnosticSchema.parse({
+    phase: input.phase,
+    recordIndex: input.recordIndex,
+    externalIdHashPrefix: input.externalId
+      ? createHash("sha256").update(input.externalId).digest("hex").slice(0, 12)
+      : null,
+    provider: input.provider,
+    sqliteCodeClass: persistenceSqliteCodeClass(input.error),
+    safeDomainCode,
+    transactionRolledBack: true,
+    pageProviderRecordCount: input.pageProviderRecordCount,
+    acceptedRecordCount: input.acceptedRecordCount,
+    unusableRecordCount: input.unusableRecordCount,
+  });
+}
+
+export class SourcePersistenceError extends Error {
+  readonly code = "PERSISTENCE_FAILED" as const;
+  readonly persistenceDiagnostic: SourcePersistenceDiagnostic;
+
+  constructor(diagnostic: SourcePersistenceDiagnostic) {
+    super(diagnostic.safeDomainCode ?? "PERSISTENCE_FAILED");
+    this.name = "SourcePersistenceError";
+    this.persistenceDiagnostic = SourcePersistenceDiagnosticSchema.parse(diagnostic);
+  }
+}
 
 export const SourceAuditMetadataSchemas = {
   "source.capability.versioned": z
@@ -506,6 +650,7 @@ export const SourceAuditMetadataSchemas = {
       code: SourceStopCodeSchema,
       transportStage: SourceTransportLifecycleStageSchema.nullable().optional(),
       schemaDiagnostic: SourceSchemaDiagnosticSchema.optional(),
+      persistenceDiagnostic: SourcePersistenceDiagnosticSchema.optional(),
       requestCount: z.number().int().nonnegative(),
       recordCount: z.number().int().nonnegative(),
     })
