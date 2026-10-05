@@ -6,6 +6,9 @@ import {
   readGreenhousePostingV2FromPayload,
 } from "@applypilot/job-sources";
 import { assertR2ASourcePointers } from "@applypilot/job-model";
+import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
+import { currentR2Bindings } from "../../../fixtures/r2/test-helpers";
+import { testProfile } from "../../../tests/fixture-data";
 import {
   assertR2AExcerptHashes,
   normalizeR2AJobEvidence,
@@ -60,7 +63,110 @@ function makeNestedMetadata(depth: number) {
   return value;
 }
 
+function normalizeFictionalPosting(content: string) {
+  const record = readGreenhousePostingV2FromPayload({
+    payload: {
+      id: 123,
+      title: "Fictional Associate Engineer",
+      absolute_url: "https://boards.greenhouse.io/fictional/jobs/123",
+      location: { name: "Melbourne VIC Australia" },
+      content,
+      updated_at: null,
+    },
+    capability,
+  });
+  const structured = structuredGreenhouseEvidenceRecord(record, capability);
+  const sourceText = JSON.stringify(structured);
+  const normalization = normalizeR2AJobEvidence({
+    sourceText,
+    structured,
+    diagnosticStructure: structuredGreenhouseRecord(record, capability),
+    sourceObservationId: "fictional-schema-regression",
+    explicitLocation: record.location,
+  });
+  assertR2ASourcePointers(normalization, sourceText);
+  assertR2AExcerptHashes(normalization);
+  return { normalization, sourceText };
+}
+
 describe("Greenhouse R2A evidence projection", () => {
+  it.each([
+    ["<p>The role is a contract position with contract renewal.</p>", "CONTRACT", "contract"],
+    ["<p>This role is full time and full time.</p>", "FULL_TIME", "full time"],
+    ['<p>Employment type: "🚀" full time, full time.</p>', "FULL_TIME", "full time"],
+  ])(
+    "preserves each repeated employment occurrence in reader-accepted content %s",
+    (content, value, token) => {
+      const { normalization, sourceText } = normalizeFictionalPosting(content);
+      const employment = normalization.fieldEvidence.filter(
+        ({ canonicalField }) => canonicalField === "employment.type",
+      );
+      expect(employment).toHaveLength(2);
+      expect(new Set(employment.map(({ id }) => id)).size).toBe(2);
+      expect(new Set(employment.map(({ source }) => source.start)).size).toBe(2);
+      expect(employment.map(({ normalizedValue }) => normalizedValue)).toEqual([
+        { kind: "EMPLOYMENT_TYPE", value },
+        { kind: "EMPLOYMENT_TYPE", value },
+      ]);
+      expect(employment.map(({ source }) => sourceText.slice(source.start, source.end))).toEqual([
+        token,
+        token,
+      ]);
+      expect(normalization.conflicts).toHaveLength(0);
+    },
+  );
+
+  it("preserves overlapping state/postcode contradictions in one linked region conflict", () => {
+    const { normalization } = normalizeFictionalPosting(
+      "<p>Location: Melbourne NSW 3000; Adelaide VIC 5000.</p>",
+    );
+    const region = normalization.conflicts.filter(
+      ({ canonicalField }) => canonicalField === "location.region",
+    );
+    expect(region).toHaveLength(1);
+    expect(region[0]!.evidenceIds).toHaveLength(4);
+    expect(new Set(region[0]!.evidenceIds).size).toBe(4);
+    const members = normalization.fieldEvidence.filter(({ id }) =>
+      region[0]!.evidenceIds.includes(id),
+    );
+    expect(
+      members
+        .map(({ normalizedValue }) => normalizedValue)
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      ["NSW", "3000", "VIC", "5000"]
+        .map((value) => ({ kind: "TEXT", value }))
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    );
+    expect(
+      members.every(
+        ({ state, conflictSetId }) => state === "CONFLICTING" && conflictSetId === region[0]!.id,
+      ),
+    ).toBe(true);
+    const eligibility = evaluateR2Eligibility({
+      profile: testProfile,
+      normalization,
+      bindings: currentR2Bindings,
+      evaluatedAt: "2026-10-05T00:00:00.000Z",
+    });
+    expect(eligibility.status).toBe("REVIEW_REQUIRED");
+    expect(eligibility.reasons.some(({ code }) => code === "R2_MATERIAL_FIELD_CONFLICT")).toBe(
+      true,
+    );
+  });
+
+  it("keeps independent region contradictions in separate conflict sets", () => {
+    const { normalization } = normalizeFictionalPosting(
+      "<p>Location: Melbourne NSW 3000; Footscray NSW 3000.</p>",
+    );
+    const region = normalization.conflicts.filter(
+      ({ canonicalField }) => canonicalField === "location.region",
+    );
+    expect(region).toHaveLength(2);
+    expect(region.every(({ evidenceIds }) => evidenceIds.length === 2)).toBe(true);
+    expect(new Set(region.flatMap(({ evidenceIds }) => evidenceIds)).size).toBe(4);
+  });
+
   it("normalizes a parser-accepted deep metadata record and preserves its full raw payload", () => {
     const payload = {
       id: 123,

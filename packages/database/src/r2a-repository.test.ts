@@ -118,6 +118,67 @@ afterEach(async () => {
 });
 
 describe("R2A additive migration and repository", () => {
+  it("round-trips region conflict identity and members without rewriting stored evidence", async () => {
+    const root = await mkdtemp(join(tmpdir(), "applypilot-r2a-region-"));
+    roots.push(root);
+    const databasePath = join(root, "region.sqlite");
+    populateSchemaV2(databasePath);
+    const sqlite = new BetterSqlite3(databasePath);
+    try {
+      sqlite.exec(migration("0003_r2a_evidence_normalization.sql"));
+      const observationId = sqlite
+        .prepare("SELECT id FROM source_observations LIMIT 1")
+        .pluck()
+        .get() as string;
+      const structured = { description: "Location: Melbourne NSW 3000; Adelaide VIC 5000." };
+      const normalization = normalizeR2AJobEvidence({
+        sourceText: JSON.stringify(structured),
+        sourceObservationId: observationId,
+        structured,
+      });
+      const version = new BetaRepository(
+        sqlite,
+        () => new Date(now),
+        () => "job-version:region",
+      ).recordJobVersion({
+        job: { ...fixtureJob("job-retail-sales-assistant"), dateUpdated: now },
+        sourceObservationId: observationId,
+        r2aNormalization: normalization,
+      });
+      const r2a = new R2ARepository(sqlite, () => new Date(now));
+      const before = sqlite
+        .prepare("SELECT * FROM job_field_evidence_v2 WHERE job_version_id=? ORDER BY id")
+        .all(version.id);
+      const reloaded = r2a.getNormalization(version.id)!;
+      const region = reloaded.conflicts.filter(
+        ({ canonicalField }) => canonicalField === "location.region",
+      );
+      expect(region).toHaveLength(1);
+      expect(region[0]!.evidenceIds).toHaveLength(4);
+      expect(
+        reloaded.fieldEvidence.every(
+          (item) =>
+            !item.conflictSetId ||
+            reloaded.conflicts.some(
+              (conflict) =>
+                conflict.id === item.conflictSetId && conflict.evidenceIds.includes(item.id),
+            ),
+        ),
+      ).toBe(true);
+      expect(r2aSemanticDigest(reloaded)).toBe(r2aSemanticDigest(normalization));
+      expect(r2a.recordNormalization(version.id, normalization).created).toBe(false);
+      expect(
+        sqlite
+          .prepare("SELECT * FROM job_field_evidence_v2 WHERE job_version_id=? ORDER BY id")
+          .all(version.id),
+      ).toEqual(before);
+      expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+      expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    } finally {
+      sqlite.close();
+    }
+  });
+
   it("backs up schema v2, conservatively migrates, persists idempotently, and restores", async () => {
     const root = await mkdtemp(join(tmpdir(), "applypilot-r2a-"));
     roots.push(root);
@@ -208,7 +269,7 @@ describe("R2A additive migration and repository", () => {
       );
       expect(r2a.recordNormalization(recorded.id, normalization).created).toBe(false);
       const reloaded = r2a.getNormalization(recorded.id)!;
-      expect(reloaded.parserVersion).toBe("3.6.0");
+      expect(reloaded.parserVersion).toBe("3.6.1");
       const derived = reloaded.fieldEvidence.find(({ state }) => state === "DERIVED");
       expect(derived?.derivationInputIds.length).toBeGreaterThan(1);
       expect(

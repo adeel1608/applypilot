@@ -3464,12 +3464,12 @@ describe("offline source-to-R2 queue persistence", () => {
     const old = new R2ARepository(sqlite).getNormalization(verification.jobVersionId)!;
     expect(old.parserVersion).toBe("3.1.0");
     const derived = repository.rederiveLeverObservation({ verificationId: verification.id });
-    expect(derived.parserVersion).toBe("3.6.0");
-    expect(derived.normalizationVersion).toBe("3.6.0");
+    expect(derived.parserVersion).toBe("3.6.1");
+    expect(derived.normalizationVersion).toBe("3.6.1");
     expect(derived.parentJobVersionId).toBe(verification.jobVersionId);
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.0");
+    ).toBe("3.6.1");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -3558,14 +3558,14 @@ describe("offline source-to-R2 queue persistence", () => {
 
     const derived = repository.rederiveGreenhouseObservation({ verificationId: verification.id });
     expect(derived).toMatchObject({
-      parserVersion: "3.6.0",
-      normalizationVersion: "3.6.0",
+      parserVersion: "3.6.1",
+      normalizationVersion: "3.6.1",
       parentJobVersionId: verification.jobVersionId,
       created: true,
     });
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.0");
+    ).toBe("3.6.1");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -4184,8 +4184,8 @@ describe("stopped-run persisted-source inspection", () => {
       parentJobVersionId: verification.jobVersionId,
       providerDriftWarnings: [],
       normalization: {
-        parserVersion: "3.6.0",
-        normalizationVersion: "3.6.0",
+        parserVersion: "3.6.1",
+        normalizationVersion: "3.6.1",
         evidenceContractVersion: "3.1.0",
       },
     });
@@ -4194,8 +4194,8 @@ describe("stopped-run persisted-source inspection", () => {
       sourceQualificationState: "PAGE_PERSISTED",
       sourceRunStatus: "STOPPED",
       sourceStopCode: "RUN_TIMEOUT",
-      parserVersion: "3.6.0",
-      normalizationVersion: "3.6.0",
+      parserVersion: "3.6.1",
+      normalizationVersion: "3.6.1",
       evidenceContractVersion: "3.1.0",
       scorerVersion: "2.2.0",
       weightVersion: "r2-weights-1",
@@ -4283,7 +4283,7 @@ describe("stopped-run persisted-source inspection", () => {
         },
       ]);
       expect(inspection.job).not.toHaveProperty("workplaceType");
-      expect(inspection.normalization.parserVersion).toBe("3.6.0");
+      expect(inspection.normalization.parserVersion).toBe("3.6.1");
     } finally {
       fixture.sqlite.close();
     }
@@ -4542,7 +4542,7 @@ describe("stopped-run persisted-source inspection", () => {
     }
   });
 
-  it("reconstructs current 3.6.0 evidence over an older 3.2.0 parent without rewriting it", async () => {
+  it("reconstructs current 3.6.1 evidence over an older 3.2.0 parent without rewriting it", async () => {
     const fixture = await stoppedInspectionFixture();
     try {
       const { sqlite, repository, verification } = fixture;
@@ -4567,8 +4567,8 @@ describe("stopped-run persisted-source inspection", () => {
       });
       const after = inspectionStateSnapshot(sqlite);
       expect(inspection.normalization).toMatchObject({
-        parserVersion: "3.6.0",
-        normalizationVersion: "3.6.0",
+        parserVersion: "3.6.1",
+        normalizationVersion: "3.6.1",
         evidenceContractVersion: "3.1.0",
       });
       expect(

@@ -609,6 +609,57 @@ function stableId(...values: string[]): string {
   return digest(values.join("\n")).slice(0, 32);
 }
 
+function coalesceRegionConflicts(
+  candidates: R2ANormalization["conflicts"],
+  observationId: string,
+): R2ANormalization["conflicts"] {
+  const parents = candidates.map((_, index) => index);
+  const find = (index: number): number => {
+    let root = index;
+    while (parents[root] !== root) root = parents[root]!;
+    while (parents[index] !== index) {
+      const next = parents[index]!;
+      parents[index] = root;
+      index = next;
+    }
+    return root;
+  };
+  const ownerByEvidence = new Map<string, number>();
+  candidates.forEach((candidate, index) => {
+    if (
+      !["location.region", "location.state", "location.postcode"].includes(candidate.canonicalField)
+    )
+      return;
+    for (const evidenceId of candidate.evidenceIds) {
+      const owner = ownerByEvidence.get(evidenceId);
+      if (owner === undefined) ownerByEvidence.set(evidenceId, index);
+      else parents[find(index)] = find(owner);
+    }
+  });
+  const groups = new Map<number, R2ANormalization["conflicts"]>();
+  candidates.forEach((candidate, index) => {
+    const root = find(index);
+    const group = groups.get(root) ?? [];
+    group.push(candidate);
+    groups.set(root, group);
+  });
+  return [...groups.values()].flatMap((group) => {
+    if (
+      group.length === 1 ||
+      !group.some(({ canonicalField }) => canonicalField === "location.region")
+    )
+      return group;
+    const evidenceIds = [...new Set(group.flatMap((candidate) => candidate.evidenceIds))].sort();
+    return [
+      {
+        id: stableId("R2A_REGION_CONFLICT_COMPONENT", observationId, ...evidenceIds),
+        canonicalField: "location.region",
+        evidenceIds,
+      },
+    ];
+  });
+}
+
 function createFieldEvidence(input: {
   source: string;
   observationId: string;
@@ -2044,8 +2095,7 @@ function normalizeR2AJobEvidenceInternal(
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
-      const itemSpan =
-        exactChildSpan(source, span, item.match) ?? childSpan(span, item.index, item.match);
+      const itemSpan = childSpan(span, item.index, item.match);
       fields.push(
         fieldEvidence({
           source,
@@ -2238,22 +2288,20 @@ function normalizeR2AJobEvidenceInternal(
     }
   }
 
-  const conflicts: R2ANormalization["conflicts"] = [];
+  const fieldConflicts: R2ANormalization["conflicts"] = [];
   const byField = new Map<string, R2JobFieldEvidence[]>();
   for (const item of fields) {
     const existing = byField.get(item.canonicalField) ?? [];
     existing.push(item);
     byField.set(item.canonicalField, existing);
   }
-  const conflictingIds = new Map<string, string>();
   for (const pair of regionConflictPairs) {
     const conflictId = stableId("R2A_REGION_CONFLICT", observationId, ...pair.map(({ id }) => id));
-    conflicts.push({
+    fieldConflicts.push({
       id: conflictId,
       canonicalField: "location.region",
       evidenceIds: pair.map(({ id }) => id),
     });
-    for (const item of pair) conflictingIds.set(item.id, conflictId);
   }
   for (const [canonicalField, evidence] of byField) {
     const distinct = new Set(
@@ -2275,9 +2323,16 @@ function normalizeR2AJobEvidenceInternal(
       canonicalField,
       ...evidence.map(({ id }) => id),
     );
-    conflicts.push({ id: conflictId, canonicalField, evidenceIds: evidence.map(({ id }) => id) });
-    for (const item of evidence) conflictingIds.set(item.id, conflictId);
+    fieldConflicts.push({
+      id: conflictId,
+      canonicalField,
+      evidenceIds: evidence.map(({ id }) => id),
+    });
   }
+  const conflicts = coalesceRegionConflicts(fieldConflicts, observationId);
+  const conflictingIds = new Map<string, string>();
+  for (const conflict of conflicts)
+    for (const evidenceId of conflict.evidenceIds) conflictingIds.set(evidenceId, conflict.id);
   const resolvedFields = fields.map((item) => {
     const conflictSetId = conflictingIds.get(item.id);
     return conflictSetId
