@@ -3,7 +3,7 @@
 Last updated: 2026-10-05
 Owner: `adeel1608`
 Repository: `adeel1608/applypilot`
-Expected current main: `88ea4bf9085f3214cddb6019d35f582a525b25f1`
+Expected current main: `5e1007c73eeeb3af3fd7eae5c38c9cc2222ea406`
 Workflow: `PROJECT_PLAN.md -> one scoped Codex prompt -> execution/evidence -> updated PROJECT_PLAN.md -> technical review -> next prompt`
 
 ### Active final 5-of-5 sprint blueprint (2026-10-05)
@@ -7366,3 +7366,39 @@ m2_source_kogan_df3db4cad99c_1790843296995`. After the owner reports completion,
 - Privacy audit passed: 359 tracked files, 1,671 history paths, 1,410 history blobs, 1,475 build/test artifacts and 11 private canaries checked. Full and production dependency audits reported 0 vulnerabilities. The disposable schema-10 migration fixture passed; the active database remained schema 12 with zero pending migrations, integrity PASS, FK issues 0. `git fsck --strict` exited successfully; Git printed existing dangling objects. Release classification remains `PERSONAL_LIVE_V1_NOT_READY` because real target approval and first real-target validation are outstanding.
 - The successful fixture followed two stopped runs: one plan-formatting issue corrected with Prettier, then three projection-helper lint warnings corrected by deleting opaque keys from a newly constructed local object, then one stale E2E 3.5.2 expectation corrected to 3.6.0. Focused R2A E2E passed 2/2 before the complete green run. No live source request or private authority mutation occurred.
 - Next: inspect the complete staged candidate diff and privacy boundary, run final `git diff --check` / Prettier check and real-DB read-only baseline, then commit and open the focused PR. Do not stage nCino v7 until the repair is merged, exact-main/runtime and real-database gates pass; stop at the canonical owner approval/start UI gate.
+
+### Execution record — PR #72 merge and post-merge v7 gate handoff (2026-10-05)
+
+- PR #72 `fix: bound Greenhouse R2A structured indexing` merged by guarded squash after both exact-head `quality` workflows passed, mergeability was CLEAN, and GraphQL reported zero review threads. Merge commit `5e1007c73eeeb3af3fd7eae5c38c9cc2222ea406` has parent `31685f55eb39a81240e8eb86a186c5adae3c06c1`; `origin/main` is synchronized to that commit. The local feature branch for the remaining continuation is rooted at this exact merged main.
+- The successful full fixture and safe synthetic reproduction are recorded above. Historical v5 root cause remains unproven; the repair addresses the independently reproduced parser-accepted R2A stack-overflow class. No live source request, receipt, or target action was issued to merge the code.
+- Next required gates: verify runtime executable/ownership and exact merged tree; restart only the repository-owned local runtime; read-only recheck schema 12, v5 run/consumed bindings, v6 `REVOKED / SECURITY_STOP` head and zero global active authority; then stage nCino v7 only if the durable DB and allowlist agree. V7 remains the sole next capability and requires owner APPROVE then RUN through `/sources`; stop before creating receipts or making a request.
+
+### Blueprint addendum — bounded allowlist capacity for the approved v7 continuation (2026-10-05)
+
+#### Current state and exact blocker
+
+- PR #72's R2A repair is merged at `5e1007c73eeeb3af3fd7eae5c38c9cc2222ea406`. The owned merged runtime and private preflight pass. Read-only database/allowlist guards confirm v5 remains STOPPED / PERSISTENCE_FAILED with its one consumed APPROVE and START receipt exactly bound to its only run, v6 remains current REVOKED / SECURITY_STOP with digest `77d07f2243347acb4bf7279a9b3f19f879a8c6ac63bee27ca099df5691747ac1`, and global active authority is zero.
+- The one guarded v7 staging attempt failed before creating a backup, replacing the allowlist, or writing SQLite: `SourceAllowlistV2Schema` caps the entire history at 20 capabilities, while the canonical private allowlist already contains exactly 20. Read-only rerun confirms its original SHA-256, v7 rows/receipts/bindings/runs all zero, and every pre-v7 gate unchanged. The exact v6 head and predecessor remain eligible for the staged v7 contract.
+
+#### Objective and bounded design
+
+- Permit the finite capability history needed by this user's explicit final-sprint bounds while preserving a hard list-size limit. The worst authorized path needs at most 29 entries: the existing 20, nCino v7/v8 plus at most one v9/v10 repair cycle (4 entries), up to four bounded LIST_JOBS fallback boards, and one exact GET_JOB capability. Set the strict allowlist maximum to 29; do not remove the limit or alter version/digest/current-head/owner-receipt requirements.
+- Add regression tests proving 29 unique capability entries parse, 30 are rejected, and duplicate capability-version identities remain rejected. No private allowlist, capability row, receipt, binding, or source run is part of this code repair.
+
+#### Data flow, risks, tests, rollback, and acceptance
+
+- The allowlist remains strict Zod validation -> latest family-head resolution -> source readiness -> canonical durable owner APPROVE/START binding. Increasing only the maximum collection length must not make any capability active by itself; every new source still needs a current exact capability and canonical UI receipts.
+- Risk: an excessively large history could increase local parse/validation work. The bound remains finite at the explicit maximum required by the sprint. Rollback is a focused code revert before retrying stage; the private allowlist and database remain unchanged during implementation.
+- Exact steps: focused schema tests; full offline release fixture, privacy/dependency audits, and database/migration checks; exact-head PR CI, zero review threads, fresh review, guarded squash merge; sync/restart the exact merged runtime; recheck v5/v6/zero-authority gates; then stage v7 once and stop at owner APPROVE/RUN. No source request is authorized before the owner gate.
+
+### Execution record — allowlist capacity blocker and bounded repair (2026-10-05)
+
+- The first v7 stage helper reached strict allowlist validation and stopped at `SourceAllowlistV2Schema` maximum 20, before creating the backup, replacing `data/private/source-allowlist.json`, opening a writable database, or inserting any capability row. The read-only pre-v7 guard passed again: allowlist SHA-256 remains `92300cde5533bb9b445e73404aa0cb96bdaecc94e939be78bada15aab17f7b0a`; v5/v6 receipts, run, binding, and digests remain exact; v7 rows/receipts/bindings/runs are all 0; global active source/target/application authority is 0.
+- Added the blueprint addendum above before changing application code. Raised only the finite `SourceAllowlistV2Schema` array ceiling from 20 to 29: the maximum required by this sprint's 20 existing entries plus four bounded nCino versions, four fallback LIST_JOBS capabilities, and one exact GET_JOB capability. Added tests that 29 distinct capability heads parse, 30 are rejected, and duplicate version identities remain rejected.
+- Focused validation passed: `npx.cmd vitest run packages/job-sources/src/source-capability.test.ts` — 1 file / 115 tests; `npm.cmd run typecheck` — PASS. No private allowlist or real DB change was made. Next: full offline release fixture and privacy/diff review, then a focused PR with exact-head CI/review gates before retrying the v7 stage once.
+
+### Execution record — bounded allowlist capacity full validation (2026-10-05)
+
+- `$env:npm_config_offline='true'; npm.cmd run release:check:fixture` passed with exit code 0 for the 29-entry bound. Formatting, zero-warning lint, typecheck, 65 unit files / 728 tests, 3 integration files / 21 tests, local and showcase builds, showcase audit, all 47 browser tests, privacy audit, full and production dependency audits (0 vulnerabilities), disposable schema-10 migration fixture, database schema-12 integrity/FK checks, and `git fsck --strict` passed. Privacy audit checked 363 tracked files, 1,701 history paths, 1,422 history blobs, 1,486 build/test artifacts, and 11 private canaries. Real private DB remains schema 12 / pending 0 / integrity PASS / FK 0; no migration changed.
+- The stage attempt's maximum-length failure and the unchanged read-only v5/v6/v7-zero gate are recorded above. The 29-entry repair changes only the allowlist parser's bounded array maximum and its regression test; no private allowlist, database, owner receipt, source-run binding, or source request was changed.
+- Next: final diff/privacy check, focused commit and PR #73, exact-head CI / zero-thread / mergeability / self-review gates, guarded squash merge, then sync and restart exact main, recheck pre-v7 durable invariants, and stage nCino v7 once before stopping at the canonical human owner gate.

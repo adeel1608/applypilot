@@ -191,7 +191,7 @@ export function resolveCurrentSourceCapabilityHead(
 export const SourceAllowlistV2Schema = z
   .object({
     schemaVersion: z.literal(2),
-    capabilities: z.array(SourceCapabilityV2Schema).max(20),
+    capabilities: z.array(SourceCapabilityV2Schema).max(29),
   })
   .strict()
   // Older APPROVED entries remain immutable history; current authority is the latest family head.

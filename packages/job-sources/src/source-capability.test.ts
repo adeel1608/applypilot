@@ -274,6 +274,22 @@ describe("R1A source capability and transport", () => {
     ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
   });
 
+  it("keeps bounded room for the authorized source continuation and fallback ceiling", () => {
+    const capabilities = Array.from({ length: 29 }, (_, index) =>
+      capability({ capabilityId: `cap-fictional-history-${index + 1}` }),
+    );
+    const parsed = SourceAllowlistV2Schema.parse({ schemaVersion: 2, capabilities });
+
+    expect(parsed.capabilities).toHaveLength(29);
+    expect(latestSourceCapabilityHeads(parsed.capabilities)).toHaveLength(29);
+    expect(
+      SourceAllowlistV2Schema.safeParse({
+        schemaVersion: 2,
+        capabilities: [...capabilities, capability({ capabilityId: "cap-fictional-history-30" })],
+      }).success,
+    ).toBe(false);
+  });
+
   it("continues to reject duplicate capability version identities in the allowlist", () => {
     const duplicate = capability({
       capabilityId: "cap-fictional-002",
