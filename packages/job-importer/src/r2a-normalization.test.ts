@@ -142,7 +142,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.6.1");
+    expect(result.parserVersion).toBe("3.6.2");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");
@@ -169,6 +169,24 @@ describe("R2A evidence normalization", () => {
     expect(
       employment.every(({ state, conflictSetId }) => state === "CONFLICTING" && conflictSetId),
     ).toBe(true);
+    const repeated = normalizeR2AJobEvidence({
+      sourceText: fixture.text,
+      sourceObservationId: "observation:conflict",
+      structured: fixture.structured,
+      explicitLocation: fixture.location,
+    });
+    expect(repeated.conflicts.map(({ id }) => id)).toEqual(result.conflicts.map(({ id }) => id));
+  });
+
+  it("produces byte-identical evidence for repeated normalization of the same input", () => {
+    const structured = {
+      description: "Full-time role. Requirements: two years experience preferred.",
+    };
+    const sourceText = JSON.stringify(structured);
+    const input = { sourceText, sourceObservationId: "observation:deterministic", structured };
+    const first = normalizeR2AJobEvidence(input);
+    const second = normalizeR2AJobEvidence(input);
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
   });
 
   it("keeps valid and unrestricted work-right wording distinct", () => {

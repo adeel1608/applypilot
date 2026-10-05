@@ -29,6 +29,11 @@ import {
   r2aStructuralMetrics,
   r2aStructureBudget,
 } from "./r2a-diagnostics";
+import {
+  fieldEvidenceId,
+  requirementEvidenceId,
+  resolveR2AEvidenceIds,
+} from "./r2a-evidence-identity";
 
 type Span = {
   text: string;
@@ -672,25 +677,35 @@ function createFieldEvidence(input: {
   derivationInputIds?: string[];
   ruleId: string;
 }): R2JobFieldEvidence {
+  const state = input.state ?? "SOURCE_STATED";
+  const evidenceModality = input.modality ?? null;
+  const derivationInputIds = input.derivationInputIds ?? [];
   return R2JobFieldEvidenceSchema.parse({
-    id: stableId(
-      R2A_PARSER_VERSION,
-      input.observationId,
-      input.canonicalField,
-      String(input.span.start),
-      JSON.stringify(input.normalizedValue),
-    ),
+    id: fieldEvidenceId({
+      parserVersion: R2A_PARSER_VERSION,
+      observationId: input.observationId,
+      family: input.family,
+      canonicalField: input.canonicalField,
+      sourcePath: input.span.sourcePath,
+      start: input.span.start,
+      end: input.span.end,
+      ruleId: input.ruleId,
+      state,
+      modality: evidenceModality,
+      derivationInputIds,
+      normalizedValue: input.normalizedValue,
+    }),
     sourceObservationId: input.observationId,
     jobVersionId: null,
     family: input.family,
     canonicalField: input.canonicalField,
-    state: input.state ?? "SOURCE_STATED",
-    modality: input.modality ?? null,
+    state,
+    modality: evidenceModality,
     source: pointer(input.source, input.span),
     normalizedValue: input.normalizedValue,
     extractorVersion: R2A_PARSER_VERSION,
     ruleId: input.ruleId,
-    derivationInputIds: input.derivationInputIds ?? [],
+    derivationInputIds,
     ownerCorrectionId: null,
     conflictSetId: null,
   });
@@ -1003,17 +1018,28 @@ function extractRequirementEvidence(
       : lexicalStatement;
   if (kind === "GENERAL" && statement.modality === "UNKNOWN") return [];
   const family = familyForKind(kind);
+  const ruleId = inheritedParentStatement
+    ? `R2A_${kind}_${statement.modality}_EXTRACTED_CONTEXT`
+    : inheritedModality
+      ? `R2A_${kind}_${statement.modality}_SECTION_DEFAULT`
+      : `R2A_${kind}_${statement.modality}`;
   return normalizedRequirementValues(kind, span.text, statement).map((normalizedValue, index) =>
     R2RequirementEvidenceSchema.parse({
-      id: stableId(
-        R2A_PARSER_VERSION,
+      id: requirementEvidenceId({
+        parserVersion: R2A_PARSER_VERSION,
         observationId,
-        span.sourcePath,
-        String(span.start),
-        span.text,
-        String(index),
-        JSON.stringify(normalizedValue),
-      ),
+        family,
+        canonicalKind: kind,
+        sourcePath: span.sourcePath,
+        start: span.start,
+        end: span.end,
+        ruleId,
+        state: "SOURCE_STATED",
+        modality: statement.modality,
+        condition: statement.condition,
+        normalizedValueOrdinal: index,
+        normalizedValue,
+      }),
       sourceObservationId: observationId,
       jobVersionId: null,
       family,
@@ -1024,11 +1050,7 @@ function extractRequirementEvidence(
       source: pointer(source, span),
       normalizedValue,
       extractorVersion: R2A_PARSER_VERSION,
-      ruleId: inheritedParentStatement
-        ? `R2A_${kind}_${statement.modality}_EXTRACTED_CONTEXT`
-        : inheritedModality
-          ? `R2A_${kind}_${statement.modality}_SECTION_DEFAULT`
-          : `R2A_${kind}_${statement.modality}`,
+      ruleId,
       derivationInputIds: [],
       ownerCorrectionId: null,
       conflictSetId: null,
@@ -1543,8 +1565,8 @@ function normalizeR2AJobEvidenceInternal(
     diagnostics.at("R2A_REQUIREMENT_EXTRACTION", () => extractRequirementEvidence(...args));
   const { sourceText: source, sourceObservationId: observationId } = input;
   const structured = input.structured ?? {};
-  const fields: R2JobFieldEvidence[] = [];
-  const requirements: R2RequirementEvidence[] = [];
+  let fields: R2JobFieldEvidence[] = [];
+  let requirements: R2RequirementEvidence[] = [];
   const regionConflictPairs: Array<[R2JobFieldEvidence, R2JobFieldEvidence]> = [];
   const structuredSpans = diagnostics.at("R2A_INDEX_STRUCTURED_SPANS", () =>
     indexStructuredSpans(source, structured, diagnostics),
@@ -2287,6 +2309,13 @@ function normalizeR2AJobEvidenceInternal(
       }
     }
   }
+
+  diagnostics.subphase = "R2A_EVIDENCE_ID_RESOLUTION";
+  const evidenceIdentityResolution = diagnostics.at("R2A_EVIDENCE_ID_RESOLUTION", () =>
+    resolveR2AEvidenceIds({ fields, requirements, metrics: diagnostics.metrics }),
+  );
+  fields = evidenceIdentityResolution.fields;
+  requirements = evidenceIdentityResolution.requirements;
 
   const fieldConflicts: R2ANormalization["conflicts"] = [];
   const byField = new Map<string, R2JobFieldEvidence[]>();
