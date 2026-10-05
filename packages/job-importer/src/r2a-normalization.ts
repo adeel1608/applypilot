@@ -23,6 +23,12 @@ import {
 
 import { extractInertHtmlText } from "./sanitize";
 import { normalizeText } from "@applypilot/shared";
+import {
+  R2ADiagnosticContext,
+  R2ADiagnosticError,
+  r2aStructuralMetrics,
+  r2aStructureBudget,
+} from "./r2a-diagnostics";
 
 type Span = {
   text: string;
@@ -339,56 +345,77 @@ function nestedStructured(value: unknown, keys: string[]): string | null {
 function indexStructuredSpans(
   source: string,
   structured: Record<string, unknown>,
+  diagnostics: R2ADiagnosticContext,
 ): Map<string, Span> {
   const spans = new Map<string, Span>();
-  if (JSON.stringify(structured) !== source) return spans;
-  const walk = (value: unknown, path: string, start: number): number => {
-    const encoded = JSON.stringify(value);
-    if (encoded === undefined) return start;
-    const end = start + encoded.length;
+  const serialized = JSON.stringify(structured);
+  diagnostics.metrics.structuredJsonLength = Math.min(serialized.length, 2_000_000);
+  if (serialized !== source) return spans;
+  const root = JSON.parse(source) as Record<string, unknown>;
+  const pending: Array<{ value: unknown; path: string; start: number }> = [
+    { value: root, path: "structured", start: 0 },
+  ];
+  let visited = 0;
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    visited += 1;
+    if (visited > 50_000) throw new Error("R2A_STRUCTURE_BUDGET_EXCEEDED");
+    const encoded = JSON.stringify(current.value);
+    if (encoded === undefined) continue;
+    const end = current.start + encoded.length;
     const longEvidenceString =
-      typeof value === "string" &&
-      (path === "structured.description" ||
-        /^structured\.sourceSections\[\d+\]\.content$/.test(path));
+      typeof current.value === "string" &&
+      (current.path === "structured.description" ||
+        /^structured\.sourceSections\[\d+\]\.content$/.test(current.path));
     if (encoded.length <= 1000 || longEvidenceString) {
-      const valueOffsets = typeof value === "string" ? jsonStringOffsets(value) : null;
-      spans.set(path, {
-        text: typeof value === "string" ? value : encoded,
-        start,
+      const valueOffsets =
+        typeof current.value === "string" ? jsonStringOffsets(current.value, diagnostics) : null;
+      spans.set(current.path, {
+        text: typeof current.value === "string" ? current.value : encoded,
+        start: current.start,
         end,
-        sourcePath: path,
+        sourcePath: current.path,
         ...(valueOffsets
           ? {
               sourceOffsets: Array.from(
                 { length: valueOffsets.length },
-                (_, index) => start + 1 + valueOffsets[index]!,
+                (_, index) => current.start + 1 + valueOffsets[index]!,
               ),
             }
           : {}),
       });
     }
-    if (Array.isArray(value)) {
-      let cursor = start + 1;
-      value.forEach((item, index) => {
+    const children: Array<{ value: unknown; path: string; start: number }> = [];
+    if (Array.isArray(current.value)) {
+      if (current.value.length > 10_000) throw new Error("R2A_STRUCTURE_BUDGET_EXCEEDED");
+      let cursor = current.start + 1;
+      current.value.forEach((value, index) => {
         if (index > 0) cursor += 1;
-        cursor = walk(item, `${path}[${index}]`, cursor);
+        children.push({ value, path: `${current.path}[${index}]`, start: cursor });
+        cursor += JSON.stringify(value).length;
       });
-    } else if (value && typeof value === "object") {
-      let cursor = start + 1;
-      Object.entries(value as Record<string, unknown>).forEach(([key, item], index) => {
-        if (item === undefined) return;
+    } else if (current.value && typeof current.value === "object") {
+      let cursor = current.start + 1;
+      Object.entries(current.value as Record<string, unknown>).forEach(([key, value], index) => {
+        if (value === undefined) return;
         if (index > 0) cursor += 1;
         cursor += JSON.stringify(key).length + 1;
-        cursor = walk(item, `${path}.${key}`, cursor);
+        children.push({ value, path: `${current.path}.${key}`, start: cursor });
+        cursor += JSON.stringify(value).length;
       });
     }
-    return end;
-  };
-  walk(JSON.parse(source) as Record<string, unknown>, "structured", 0);
+    for (let index = children.length - 1; index >= 0; index -= 1) pending.push(children[index]!);
+  }
   return spans;
 }
 
-function jsonStringOffsets(value: string): number[] {
+function jsonStringOffsets(value: string, diagnostics?: R2ADiagnosticContext): number[] {
+  return diagnostics
+    ? diagnostics.at("R2A_JSON_STRING_OFFSETS", () => calculateJsonStringOffsets(value))
+    : calculateJsonStringOffsets(value);
+}
+
+function calculateJsonStringOffsets(value: string): number[] {
   const offsets = new Array<number>(value.length + 1).fill(0);
   let decodedOffset = 0;
   let encodedOffset = 0;
@@ -409,9 +436,10 @@ function structuredStringChunks(
   sourcePath: string,
   startOffset = 0,
   endOffset = value.length,
+  diagnostics?: R2ADiagnosticContext,
 ): Span[] {
   if (!parent || parent.end - parent.start < 2) return [];
-  const offsets = jsonStringOffsets(value);
+  const offsets = jsonStringOffsets(value, diagnostics);
   const chunks: Span[] = [];
   let cursor = startOffset;
   let chunkIndex = 0;
@@ -468,6 +496,7 @@ function structuredStringLineChunks(
   parent: Span | undefined,
   value: string,
   sourcePath: string,
+  diagnostics?: R2ADiagnosticContext,
 ): Span[] {
   return lineSpans(value).flatMap((line, index) =>
     structuredStringChunks(
@@ -477,6 +506,7 @@ function structuredStringLineChunks(
       `${sourcePath}.line[${index}]`,
       line.start,
       line.end,
+      diagnostics,
     ),
   );
 }
@@ -579,7 +609,7 @@ function stableId(...values: string[]): string {
   return digest(values.join("\n")).slice(0, 32);
 }
 
-function fieldEvidence(input: {
+function createFieldEvidence(input: {
   source: string;
   observationId: string;
   family: JobFieldFamily;
@@ -897,7 +927,7 @@ function sectionRequirementDefaultModality(
   return "REQUIRED";
 }
 
-function requirementEvidence(
+function extractRequirementEvidence(
   source: string,
   observationId: string,
   span: Span,
@@ -1422,14 +1452,53 @@ export function normalizeR2AJobEvidence(input: {
   sourceText: string;
   sourceObservationId: string;
   structured?: Record<string, unknown> | null;
+  diagnosticStructure?: Record<string, unknown> | null;
   explicitLocation?: string | null;
 }): R2ANormalization {
+  const evidenceStructure = input.structured ?? {};
+  const metrics = r2aStructuralMetrics(
+    evidenceStructure,
+    input.sourceText.length,
+    null,
+    input.diagnosticStructure ?? evidenceStructure,
+  );
+  const diagnostics = new R2ADiagnosticContext(metrics);
+  const structuralBudget = r2aStructureBudget(evidenceStructure, input.sourceText.length);
+  if (structuralBudget) {
+    throw new R2ADiagnosticError(
+      {
+        subphase: "R2A_INDEX_STRUCTURED_SPANS",
+        rangeErrorClass: null,
+        structuralBudget,
+        metrics,
+      },
+      "R2A_STRUCTURE_BUDGET_EXCEEDED",
+    );
+  }
+  try {
+    return normalizeR2AJobEvidenceInternal(input, diagnostics);
+  } catch (error) {
+    throw diagnostics.failure(error);
+  }
+}
+
+function normalizeR2AJobEvidenceInternal(
+  input: Parameters<typeof normalizeR2AJobEvidence>[0],
+  diagnostics: R2ADiagnosticContext,
+): R2ANormalization {
+  const fieldEvidence = (value: Parameters<typeof createFieldEvidence>[0]) =>
+    diagnostics.at("R2A_FIELD_EVIDENCE", () => createFieldEvidence(value));
+  const requirementEvidence = (...args: Parameters<typeof extractRequirementEvidence>) =>
+    diagnostics.at("R2A_REQUIREMENT_EXTRACTION", () => extractRequirementEvidence(...args));
   const { sourceText: source, sourceObservationId: observationId } = input;
   const structured = input.structured ?? {};
   const fields: R2JobFieldEvidence[] = [];
   const requirements: R2RequirementEvidence[] = [];
   const regionConflictPairs: Array<[R2JobFieldEvidence, R2JobFieldEvidence]> = [];
-  const structuredSpans = indexStructuredSpans(source, structured);
+  const structuredSpans = diagnostics.at("R2A_INDEX_STRUCTURED_SPANS", () =>
+    indexStructuredSpans(source, structured, diagnostics),
+  );
+  diagnostics.subphase = "R2A_STRUCTURED_STRING_CHUNKS";
   const isCanonicalStructuredSource = structuredSpans.size > 0;
   const sections = isCanonicalStructuredSource ? [] : parseR2ASections(source);
   const structuredSectionFieldSpans: Span[] = [];
@@ -1451,7 +1520,13 @@ export function normalizeR2AJobEvidence(input: {
     structuredSourceSectionContents.push(content);
     for (const line of lineSpans(content)) sectionTextLines.add(normalizedSourceLine(line.text));
     const path = `structured.sourceSections[${index}].content`;
-    const spans = structuredStringLineChunks(source, structuredSpans.get(path), content, path);
+    const spans = structuredStringLineChunks(
+      source,
+      structuredSpans.get(path),
+      content,
+      path,
+      diagnostics,
+    );
     structuredSectionFieldSpans.push(...spans);
     if (section.kind === "REQUIREMENTS") {
       structuredSectionRequirementSpans.push(
@@ -1507,6 +1582,7 @@ export function normalizeR2AJobEvidence(input: {
         `structured.description.line[${index}]`,
         span.start,
         span.end,
+        diagnostics,
       ),
     );
   })();
@@ -1526,6 +1602,7 @@ export function normalizeR2AJobEvidence(input: {
     return true;
   });
 
+  diagnostics.subphase = "R2A_FIELD_EVIDENCE";
   const structuredFields: Array<{
     canonicalField: string;
     family: JobFieldFamily;
@@ -1571,6 +1648,7 @@ export function normalizeR2AJobEvidence(input: {
     );
   }
 
+  diagnostics.subphase = "R2A_LOCATION_EXTRACTION";
   const structuredLocations = [
     ...collectStructuredLocations(structured.jobLocation, "structured.jobLocation"),
     ...collectStructuredLocations(structured.location, "structured.location"),
@@ -2123,6 +2201,7 @@ export function normalizeR2AJobEvidence(input: {
       );
   }
 
+  diagnostics.subphase = "R2A_REQUIREMENT_EXTRACTION";
   for (const item of requirementSpans) {
     const sectionDefault = item.sectionContext
       ? sectionRequirementDefaultModality(item.sectionContext.kind, item.sectionContext.heading)
@@ -2246,6 +2325,7 @@ export function normalizeR2AJobEvidence(input: {
     ranges.add(spanKey(item.source));
     parsedRangesByFamily.set(item.family, ranges);
   }
+  diagnostics.subphase = "R2A_COVERAGE";
   const coverage = familyValues.map((family) => {
     const evidenceIds = [
       ...resolvedFields.filter((item) => item.family === family),
@@ -2303,6 +2383,7 @@ export function normalizeR2AJobEvidence(input: {
     };
   });
 
+  diagnostics.subphase = "R2A_SCHEMA_PARSE";
   const result = R2ANormalizationSchema.parse({
     sourceObservationId: observationId,
     sourceLength: source.length,
@@ -2314,6 +2395,7 @@ export function normalizeR2AJobEvidence(input: {
     conflicts,
     coverage,
   });
+  diagnostics.subphase = "R2A_POINTER_ASSERTION";
   assertR2ASourcePointers(result, source);
   assertR2AExcerptHashes(result);
   return result;

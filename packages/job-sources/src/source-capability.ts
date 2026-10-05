@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
+import { R2AFailureDiagnosticSchema } from "./r2a-diagnostic";
+
 export const SourceOperationSchema = z.enum(["LIST_JOBS", "GET_JOB"]);
 export type SourceOperation = z.infer<typeof SourceOperationSchema>;
 export const SourceOwnerActionSchema = z.enum(["APPROVE", "START"]);
@@ -479,6 +481,7 @@ export const SourcePersistenceDomainCodeSchema = z.union([
     "R2A_NORMALIZATION_MISSING",
     "R2A_OBSERVATION_VERSION_MISMATCH",
     "R2A_SCHEMA_NOT_AVAILABLE",
+    "R2A_STRUCTURE_BUDGET_EXCEEDED",
     "SOURCE_JOB_VERSION_REQUIRED",
     "SOURCE_OPERATION_MISMATCH",
     "SOURCE_PAGE_REPLAY_CONFLICT",
@@ -504,6 +507,7 @@ export const SourcePersistenceDiagnosticSchema = z
     pageProviderRecordCount: z.number().int().nonnegative().max(1_000_000),
     acceptedRecordCount: z.number().int().nonnegative().max(1_000_000),
     unusableRecordCount: z.number().int().nonnegative().max(1_000_000),
+    r2a: R2AFailureDiagnosticSchema.optional(),
   })
   .strict();
 export type SourcePersistenceDiagnostic = z.infer<typeof SourcePersistenceDiagnosticSchema>;
@@ -541,6 +545,11 @@ export function createSourcePersistenceDiagnostic(input: {
   const candidateDomainCode = input.error instanceof Error ? input.error.message : null;
   const parsedDomainCode = SourcePersistenceDomainCodeSchema.safeParse(candidateDomainCode);
   const safeDomainCode = parsedDomainCode.success ? parsedDomainCode.data : null;
+  const r2a = R2AFailureDiagnosticSchema.safeParse(
+    input.error && typeof input.error === "object" && "r2aDiagnostic" in input.error
+      ? input.error.r2aDiagnostic
+      : undefined,
+  );
   return SourcePersistenceDiagnosticSchema.parse({
     phase: input.phase,
     recordIndex: input.recordIndex,
@@ -554,6 +563,7 @@ export function createSourcePersistenceDiagnostic(input: {
     pageProviderRecordCount: input.pageProviderRecordCount,
     acceptedRecordCount: input.acceptedRecordCount,
     unusableRecordCount: input.unusableRecordCount,
+    ...(r2a.success ? { r2a: r2a.data } : {}),
   });
 }
 
