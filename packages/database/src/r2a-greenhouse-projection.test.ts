@@ -1,11 +1,13 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
   SourceCapabilityV2Schema,
   R2AFailureDiagnosticSchema,
+  classifyR2ASchemaFailure,
   readGreenhousePostingV2FromPayload,
 } from "@applypilot/job-sources";
-import { assertR2ASourcePointers } from "@applypilot/job-model";
+import { R2ANormalizationSchema, assertR2ASourcePointers } from "@applypilot/job-model";
 import { evaluateR2Eligibility } from "@applypilot/eligibility-engine";
 import { currentR2Bindings } from "../../../fixtures/r2/test-helpers";
 import { testProfile } from "../../../tests/fixture-data";
@@ -115,6 +117,81 @@ describe("Greenhouse R2A evidence projection", () => {
       expect(normalization.conflicts).toHaveLength(0);
     },
   );
+
+  it("preserves distinct evidence IDs for parser-accepted escaped HTML items sharing one source span", () => {
+    const record = readGreenhousePostingV2FromPayload({
+      payload: {
+        id: 7001,
+        title: "Fictional Associate Engineer",
+        absolute_url: "https://boards.greenhouse.io/fictional/jobs/7001",
+        location: { name: "Melbourne VIC Australia" },
+        content:
+          "&lt;p&gt;This role is full time&lt;/p&gt; &lt;p&gt;This role is full time&lt;/p&gt;",
+        updated_at: null,
+      },
+      capability,
+    });
+    expect(record.description).toContain("<p>");
+
+    const fullStructured = structuredGreenhouseRecord(record, capability);
+    const evidenceStructured = structuredGreenhouseEvidenceRecord(record, capability);
+    expect(evidenceStructured.description).toBe(fullStructured.description);
+    const sourceText = serializeR2AStructuredSource(evidenceStructured);
+    const normalization = normalizeR2AJobEvidence({
+      sourceText,
+      structured: evidenceStructured,
+      diagnosticStructure: fullStructured,
+      sourceObservationId: "fictional-escaped-html-items",
+      explicitLocation: record.location,
+    });
+
+    assertR2ASourcePointers(normalization, sourceText);
+    assertR2AExcerptHashes(normalization);
+    const employment = normalization.fieldEvidence.filter(
+      ({ canonicalField }) => canonicalField === "employment.type",
+    );
+    expect(employment).toHaveLength(2);
+    expect(employment.map(({ source }) => source.sourcePath)).toEqual([
+      "structured.description.item.0",
+      "structured.description.item.1",
+    ]);
+    expect(new Set(employment.map(({ id }) => id)).size).toBe(2);
+    expect(new Set(employment.map(({ source }) => source.start)).size).toBe(1);
+    expect(new Set(employment.map(({ source }) => source.end)).size).toBe(1);
+    expect(employment.map(({ normalizedValue }) => normalizedValue.kind)).toEqual([
+      "EMPLOYMENT_TYPE",
+      "EMPLOYMENT_TYPE",
+    ]);
+
+    const oldIdentity = (item: (typeof employment)[number]) =>
+      [
+        "3.6.1",
+        item.sourceObservationId,
+        item.canonicalField,
+        String(item.source.start),
+        JSON.stringify(item.normalizedValue),
+      ].join("\n");
+    expect(oldIdentity(employment[0]!)).toBe(oldIdentity(employment[1]!));
+    const oldEvidenceId = createHash("sha256")
+      .update(oldIdentity(employment[0]!))
+      .digest("hex")
+      .slice(0, 32);
+    expect(
+      createHash("sha256").update(oldIdentity(employment[1]!)).digest("hex").slice(0, 32),
+    ).toBe(oldEvidenceId);
+    const oldNormalization = {
+      ...normalization,
+      fieldEvidence: normalization.fieldEvidence.map((item) =>
+        item.canonicalField === "employment.type" ? { ...item, id: oldEvidenceId } : item,
+      ),
+    };
+    try {
+      R2ANormalizationSchema.parse(oldNormalization);
+      throw new Error("OLD_DUPLICATE_ID_FAILURE_NOT_REPRODUCED");
+    } catch (error) {
+      expect(classifyR2ASchemaFailure(error)).toContain("DUPLICATE_EVIDENCE_ID");
+    }
+  });
 
   it("preserves overlapping state/postcode contradictions in one linked region conflict", () => {
     const { normalization } = normalizeFictionalPosting(
