@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import {
-  approveSourceCapabilityAction,
+  approveAndStartSourceRunAction,
   cancelSourceRunAction,
   revokeSourceAction,
   startSourceRunAction,
@@ -17,11 +17,25 @@ const display = (value: string) => value.replaceAll("_", " ");
 export default async function SourcesPage() {
   const view = await getSourceEnablementView();
   const nonces = await Promise.all(
-    view.capabilities.map(async () => ({
-      approve: await issueLocalMutationNonce("SOURCE_CAPABILITY_APPROVE", "/sources"),
-      start: await issueLocalMutationNonce("SOURCE_RUN_START", "/sources"),
-      revoke: await issueLocalMutationNonce("SOURCE_REVOKE", "/sources"),
-    })),
+    view.capabilities.map(async (capability) => {
+      const combinedOwnerAction =
+        capability.readiness === "SOURCE_ENABLED" &&
+        capability.ownerApprovalState === "APPROVAL_REQUIRED";
+      const legacyRunRecovery =
+        capability.readiness === "SOURCE_ENABLED" &&
+        capability.ownerApprovalState === "CURRENT" &&
+        capability.canOwnerStart;
+      const [approval, start, revoke] = await Promise.all([
+        combinedOwnerAction
+          ? issueLocalMutationNonce("SOURCE_CAPABILITY_APPROVE", "/sources")
+          : Promise.resolve(null),
+        combinedOwnerAction || legacyRunRecovery
+          ? issueLocalMutationNonce("SOURCE_RUN_START", "/sources")
+          : Promise.resolve(null),
+        issueLocalMutationNonce("SOURCE_REVOKE", "/sources"),
+      ]);
+      return { approval, start, revoke };
+    }),
   );
   const runNonces = await Promise.all(
     view.recentRuns.map(() => issueLocalMutationNonce("SOURCE_RUN_CANCEL", "/sources")),
@@ -63,8 +77,10 @@ export default async function SourcesPage() {
         {view.capabilities.map((capability, index) => {
           const supported = capability.source === "LEVER" || capability.source === "GREENHOUSE";
           const enabled = supported && capability.readiness === "SOURCE_ENABLED";
-          const canApprove = enabled && capability.ownerApprovalState !== "CURRENT";
-          const canRun = enabled && capability.canOwnerStart;
+          const combinedOwnerAction =
+            enabled && capability.ownerApprovalState === "APPROVAL_REQUIRED";
+          const legacyRunRecovery =
+            enabled && capability.ownerApprovalState === "CURRENT" && capability.canOwnerStart;
           return (
             <article className="job-row" key={`${capability.capabilityId}:${capability.version}`}>
               <div className="job-row__main">
@@ -75,6 +91,7 @@ export default async function SourcesPage() {
                   Tenant {capability.tenant} · v{capability.version} ·{" "}
                   {display(capability.readiness)}
                 </p>
+                <p>Capability digest {capability.configurationDigest.slice(0, 12)}</p>
                 <p>
                   Durable owner approval: {display(capability.ownerApprovalState)}
                   {capability.ownerApprovalReceiptId
@@ -97,64 +114,76 @@ export default async function SourcesPage() {
                 </p>
               </div>
               <div className="page-stack">
-                <form
-                  action={approveSourceCapabilityAction}
-                  className="import-form"
-                  aria-describedby={`source-approval-help-${index}`}
-                >
-                  <input type="hidden" name="mutationNonce" value={nonces[index]?.approve} />
-                  <input type="hidden" name="capabilityId" value={capability.capabilityId} />
-                  <input type="hidden" name="capabilityVersion" value={capability.version} />
-                  <input
-                    type="hidden"
-                    name="capabilityDigest"
-                    value={capability.configurationDigest}
-                  />
-                  <p id={`source-approval-help-${index}`}>
-                    This records an owner approval receipt for this exact capability version and
-                    makes no source request. Type <code>APPROVE {capability.capabilityId}</code>.
-                  </p>
-                  <label>
-                    Exact owner-approval confirmation
-                    <input name="confirmationText" autoComplete="off" required />
-                  </label>
-                  <label className="checkbox-line">
-                    <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
-                    this exact source capability.
-                  </label>
-                  <button className="button button--secondary" disabled={!canApprove}>
-                    Approve exact source capability
-                  </button>
-                </form>
-                <form
-                  action={startSourceRunAction}
-                  className="import-form"
-                  aria-describedby={`source-run-help-${index}`}
-                >
-                  <input type="hidden" name="mutationNonce" value={nonces[index]?.start} />
-                  <input type="hidden" name="capabilityId" value={capability.capabilityId} />
-                  <input type="hidden" name="capabilityVersion" value={capability.version} />
-                  <input
-                    type="hidden"
-                    name="capabilityDigest"
-                    value={capability.configurationDigest}
-                  />
-                  <p id={`source-run-help-${index}`}>
-                    This starts one bounded source read after a separate current owner approval
-                    receipt. Type <code>RUN {capability.capabilityId}</code>.
-                  </p>
-                  <label>
-                    Exact source-run confirmation
-                    <input name="confirmationText" autoComplete="off" required />
-                  </label>
-                  <label className="checkbox-line">
-                    <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
-                    this separate bounded source run.
-                  </label>
-                  <button className="button button--primary" disabled={!canRun}>
-                    Start bounded source read
-                  </button>
-                </form>
+                {combinedOwnerAction ? (
+                  <form
+                    action={approveAndStartSourceRunAction}
+                    className="import-form"
+                    aria-describedby={`source-combined-help-${index}`}
+                  >
+                    <input
+                      type="hidden"
+                      name="approvalMutationNonce"
+                      value={nonces[index]?.approval ?? ""}
+                    />
+                    <input
+                      type="hidden"
+                      name="startMutationNonce"
+                      value={nonces[index]?.start ?? ""}
+                    />
+                    <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                    <input type="hidden" name="capabilityVersion" value={capability.version} />
+                    <input
+                      type="hidden"
+                      name="capabilityDigest"
+                      value={capability.configurationDigest}
+                    />
+                    <h4>Approve and start this exact bounded source read</h4>
+                    <p id={`source-combined-help-${index}`}>
+                      This single owner confirmation records approval for this exact capability and
+                      immediately starts one bounded source read. It cannot be replayed. Type{" "}
+                      <code>APPROVE AND RUN {capability.capabilityId}</code>.
+                    </p>
+                    <label>
+                      Exact owner confirmation
+                      <input name="confirmationText" autoComplete="off" required />
+                    </label>
+                    <label className="checkbox-line">
+                      <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
+                      this exact capability and one bounded source read.
+                    </label>
+                    <button className="button button--primary">
+                      Approve &amp; start bounded source read
+                    </button>
+                  </form>
+                ) : legacyRunRecovery ? (
+                  <form
+                    action={startSourceRunAction}
+                    className="import-form"
+                    aria-describedby={`source-run-help-${index}`}
+                  >
+                    <input type="hidden" name="mutationNonce" value={nonces[index]?.start ?? ""} />
+                    <input type="hidden" name="capabilityId" value={capability.capabilityId} />
+                    <input type="hidden" name="capabilityVersion" value={capability.version} />
+                    <input
+                      type="hidden"
+                      name="capabilityDigest"
+                      value={capability.configurationDigest}
+                    />
+                    <p id={`source-run-help-${index}`}>
+                      A legacy owner approval is current for this exact capability. Type{" "}
+                      <code>RUN {capability.capabilityId}</code> to start its bounded source read.
+                    </p>
+                    <label>
+                      Exact source-run confirmation
+                      <input name="confirmationText" autoComplete="off" required />
+                    </label>
+                    <label className="checkbox-line">
+                      <input type="checkbox" name="ownerConfirmed" value="yes" required />I approve
+                      this bounded source read.
+                    </label>
+                    <button className="button button--primary">Start bounded source read</button>
+                  </form>
+                ) : null}
                 <form
                   action={revokeSourceAction}
                   className="import-form"

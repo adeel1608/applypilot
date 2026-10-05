@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getLocalDatabase: vi.fn(),
   getSourceEnablementRepository: vi.fn(),
   persistCapabilityVersion: vi.fn(),
-  recordOwnerApprovalReceipt: vi.fn(),
+  createOwnerApprovalAndStartReceipt: vi.fn(),
   createOwnerStartReceipt: vi.fn(),
   runGreenhouseSourceToQueue: vi.fn(),
   runLeverSourceToQueue: vi.fn(),
@@ -39,7 +39,7 @@ import {
 } from "@applypilot/job-sources";
 
 import {
-  approveOwnerSourceCapability,
+  approveAndRunOwnerSource,
   getSourceEnablementView,
   revokeSourceCapability,
   runOwnerApprovedSource,
@@ -96,7 +96,7 @@ describe("source workspace current capability lookup", () => {
       }),
       getRunOwnerProvenance: () => "OWNER_RECEIPTS_BOUND",
       persistCapabilityVersion: mocks.persistCapabilityVersion,
-      recordOwnerApprovalReceipt: mocks.recordOwnerApprovalReceipt,
+      createOwnerApprovalAndStartReceipt: mocks.createOwnerApprovalAndStartReceipt,
       createOwnerStartReceipt: mocks.createOwnerStartReceipt,
     });
   });
@@ -183,36 +183,102 @@ describe("source workspace current capability lookup", () => {
     expect(JSON.stringify(view.recentRuns[0]?.persistenceDiagnostic)).not.toContain("SQL ");
   });
 
-  it("approves the exact current head after reloading the private allowlist", async () => {
+  it("atomically approves and starts the exact current Greenhouse head", async () => {
     const previous = capability(2, "REVOKED");
     const head = capability(3, "APPROVED");
-    const gateProof = {
+    const approvalGateProof = {
       action: "SOURCE_CAPABILITY_APPROVE" as const,
       consumedAt: "2026-10-01T00:00:00.000Z",
       loopbackValidated: true as const,
       localSessionValidated: true as const,
       nonceConsumed: true as const,
     };
+    const startGateProof = {
+      ...approvalGateProof,
+      action: "SOURCE_RUN_START" as const,
+    };
+    const ownerReceiptChain = {
+      approvalReceiptId: "fixture-approval",
+      startReceiptId: "fixture-start",
+    };
     mocks.loadPrivateSourceAllowlistV2.mockResolvedValue({
       status: "SOURCE_ALLOWLIST_V2_READY",
       capabilities: [previous, head],
     });
+    mocks.createOwnerApprovalAndStartReceipt.mockReturnValue(ownerReceiptChain);
+    mocks.runGreenhouseSourceToQueue.mockResolvedValue({ status: "COMPLETE" });
 
-    await approveOwnerSourceCapability(
+    await approveAndRunOwnerSource(
       {
         capabilityId: head.capabilityId,
         version: head.version,
         capabilityDigest: sourceCapabilityDigest(head),
       },
-      gateProof,
+      { approval: approvalGateProof, start: startGateProof },
+      `APPROVE AND RUN ${head.capabilityId}`,
     );
 
     expect(mocks.persistCapabilityVersion).toHaveBeenCalledExactlyOnceWith(head);
-    expect(mocks.recordOwnerApprovalReceipt).toHaveBeenCalledExactlyOnceWith({
+    expect(mocks.createOwnerApprovalAndStartReceipt).toHaveBeenCalledExactlyOnceWith({
       capability: head,
-      gateProof,
+      operation: "LIST_JOBS",
+      approvalGateProof,
+      startGateProof,
+      confirmationText: `APPROVE AND RUN ${head.capabilityId}`,
       ownerConfirmed: true,
     });
+    expect(mocks.runGreenhouseSourceToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: head, ownerReceiptChain }),
+    );
+    expect(mocks.runLeverSourceToQueue).not.toHaveBeenCalled();
+  });
+
+  it("dispatches the combined current head to the canonical Lever runner", async () => {
+    const head = capability(1, "APPROVED");
+    const leverHead = SourceCapabilityV2Schema.parse({
+      ...head,
+      source: "LEVER",
+      alias: "Fictional Lever Board",
+      tenant: "fictional-lever",
+      allowedHost: "api.lever.co",
+      allowedPathPrefix: "/v0/postings/fictional-lever",
+    });
+    const approval = {
+      action: "SOURCE_CAPABILITY_APPROVE" as const,
+      consumedAt: "2026-10-01T00:00:00.000Z",
+      loopbackValidated: true as const,
+      localSessionValidated: true as const,
+      nonceConsumed: true as const,
+    };
+    const start = { ...approval, action: "SOURCE_RUN_START" as const };
+    const ownerReceiptChain = {
+      approvalReceiptId: "fixture-approval-lever",
+      startReceiptId: "fixture-start-lever",
+    };
+    mocks.loadPrivateSourceAllowlistV2.mockResolvedValue({
+      status: "SOURCE_ALLOWLIST_V2_READY",
+      capabilities: [leverHead],
+    });
+    mocks.createOwnerApprovalAndStartReceipt.mockReturnValue(ownerReceiptChain);
+    mocks.runLeverSourceToQueue.mockResolvedValue({ status: "COMPLETE" });
+
+    await approveAndRunOwnerSource(
+      {
+        capabilityId: leverHead.capabilityId,
+        version: leverHead.version,
+        capabilityDigest: sourceCapabilityDigest(leverHead),
+      },
+      { approval, start },
+      `APPROVE AND RUN ${leverHead.capabilityId}`,
+    );
+
+    expect(mocks.createOwnerApprovalAndStartReceipt).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ capability: leverHead, operation: "LIST_JOBS" }),
+    );
+    expect(mocks.runLeverSourceToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: leverHead, ownerReceiptChain }),
+    );
+    expect(mocks.runGreenhouseSourceToQueue).not.toHaveBeenCalled();
   });
 
   it("creates a mocked START chain only for the exact current Greenhouse head", async () => {
@@ -307,10 +373,17 @@ describe("source workspace current capability lookup", () => {
     });
 
     await expect(
-      approveOwnerSourceCapability(staleBinding, {
-        ...gateProof,
-        action: "SOURCE_CAPABILITY_APPROVE",
-      }),
+      approveAndRunOwnerSource(
+        staleBinding,
+        {
+          approval: {
+            ...gateProof,
+            action: "SOURCE_CAPABILITY_APPROVE" as const,
+          },
+          start: gateProof,
+        },
+        `APPROVE AND RUN ${staleBinding.capabilityId}`,
+      ),
     ).rejects.toThrow("SOURCE_CAPABILITY_VIEW_STALE");
     await expect(runOwnerApprovedSource(staleBinding, gateProof)).rejects.toThrow(
       "SOURCE_CAPABILITY_VIEW_STALE",
@@ -321,7 +394,7 @@ describe("source workspace current capability lookup", () => {
 
     expect(mocks.getSourceEnablementRepository).not.toHaveBeenCalled();
     expect(mocks.persistCapabilityVersion).not.toHaveBeenCalled();
-    expect(mocks.recordOwnerApprovalReceipt).not.toHaveBeenCalled();
+    expect(mocks.createOwnerApprovalAndStartReceipt).not.toHaveBeenCalled();
     expect(mocks.createOwnerStartReceipt).not.toHaveBeenCalled();
     expect(mocks.runGreenhouseSourceToQueue).not.toHaveBeenCalled();
     expect(mocks.runLeverSourceToQueue).not.toHaveBeenCalled();

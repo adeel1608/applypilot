@@ -20,6 +20,11 @@ export interface LocalMutationTokenOptions {
   randomToken?: () => string;
 }
 
+export interface LocalMutationNonceConsumption {
+  action: string;
+  nonce: unknown;
+}
+
 function hash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -77,22 +82,42 @@ export class LocalMutationTokenStore {
   }
 
   consume(sessionToken: string | null | undefined, action: string, nonce: unknown): void {
+    this.consumeBatch(sessionToken, [{ action, nonce }]);
+  }
+
+  /** Validate every nonce first, then consume them together without partial success. */
+  consumeBatch(
+    sessionToken: string | null | undefined,
+    consumptions: readonly LocalMutationNonceConsumption[],
+  ): void {
     if (!this.isSessionValid(sessionToken)) throw new Error("LOCAL_SESSION_REQUIRED");
-    if (typeof nonce !== "string" || !TOKEN_PATTERN.test(nonce)) {
-      throw new Error("MUTATION_NONCE_REQUIRED");
-    }
-    const record = this.nonces.get(hash(nonce));
-    if (!record) throw new Error("MUTATION_NONCE_INVALID");
-    if (record.used) throw new Error("MUTATION_NONCE_REPLAYED");
-    if (record.expiresAt <= this.now()) {
-      record.used = true;
-      throw new Error("MUTATION_NONCE_EXPIRED");
-    }
-    if (!equalHash(record.sessionHash, hash(sessionToken))) {
-      throw new Error("MUTATION_NONCE_SESSION_MISMATCH");
-    }
-    if (record.action !== action) throw new Error("MUTATION_NONCE_ACTION_MISMATCH");
-    record.used = true;
+    if (!consumptions.length) throw new Error("MUTATION_NONCE_REQUIRED");
+
+    const sessionHash = hash(sessionToken);
+    const nonceHashes = new Set<string>();
+    const records = consumptions.map(({ action, nonce }) => {
+      if (typeof nonce !== "string" || !TOKEN_PATTERN.test(nonce)) {
+        throw new Error("MUTATION_NONCE_REQUIRED");
+      }
+      const nonceHash = hash(nonce);
+      if (nonceHashes.has(nonceHash)) throw new Error("MUTATION_NONCE_DUPLICATE");
+      nonceHashes.add(nonceHash);
+
+      const record = this.nonces.get(nonceHash);
+      if (!record) throw new Error("MUTATION_NONCE_INVALID");
+      if (record.used) throw new Error("MUTATION_NONCE_REPLAYED");
+      if (record.expiresAt <= this.now()) {
+        record.used = true;
+        throw new Error("MUTATION_NONCE_EXPIRED");
+      }
+      if (!equalHash(record.sessionHash, sessionHash)) {
+        throw new Error("MUTATION_NONCE_SESSION_MISMATCH");
+      }
+      if (record.action !== action) throw new Error("MUTATION_NONCE_ACTION_MISMATCH");
+      return record;
+    });
+
+    for (const record of records) record.used = true;
   }
 
   private prune(): void {

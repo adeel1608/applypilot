@@ -236,10 +236,14 @@ async function exactPrivateCapability(
   return resolveCurrentSourceCapabilityHead(allowlist.capabilities, binding);
 }
 
-export async function approveOwnerSourceCapability(
+export async function approveAndRunOwnerSource(
   binding: SourceCapabilityViewBinding,
-  gateProof: SourceOwnerActionGateProof,
-): Promise<void> {
+  gateProofs: {
+    approval: SourceOwnerActionGateProof & { action: "SOURCE_CAPABILITY_APPROVE" };
+    start: SourceOwnerActionGateProof & { action: "SOURCE_RUN_START" };
+  },
+  confirmationText: string,
+) {
   const capability = await exactPrivateCapability(binding);
   if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
     throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
@@ -251,11 +255,24 @@ export async function approveOwnerSourceCapability(
     throw new Error("DATABASE_MIGRATION_REQUIRED");
   }
   repository.persistCapabilityVersion(capability);
-  repository.recordOwnerApprovalReceipt({
+  const ownerReceiptChain = repository.createOwnerApprovalAndStartReceipt({
     capability,
-    gateProof,
+    operation: "LIST_JOBS",
+    approvalGateProof: gateProofs.approval,
+    startGateProof: gateProofs.start,
+    confirmationText,
     ownerConfirmed: true,
   });
+  const runInput = {
+    capability,
+    repository,
+    ownerReceiptChain,
+    evaluateJob: reevaluateBetaJob,
+    queueJob: (jobId: string) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
+  };
+  return capability.source === "GREENHOUSE"
+    ? runGreenhouseSourceToQueue(runInput)
+    : runLeverSourceToQueue(runInput);
 }
 
 export async function runOwnerApprovedSource(
@@ -266,8 +283,9 @@ export async function runOwnerApprovedSource(
   if (capability.source !== "LEVER" && capability.source !== "GREENHOUSE") {
     throw new Error("SUPPORTED_SOURCE_CAPABILITY_REQUIRED");
   }
-  if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED")
+  if (sourceCapabilityReadiness(capability).status !== "SOURCE_ENABLED") {
     throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+  }
   const repository = getSourceEnablementRepository();
   if (!repository || !repository.ownerActionReceiptSchemaAvailable()) {
     throw new Error("DATABASE_MIGRATION_REQUIRED");

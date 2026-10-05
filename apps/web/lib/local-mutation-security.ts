@@ -15,6 +15,15 @@ export interface LocalMutationGateProof {
   nonceConsumed: true;
 }
 
+export interface LocalMutationNonceFieldSpec {
+  action: string;
+  fieldName: string;
+}
+
+type GateProofFor<Spec extends LocalMutationNonceFieldSpec> = LocalMutationGateProof & {
+  action: Spec["action"];
+};
+
 const processState = globalThis as typeof globalThis & {
   __applypilotLocalMutationTokens?: LocalMutationTokenStore;
 };
@@ -60,5 +69,51 @@ export async function consumeLocalMutationNonce<Action extends string>(
     loopbackValidated: true,
     localSessionValidated: true,
     nonceConsumed: true,
+  };
+}
+
+export async function consumeLocalMutationNonceBatch<
+  const Specs extends readonly LocalMutationNonceFieldSpec[],
+>(
+  specs: Specs,
+  formData: FormData,
+): Promise<{
+  [Index in keyof Specs]: Specs[Index] extends LocalMutationNonceFieldSpec
+    ? GateProofFor<Specs[Index]>
+    : never;
+}> {
+  if (!specs.length) throw new Error("MUTATION_NONCE_REQUIRED");
+  const fieldNames = new Set<string>();
+  const consumptions = specs.map(({ action, fieldName }) => {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,80}$/.test(fieldName)) {
+      throw new Error("MUTATION_NONCE_FIELD_INVALID");
+    }
+    if (fieldNames.has(fieldName)) throw new Error("MUTATION_NONCE_FIELD_DUPLICATE");
+    fieldNames.add(fieldName);
+    const values = formData.getAll(fieldName);
+    if (!values.length) throw new Error("MUTATION_NONCE_REQUIRED");
+    if (values.length !== 1) throw new Error("MUTATION_NONCE_FIELD_AMBIGUOUS");
+    return { action, nonce: values[0] };
+  });
+
+  const requestHeaders = await headers();
+  assertLoopbackMutationRequest({
+    host: requestHeaders.get("host"),
+    origin: requestHeaders.get("origin"),
+    forwardedHost: requestHeaders.get("x-forwarded-host"),
+  });
+  const session = (await cookies()).get(LOCAL_SESSION_COOKIE)?.value;
+  localMutationTokens.consumeBatch(session, consumptions);
+
+  return specs.map((spec) => ({
+    action: spec.action,
+    consumedAt: new Date().toISOString(),
+    loopbackValidated: true,
+    localSessionValidated: true,
+    nonceConsumed: true,
+  })) as {
+    [Index in keyof Specs]: Specs[Index] extends LocalMutationNonceFieldSpec
+      ? GateProofFor<Specs[Index]>
+      : never;
   };
 }

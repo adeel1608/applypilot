@@ -66,6 +66,19 @@ function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function ownerConfirmationDigestsMatch(
+  capabilityId: string,
+  approvalConfirmationDigest: string,
+  startConfirmationDigest: string,
+): boolean {
+  const combinedDigest = sha256(`APPROVE AND RUN ${capabilityId}`);
+  return (
+    (approvalConfirmationDigest === sha256(`APPROVE ${capabilityId}`) &&
+      startConfirmationDigest === sha256(`RUN ${capabilityId}`)) ||
+    (approvalConfirmationDigest === combinedDigest && startConfirmationDigest === combinedDigest)
+  );
+}
+
 const SOURCE_OWNER_START_RECEIPT_TTL_MS = 5 * 60 * 1000;
 
 interface PersistenceContext {
@@ -1269,6 +1282,132 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       .immediate();
   }
 
+  createOwnerApprovalAndStartReceipt(input: {
+    capability: SourceCapabilityV2;
+    operation: SourceOperation;
+    approvalGateProof: SourceOwnerActionGateProof;
+    startGateProof: SourceOwnerActionGateProof;
+    confirmationText: string;
+    ownerConfirmed: true;
+  }): SourceOwnerReceiptChain {
+    this.requireOwnerReceiptSchema();
+    const capability = SourceCapabilityV2Schema.parse(input.capability);
+    const expectedConfirmation = `APPROVE AND RUN ${capability.capabilityId}`;
+    if (input.ownerConfirmed !== true || input.confirmationText !== expectedConfirmation) {
+      throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
+    }
+    this.assertGateProof(input.approvalGateProof, "SOURCE_CAPABILITY_APPROVE");
+    this.assertGateProof(input.startGateProof, "SOURCE_RUN_START");
+    if (!capability.allowedOperations.includes(input.operation)) {
+      throw new Error("OPERATION_NOT_APPROVED");
+    }
+
+    const now = this.now();
+    if (sourceCapabilityReadiness(capability, now).status !== "SOURCE_ENABLED") {
+      throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
+    }
+    const digest = sourceCapabilityDigest(capability);
+    const version = this.assertPersistedCapabilityCurrent(capability, digest);
+    const approvalReference = capability.approvalReference;
+    if (!approvalReference) throw new Error("SOURCE_APPROVAL_REFERENCE_REQUIRED");
+
+    const timestamp = now.toISOString();
+    const approvalReceiptId = this.id();
+    const startReceiptId = this.id();
+    const receiptExpiresAt = new Date(
+      now.getTime() + SOURCE_OWNER_START_RECEIPT_TTL_MS,
+    ).toISOString();
+    const confirmationDigest = sha256(expectedConfirmation);
+
+    return this.sqlite
+      .transaction(() => {
+        const current = this.currentCapability(capability.capabilityId);
+        if (
+          !current ||
+          current.id !== version.id ||
+          current.version !== capability.version ||
+          current.digest !== digest
+        ) {
+          throw new Error("CAPABILITY_CHANGED");
+        }
+        const priorOwnerAction = this.sqlite
+          .prepare(
+            `SELECT 1 FROM source_owner_action_receipts
+             WHERE capability_version_id=? LIMIT 1`,
+          )
+          .get(version.id);
+        const priorRun = this.sqlite
+          .prepare(`SELECT 1 FROM source_run_checkpoints WHERE capability_version_id=? LIMIT 1`)
+          .get(version.id);
+        if (priorOwnerAction || priorRun) throw new Error("SOURCE_OWNER_ACTION_ALREADY_RECORDED");
+
+        this.insertOwnerReceipt({
+          id: approvalReceiptId,
+          action: "APPROVE",
+          capability,
+          capabilityVersionId: version.id,
+          capabilityDigest: digest,
+          approvalReference,
+          operation: null,
+          receiptExpiresAt: null,
+          confirmationDigest,
+          nonceAction: "SOURCE_CAPABILITY_APPROVE",
+          gateProof: input.approvalGateProof,
+          predecessorReceiptId: null,
+          state: "ACTIVE",
+          consumedAt: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        this.auditOwnerApprovalRecorded(approvalReceiptId, capability, digest);
+
+        const consumed = this.sqlite
+          .prepare(
+            `UPDATE source_owner_action_receipts SET state='CONSUMED',consumed_at=?,updated_at=?
+             WHERE id=? AND action='APPROVE' AND state='ACTIVE'`,
+          )
+          .run(timestamp, timestamp, approvalReceiptId).changes;
+        if (consumed !== 1) throw new Error("SOURCE_OWNER_APPROVAL_REPLAYED");
+
+        this.insertOwnerReceipt({
+          id: startReceiptId,
+          action: "START",
+          capability,
+          capabilityVersionId: version.id,
+          capabilityDigest: digest,
+          approvalReference,
+          operation: input.operation,
+          receiptExpiresAt,
+          confirmationDigest,
+          nonceAction: "SOURCE_RUN_START",
+          gateProof: input.startGateProof,
+          predecessorReceiptId: approvalReceiptId,
+          state: "ACTIVE",
+          consumedAt: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        this.auditOwnerReceiptTerminal(approvalReceiptId, "APPROVE", "CONSUMED");
+        const audit = validateSourceAuditMetadata("source.owner.start-recorded", {
+          receiptId: startReceiptId,
+          approvalReceiptId,
+          capabilityId: capability.capabilityId,
+          capabilityVersion: capability.version,
+          capabilityDigest: digest,
+          operation: input.operation,
+          state: "ACTIVE",
+        });
+        this.audit(
+          "source.owner.start-recorded",
+          "source_owner_action_receipt",
+          startReceiptId,
+          audit,
+        );
+        return { approvalReceiptId, startReceiptId };
+      })
+      .immediate();
+  }
+
   getOwnerApprovalStatus(capabilityInput: SourceCapabilityV2): SourceOwnerApprovalStatusResult {
     if (!this.hasOwnerReceiptSchema()) {
       return { state: "MIGRATION_REQUIRED", receiptId: null, canStart: false };
@@ -1459,21 +1598,28 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
 
   failOwnerStartReceipt(receiptId: string): void {
     if (!this.hasOwnerReceiptSchema()) return;
-    const timestamp = this.now().toISOString();
-    const row = this.sqlite
-      .prepare(
-        `SELECT action FROM source_owner_action_receipts
-         WHERE id=? AND action='START' AND state='ACTIVE'`,
-      )
-      .get(receiptId) as { action: "START" } | undefined;
-    if (!row) return;
-    const changed = this.sqlite
-      .prepare(
-        `UPDATE source_owner_action_receipts SET state='FAILED',updated_at=?
-         WHERE id=? AND action='START' AND state='ACTIVE'`,
-      )
-      .run(timestamp, receiptId).changes;
-    if (changed) this.auditOwnerReceiptTerminal(receiptId, "START", "FAILED");
+    this.sqlite
+      .transaction(() => {
+        const row = this.sqlite
+          .prepare(
+            `SELECT 1 FROM source_owner_action_receipts
+             WHERE id=? AND action='START' AND state='ACTIVE'`,
+          )
+          .get(receiptId);
+        if (!row) return;
+        const binding = this.sqlite
+          .prepare("SELECT 1 FROM source_run_owner_bindings WHERE start_receipt_id=? LIMIT 1")
+          .get(receiptId);
+        if (binding) return;
+        const changed = this.sqlite
+          .prepare(
+            `UPDATE source_owner_action_receipts SET state='FAILED',updated_at=?
+             WHERE id=? AND action='START' AND state='ACTIVE'`,
+          )
+          .run(this.now().toISOString(), receiptId).changes;
+        if (changed) this.auditOwnerReceiptTerminal(receiptId, "START", "FAILED");
+      })
+      .immediate();
   }
 
   getRunOwnerProvenance(
@@ -1593,8 +1739,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       row.approvalPolicyVersion === row.startPolicyVersion &&
       row.approvalPolicyExpiresAt === row.startPolicyExpiresAt &&
       row.approvalCapabilityExpiresAt === row.startCapabilityExpiresAt &&
-      row.approvalConfirmationDigest === sha256(`APPROVE ${row.capabilityId}`) &&
-      row.startConfirmationDigest === sha256(`RUN ${row.capabilityId}`) &&
+      ownerConfirmationDigestsMatch(
+        row.capabilityId,
+        row.approvalConfirmationDigest,
+        row.startConfirmationDigest,
+      ) &&
       row.approvalNonceAction === "SOURCE_CAPABILITY_APPROVE" &&
       row.startNonceAction === "SOURCE_RUN_START" &&
       row.approvalLoopbackValidated === 1 &&
@@ -1682,8 +1831,6 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
             | Record<string, string | number | null>
             | undefined;
           if (!receipt) throw new Error("SOURCE_OWNER_RECEIPT_CHAIN_REQUIRED");
-          const expectedApprovalDigest = sha256(`APPROVE ${capability.capabilityId}`);
-          const expectedStartDigest = sha256(`RUN ${capability.capabilityId}`);
           const receiptExpiresAt = Date.parse(String(receipt.receiptExpiresAt ?? ""));
           const approvalConsumedAt = Date.parse(String(receipt.approvalConsumedAt ?? ""));
           const receiptCreatedAt = Date.parse(String(receipt.startCreatedAt ?? ""));
@@ -1718,8 +1865,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
             receipt.approvalPolicyExpiresAt === capability.policyExpiresAt &&
             receipt.startCapabilityExpiresAt === capability.capabilityExpiresAt &&
             receipt.approvalCapabilityExpiresAt === capability.capabilityExpiresAt &&
-            receipt.startConfirmationDigest === expectedStartDigest &&
-            receipt.approvalConfirmationDigest === expectedApprovalDigest &&
+            ownerConfirmationDigestsMatch(
+              capability.capabilityId,
+              String(receipt.approvalConfirmationDigest ?? ""),
+              String(receipt.startConfirmationDigest ?? ""),
+            ) &&
             receipt.startNonceAction === "SOURCE_RUN_START" &&
             receipt.approvalNonceAction === "SOURCE_CAPABILITY_APPROVE" &&
             receipt.startLoopbackValidated === 1 &&
