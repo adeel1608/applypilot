@@ -42,7 +42,11 @@ import {
   readGreenhousePostingV2FromPayload,
   readLeverPostingV2FromPayload,
 } from "@applypilot/job-sources";
-import { ParsedJobFieldsSchema, normalizeR2AJobEvidence } from "@applypilot/job-importer";
+import {
+  ParsedJobFieldsSchema,
+  normalizeR2AJobEvidence,
+  serializeR2AStructuredSource,
+} from "@applypilot/job-importer";
 import {
   JobSchema,
   R2A_NORMALIZATION_VERSION,
@@ -163,7 +167,7 @@ function structuredLeverRecord(
   };
 }
 
-function structuredGreenhouseRecord(
+export function structuredGreenhouseRecord(
   record: GreenhousePostingRecordV2,
   capability: SourceCapabilityV2,
 ): Record<string, unknown> {
@@ -183,6 +187,18 @@ function structuredGreenhouseRecord(
     offices: record.offices,
     providerMetadata: record.metadata,
   };
+}
+
+/** Opaque provider fields remain in rawPayload and are not R2A evidence inputs. */
+export function structuredGreenhouseEvidenceRecord(
+  record: GreenhousePostingRecordV2,
+  capability: SourceCapabilityV2,
+): Record<string, unknown> {
+  const evidenceRecord = structuredGreenhouseRecord(record, capability);
+  delete evidenceRecord.departments;
+  delete evidenceRecord.offices;
+  delete evidenceRecord.providerMetadata;
+  return evidenceRecord;
 }
 
 const evidenceChunkLength = 500;
@@ -553,6 +569,9 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     const structured = isLever
       ? structuredLeverRecord(record, capability)
       : structuredGreenhouseRecord(record, capability);
+    const r2aStructured = isLever
+      ? structured
+      : structuredGreenhouseEvidenceRecord(record, capability);
     const fields = ParsedJobFieldsSchema.parse({
       externalId: record.externalId,
       sourceUrl: record.sourceUrl,
@@ -589,9 +608,10 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       row.jobId,
     );
     const normalization = normalizeR2AJobEvidence({
-      sourceText: JSON.stringify(structured),
+      sourceText: serializeR2AStructuredSource(r2aStructured),
       sourceObservationId: row.sourceObservationId,
-      structured,
+      structured: r2aStructured,
+      diagnosticStructure: structured,
       explicitLocation: location,
     });
     const derived = new BetaRepository(this.sqlite, this.now).recordJobVersion({
@@ -1049,7 +1069,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       },
       row.jobVersionJobId,
     );
-    const sourceText = JSON.stringify(structured);
+    const sourceText = serializeR2AStructuredSource(structured);
     const normalization = normalizeR2AJobEvidence({
       sourceText,
       sourceObservationId: row.sourceObservationId,
@@ -2958,7 +2978,10 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     const structured = isLever
       ? structuredLeverRecord(record, capability)
       : structuredGreenhouseRecord(record, capability);
-    const sourceText = JSON.stringify(structured);
+    const r2aStructured = isLever
+      ? structured
+      : structuredGreenhouseEvidenceRecord(record, capability);
+    const sourceText = serializeR2AStructuredSource(r2aStructured);
     const fields = ParsedJobFieldsSchema.parse({
       externalId: record.externalId,
       sourceUrl: record.sourceUrl,
@@ -3172,7 +3195,8 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     const normalization = normalizeR2AJobEvidence({
       sourceText,
       sourceObservationId: observationId,
-      structured,
+      structured: r2aStructured,
+      diagnosticStructure: structured,
       explicitLocation: location,
     });
     this.setPersistencePhase(persistenceContext, "R2A_PERSIST", recordIndex, record.externalId);
