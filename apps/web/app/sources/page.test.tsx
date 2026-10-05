@@ -4,13 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getSourceEnablementView: vi.fn(),
   issueLocalMutationNonce: vi.fn(),
+  combinedAction: vi.fn(),
+  startAction: vi.fn(),
+  revokeAction: vi.fn(),
+  cancelAction: vi.fn(),
 }));
 
 vi.mock("./actions", () => ({
-  approveSourceCapabilityAction: vi.fn(),
-  cancelSourceRunAction: vi.fn(),
-  revokeSourceAction: vi.fn(),
-  startSourceRunAction: vi.fn(),
+  approveAndStartSourceRunAction: mocks.combinedAction,
+  cancelSourceRunAction: mocks.cancelAction,
+  revokeSourceAction: mocks.revokeAction,
+  startSourceRunAction: mocks.startAction,
 }));
 vi.mock("@web/lib/local-mutation-security", () => ({
   issueLocalMutationNonce: mocks.issueLocalMutationNonce,
@@ -102,23 +106,36 @@ beforeEach(() => {
 });
 
 describe("source receipt UI", () => {
-  it("shows the approval requirement, disables separate start, leaves boxes unchecked, and labels legacy runs", async () => {
+  it("shows one combined owner form for APPROVAL_REQUIRED and leaves boxes unchecked", async () => {
     const tree = await SourcesPage();
     const rendered = elements(tree);
+    const codeText = rendered
+      .filter((element) => element.type === "code")
+      .map((element) => textContent(element));
     const buttons = rendered.filter((element) => element.type === "button");
-    const primaryStartButton = buttons.find(
-      (element) => element.props.className === "button button--primary",
+    const combinedButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes(
+        "Approve & start bounded source read",
+      ),
     );
     const checkboxes = rendered.filter(
       (element) => element.type === "input" && element.props.type === "checkbox",
     );
+    const sourceForms = rendered.filter(
+      (element) => element.type === "form" && element.props.className === "import-form",
+    );
 
     expect(textContent(tree)).toContain("Durable owner approval: APPROVAL REQUIRED");
-    expect(textContent(tree)).toContain("APPROVE fictional-source-capability");
-    expect(textContent(tree)).toContain("RUN fictional-source-capability");
+    expect(textContent(tree)).toContain("Approve and start this exact bounded source read");
+    expect(textContent(tree)).toContain(
+      `Capability digest ${capability.configurationDigest.slice(0, 12)}`,
+    );
+    expect(codeText).toContain("APPROVE AND RUN fictional-source-capability");
+    expect(codeText).not.toContain("RUN fictional-source-capability");
     expect(textContent(tree)).toContain("LEGACY OWNER ACTION PROVENANCE UNVERIFIED");
-    expect(primaryStartButton?.props.disabled).toBe(true);
-    expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+    expect(combinedButton?.props.disabled).not.toBe(true);
+    expect(sourceForms).toHaveLength(2);
+    expect(checkboxes).toHaveLength(2);
     expect(
       checkboxes.every(
         (input) => input.props.checked !== true && input.props.defaultChecked !== true,
@@ -132,7 +149,7 @@ describe("source receipt UI", () => {
       (element) => element.type === "form" && element.props.className === "import-form",
     );
 
-    expect(sourceForms).toHaveLength(3);
+    expect(sourceForms).toHaveLength(2);
     for (const form of sourceForms) {
       const inputs = elements(form);
       expect(inputs.find((input) => input.props.name === "capabilityId")?.props.value).toBe(
@@ -145,9 +162,17 @@ describe("source receipt UI", () => {
         capability.configurationDigest,
       );
     }
+    const combinedForm = sourceForms.find((form) => form.props.action === mocks.combinedAction);
+    const combinedInputs = elements(combinedForm);
+    expect(
+      combinedInputs.find((input) => input.props.name === "approvalMutationNonce")?.props.value,
+    ).toBe("SOURCE_CAPABILITY_APPROVE-nonce");
+    expect(
+      combinedInputs.find((input) => input.props.name === "startMutationNonce")?.props.value,
+    ).toBe("SOURCE_RUN_START-nonce");
   });
 
-  it("keeps a revoked latest head visible but disables APPROVE and RUN without predecessor fallback", async () => {
+  it("keeps a revoked latest head visible without approval or run actions", async () => {
     mocks.getSourceEnablementView.mockResolvedValueOnce({
       status: "SOURCE_ALLOWLIST_V2_READY",
       capabilities: [
@@ -164,24 +189,17 @@ describe("source receipt UI", () => {
     });
 
     const tree = await SourcesPage();
-    const buttons = elements(tree).filter((element) => element.type === "button");
-    const approvalButton = buttons.find((element) =>
-      textContent(element.props.children as ReactNode).includes("Approve exact source capability"),
-    );
-    const runButton = buttons.find((element) =>
-      textContent(element.props.children as ReactNode).includes("Start bounded source read"),
-    );
     const formVersions = elements(tree)
       .filter((element) => element.type === "input" && element.props.name === "capabilityVersion")
       .map((input) => input.props.value);
 
     expect(textContent(tree)).toContain("Durable owner approval: REVOKED");
-    expect(approvalButton?.props.disabled).toBe(true);
-    expect(runButton?.props.disabled).toBe(true);
-    expect(formVersions).toEqual([3, 3, 3]);
+    expect(textContent(tree)).not.toContain("APPROVE AND RUN");
+    expect(textContent(tree)).not.toContain("RUN fictional-source-capability");
+    expect(formVersions).toEqual([3]);
   });
 
-  it("enables a fresh bounded start only for a current exact-version approval receipt", async () => {
+  it("keeps legacy CURRENT approvals on a RUN-only recovery form", async () => {
     mocks.getSourceEnablementView.mockResolvedValueOnce({
       status: "SOURCE_ALLOWLIST_V2_READY",
       capabilities: [
@@ -196,22 +214,35 @@ describe("source receipt UI", () => {
     });
 
     const tree = await SourcesPage();
-    const primaryStartButton = elements(tree).find(
+    const rendered = elements(tree);
+    const runButton = rendered.find(
       (element) =>
-        element.type === "button" && element.props.className === "button button--primary",
+        element.type === "button" &&
+        textContent(element.props.children as ReactNode).includes("Start bounded source read"),
+    );
+    const forms = rendered.filter(
+      (element) => element.type === "form" && element.props.className === "import-form",
     );
 
     expect(textContent(tree)).toContain("Durable owner approval: CURRENT");
     expect(textContent(tree)).toContain("receipt fictional-approval-receipt");
-    expect(primaryStartButton?.props.disabled).toBe(false);
-    expect(mocks.issueLocalMutationNonce).toHaveBeenCalledWith(
+    expect(textContent(tree)).toContain("RUN fictional-source-capability");
+    expect(textContent(tree)).not.toContain("APPROVE AND RUN");
+    expect(runButton?.props.disabled).not.toBe(true);
+    expect(forms).toHaveLength(2);
+    expect(
+      forms.some((form) =>
+        elements(form).some((input) => input.props.name === "approvalMutationNonce"),
+      ),
+    ).toBe(false);
+    expect(mocks.issueLocalMutationNonce).not.toHaveBeenCalledWith(
       "SOURCE_CAPABILITY_APPROVE",
       "/sources",
     );
     expect(mocks.issueLocalMutationNonce).toHaveBeenCalledWith("SOURCE_RUN_START", "/sources");
   });
 
-  it("enables Greenhouse approval while keeping RUN blocked until its receipt is current", async () => {
+  it("shows the combined one-click flow for Greenhouse APPROVAL_REQUIRED state", async () => {
     mocks.getSourceEnablementView.mockResolvedValueOnce({
       status: "SOURCE_ALLOWLIST_V2_READY",
       capabilities: [
@@ -227,42 +258,37 @@ describe("source receipt UI", () => {
 
     const tree = await SourcesPage();
     const buttons = elements(tree).filter((element) => element.type === "button");
-    const approvalButton = buttons.find((element) =>
-      textContent(element.props.children as ReactNode).includes("Approve exact source capability"),
-    );
-    const runButton = buttons.find((element) =>
-      textContent(element.props.children as ReactNode).includes("Start bounded source read"),
+    const combinedButton = buttons.find((element) =>
+      textContent(element.props.children as ReactNode).includes(
+        "Approve & start bounded source read",
+      ),
     );
 
     expect(textContent(tree)).toContain("GREENHOUSE · Fictional Greenhouse Board");
-    expect(textContent(tree)).toContain("APPROVE fictional-greenhouse-capability");
-    expect(approvalButton?.props.disabled).toBe(false);
-    expect(runButton?.props.disabled).toBe(true);
+    expect(textContent(tree)).toContain("APPROVE AND RUN fictional-greenhouse-capability");
+    expect(combinedButton?.props.disabled).not.toBe(true);
+    expect(
+      buttons.filter((element) => element.props.className === "button button--primary"),
+    ).toHaveLength(1);
   });
 
-  it("enables Greenhouse RUN only after the exact approval receipt is current", async () => {
+  it("does not offer source actions for a terminal approval state", async () => {
     mocks.getSourceEnablementView.mockResolvedValueOnce({
       status: "SOURCE_ALLOWLIST_V2_READY",
       capabilities: [
         {
           ...greenhouseCapability,
-          ownerApprovalState: "CURRENT",
+          ownerApprovalState: "CONSUMED",
           ownerApprovalReceiptId: "fictional-greenhouse-approval",
-          canOwnerStart: true,
+          canOwnerStart: false,
         },
       ],
       recentRuns: [],
     });
 
     const tree = await SourcesPage();
-    const runButton = elements(tree).find(
-      (element) =>
-        element.type === "button" &&
-        textContent(element.props.children as ReactNode).includes("Start bounded source read"),
-    );
-
-    expect(textContent(tree)).toContain("Durable owner approval: CURRENT");
-    expect(textContent(tree)).toContain("RUN fictional-greenhouse-capability");
-    expect(runButton?.props.disabled).toBe(false);
+    expect(textContent(tree)).toContain("Durable owner approval: CONSUMED");
+    expect(textContent(tree)).not.toContain("APPROVE AND RUN");
+    expect(textContent(tree)).not.toContain("RUN fictional-greenhouse-capability");
   });
 });

@@ -3871,6 +3871,257 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("creates a combined receipt chain atomically and binds it before one mocked request", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `combined-owner:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const phrase = `APPROVE AND RUN ${approved.capabilityId}`;
+    const approvalGateProof = {
+      ...fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+      nonce: "combined-approval-nonce-secret",
+      sessionCookie: "combined-session-secret",
+    } as never;
+    const startGateProof = {
+      ...fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+      nonce: "combined-start-nonce-secret",
+      sessionCookie: "combined-session-secret",
+    } as never;
+
+    const chain = repository.createOwnerApprovalAndStartReceipt({
+      capability: approved,
+      operation: "LIST_JOBS",
+      approvalGateProof,
+      startGateProof,
+      confirmationText: phrase,
+      ownerConfirmed: true,
+    });
+
+    const expectedConfirmationDigest = createHash("sha256").update(phrase).digest("hex");
+    expect(
+      sqlite
+        .prepare(
+          `SELECT action,state,operation,predecessor_receipt_id AS predecessorReceiptId,
+                  confirmation_digest AS confirmationDigest,nonce_action AS nonceAction
+           FROM source_owner_action_receipts ORDER BY rowid`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        action: "APPROVE",
+        state: "CONSUMED",
+        operation: null,
+        predecessorReceiptId: null,
+        confirmationDigest: expectedConfirmationDigest,
+        nonceAction: "SOURCE_CAPABILITY_APPROVE",
+      },
+      {
+        action: "START",
+        state: "ACTIVE",
+        operation: "LIST_JOBS",
+        predecessorReceiptId: chain.approvalReceiptId,
+        confirmationDigest: expectedConfirmationDigest,
+        nonceAction: "SOURCE_RUN_START",
+      },
+    ]);
+    expect(chain.startReceiptId).not.toBe(chain.approvalReceiptId);
+    expect(repository.getOwnerApprovalStatus(approved)).toMatchObject({
+      state: "CONSUMED",
+      receiptId: chain.approvalReceiptId,
+      canStart: false,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_owner_bindings").get()).toEqual(
+      {
+        count: 0,
+      },
+    );
+
+    const beforeTransport = JSON.stringify({
+      receipts: sqlite.prepare("SELECT * FROM source_owner_action_receipts").all(),
+      audit: sqlite
+        .prepare(
+          "SELECT redacted_metadata_json FROM audit_events WHERE event_type LIKE 'source.owner.%'",
+        )
+        .all(),
+    });
+    for (const secret of [
+      "combined-approval-nonce-secret",
+      "combined-start-nonce-secret",
+      "combined-session-secret",
+      phrase,
+    ]) {
+      expect(beforeTransport).not.toContain(secret);
+    }
+
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => {
+        expect(
+          sqlite.prepare("SELECT count(*) AS count FROM source_run_owner_bindings").get(),
+        ).toEqual({ count: 1 });
+        return ["8.8.8.8"];
+      }),
+      request: vi.fn(async ({ pinnedAddress }) => ({
+        status: 200,
+        headers: { "content-type": "application/json", "content-encoding": "identity" },
+        body: Buffer.from("[]"),
+        connectedAddress: pinnedAddress,
+      })),
+    };
+    const result = await runLeverSourceToQueueWithOwnerReceipts({
+      capability: approved,
+      repository,
+      ownerReceiptChain: chain,
+      now: () => instant,
+      dependencies,
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result.status).toBe("COMPLETE");
+    expect(dependencies.resolveHost).toHaveBeenCalledTimes(1);
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite.prepare("SELECT action,state FROM source_owner_action_receipts ORDER BY rowid").all(),
+    ).toEqual([
+      { action: "APPROVE", state: "CONSUMED" },
+      { action: "START", state: "CONSUMED" },
+    ]);
+
+    expect(() =>
+      repository.createOwnerApprovalAndStartReceipt({
+        capability: approved,
+        operation: "LIST_JOBS",
+        approvalGateProof,
+        startGateProof,
+        confirmationText: phrase,
+        ownerConfirmed: true,
+      }),
+    ).toThrow("SOURCE_OWNER_ACTION_ALREADY_RECORDED");
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_owner_action_receipts").get(),
+    ).toEqual({
+      count: 2,
+    });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 1,
+    });
+    expect(dependencies.request).toHaveBeenCalledTimes(1);
+    sqlite.close();
+  });
+
+  it("rolls back both combined receipts and audit events if START insertion fails", () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability();
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `combined-rollback:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    sqlite.exec(`
+      CREATE TRIGGER reject_combined_start
+      BEFORE INSERT ON source_owner_action_receipts
+      WHEN NEW.action='START'
+      BEGIN
+        SELECT RAISE(ABORT, 'fixture start insert failure');
+      END;
+    `);
+
+    expect(() =>
+      repository.createOwnerApprovalAndStartReceipt({
+        capability: approved,
+        operation: "LIST_JOBS",
+        approvalGateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+        startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+        confirmationText: `APPROVE AND RUN ${approved.capabilityId}`,
+        ownerConfirmed: true,
+      }),
+    ).toThrow();
+    expect(
+      sqlite.prepare("SELECT count(*) AS count FROM source_owner_action_receipts").get(),
+    ).toEqual({
+      count: 0,
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT count(*) AS count FROM audit_events WHERE event_type LIKE 'source.owner.%'",
+        )
+        .get(),
+    ).toEqual({ count: 0 });
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
+    });
+    sqlite.close();
+  });
+
+  it("fails an invalid combined START before run creation and transport", async () => {
+    const sqlite = database();
+    let id = 0;
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(
+      sqlite,
+      () => instant,
+      () => `combined-invalid-start:${++id}`,
+    );
+    repository.persistCapabilityVersion(approved);
+    const chain = repository.createOwnerApprovalAndStartReceipt({
+      capability: approved,
+      operation: "LIST_JOBS",
+      approvalGateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+      startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+      confirmationText: `APPROVE AND RUN ${approved.capabilityId}`,
+      ownerConfirmed: true,
+    });
+    sqlite
+      .prepare("UPDATE source_owner_action_receipts SET confirmation_digest=? WHERE id=?")
+      .run("f".repeat(64), chain.startReceiptId);
+    const dependencies: SecureSourceTransportDependencies = {
+      resolveHost: vi.fn(async () => ["8.8.8.8"]),
+      request: vi.fn(async () => {
+        throw new Error("UNEXPECTED_TRANSPORT");
+      }),
+    };
+
+    await expect(
+      runLeverSourceToQueueWithOwnerReceipts({
+        capability: approved,
+        repository,
+        ownerReceiptChain: chain,
+        now: () => instant,
+        dependencies,
+        evaluateJob: async () => null,
+        queueJob: () => undefined,
+      }),
+    ).rejects.toThrow("SOURCE_OWNER_RECEIPT_CHAIN_INVALID");
+    expect(dependencies.resolveHost).not.toHaveBeenCalled();
+    expect(dependencies.request).not.toHaveBeenCalled();
+    expect(
+      sqlite.prepare("SELECT action,state FROM source_owner_action_receipts ORDER BY rowid").all(),
+    ).toEqual([
+      { action: "APPROVE", state: "CONSUMED" },
+      { action: "START", state: "FAILED" },
+    ]);
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_owner_bindings").get()).toEqual(
+      {
+        count: 0,
+      },
+    );
+    expect(sqlite.prepare("SELECT count(*) AS count FROM source_run_checkpoints").get()).toEqual({
+      count: 0,
+    });
+    sqlite.close();
+  });
+
   it("terminalizes expired owner approvals and superseded capability approvals", () => {
     const sqlite = database();
     let now = instant;

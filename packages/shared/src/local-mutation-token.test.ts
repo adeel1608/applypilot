@@ -34,6 +34,69 @@ describe("LocalMutationTokenStore", () => {
     );
   });
 
+  it("consumes independently issued action nonces as one batch", () => {
+    let counter = 0;
+    const store = new LocalMutationTokenStore({
+      randomToken: () => `token_${String(++counter).padStart(32, "x")}`,
+    });
+    const session = store.createSession();
+    const approval = store.issue(session.token, "SOURCE_CAPABILITY_APPROVE");
+    const start = store.issue(session.token, "SOURCE_RUN_START");
+
+    expect(() =>
+      store.consumeBatch(session.token, [
+        { action: "SOURCE_CAPABILITY_APPROVE", nonce: approval.nonce },
+        { action: "SOURCE_RUN_START", nonce: start.nonce },
+      ]),
+    ).not.toThrow();
+    expect(() => store.consume(session.token, "SOURCE_CAPABILITY_APPROVE", approval.nonce)).toThrow(
+      "MUTATION_NONCE_REPLAYED",
+    );
+    expect(() => store.consume(session.token, "SOURCE_RUN_START", start.nonce)).toThrow(
+      "MUTATION_NONCE_REPLAYED",
+    );
+  });
+
+  it("does not partially consume valid nonces when another named action is invalid", () => {
+    let counter = 0;
+    const store = new LocalMutationTokenStore({
+      randomToken: () => `token_${String(++counter).padStart(32, "x")}`,
+    });
+    const session = store.createSession();
+    const approval = store.issue(session.token, "SOURCE_CAPABILITY_APPROVE");
+    const start = store.issue(session.token, "SOURCE_RUN_START");
+
+    expect(() =>
+      store.consumeBatch(session.token, [
+        { action: "SOURCE_CAPABILITY_APPROVE", nonce: approval.nonce },
+        { action: "WRONG_ACTION", nonce: start.nonce },
+      ]),
+    ).toThrow("MUTATION_NONCE_ACTION_MISMATCH");
+    expect(() =>
+      store.consume(session.token, "SOURCE_CAPABILITY_APPROVE", approval.nonce),
+    ).not.toThrow();
+    expect(() => store.consume(session.token, "SOURCE_RUN_START", start.nonce)).not.toThrow();
+  });
+
+  it("rejects duplicate nonce values in a batch without consuming them", () => {
+    let counter = 0;
+    const store = new LocalMutationTokenStore({
+      randomToken: () => `token_${String(++counter).padStart(32, "x")}`,
+    });
+    const session = store.createSession();
+    const approval = store.issue(session.token, "SOURCE_CAPABILITY_APPROVE");
+
+    expect(() =>
+      store.consumeBatch(session.token, [
+        { action: "SOURCE_CAPABILITY_APPROVE", nonce: approval.nonce },
+        { action: "SOURCE_CAPABILITY_APPROVE", nonce: approval.nonce },
+      ]),
+    ).toThrow("MUTATION_NONCE_DUPLICATE");
+    expect(() =>
+      store.consume(session.token, "SOURCE_CAPABILITY_APPROVE", approval.nonce),
+    ).not.toThrow();
+  });
+
   it("rejects absent and expired sessions", () => {
     let now = 1_000;
     const store = new LocalMutationTokenStore({
