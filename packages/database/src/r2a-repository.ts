@@ -515,6 +515,26 @@ export class R2ARepository {
       coverageRows[0]?.evidenceContractVersion ??
       (parserVersion === R2A_PARSER_VERSION ? R2A_EVIDENCE_CONTRACT_VERSION : parserVersion);
     const normalizationVersion = coverageRows[0]?.normalizationVersion ?? parserVersion;
+    const conflicts = [...conflictGroups].map(([id, evidenceIds]) => {
+      const fieldMembers = fieldEvidence.filter((item) => item.conflictSetId === id);
+      const canonicalFields = new Set(fieldMembers.map(({ canonicalField }) => canonicalField));
+      const isRegionConflict =
+        fieldMembers.length === evidenceIds.length &&
+        canonicalFields.size === 2 &&
+        canonicalFields.has("location.state") &&
+        canonicalFields.has("location.postcode");
+      const requirementMember = requirementEvidence.find((item) => item.conflictSetId === id);
+      return {
+        id,
+        canonicalField: isRegionConflict
+          ? "location.region"
+          : (fieldMembers[0]?.canonicalField ??
+            (requirementMember
+              ? `requirement:${r2RequirementPropositionKey(requirementMember)}`
+              : "unknown")),
+        evidenceIds,
+      };
+    });
     const normalization = R2ANormalizationSchema.parse({
       sourceObservationId: version.sourceObservationId,
       sourceLength,
@@ -523,18 +543,7 @@ export class R2ARepository {
       normalizationVersion,
       fieldEvidence,
       requirementEvidence,
-      conflicts: [...conflictGroups].map(([id, evidenceIds]) => ({
-        id,
-        canonicalField:
-          fieldEvidence.find((item) => item.conflictSetId === id)?.canonicalField ??
-          (requirementEvidence.find((item) => item.conflictSetId === id)
-            ? `requirement:${r2RequirementPropositionKey(
-                requirementEvidence.find((item) => item.conflictSetId === id)!,
-              )}`
-            : undefined) ??
-          "unknown",
-        evidenceIds,
-      })),
+      conflicts,
       coverage: coverageRows.map((row) => ({
         family: row.family,
         state: row.coverageState,

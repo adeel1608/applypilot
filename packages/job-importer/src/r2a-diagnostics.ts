@@ -2,6 +2,7 @@ import {
   R2AFailureDiagnosticSchema,
   SourcePersistenceDomainCodeSchema,
   classifyR2ARangeError,
+  classifyR2ASchemaFailure,
   type R2AFailureDiagnostic,
   type R2AStructuralMetrics,
   type R2ASubphase,
@@ -162,12 +163,15 @@ export class R2ADiagnosticContext {
     const safeCode = SourcePersistenceDomainCodeSchema.safeParse(
       error instanceof Error ? error.message : null,
     );
+    const schemaFailureClasses =
+      this.subphase === "R2A_SCHEMA_PARSE" ? classifyR2ASchemaFailure(error) : null;
     return new R2ADiagnosticError(
       {
         subphase: this.subphase,
         rangeErrorClass: classifyR2ARangeError(error),
         structuralBudget: null,
         metrics: this.metrics,
+        ...(schemaFailureClasses ? { schemaFailureClasses } : {}),
       },
       safeCode.success ? safeCode.data : undefined,
     );
