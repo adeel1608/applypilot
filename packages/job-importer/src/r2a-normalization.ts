@@ -981,7 +981,9 @@ function sectionRequirementDefaultModality(
   if (/\b(?:some|any|one or more) of (?:the )?(?:following|these)\b/i.test(heading)) return null;
   if (/^\s*not required but highly regarded\s*:?.*$/i.test(heading)) return "PREFERRED";
   const preference =
-    /\b(?:preferred|desirable|nice to have|bonus|advantageous|highly regarded)\b/i.test(heading);
+    /\b(?:preferred|desirable|nice to have|bonus|advantageous|highly regarded|strongly regarded)\b/i.test(
+      heading,
+    );
   const explicitRequirement =
     /\b(?:requirements?|required|minimum qualifications?|minimum skills?|basic qualifications?|must[ -]?have|essential|what you need)\b/i.test(
       heading,

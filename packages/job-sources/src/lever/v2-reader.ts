@@ -21,7 +21,7 @@ import {
   boundedSecureJsonGet,
   type SecureSourceTransportDependencies,
 } from "../secure-source-transport";
-import { extractInertLeverText } from "./inert-text";
+import { extractInertLeverSections, extractInertLeverText } from "./inert-text";
 
 const LeverCategoriesV2Schema = z
   .object({
@@ -281,7 +281,10 @@ function sectionKind(heading: string): LeverSourceSectionV2["kind"] {
   }
   if (
     /^what we(?: are|'re|’re) looking for\b/i.test(label) ||
-    /^(?:nice to have|not required but highly regarded)\b/i.test(label)
+    /^(?:nice to have|not required but highly regarded)\b/i.test(label) ||
+    /^(?:about you|who you are|what you(?:(?:'|’)ll)? bring|experience (?:&|and) background|desirable(?: (?:qualifications?|skills?|experience))?|strongly regarded)\s*:?$/i.test(
+      label,
+    )
   ) {
     return "REQUIREMENTS";
   }
@@ -292,6 +295,41 @@ function sectionKind(heading: string): LeverSourceSectionV2["kind"] {
     return "RESPONSIBILITIES";
   }
   return "OTHER";
+}
+
+function descriptionSections(
+  html: string | undefined,
+  plain: string | undefined,
+): LeverSourceSectionV2[] {
+  if (!html) return [];
+  const normalized = (value: string): string =>
+    extractInertLeverText(value).replace(/\s+/g, " ").trim();
+  // Plaintext remains the selected description when the two source representations disagree.
+  if (plain && normalized(plain) !== normalized(html)) return [];
+  const sections = extractInertLeverSections(html);
+  if (!sections.some(({ heading }) => Boolean(heading))) return [];
+  const classified = sections.map(({ heading, content }): LeverSourceSectionV2 => {
+    // Emphasized clauses are not trusted criteria headings merely because they contain "skills".
+    const label = heading.trim().replace(/\s+/g, " ");
+    const criteria =
+      /^(?:about you|who you are|what you(?:(?:'|’)ll)? bring|experience (?:&|and) background|(?:required|preferred|minimum|basic|essential|desirable|key)(?: and (?:required|preferred))? (?:qualifications?|skills?|experience|requirements?)|requirements?|qualifications?|skills?(?: (?:&|and) experience)?|experience|desirable|preferred|essential|strongly regarded|nice to have(?:\b.*)?|not required but highly regarded|what we(?: are|'re|’re) looking for(?:\b.*)?)\s*:?$/i.test(
+        label,
+      );
+    const kind = criteria
+      ? "REQUIREMENTS"
+      : sectionKind(label) === "REQUIREMENTS"
+        ? "OTHER"
+        : sectionKind(label);
+    return {
+      heading,
+      // Preserve ambiguous emphasized clauses as unknown body evidence instead of dropping them.
+      content:
+        kind === "OTHER" && heading ? [heading, content].filter(Boolean).join("\n") : content,
+      kind,
+    };
+  });
+  // Overview-only HTML does not add new criteria scope beside the existing flat text/lists.
+  return classified.some(({ kind }) => kind === "REQUIREMENTS") ? classified : [];
 }
 
 function freezeDeep<T>(value: T): T {
@@ -317,22 +355,27 @@ function mapPosting(
         .filter((value) => Boolean(value)),
     ),
   ];
+  const listSections = posting.lists
+    .map(({ text, content }) => {
+      const heading = extractInertLeverText(text);
+      const inertContent = extractInertLeverText(content);
+      return Object.freeze({
+        heading,
+        content: inertContent,
+        kind: sectionKind(heading),
+      });
+    })
+    .filter(({ heading, content }) => Boolean(heading || content));
   const sections = Object.freeze(
-    posting.lists
-      .map(({ text, content }) => {
-        const heading = extractInertLeverText(text);
-        const inertContent = extractInertLeverText(content);
-        return Object.freeze({
-          heading,
-          content: inertContent,
-          kind: sectionKind(heading),
-        });
-      })
-      .filter(({ heading, content }) => Boolean(heading || content)),
+    [
+      ...descriptionSections(posting.description, posting.descriptionPlain),
+      ...listSections,
+      ...descriptionSections(posting.additional, posting.additionalPlain),
+    ].map((section) => Object.freeze(section)),
   );
   const description = [
     extractInertLeverText(posting.descriptionPlain || posting.description || ""),
-    ...sections.map(({ heading, content }) => [heading, content].filter(Boolean).join("\n")),
+    ...listSections.map(({ heading, content }) => [heading, content].filter(Boolean).join("\n")),
     extractInertLeverText(posting.additionalPlain || posting.additional || ""),
   ]
     .filter(Boolean)
