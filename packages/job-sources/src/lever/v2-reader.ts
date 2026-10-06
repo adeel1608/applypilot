@@ -271,13 +271,26 @@ type LeverPostingDispositionV2 =
     };
 
 function sectionKind(heading: string): LeverSourceSectionV2["kind"] {
+  const label = heading.trim().replace(/\s+/g, " ");
+  if (
+    /\b(benefits?|perks?|what we offer)\b/i.test(label) &&
+    !/\b(requirements?|qualifications?|what you (?:bring|need))\b/i.test(label) &&
+    !/^what we(?: are|'re|’re) looking for\b/i.test(label)
+  ) {
+    return "BENEFITS";
+  }
+  if (
+    /^what we(?: are|'re|’re) looking for\b/i.test(label) ||
+    /^(?:nice to have|not required but highly regarded)\b/i.test(label)
+  ) {
+    return "REQUIREMENTS";
+  }
   if (/\b(requirements?|qualifications?|what you (?:bring|need)|skills?)\b/i.test(heading)) {
     return "REQUIREMENTS";
   }
-  if (/\b(responsibilities|duties|what you(?:'|’)ll do|the role)\b/i.test(heading)) {
+  if (/\b(responsibilities|duties|what you(?:'|’)ll (?:do|be doing)|the role)\b/i.test(heading)) {
     return "RESPONSIBILITIES";
   }
-  if (/\b(benefits?|perks?|what we offer)\b/i.test(heading)) return "BENEFITS";
   return "OTHER";
 }
 

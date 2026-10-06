@@ -53,6 +53,16 @@ describe("Lever v2 immutable payload reader section classification", () => {
           { text: "Responsibilities", content: "Fictional responsibility content." },
           { text: "Benefits", content: "Fictional benefit content." },
           { text: "Additional Information", content: "Fictional other content." },
+          { text: " What We Are Looking For ", content: "Python programming." },
+          { text: "What We're Looking For", content: "Software testing experience." },
+          { text: "What We’re Looking For", content: "Embedded systems knowledge." },
+          { text: "What We Are Looking For - Some of the following", content: "Python." },
+          { text: "Not Required But Highly Regarded", content: "Fictional optional skill." },
+          { text: "Nice to have, but not essential traits and experience", content: "Python." },
+          { text: "What You’ll Be Doing", content: "Develop fictional software." },
+          { text: "Benefits and skills training", content: "Learn fictional skills." },
+          { text: "Requirements and benefits", content: "Python programming." },
+          { text: "What we are looking forward to", content: "Fictional future plans." },
         ],
       },
     });
@@ -63,6 +73,16 @@ describe("Lever v2 immutable payload reader section classification", () => {
       { heading: "Responsibilities", kind: "RESPONSIBILITIES" },
       { heading: "Benefits", kind: "BENEFITS" },
       { heading: "Additional Information", kind: "OTHER" },
+      { heading: "What We Are Looking For", kind: "REQUIREMENTS" },
+      { heading: "What We're Looking For", kind: "REQUIREMENTS" },
+      { heading: "What We’re Looking For", kind: "REQUIREMENTS" },
+      { heading: "What We Are Looking For - Some of the following", kind: "REQUIREMENTS" },
+      { heading: "Not Required But Highly Regarded", kind: "REQUIREMENTS" },
+      { heading: "Nice to have, but not essential traits and experience", kind: "REQUIREMENTS" },
+      { heading: "What You’ll Be Doing", kind: "RESPONSIBILITIES" },
+      { heading: "Benefits and skills training", kind: "BENEFITS" },
+      { heading: "Requirements and benefits", kind: "REQUIREMENTS" },
+      { heading: "What we are looking forward to", kind: "OTHER" },
     ]);
   });
 });

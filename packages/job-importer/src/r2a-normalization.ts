@@ -733,7 +733,7 @@ function modality(text: string): { modality: RequirementModality; condition: str
     return { modality: "CONDITIONAL", condition: found?.slice(0, 1000) ?? text.slice(0, 1000) };
   }
   if (
-    /\b(?:preferred|preferably|desirable|advantage(?:ous)?|nice to have|highly regarded)\b/i.test(
+    /\b(?:preferred|preferably|desirable|advantage(?:ous)?|nice to have|highly regarded)\b|\b(?:is|are|would be) (?:a |an )?(?:plus|asset)\b/i.test(
       text,
     )
   ) {
@@ -978,6 +978,8 @@ function sectionRequirementDefaultModality(
   heading: string,
 ): RequirementModality | null {
   if (kind !== "REQUIREMENTS") return null;
+  if (/\b(?:some|any|one or more) of (?:the )?(?:following|these)\b/i.test(heading)) return null;
+  if (/^\s*not required but highly regarded\s*:?.*$/i.test(heading)) return "PREFERRED";
   const preference =
     /\b(?:preferred|desirable|nice to have|bonus|advantageous|highly regarded)\b/i.test(heading);
   const explicitRequirement =
@@ -991,6 +993,20 @@ function sectionRequirementDefaultModality(
   if ((preference && explicitRequirement) || mixedSection) return null;
   if (preference) return "PREFERRED";
   return "REQUIRED";
+}
+
+/** Inert section text retains heading lines; only bounded known labels change context. */
+function innerRequirementHeading(text: string): "MODALITY" | "CONTEXT_ONLY" | null {
+  const label = text.trim().replace(/\s+/g, " ");
+  if (
+    /^(?:nice to have(?: \((?:or happy to help you learn|optional)\))?|preferred(?: qualifications?| skills?)?|desirable(?: qualifications?| skills?)?|not required but highly regarded|requirements?|required(?: qualifications?| skills?)?|minimum qualifications?|essential(?: qualifications?| skills?)?)\s*:?$/i.test(
+      label,
+    )
+  ) {
+    return "MODALITY";
+  }
+  if (/^you(?:'|’)ll thrive here if you\s*:$/i.test(label)) return "CONTEXT_ONLY";
+  return null;
 }
 
 function extractRequirementEvidence(
@@ -1600,16 +1616,22 @@ function normalizeR2AJobEvidenceInternal(
       path,
       diagnostics,
     );
-    structuredSectionFieldSpans.push(...spans);
-    if (section.kind === "REQUIREMENTS") {
-      structuredSectionRequirementSpans.push(
-        ...spans.flatMap((span) =>
-          structuredRequirementClauses(span).map((child) => ({
+    let localHeading = heading;
+    for (const span of spans) {
+      if (section.kind === "REQUIREMENTS") {
+        const innerHeading = innerRequirementHeading(span.text);
+        if (innerHeading) {
+          if (innerHeading === "MODALITY") localHeading = span.text;
+          continue;
+        }
+        structuredSectionRequirementSpans.push(
+          ...structuredRequirementClauses(span).map((child) => ({
             span: child,
-            sectionContext: { kind: "REQUIREMENTS", heading },
+            sectionContext: { kind: "REQUIREMENTS", heading: localHeading },
           })),
-        ),
-      );
+        );
+      }
+      structuredSectionFieldSpans.push(span);
     }
   });
   const standaloneSpans = (isCanonicalStructuredSource ? [] : lineSpans(source))
