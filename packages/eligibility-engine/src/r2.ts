@@ -11,11 +11,11 @@ import {
   type R2JobFieldEvidence,
   type R2RequirementEvidence,
 } from "@applypilot/job-model";
-import { normalizeText, VerificationStatus } from "@applypilot/shared";
+import { matchesEvidenceText, normalizeText, VerificationStatus } from "@applypilot/shared";
 
 import type { EvaluationEvidenceClass } from "./types";
 
-export const R2_ELIGIBILITY_ENGINE_VERSION = "2.1.0";
+export const R2_ELIGIBILITY_ENGINE_VERSION = "2.2.0";
 export const R2_MINIMUM_EXTRACTION_COVERAGE = 60;
 
 export interface R2EvaluationBindings {
@@ -116,7 +116,7 @@ function hasVerifiedMatch(
   candidates: Array<{ id: string; name: string }>,
   required: string,
 ): { id: string; name: string } | undefined {
-  return candidates.find(({ name }) => normalizedIncludes(name, required));
+  return candidates.find(({ name }) => matchesEvidenceText(name, required));
 }
 
 function minutes(value: string): number {

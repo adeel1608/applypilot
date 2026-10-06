@@ -15,6 +15,124 @@ import {
 } from "./r2a-normalization";
 
 describe("R2A evidence normalization", () => {
+  it("preserves nested preference scope without counting headings as requirements", () => {
+    const structured = {
+      description: "Fictional role.",
+      sourceSections: [
+        {
+          heading: "What We Are Looking For",
+          kind: "REQUIREMENTS",
+          content: [
+            "You'll thrive here if you:",
+            "Python programming",
+            "Nice to have (or happy to help you learn):",
+            "Software testing experience",
+            "C++ programming is required.",
+            "No certification is required.",
+            "A licence may be required where applicable.",
+            "Required Skills:",
+            "Embedded systems knowledge",
+            "Networking skills are a plus.",
+          ].join("\n"),
+        },
+      ],
+    };
+    const sourceText = JSON.stringify(structured);
+    const input = { sourceText, structured, sourceObservationId: "fictional:nested-scope" };
+    const result = normalizeR2AJobEvidence(input);
+    expect(
+      result.requirementEvidence.map(({ source, modality }) => [source.excerpt, modality]),
+    ).toEqual([
+      ["Python programming", "REQUIRED"],
+      ["Software testing experience", "PREFERRED"],
+      ["C++ programming is required.", "REQUIRED"],
+      ["No certification is required.", "NEGATED"],
+      ["A licence may be required where applicable.", "CONDITIONAL"],
+      ["Embedded systems knowledge", "REQUIRED"],
+      ["Networking skills are a plus.", "PREFERRED"],
+    ]);
+    expect(
+      result.requirementEvidence.every(({ source }) =>
+        source.sourcePath.startsWith("structured.sourceSections[0].content.line["),
+      ),
+    ).toBe(true);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+    expect(normalizeR2AJobEvidence(input)).toEqual(result);
+  });
+
+  it("does not make an ambiguous some-of-the-following section mandatory", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "What We Are Looking For - Some of the following",
+          kind: "REQUIREMENTS",
+          content:
+            "Software testing experience\nPython programming\nA driver's licence is required.",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "fictional:alternative-scope",
+    });
+    expect(
+      result.requirementEvidence.find(({ canonicalKind }) => canonicalKind === "EXPERIENCE"),
+    ).toMatchObject({ modality: "UNKNOWN" });
+    expect(
+      result.requirementEvidence.find(({ canonicalKind }) => canonicalKind === "LICENCE"),
+    ).toMatchObject({ modality: "REQUIRED" });
+    expect(result.coverage.find(({ family }) => family === "SKILLS")?.state).not.toBe("COMPLETE");
+  });
+
+  it("keeps optional, mixed and benefit sections distinct and resets inner context per section", () => {
+    const structured = {
+      sourceSections: [
+        {
+          heading: "Not Required But Highly Regarded",
+          kind: "REQUIREMENTS",
+          content: "Python programming",
+        },
+        {
+          heading: "What We Are Looking For",
+          kind: "REQUIREMENTS",
+          content: "Embedded systems knowledge\nNice to Have\nSoftware testing experience",
+        },
+        {
+          heading: "Responsibilities and requirements",
+          kind: "REQUIREMENTS",
+          content: "Communication skills",
+        },
+        {
+          heading: "Benefits and skills training",
+          kind: "BENEFITS",
+          content: "C++ programming training\nNice to have",
+        },
+        {
+          heading: "Requirements and benefits",
+          kind: "REQUIREMENTS",
+          content: "Linux programming skills",
+        },
+      ],
+    };
+    const result = normalizeR2AJobEvidence({
+      sourceText: JSON.stringify(structured),
+      structured,
+      sourceObservationId: "fictional:section-boundaries",
+    });
+    expect(
+      result.requirementEvidence.map(({ source, modality }) => [source.excerpt, modality]),
+    ).toEqual([
+      ["Python programming", "PREFERRED"],
+      ["Embedded systems knowledge", "REQUIRED"],
+      ["Software testing experience", "PREFERRED"],
+      ["Communication skills", "UNKNOWN"],
+      ["Linux programming skills", "UNKNOWN"],
+    ]);
+    expect(result.coverage.find(({ family }) => family === "SKILLS")?.state).toBe("PARTIAL");
+  });
+
   it("accepts only bounded source pointers and linked derived/conflicting evidence", () => {
     expect(() =>
       SourceEvidencePointerSchema.parse({
@@ -142,7 +260,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.6.2");
+    expect(result.parserVersion).toBe("3.6.3");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");

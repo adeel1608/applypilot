@@ -269,7 +269,7 @@ describe("R2A additive migration and repository", () => {
       );
       expect(r2a.recordNormalization(recorded.id, normalization).created).toBe(false);
       const reloaded = r2a.getNormalization(recorded.id)!;
-      expect(reloaded.parserVersion).toBe("3.6.2");
+      expect(reloaded.parserVersion).toBe("3.6.3");
       const derived = reloaded.fieldEvidence.find(({ state }) => state === "DERIVED");
       expect(derived?.derivationInputIds.length).toBeGreaterThan(1);
       expect(

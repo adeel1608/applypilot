@@ -27,4 +27,5 @@ export function assertNever(value: never): never {
 }
 
 export * from "./loopback-security";
+export * from "./evidence-text";
 export * from "./local-mutation-token";

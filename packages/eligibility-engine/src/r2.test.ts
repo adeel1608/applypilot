@@ -27,6 +27,53 @@ function evaluate(
 }
 
 describe("R2 eligibility", () => {
+  it.each(["C", "C++", "C#", "Go", "R", "AI"])(
+    "does not satisfy unrelated mandatory capabilities with a verified %s label",
+    (name) => {
+      const profile = CandidateProfileSchema.parse({
+        ...testProfile,
+        skills: [{ id: "fictional-technical-label", name, verification: "VERIFIED" }],
+        employment: [],
+        education: [],
+        licences: [],
+        certifications: [],
+      });
+      const requirement = r2RequirementEvidence("fictional-backend", "SKILLS", "SKILL", {
+        kind: "TEXT",
+        value: "Backend engineering and cargo operations",
+      });
+      const result = evaluate(r2TestNormalization({ requirements: [requirement] }), profile);
+      expect(result.status).toBe("REVIEW_REQUIRED");
+      expect(result.reasons.map(({ code }) => code)).toContain(
+        "R2_MANDATORY_CAPABILITY_UNCONFIRMED",
+      );
+    },
+  );
+
+  it.each(["C++", "C#", ".NET", "Python"])(
+    "preserves exact verified %s matches and blocks unverified facts",
+    (name) => {
+      const requirement = r2RequirementEvidence("fictional-exact-skill", "SKILLS", "SKILL", {
+        kind: "TEXT",
+        value: `${name} programming`,
+      });
+      const normalization = r2TestNormalization({ requirements: [requirement] });
+      const profile = (verification: "VERIFIED" | "USER_CONFIRMATION_REQUIRED") =>
+        CandidateProfileSchema.parse({
+          ...testProfile,
+          skills: [{ id: "fictional-technical-label", name, verification }],
+          employment: [],
+          education: [],
+          licences: [],
+          certifications: [],
+        });
+      expect(evaluate(normalization, profile("VERIFIED")).status).toBe("ELIGIBLE");
+      expect(evaluate(normalization, profile("USER_CONFIRMATION_REQUIRED")).status).toBe(
+        "REVIEW_REQUIRED",
+      );
+    },
+  );
+
   it("does not turn silent material families into blockers or satisfaction", () => {
     const observedLocation = r2FieldEvidence("location-observed", "GEOGRAPHY", {
       kind: "LOCATION",

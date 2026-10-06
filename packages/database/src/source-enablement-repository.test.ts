@@ -3420,6 +3420,78 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("persists candidate-criteria sections with nested preference evidence and conservative fit", async () => {
+    const sqlite = database();
+    const profile = installFixtureProfile(sqlite);
+    const approved = capability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    let id = 0;
+    const pipeline = fixturePipeline(sqlite, profile, () => `r2:criteria:${++id}`);
+    const fixture = {
+      ...posting(700),
+      descriptionPlain: "Fictional engineering role.",
+      lists: [
+        {
+          text: "What We're Looking For",
+          content:
+            "<ul><li>Customer service experience</li></ul><h3>Nice to Have</h3><ul><li>Teamwork</li><li>Backend engineering</li></ul>",
+        },
+        { text: "Benefits and skills training", content: "<p>Fictional programming training.</p>" },
+      ],
+    };
+    const result = await runLeverSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: vi.fn(async () => ["8.8.8.8"]),
+        request: vi.fn(async ({ pinnedAddress }) => ({
+          status: 200,
+          headers: { "content-type": "application/json", "content-encoding": "identity" },
+          body: Buffer.from(JSON.stringify([fixture])),
+          connectedAddress: pinnedAddress,
+        })),
+      },
+      evaluateJob: pipeline.evaluateJob,
+      queueJob: pipeline.queueJob,
+    });
+    expect(result.status).toBe("COMPLETE");
+    expect(result.records).toHaveLength(1);
+    expect(
+      sqlite
+        .prepare("SELECT request_count,page_count,record_count FROM source_run_checkpoints")
+        .get(),
+    ).toEqual({ request_count: 1, page_count: 1, record_count: 1 });
+    const version = sqlite.prepare("SELECT id FROM job_versions").pluck().get() as string;
+    const normalization = new R2ARepository(sqlite).getNormalization(version)!;
+    expect(
+      normalization.requirementEvidence.map(({ source, modality }) => [source.excerpt, modality]),
+    ).toEqual([
+      ["Customer service experience", "REQUIRED"],
+      ["Teamwork", "PREFERRED"],
+      ["Backend engineering", "PREFERRED"],
+    ]);
+    expect(normalization.parserVersion).toBe("3.6.3");
+    expect(
+      sqlite.prepare("SELECT qualification_state FROM source_record_verifications").pluck().get(),
+    ).toBe("QUALIFIED");
+    const evaluation = sqlite
+      .prepare(
+        "SELECT recommended,fit_contributions_json AS contributions FROM r2_evaluation_versions",
+      )
+      .get() as { recommended: number; contributions: string };
+    expect(evaluation.recommended).toBe(0);
+    expect(JSON.parse(evaluation.contributions).map((c: { points: number }) => c.points)).toEqual([
+      7, 4, 10, 10,
+    ]);
+    expect(sqlite.prepare("SELECT freshness FROM r2_queue_decision_versions").pluck().get()).toBe(
+      "CURRENT",
+    );
+    expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
   it("re-derives unchanged immutable content with a new R2A identity and exact binding", async () => {
     const sqlite = database();
     const profile = installFixtureProfile(sqlite);
@@ -3464,12 +3536,12 @@ describe("offline source-to-R2 queue persistence", () => {
     const old = new R2ARepository(sqlite).getNormalization(verification.jobVersionId)!;
     expect(old.parserVersion).toBe("3.1.0");
     const derived = repository.rederiveLeverObservation({ verificationId: verification.id });
-    expect(derived.parserVersion).toBe("3.6.2");
-    expect(derived.normalizationVersion).toBe("3.6.2");
+    expect(derived.parserVersion).toBe("3.6.3");
+    expect(derived.normalizationVersion).toBe("3.6.3");
     expect(derived.parentJobVersionId).toBe(verification.jobVersionId);
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.2");
+    ).toBe("3.6.3");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -3558,14 +3630,14 @@ describe("offline source-to-R2 queue persistence", () => {
 
     const derived = repository.rederiveGreenhouseObservation({ verificationId: verification.id });
     expect(derived).toMatchObject({
-      parserVersion: "3.6.2",
-      normalizationVersion: "3.6.2",
+      parserVersion: "3.6.3",
+      normalizationVersion: "3.6.3",
       parentJobVersionId: verification.jobVersionId,
       created: true,
     });
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.2");
+    ).toBe("3.6.3");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -4435,8 +4507,8 @@ describe("stopped-run persisted-source inspection", () => {
       parentJobVersionId: verification.jobVersionId,
       providerDriftWarnings: [],
       normalization: {
-        parserVersion: "3.6.2",
-        normalizationVersion: "3.6.2",
+        parserVersion: "3.6.3",
+        normalizationVersion: "3.6.3",
         evidenceContractVersion: "3.1.0",
       },
     });
@@ -4445,8 +4517,8 @@ describe("stopped-run persisted-source inspection", () => {
       sourceQualificationState: "PAGE_PERSISTED",
       sourceRunStatus: "STOPPED",
       sourceStopCode: "RUN_TIMEOUT",
-      parserVersion: "3.6.2",
-      normalizationVersion: "3.6.2",
+      parserVersion: "3.6.3",
+      normalizationVersion: "3.6.3",
       evidenceContractVersion: "3.1.0",
       scorerVersion: "2.2.0",
       weightVersion: "r2-weights-1",
@@ -4534,7 +4606,7 @@ describe("stopped-run persisted-source inspection", () => {
         },
       ]);
       expect(inspection.job).not.toHaveProperty("workplaceType");
-      expect(inspection.normalization.parserVersion).toBe("3.6.2");
+      expect(inspection.normalization.parserVersion).toBe("3.6.3");
     } finally {
       fixture.sqlite.close();
     }
@@ -4793,7 +4865,7 @@ describe("stopped-run persisted-source inspection", () => {
     }
   });
 
-  it("reconstructs current 3.6.2 evidence over an older 3.2.0 parent without rewriting it", async () => {
+  it("reconstructs current 3.6.3 evidence over an older 3.2.0 parent without rewriting it", async () => {
     const fixture = await stoppedInspectionFixture();
     try {
       const { sqlite, repository, verification } = fixture;
@@ -4818,8 +4890,8 @@ describe("stopped-run persisted-source inspection", () => {
       });
       const after = inspectionStateSnapshot(sqlite);
       expect(inspection.normalization).toMatchObject({
-        parserVersion: "3.6.2",
-        normalizationVersion: "3.6.2",
+        parserVersion: "3.6.3",
+        normalizationVersion: "3.6.3",
         evidenceContractVersion: "3.1.0",
       });
       expect(
