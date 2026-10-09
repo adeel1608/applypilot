@@ -158,44 +158,46 @@ test("v7 classifies the complete fictional Lever-like semantic contract", async 
   ).toBeGreaterThanOrEqual(7);
 });
 
-test("fictional inspection matrix stops safely or inventories without clicks", async ({ page }) => {
-  test.setTimeout(180_000);
-  for (const [caseName, expectedState, expectedReason] of [
-    ["normal", "COMPLETED", null],
-    ["full-contract", "COMPLETED", null],
-    ["unknown-required", "COMPLETED", null],
-    ["documents", "COMPLETED", null],
-    ["captcha", "STOPPED", "CAPTCHA"],
-    ["mfa", "STOPPED", "MFA"],
-    ["auth", "STOPPED", "AUTHENTICATION_REQUIRED"],
-    ["bot", "STOPPED", "BOT_DETECTION"],
-    ["rate", "STOPPED", "RATE_LIMIT"],
-    ["access", "STOPPED", "ACCESS_CONTROL"],
-    ["restriction", "STOPPED", "WEBSITE_RESTRICTION"],
-    ["unsupported", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["changed-form", "STOPPED", "FORM_CHANGED"],
-    ["changed-destination", "STOPPED", "DESTINATION_CHANGED"],
-    ["popup", "COMPLETED", null],
-    ["popup-attempt", "STOPPED", "DESTINATION_CHANGED"],
-    ["hidden-step", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["hidden-submit", "COMPLETED", null],
-    ["file-chooser", "COMPLETED", null],
-    ["labels-absent", "COMPLETED", null],
-    ["unusual-native", "COMPLETED", null],
-    ["large-attributes", "COMPLETED", null],
-    ["unicode", "COMPLETED", null],
-    ["no-form", "STOPPED", "FORM_CHANGED"],
-    ["multiple-forms", "COMPLETED", null],
-    ["over-20-forms", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["over-200", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["over-400-labels", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["over-100-sections", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["duplicate-controls", "COMPLETED", null],
-    ["blocked-write", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["dynamic-insert", "COMPLETED", null],
-    ["shadow-dom", "STOPPED", "UNSUPPORTED_CONTROL"],
-    ["no-submit", "STOPPED", "FORM_CHANGED"],
-  ] as const) {
+for (const [caseName, expectedState, expectedReason] of [
+  ["normal", "COMPLETED", null],
+  ["full-contract", "COMPLETED", null],
+  ["unknown-required", "COMPLETED", null],
+  ["documents", "COMPLETED", null],
+  ["captcha", "STOPPED", "CAPTCHA"],
+  ["mfa", "STOPPED", "MFA"],
+  ["auth", "STOPPED", "AUTHENTICATION_REQUIRED"],
+  ["bot", "STOPPED", "BOT_DETECTION"],
+  ["rate", "STOPPED", "RATE_LIMIT"],
+  ["access", "STOPPED", "ACCESS_CONTROL"],
+  ["restriction", "STOPPED", "WEBSITE_RESTRICTION"],
+  ["unsupported", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["changed-form", "STOPPED", "FORM_CHANGED"],
+  ["changed-destination", "STOPPED", "DESTINATION_CHANGED"],
+  ["popup", "COMPLETED", null],
+  ["popup-attempt", "STOPPED", "DESTINATION_CHANGED"],
+  ["hidden-step", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["hidden-submit", "COMPLETED", null],
+  ["file-chooser", "COMPLETED", null],
+  ["labels-absent", "COMPLETED", null],
+  ["unusual-native", "COMPLETED", null],
+  ["large-attributes", "COMPLETED", null],
+  ["unicode", "COMPLETED", null],
+  ["no-form", "STOPPED", "FORM_CHANGED"],
+  ["multiple-forms", "COMPLETED", null],
+  ["over-20-forms", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["over-200", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["over-400-labels", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["over-100-sections", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["duplicate-controls", "COMPLETED", null],
+  ["blocked-write", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["dynamic-insert", "COMPLETED", null],
+  ["shadow-dom", "STOPPED", "UNSUPPORTED_CONTROL"],
+  ["no-submit", "STOPPED", "FORM_CHANGED"],
+] as const) {
+  test(`fictional inspection matrix: ${caseName} stops safely or inventories without clicks`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
     const { capability, binding } = inspection(caseName);
     const result = await new TargetInspectionRunner(
       capability,
@@ -206,7 +208,16 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
       () => now,
     ).openAndInspect();
     expect(result.state, caseName).toBe(expectedState);
-    if (result.state === "STOPPED") expect(result.stopReason, caseName).toBe(expectedReason);
+    if (result.state === "STOPPED")
+      expect(
+        result.stopReason,
+        JSON.stringify({
+          caseName,
+          diagnosticCategory: result.diagnosticCategory,
+          diagnosticStage: result.diagnosticStage,
+          unsupportedControlDiagnostic: result.unsupportedControlDiagnostic,
+        }),
+      ).toBe(expectedReason);
     if (result.state === "STOPPED" && caseName === "changed-destination") {
       expect(result.destinationDiagnostic).toBe("FINAL_PATH_CHANGED");
     }
@@ -237,8 +248,8 @@ test("fictional inspection matrix stops safely or inventories without clicks", a
         candidateDataOutboundFields: 0,
       });
     }
-  }
-});
+  });
+}
 
 test("distinguishes inert popup declarations from observed popup events without retry or writes", async ({
   browser,

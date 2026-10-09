@@ -257,6 +257,34 @@ async function main(): Promise<void> {
         ),
       );
     }
+    if (version < 13) {
+      sqlite.transaction(() =>
+        sqlite.exec(
+          readFileSync(
+            new URL(
+              "../packages/database/drizzle/0013_exact_source_request_binding.sql",
+              import.meta.url,
+            ),
+            "utf8",
+          ),
+        ),
+      )();
+    }
+    if (version < 14) {
+      sqlite
+        .transaction(() => {
+          sqlite.exec(
+            readFileSync(
+              new URL(
+                "../packages/database/drizzle/0014_hosted_application_workflow.sql",
+                import.meta.url,
+              ),
+              "utf8",
+            ),
+          );
+        })
+        .immediate();
+    }
     const migratedSnapshot = sqlite
       .prepare(
         `SELECT id, job_id, source_id, external_id, source_url, payload_hash, discovered_at, fetched_at

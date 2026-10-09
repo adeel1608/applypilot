@@ -64,6 +64,8 @@ const migrationNames = [
   "0010_verified_source_packet_binding.sql",
   "0011_immutable_r2a_derivation_bindings.sql",
   "0012_source_owner_action_receipts.sql",
+  "0013_exact_source_request_binding.sql",
+  "0014_hosted_application_workflow.sql",
 ] as const;
 
 async function createDiskFixture() {
@@ -88,8 +90,8 @@ async function createDiskFixture() {
       await readFile(join(process.cwd(), "packages", "database", "drizzle", name), "utf8"),
     );
   }
-  if (sqlite.pragma("user_version", { simple: true }) !== 12) {
-    throw new Error("R46_07_SCHEMA12_REQUIRED");
+  if (sqlite.pragma("user_version", { simple: true }) !== 14) {
+    throw new Error("R46_07_SCHEMA14_REQUIRED");
   }
   return { root, databasePath, documentsRoot, reportsRoot, sqlite };
 }

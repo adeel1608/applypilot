@@ -15,6 +15,7 @@ import {
   type SecureSourceTransportDependencies,
 } from "../secure-source-transport";
 import { extractInertLeverText } from "../lever/inert-text";
+import { sourceSchemaDiagnostic } from "../schema-diagnostic";
 
 const GreenhouseJobV2PayloadSchema = z
   .object({
@@ -26,7 +27,7 @@ const GreenhouseJobV2PayloadSchema = z
     updated_at: z.string().nullable().optional(),
     departments: z.array(z.unknown()).optional(),
     offices: z.array(z.unknown()).optional(),
-    metadata: z.array(z.unknown()).optional(),
+    metadata: z.array(z.unknown()).nullable().optional(),
   })
   .passthrough();
 
@@ -212,7 +213,18 @@ export function readGreenhousePostingV2FromPayload(input: {
 }): GreenhousePostingRecordV2 {
   const capability = assertGreenhouseCapability(input.capability);
   const payload = GreenhouseJobV2PayloadSchema.safeParse(input.payload);
-  if (!payload.success) throw new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY");
+  if (!payload.success)
+    throw new SecureSourceError(
+      "SCHEMA_CHANGED",
+      null,
+      "RESPONSE_BODY",
+      sourceSchemaDiagnostic({
+        error: payload.error,
+        payload: input.payload,
+        provider: "GREENHOUSE",
+        operation: "GET_JOB",
+      }),
+    );
   const parsed = parseRecord(payload.data, capability, 0);
   if (parsed.status !== "ACCEPTED") {
     throw new SecureSourceError("SOURCE_RECORD_UNUSABLE", null, "RESPONSE_BODY");
@@ -237,18 +249,42 @@ function apiUrl(capability: SourceCapabilityV2, operation: "LIST_JOBS" | "GET_JO
     operation === "LIST_JOBS" ? root + "/jobs" : root + "/jobs/" + encodeURIComponent(id ?? "");
   const url = new URL(path, "https://" + capability.allowedHost);
   if (operation === "LIST_JOBS") url.searchParams.set("content", "true");
+  if (operation === "GET_JOB" && capability.requestBinding?.includeQuestions)
+    url.searchParams.set("questions", "true");
   return url;
 }
 
 function parseListPayload(body: unknown): GreenhouseJobV2Payload[] {
   const parsed = GreenhouseListV2PayloadSchema.safeParse(body);
-  if (!parsed.success) throw new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY");
+  if (!parsed.success)
+    throw new SecureSourceError(
+      "SCHEMA_CHANGED",
+      null,
+      "RESPONSE_BODY",
+      sourceSchemaDiagnostic({
+        error: parsed.error,
+        payload: body,
+        provider: "GREENHOUSE",
+        operation: "LIST_JOBS",
+      }),
+    );
   return parsed.data.jobs;
 }
 
 function parseDetailPayload(body: unknown): GreenhouseJobV2Payload {
   const parsed = GreenhouseJobV2PayloadSchema.safeParse(body);
-  if (!parsed.success) throw new SecureSourceError("SCHEMA_CHANGED", null, "RESPONSE_BODY");
+  if (!parsed.success)
+    throw new SecureSourceError(
+      "SCHEMA_CHANGED",
+      null,
+      "RESPONSE_BODY",
+      sourceSchemaDiagnostic({
+        error: parsed.error,
+        payload: body,
+        provider: "GREENHOUSE",
+        operation: "GET_JOB",
+      }),
+    );
   return parsed.data;
 }
 

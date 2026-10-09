@@ -1,9 +1,13 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 
 import { databaseSchemaStatus } from "./lib/database-schema";
 import { localDatabasePath, repositoryRoot } from "./lib/runtime-safety";
+import { personalLiveV1Readiness } from "./lib/personal-live-readiness";
+import { assertHostedQualityEvidence } from "@applypilot/application-runner";
 import {
   operationalSourceReadiness,
   sourceEnabledBetaReleaseReadiness,
@@ -21,7 +25,20 @@ async function main(): Promise<void> {
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
   const head = git("rev-parse", "HEAD");
+  const tree = git("rev-parse", "HEAD^{tree}");
   const dirty = git("status", "--porcelain").length > 0;
+  let qualityProven = false;
+  try {
+    assertHostedQualityEvidence(
+      readFileSync(join(root, "data", "private", "runtime", "hosted-quality-evidence.json")),
+      join(root, "apps", "web", ".next"),
+      head,
+      tree,
+    );
+    qualityProven = !dirty;
+  } catch {
+    /* An operator flag cannot substitute for frozen validation evidence. */
+  }
   let schemaVersion = 0;
   let databaseIntegrity = "UNKNOWN";
   let foreignKeyIssues = 0;
@@ -57,8 +74,10 @@ async function main(): Promise<void> {
   ];
   console.log(`RELEASE_HEAD sha=${head}`);
   console.log(`RELEASE_WORKTREE state=${dirty ? "DIRTY" : "CLEAN"}`);
-  console.log("RELEASE_PRIVACY status=PASS");
-  console.log("RELEASE_QUALITY status=PASS");
+  console.log(
+    `RELEASE_PRIVACY status=${qualityProven ? "PROVEN_BY_FROZEN_MATRIX" : "NOT_RECORDED"}`,
+  );
+  console.log(`RELEASE_QUALITY status=${qualityProven ? "OFFLINE_PROVEN" : "NOT_RECORDED"}`);
   console.log(
     `RELEASE_DATABASE schema_version=${schemaVersion} pending_migrations=${schemaStatus.pendingMigrations} integrity=${databaseIntegrity} foreign_key_issues=${foreignKeyIssues}`,
   );
@@ -75,11 +94,22 @@ async function main(): Promise<void> {
     `RELEASE_SOURCE_ENABLED_BETA state=${sourceBeta.state} active_capability_count=${source.activeCapabilityCount}`,
   );
   const personalLiveBlockers = [
-    "REAL_RUNNER_TARGET_APPROVAL_REQUIRED",
-    ...(targetValidation.state === "PROVEN" ? [] : ["FIRST_REAL_TARGET_VALIDATION_REQUIRED"]),
+    ...(() => {
+      let db: BetterSqlite3.Database | null = null;
+      try {
+        if (schemaVersion > 0)
+          db = new BetterSqlite3(localDatabasePath(), { readonly: true, fileMustExist: true });
+        return personalLiveV1Readiness(root, db, head, tree, manualBetaBlockers.length === 0)
+          .blockers;
+      } catch {
+        return ["DATABASE_EVIDENCE_READ_FAILED"];
+      } finally {
+        db?.close();
+      }
+    })(),
   ];
   console.log(
-    `RELEASE_PERSONAL_LIVE_V1 state=NOT_READY blockers=${personalLiveBlockers.join(",")}`,
+    `RELEASE_PERSONAL_LIVE_V1 state=${personalLiveBlockers.length ? "NOT_READY" : "PERSONAL_LIVE_V1_READY"} blockers=${personalLiveBlockers.length ? personalLiveBlockers.join(",") : "none"}`,
   );
   console.log(
     `RELEASE_CLASSIFICATION state=${manualBetaBlockers.length === 0 && sourceBeta.state === "READY" ? "SOURCE_ENABLED_PERSONAL_BETA_READY" : manualBetaBlockers.length === 0 ? "MANUAL_INTAKE_BETA_READY" : "NOT_READY"} deferred=REAL_TARGET_APPROVAL`,
