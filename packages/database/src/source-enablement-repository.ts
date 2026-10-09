@@ -3,6 +3,9 @@ import { createHash, randomUUID } from "node:crypto";
 import type BetterSqlite3 from "better-sqlite3";
 import {
   SourceCapabilityV2Schema,
+  SourceRequestBindingSchema,
+  assertSourceRequestBinding,
+  sourceRequestBindingDigest,
   SourceOwnerActionSchema,
   SourceOwnerReceiptStateSchema,
   SourceProviderDriftDiagnosticSchema,
@@ -13,7 +16,7 @@ import {
   runGreenhouseSourceDiscovery,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
-  SourceSchemaDiagnosticSchema,
+  decodeSourceSchemaDiagnostic,
   SourcePersistenceDiagnosticSchema,
   SourceStopCodeSchema,
   SourceTransportLifecycleStageSchema,
@@ -1135,6 +1138,13 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
   }
 
   persistCapabilityVersion(input: SourceCapabilityV2): { id: string; created: boolean } {
+    return this.sqlite.transaction(() => this.persistCapabilityVersionInternal(input)).immediate();
+  }
+
+  private persistCapabilityVersionInternal(input: SourceCapabilityV2): {
+    id: string;
+    created: boolean;
+  } {
     if (!this.available()) throw new Error("SOURCE_V2_SCHEMA_REQUIRED");
     const capability = SourceCapabilityV2Schema.parse(input);
     const digest = sourceCapabilityDigest(capability);
@@ -1148,6 +1158,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       | undefined;
     if (existing) {
       if (existing.digest !== digest) throw new Error("CAPABILITY_IMMUTABLE_VERSION_CONFLICT");
+      this.assertStoredRequestBinding(
+        existing.id,
+        capability.requestBinding
+          ? sourceRequestBindingDigest(capability.requestBinding)
+          : undefined,
+      );
       return { id: existing.id, created: false };
     }
     const latest = this.sqlite
@@ -1210,6 +1226,19 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
         capability.revocationReason,
         this.now().toISOString(),
       );
+    if (capability.requestBinding) {
+      if (!this.exactRequestBindingSchemaAvailable())
+        throw new Error("SOURCE_REQUEST_BINDING_MIGRATION_REQUIRED");
+      this.sqlite
+        .prepare(
+          "INSERT INTO source_capability_request_bindings (capability_version_id,request_json,request_digest) VALUES (?,?,?)",
+        )
+        .run(
+          id,
+          JSON.stringify(capability.requestBinding),
+          sourceRequestBindingDigest(capability.requestBinding),
+        );
+    }
     const audit = validateSourceAuditMetadata("source.capability.versioned", {
       capabilityId: capability.capabilityId,
       version: capability.version,
@@ -1778,6 +1807,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       if (!capability.allowedOperations.includes(input.operation)) {
         throw new Error("OPERATION_NOT_APPROVED");
       }
+      assertSourceRequestBinding(
+        capability,
+        input.operation,
+        capability.requestBinding?.externalId ?? undefined,
+      );
       if (sourceCapabilityReadiness(capability, currentTime).status !== "SOURCE_ENABLED") {
         throw new Error("SOURCE_CAPABILITY_NOT_ENABLED");
       }
@@ -1976,6 +2010,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     capabilityId: string;
     capabilityVersion: number;
     capabilityDigest: string;
+    requestBindingDigest?: string;
   }): void {
     const run = this.sqlite
       .prepare(
@@ -2000,6 +2035,7 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     ) {
       throw new Error("CAPABILITY_CHANGED");
     }
+    this.assertStoredRequestBinding(current.id, input.requestBindingDigest);
   }
 
   persistPage(input: {
@@ -2028,6 +2064,9 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
           capabilityId: capability.capabilityId,
           capabilityVersion: capability.version,
           capabilityDigest: sourceCapabilityDigest(capability),
+          ...(capability.requestBinding
+            ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+            : {}),
         });
         const capabilityRow = this.sqlite
           .prepare(`SELECT id FROM source_capability_versions WHERE capability_id=? AND version=?`)
@@ -2287,6 +2326,9 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
           capabilityId: capability.capabilityId,
           capabilityVersion: capability.version,
           capabilityDigest: sourceCapabilityDigest(capability),
+          ...(capability.requestBinding
+            ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+            : {}),
         });
         const run = this.sqlite
           .prepare("SELECT operation FROM source_run_checkpoints WHERE id=?")
@@ -2484,17 +2526,48 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     persistenceDiagnostic?: SourcePersistenceDiagnostic;
     stoppedAt: string;
   }): void {
-    this.finish(
-      input.runId,
-      "STOPPED",
-      input.budget,
-      input.code,
-      input.retryAfter,
-      input.transportStage,
-      input.schemaDiagnostic,
-      input.stoppedAt,
-      input.persistenceDiagnostic ?? null,
-    );
+    try {
+      this.sqlite.transaction(() =>
+        this.finish(
+          input.runId,
+          "STOPPED",
+          input.budget,
+          input.code,
+          input.retryAfter,
+          input.transportStage,
+          input.schemaDiagnostic,
+          input.stoppedAt,
+          input.persistenceDiagnostic ?? null,
+        ),
+      )();
+    } catch {
+      if (!input.schemaDiagnostic) throw new Error("SOURCE_STOP_PERSISTENCE_FAILED");
+      // The failed stop/audit transaction is rolled back. Preserve terminal state and
+      // actual accounting separately, explicitly recording that capture failed.
+      try {
+        this.sqlite
+          .prepare(
+            `UPDATE source_run_checkpoints SET status='STOPPED',
+        request_count=?,page_count=?,record_count=?,byte_count=?,retry_count=?,redirect_count=?,
+        safe_error_code='SCHEMA_DIAGNOSTIC_PERSISTENCE_FAILED',completed_at=?,updated_at=?
+        WHERE id=? AND status='RUNNING'`,
+          )
+          .run(
+            input.budget.attempts,
+            input.budget.pages,
+            input.budget.records,
+            input.budget.bytes,
+            input.budget.retries,
+            input.budget.redirects,
+            input.stoppedAt,
+            input.stoppedAt,
+            input.runId,
+          );
+      } catch {
+        throw new Error("SOURCE_STOP_PERSISTENCE_FAILED");
+      }
+      throw new Error("SCHEMA_DIAGNOSTIC_PERSISTENCE_FAILED");
+    }
   }
 
   jobIdsForRun(runId: string): string[] {
@@ -2607,22 +2680,10 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
                  WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
                    AND a.entity_id=source_run_checkpoints.id
                  ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
-                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.field')
+                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic')
                  FROM audit_events a WHERE a.event_type='source.run.stopped'
                    AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaField,
-                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.expectedStructuralType')
-                 FROM audit_events a WHERE a.event_type='source.run.stopped'
-                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaExpectedType,
-                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.issueCategory')
-                 FROM audit_events a WHERE a.event_type='source.run.stopped'
-                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaIssueCategory,
-                (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
-                 FROM audit_events a WHERE a.event_type='source.run.stopped'
-                   AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
-                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex,
+                 ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaDiagnosticJson,
                 (SELECT json_extract(a.redacted_metadata_json, '$.persistenceDiagnostic')
                  FROM audit_events a WHERE a.event_type='source.run.stopped'
                    AND a.entity_type='source_run' AND a.entity_id=source_run_checkpoints.id
@@ -2632,20 +2693,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       .get(runId) as
       | (Record<string, unknown> & {
           transportStage: unknown;
-          schemaField: unknown;
-          schemaExpectedType: unknown;
-          schemaIssueCategory: unknown;
-          schemaRecordIndex: unknown;
+          schemaDiagnosticJson: unknown;
         })
       | undefined;
     if (!row) return undefined;
     const stage = SourceTransportLifecycleStageSchema.safeParse(row.transportStage);
-    const diagnostic = SourceSchemaDiagnosticSchema.safeParse({
-      field: row.schemaField,
-      expectedStructuralType: row.schemaExpectedType,
-      issueCategory: row.schemaIssueCategory,
-      ...(row.schemaRecordIndex === null ? {} : { recordIndex: row.schemaRecordIndex }),
-    });
+    const diagnostic = decodeSourceSchemaDiagnostic(row.schemaDiagnosticJson);
     let persistenceDiagnostic: SourcePersistenceDiagnostic | null = null;
     if (typeof row.persistenceDiagnosticJson === "string") {
       try {
@@ -2675,7 +2728,8 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       safeErrorCode: row.safeErrorCode,
       retryAfter: row.retryAfter,
       transportStage: stage.success ? stage.data : null,
-      schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+      schemaDiagnostic: diagnostic.diagnostic,
+      schemaDiagnosticState: diagnostic.state,
       persistenceDiagnostic,
     };
   }
@@ -2780,6 +2834,10 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
     ) {
       throw new Error("CAPABILITY_CHANGED");
     }
+    this.assertStoredRequestBinding(
+      current.id,
+      capability.requestBinding ? sourceRequestBindingDigest(capability.requestBinding) : undefined,
+    );
     return current;
   }
 
@@ -2894,6 +2952,41 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
          WHERE capability_id = ? ORDER BY version DESC LIMIT 1`,
       )
       .get(capabilityId) as { id: string; version: number; digest: string } | undefined;
+  }
+
+  exactRequestBindingSchemaAvailable(): boolean {
+    return Boolean(
+      this.sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_capability_request_bindings'",
+        )
+        .get(),
+    );
+  }
+
+  private assertStoredRequestBinding(versionId: string, expectedDigest?: string): void {
+    if (!this.exactRequestBindingSchemaAvailable()) {
+      if (expectedDigest) throw new Error("SOURCE_REQUEST_BINDING_MIGRATION_REQUIRED");
+      return;
+    }
+    const stored = this.sqlite
+      .prepare(
+        "SELECT request_json AS requestJson,request_digest AS digest FROM source_capability_request_bindings WHERE capability_version_id=?",
+      )
+      .get(versionId) as { requestJson: string; digest: string } | undefined;
+    if (!stored && !expectedDigest) return;
+    if (!stored || !expectedDigest || stored.digest !== expectedDigest)
+      throw new Error("SOURCE_REQUEST_BINDING_MISMATCH");
+    try {
+      if (
+        sourceRequestBindingDigest(
+          SourceRequestBindingSchema.parse(JSON.parse(stored.requestJson)),
+        ) !== expectedDigest
+      )
+        throw new Error();
+    } catch {
+      throw new Error("SOURCE_REQUEST_BINDING_MISMATCH");
+    }
   }
 
   private hasVerificationLedger(): boolean {

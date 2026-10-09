@@ -9,11 +9,16 @@ import {
 import { listBetaApplications } from "@web/lib/beta-workspace";
 import { issueLocalMutationNonce } from "@web/lib/local-mutation-security";
 import { getRunnerEnablementView } from "@web/lib/runner-workspace";
+import { HostedApplicationPanel } from "./hosted-panel";
+import { hostedSafeErrorCode } from "@applypilot/application-runner";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
 
-export default async function ApplicationsPage() {
+export default async function ApplicationsPage({
+  searchParams,
+}: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> } = {}) {
+  const hostedError = hostedSafeErrorCode((await searchParams)?.hostedError);
   const applications = listBetaApplications();
   const runnerView = await getRunnerEnablementView();
   const outcomeNonces = await Promise.all(
@@ -31,10 +36,18 @@ export default async function ApplicationsPage() {
         <div className="eyebrow">Private local tracking</div>
         <h1>Applications</h1>
         <p>
-          Durable packet and lifecycle events are shown from the local database. Real form access
-          and submission remain disabled.
+          Durable packet and lifecycle events are shown from the local database. Hosted form actions
+          require an exact reviewed target, approved packet and separate owner gates.
         </p>
       </section>
+      {hostedError ? (
+        <section className="panel" role="alert">
+          <h2>Hosted action stopped</h2>
+          <p>{hostedError}</p>
+          <p>Review the durable session state before another action.</p>
+        </section>
+      ) : null}
+      <HostedApplicationPanel />
       {applications.length === 0 ? (
         <section className="panel empty-state">
           <span className="empty-mark" aria-hidden="true">

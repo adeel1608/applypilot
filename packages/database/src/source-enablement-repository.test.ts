@@ -54,6 +54,7 @@ function database() {
     "0010_verified_source_packet_binding.sql",
     "0011_immutable_r2a_derivation_bindings.sql",
     "0012_source_owner_action_receipts.sql",
+    "0013_exact_source_request_binding.sql",
   ])
     sqlite.exec(readFileSync(new URL(`../drizzle/${name}`, import.meta.url), "utf8"));
   return sqlite;
@@ -507,49 +508,47 @@ function inspectionStateSnapshot(sqlite: BetterSqlite3.Database) {
 }
 
 describe("offline source-to-R2 queue persistence", () => {
-  it("rolls back each page persistence phase and retains only its safe diagnostic", async () => {
-    const pagePhases: SourcePersistencePhase[] = [
-      "UNKNOWN_PERSISTENCE",
-      "CAPABILITY_ASSERT",
-      "SOURCE_IDENTITY",
-      "JOB_NORMALIZATION",
-      "JOB_UPSERT",
-      "SOURCE_RECORD_UPSERT",
-      "SOURCE_RECORD_LOOKUP",
-      "OBSERVATION_INSERT",
-      "PAYLOAD_INSERT",
-      "JOB_VERSION_INSERT",
-      "R2A_NORMALIZATION",
-      "R2A_PERSIST",
-      "DUPLICATE_IDENTITY",
-      "DUPLICATE_SUGGESTION",
-      "PAGE_INSERT",
-      "VERIFICATION_INSERT",
-      "CHECKPOINT_UPDATE",
-      "PAGE_AUDIT",
-    ];
-    const completionPhases: SourcePersistencePhase[] = [
-      "COMPLETE_STATUS",
-      "COMPLETE_QUALIFICATION",
-    ];
-    const pageEvidenceTables = [
-      "job_sources",
-      "jobs",
-      "job_source_records",
-      "source_run_pages",
-      "source_observations",
-      "source_observation_payloads",
-      "job_versions",
-      "source_record_verifications",
-      "job_field_evidence_v2",
-      "requirement_evidence_v2",
-      "evidence_derivations",
-      "job_normalization_coverage",
-      "r2_duplicate_candidates",
-      "r2_duplicate_decision_versions",
-    ];
+  const pagePhases: SourcePersistencePhase[] = [
+    "UNKNOWN_PERSISTENCE",
+    "CAPABILITY_ASSERT",
+    "SOURCE_IDENTITY",
+    "JOB_NORMALIZATION",
+    "JOB_UPSERT",
+    "SOURCE_RECORD_UPSERT",
+    "SOURCE_RECORD_LOOKUP",
+    "OBSERVATION_INSERT",
+    "PAYLOAD_INSERT",
+    "JOB_VERSION_INSERT",
+    "R2A_NORMALIZATION",
+    "R2A_PERSIST",
+    "DUPLICATE_IDENTITY",
+    "DUPLICATE_SUGGESTION",
+    "PAGE_INSERT",
+    "VERIFICATION_INSERT",
+    "CHECKPOINT_UPDATE",
+    "PAGE_AUDIT",
+  ];
+  const completionPhases: SourcePersistencePhase[] = ["COMPLETE_STATUS", "COMPLETE_QUALIFICATION"];
+  const pageEvidenceTables = [
+    "job_sources",
+    "jobs",
+    "job_source_records",
+    "source_run_pages",
+    "source_observations",
+    "source_observation_payloads",
+    "job_versions",
+    "source_record_verifications",
+    "job_field_evidence_v2",
+    "requirement_evidence_v2",
+    "evidence_derivations",
+    "job_normalization_coverage",
+    "r2_duplicate_candidates",
+    "r2_duplicate_decision_versions",
+  ];
 
-    for (const phase of [...pagePhases, ...completionPhases]) {
+  it.each([...pagePhases, ...completionPhases])(
+    "rolls back %s and retains only its safe diagnostic",
+    async (phase) => {
       const sqlite = database();
       const approved = greenhouseCapability({ requestBudget: 1, recordCap: 1, pageSizeCap: 1 });
       const repository = new SourceEnablementRepository(sqlite, () => instant, undefined, {
@@ -621,8 +620,8 @@ describe("offline source-to-R2 queue persistence", () => {
         integrity_check: "ok",
       });
       sqlite.close();
-    }
-  });
+    },
+  );
 
   it("stops and rolls back a page containing duplicate Greenhouse external IDs", async () => {
     const sqlite = database();
@@ -960,6 +959,16 @@ describe("offline source-to-R2 queue persistence", () => {
       tenant: "ncinoinc",
       allowedPathPrefix: "/v1/boards/ncinoinc/",
       allowedOperations: ["GET_JOB"],
+      requestBinding: {
+        provider: "GREENHOUSE",
+        region: "GLOBAL",
+        tenant: "ncinoinc",
+        operation: "GET_JOB",
+        externalId,
+        includeContent: false,
+        includeQuestions: false,
+        readerVersion: "greenhouse-public-v2.1",
+      },
       requestBudget: 1,
       recordCap: 1,
       pageSizeCap: 1,
@@ -1159,7 +1168,7 @@ describe("offline source-to-R2 queue persistence", () => {
     expect(sqlite.prepare("SELECT count(*) AS count FROM job_versions").get()).toEqual({
       count: 28,
     });
-    expect(sqlite.pragma("user_version", { simple: true })).toBe(12);
+    expect(sqlite.pragma("user_version", { simple: true })).toBe(13);
     expect(sqlite.pragma("integrity_check", { simple: true })).toBe("ok");
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
@@ -1327,6 +1336,16 @@ describe("offline source-to-R2 queue persistence", () => {
       recordCap: 1,
       pageSizeCap: 1,
       allowedOperations: ["GET_JOB"],
+      requestBinding: {
+        provider: "GREENHOUSE",
+        region: "GLOBAL",
+        tenant: "fictional",
+        operation: "GET_JOB",
+        externalId: "fictional-greenhouse-detail-7",
+        includeContent: false,
+        includeQuestions: false,
+        readerVersion: "greenhouse-public-v2.1",
+      },
     });
     const repository = new SourceEnablementRepository(sqlite, () => instant);
     const requestedId = "fictional-greenhouse-detail-7";
@@ -2521,6 +2540,321 @@ describe("offline source-to-R2 queue persistence", () => {
     sqlite.close();
   });
 
+  it("qualifies documented null metadata without altering raw provider facts or R2A evidence", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      allowedOperations: ["LIST_JOBS"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const raw = {
+      ...greenhousePosting(),
+      metadata: null,
+      departments: [{ parent_id: null }],
+      offices: [{ parent_id: null }],
+    };
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: async () => ["8.8.8.8"],
+        request: async () => ({
+          status: 200,
+          headers: { "content-type": "application/json" },
+          body: Buffer.from(JSON.stringify({ jobs: [raw] })),
+          connectedAddress: "8.8.8.8",
+        }),
+      },
+      evaluateJob: async () => null,
+      queueJob: () => undefined,
+    });
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+    });
+    expect(result.records[0]?.rawPayload.metadata).toBeNull();
+    const jobId = repository.jobIdsForRun(result.runId)[0]!;
+    const beta = new BetaRepository(sqlite);
+    const jobVersionId = (
+      sqlite
+        .prepare("SELECT id FROM job_versions WHERE job_id=? ORDER BY version DESC LIMIT 1")
+        .get(jobId) as { id: string }
+    ).id;
+    expect(beta.getLatestQualifiedVerification(jobId, jobVersionId)).toMatchObject({
+      runId: result.runId,
+    });
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite
+        .prepare("SELECT qualification_state FROM source_record_verifications WHERE run_id=?")
+        .get(result.runId),
+    ).toEqual({ qualification_state: "QUALIFIED" });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("binds combined exact detail receipts, stored request digest and consumed START to one run", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      allowedOperations: ["GET_JOB"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+      requestBinding: {
+        provider: "GREENHOUSE",
+        region: "GLOBAL",
+        tenant: "fictional",
+        operation: "GET_JOB",
+        externalId: "123",
+        includeContent: false,
+        includeQuestions: true,
+        readerVersion: "greenhouse-public-v2.1",
+      },
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    repository.persistCapabilityVersion(approved);
+    const combined = () =>
+      repository.createOwnerApprovalAndStartReceipt({
+        capability: approved,
+        operation: "GET_JOB",
+        approvalGateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+        startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+        confirmationText: `APPROVE AND RUN ${approved.capabilityId}`,
+        ownerConfirmed: true,
+      });
+    const chain = combined();
+    const request = vi.fn(async ({ url }: { url: URL }) => {
+      expect(url.toString()).toBe(
+        "https://boards-api.greenhouse.io/v1/boards/fictional/jobs/123?questions=true",
+      );
+      return {
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: Buffer.from(
+          JSON.stringify({ ...greenhousePosting("123"), metadata: null, questions: [] }),
+        ),
+        connectedAddress: "8.8.8.8",
+      };
+    });
+    await expect(
+      runGreenhouseDetailToQueueWithOwnerReceipts({
+        capability: approved,
+        repository,
+        ownerReceiptChain: chain,
+        externalId: "124",
+        now: () => instant,
+        dependencies: { resolveHost: async () => ["8.8.8.8"], request },
+        evaluateJob: vi.fn(),
+        queueJob: vi.fn(),
+      }),
+    ).rejects.toThrow("SOURCE_REQUEST_BINDING_MISMATCH");
+    expect(request).not.toHaveBeenCalled();
+    // A rejected mismatched dispatch terminalizes START; use a separately approved
+    // immutable successor rather than recreating that receipt or replaying it.
+    expect(
+      sqlite
+        .prepare("SELECT state FROM source_owner_action_receipts WHERE id=?")
+        .pluck()
+        .get(chain.startReceiptId),
+    ).toBe("FAILED");
+    const next = { ...approved, version: 2, predecessorVersion: 1 };
+    repository.persistCapabilityVersion(next);
+    const nextChain = repository.createOwnerApprovalAndStartReceipt({
+      capability: next,
+      operation: "GET_JOB",
+      approvalGateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+      startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+      confirmationText: `APPROVE AND RUN ${next.capabilityId}`,
+      ownerConfirmed: true,
+    });
+    const result = await runGreenhouseDetailToQueueWithOwnerReceipts({
+      capability: next,
+      repository,
+      ownerReceiptChain: nextChain,
+      externalId: "123",
+      now: () => instant,
+      dependencies: { resolveHost: async () => ["8.8.8.8"], request },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "COMPLETE",
+      requestCount: 1,
+      pageCount: 1,
+      recordCount: 1,
+    });
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    expect(
+      sqlite
+        .prepare("SELECT start_receipt_id FROM source_run_owner_bindings WHERE run_id=?")
+        .pluck()
+        .get(result.runId),
+    ).toBe(nextChain.startReceiptId);
+    expect(
+      sqlite
+        .prepare("SELECT state FROM source_owner_action_receipts WHERE id=?")
+        .pluck()
+        .get(nextChain.startReceiptId),
+    ).toBe("CONSUMED");
+    expect(() =>
+      repository.createOwnerApprovalAndStartReceipt({
+        capability: next,
+        operation: "GET_JOB",
+        approvalGateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+        startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+        confirmationText: `APPROVE AND RUN ${next.capabilityId}`,
+        ownerConfirmed: true,
+      }),
+    ).toThrow();
+    expect(request).toHaveBeenCalledOnce();
+    expect(sqlite.prepare("SELECT count(*) FROM source_run_checkpoints").pluck().get()).toBe(1);
+    expect(
+      sqlite.prepare("SELECT count(*) FROM source_capability_request_bindings").pluck().get(),
+    ).toBe(2);
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("persists the full closed Greenhouse schema stop after malformed response with no page side effects", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      allowedOperations: ["LIST_JOBS"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    const result = await runGreenhouseSourceToQueue({
+      capability: approved,
+      repository,
+      now: () => instant,
+      dependencies: {
+        resolveHost: async () => ["8.8.8.8"],
+        request: async () => ({
+          status: 200,
+          headers: { "content-type": "application/json" },
+          body: Buffer.from(
+            JSON.stringify({
+              jobs: [{ ...greenhousePosting(), metadata: "PRIVATE_PROVIDER_CANARY" }],
+            }),
+          ),
+          connectedAddress: "8.8.8.8",
+        }),
+      },
+      evaluateJob: vi.fn(),
+      queueJob: vi.fn(),
+    });
+    expect(result).toMatchObject({
+      status: "STOPPED",
+      stopCode: "SCHEMA_CHANGED",
+      requestCount: 1,
+      pageCount: 0,
+      recordCount: 0,
+    });
+    const recovery = repository.recovery(result.runId);
+    expect(recovery).toMatchObject({
+      status: "STOPPED",
+      transportStage: "RESPONSE_BODY",
+      schemaDiagnosticState: "CAPTURED",
+      schemaDiagnostic: {
+        schemaVersion: 2,
+        provider: "GREENHOUSE",
+        operation: "LIST_JOBS",
+        issues: [
+          {
+            boundary: "RECORD",
+            recordIndex: 0,
+            path: ["jobs", 0, "metadata"],
+            expectedStructuralTypes: ["ARRAY"],
+            actualStructuralType: "STRING",
+          },
+        ],
+      },
+    });
+    const audit = sqlite
+      .prepare(
+        "SELECT redacted_metadata_json FROM audit_events WHERE event_type='source.run.stopped' AND entity_id=?",
+      )
+      .pluck()
+      .get(result.runId) as string;
+    expect(audit).not.toMatch(/PRIVATE_PROVIDER|message|stack|content|https|rawPayload/);
+    expect(repository.getRunOwnerProvenance(result.runId)).toBe("OWNER_RECEIPTS_BOUND");
+    for (const table of [
+      "source_run_pages",
+      "source_observations",
+      "source_record_verifications",
+      "job_versions",
+    ])
+      expect(Number(sqlite.prepare(`SELECT count(*) FROM ${table}`).pluck().get())).toBe(0);
+    sqlite.close();
+  });
+
+  it("reports schema diagnostic persistence failure explicitly and preserves terminal request accounting", async () => {
+    const sqlite = database();
+    const approved = greenhouseCapability({
+      allowedOperations: ["LIST_JOBS"],
+      requestBudget: 1,
+      recordCap: 1,
+      pageSizeCap: 1,
+    });
+    const repository = new SourceEnablementRepository(sqlite, () => instant);
+    sqlite.exec(
+      "CREATE TRIGGER fictional_stop_audit_failure BEFORE INSERT ON audit_events WHEN NEW.event_type='source.run.stopped' BEGIN SELECT RAISE(ABORT,'PRIVATE_SQL_CANARY'); END",
+    );
+    await expect(
+      runGreenhouseSourceToQueue({
+        capability: approved,
+        repository,
+        now: () => instant,
+        dependencies: {
+          resolveHost: async () => ["8.8.8.8"],
+          request: async () => ({
+            status: 200,
+            headers: { "content-type": "application/json" },
+            body: Buffer.from(
+              JSON.stringify({ jobs: [{ ...greenhousePosting(), metadata: false }] }),
+            ),
+            connectedAddress: "8.8.8.8",
+          }),
+        },
+        evaluateJob: vi.fn(),
+        queueJob: vi.fn(),
+      }),
+    ).rejects.toThrow("SCHEMA_DIAGNOSTIC_PERSISTENCE_FAILED");
+    expect(
+      sqlite
+        .prepare(
+          "SELECT status,request_count,page_count,record_count,safe_error_code FROM source_run_checkpoints",
+        )
+        .get(),
+    ).toEqual({
+      status: "STOPPED",
+      request_count: 1,
+      page_count: 0,
+      record_count: 0,
+      safe_error_code: "SCHEMA_DIAGNOSTIC_PERSISTENCE_FAILED",
+    });
+    expect(sqlite.prepare("SELECT count(*) FROM source_run_owner_bindings").pluck().get()).toBe(1);
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM source_owner_action_receipts WHERE state='CONSUMED'")
+        .pluck()
+        .get(),
+    ).toBe(2);
+    expect(
+      sqlite
+        .prepare("SELECT count(*) FROM audit_events WHERE event_type='source.run.stopped'")
+        .pluck()
+        .get(),
+    ).toBe(0);
+    sqlite.close();
+  });
+
   it("records response-contract drift separately from persistence without raw details", async () => {
     const sqlite = database();
     let id = 0;
@@ -3309,6 +3643,16 @@ describe("offline source-to-R2 queue persistence", () => {
     let id = 0;
     const approved = capability({
       allowedOperations: ["GET_JOB"],
+      requestBinding: {
+        provider: "LEVER",
+        region: "GLOBAL",
+        tenant: "fictional",
+        operation: "GET_JOB",
+        externalId: "fictional-99",
+        includeContent: false,
+        includeQuestions: false,
+        readerVersion: "lever-public-v2",
+      },
       requestBudget: 1,
       recordCap: 1,
       pageSizeCap: 1,
@@ -3584,6 +3928,16 @@ describe("offline source-to-R2 queue persistence", () => {
     let id = 0;
     const approved = capability({
       allowedOperations: ["GET_JOB"],
+      requestBinding: {
+        provider: "LEVER",
+        region: "GLOBAL",
+        tenant: "fictional",
+        operation: "GET_JOB",
+        externalId: "fictional-100",
+        includeContent: false,
+        includeQuestions: false,
+        readerVersion: "lever-public-v2",
+      },
       requestBudget: 1,
       recordCap: 1,
       pageSizeCap: 1,
@@ -3675,6 +4029,16 @@ describe("offline source-to-R2 queue persistence", () => {
     let id = 0;
     const approved = greenhouseCapability({
       allowedOperations: ["GET_JOB"],
+      requestBinding: {
+        provider: "GREENHOUSE",
+        region: "GLOBAL",
+        tenant: "fictional",
+        operation: "GET_JOB",
+        externalId: "fictional-greenhouse-rederive-100",
+        includeContent: false,
+        includeQuestions: false,
+        readerVersion: "greenhouse-public-v2.1",
+      },
       requestBudget: 1,
       recordCap: 1,
       pageSizeCap: 1,

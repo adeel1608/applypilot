@@ -1,9 +1,10 @@
 import "server-only";
+import { captureBoundGreenhouseQuestions } from "./source-question-capture";
 
 import { dirname } from "node:path";
 
 import {
-  SourceSchemaDiagnosticSchema,
+  decodeSourceSchemaDiagnostic,
   SourcePersistenceDiagnosticSchema,
   SourceTransportLifecycleStageSchema,
   loadPrivateSourceAllowlistV2,
@@ -11,6 +12,7 @@ import {
   resolveCurrentSourceCapabilityHead,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
+  assertSourceRequestBinding,
   type SourceCapabilityV2,
   type SourceCapabilityViewBinding,
   type SourceSchemaDiagnostic,
@@ -18,7 +20,9 @@ import {
 } from "@applypilot/job-sources";
 import {
   runGreenhouseSourceToQueue,
+  runGreenhouseDetailToQueue,
   runLeverSourceToQueue,
+  runLeverDetailToQueue,
   type SourceOwnerActionGateProof,
 } from "@applypilot/database";
 
@@ -46,6 +50,9 @@ export interface SourceEnablementView {
     host: string;
     pathPrefix: string;
     operations: string[];
+    exactExternalId?: string | null;
+    includeQuestions?: boolean;
+    readerVersion?: string | null;
     readiness: string;
     ownerApprovalState: string;
     ownerApprovalReceiptId: string | null;
@@ -73,6 +80,7 @@ export interface SourceEnablementView {
     safeErrorCode: string | null;
     transportStage: string | null;
     schemaDiagnostic: SourceSchemaDiagnostic | null;
+    schemaDiagnosticState?: "ABSENT" | "CAPTURED" | "INVALID";
     persistenceDiagnostic: SourcePersistenceDiagnostic | null;
     retryAfter: string | null;
     startedAt: string;
@@ -110,6 +118,9 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
           host: capability.allowedHost,
           pathPrefix: capability.allowedPathPrefix,
           operations: [...capability.allowedOperations],
+          exactExternalId: capability.requestBinding?.externalId ?? null,
+          includeQuestions: capability.requestBinding?.includeQuestions ?? false,
+          readerVersion: capability.requestBinding?.readerVersion ?? null,
           readiness: sourceCapabilityReadiness(capability).status,
           ownerApprovalState: ownerApproval.state,
           ownerApprovalReceiptId: ownerApproval.receiptId,
@@ -137,18 +148,9 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
      (SELECT json_extract(a.redacted_metadata_json, '$.transportStage')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
         AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS transportStage,
-     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.field')
+     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
-        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaField,
-     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.expectedStructuralType')
-      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
-        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaExpectedType,
-     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.issueCategory')
-      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
-        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaIssueCategory,
-     (SELECT json_extract(a.redacted_metadata_json, '$.schemaDiagnostic.recordIndex')
-      FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
-        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaRecordIndex,
+        AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS schemaDiagnosticJson,
      (SELECT json_extract(a.redacted_metadata_json, '$.persistenceDiagnostic')
       FROM audit_events a WHERE a.event_type='source.run.stopped' AND a.entity_type='source_run'
         AND a.entity_id=r.id ORDER BY a.occurred_at DESC,a.rowid DESC LIMIT 1) AS persistenceDiagnosticJson,
@@ -167,21 +169,13 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
     > & {
       transportStage: unknown;
       persistedPageProviderRecordCount: number;
-      schemaField: unknown;
-      schemaExpectedType: unknown;
-      schemaIssueCategory: unknown;
-      schemaRecordIndex: unknown;
+      schemaDiagnosticJson: unknown;
       persistenceDiagnosticJson: unknown;
     }
   >;
   const recentRuns = recentRows.map((run) => {
     const stage = SourceTransportLifecycleStageSchema.safeParse(run.transportStage);
-    const diagnostic = SourceSchemaDiagnosticSchema.safeParse({
-      field: run.schemaField,
-      expectedStructuralType: run.schemaExpectedType,
-      issueCategory: run.schemaIssueCategory,
-      ...(run.schemaRecordIndex === null ? {} : { recordIndex: run.schemaRecordIndex }),
-    });
+    const diagnostic = decodeSourceSchemaDiagnostic(run.schemaDiagnosticJson);
     let persistenceDiagnostic: SourcePersistenceDiagnostic | null = null;
     if (run.persistenceDiagnosticJson !== null && run.persistenceDiagnosticJson !== undefined) {
       try {
@@ -213,7 +207,8 @@ export async function getSourceEnablementView(): Promise<SourceEnablementView> {
       persistedObservationCount: run.persistedObservationCount,
       safeErrorCode: run.safeErrorCode,
       transportStage: stage.success ? stage.data : null,
-      schemaDiagnostic: diagnostic.success ? diagnostic.data : null,
+      schemaDiagnostic: diagnostic.diagnostic,
+      schemaDiagnosticState: diagnostic.state,
       persistenceDiagnostic,
       retryAfter: run.retryAfter,
       startedAt: run.startedAt,
@@ -254,10 +249,18 @@ export async function approveAndRunOwnerSource(
   if (!repository || !repository.ownerActionReceiptSchemaAvailable()) {
     throw new Error("DATABASE_MIGRATION_REQUIRED");
   }
+  const operation = capability.requestBinding?.operation ?? "LIST_JOBS";
+  assertSourceRequestBinding(
+    capability,
+    operation,
+    capability.requestBinding?.externalId ?? undefined,
+  );
+  if (!capability.allowedOperations.includes(operation))
+    throw new Error("SOURCE_REQUEST_BINDING_REQUIRED");
   repository.persistCapabilityVersion(capability);
   const ownerReceiptChain = repository.createOwnerApprovalAndStartReceipt({
     capability,
-    operation: "LIST_JOBS",
+    operation,
     approvalGateProof: gateProofs.approval,
     startGateProof: gateProofs.start,
     confirmationText,
@@ -270,6 +273,19 @@ export async function approveAndRunOwnerSource(
     evaluateJob: reevaluateBetaJob,
     queueJob: (jobId: string) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
   };
+  if (operation === "GET_JOB") {
+    const externalId = capability.requestBinding!.externalId!;
+    const result = await (capability.source === "GREENHOUSE"
+      ? runGreenhouseDetailToQueue({ ...runInput, externalId })
+      : runLeverDetailToQueue({ ...runInput, externalId }));
+    return {
+      ...result,
+      questionCapture:
+        result.status === "COMPLETE"
+          ? captureBoundGreenhouseQuestions(capability, result.runId)
+          : "QUESTION_CAPTURE_BLOCKED",
+    };
+  }
   return capability.source === "GREENHOUSE"
     ? runGreenhouseSourceToQueue(runInput)
     : runLeverSourceToQueue(runInput);
@@ -290,10 +306,18 @@ export async function runOwnerApprovedSource(
   if (!repository || !repository.ownerActionReceiptSchemaAvailable()) {
     throw new Error("DATABASE_MIGRATION_REQUIRED");
   }
+  const operation = capability.requestBinding?.operation ?? "LIST_JOBS";
+  assertSourceRequestBinding(
+    capability,
+    operation,
+    capability.requestBinding?.externalId ?? undefined,
+  );
+  if (!capability.allowedOperations.includes(operation))
+    throw new Error("SOURCE_REQUEST_BINDING_REQUIRED");
   repository.persistCapabilityVersion(capability);
   const ownerReceiptChain = repository.createOwnerStartReceipt({
     capability,
-    operation: "LIST_JOBS",
+    operation,
     gateProof,
     ownerConfirmed: true,
   });
@@ -304,6 +328,19 @@ export async function runOwnerApprovedSource(
     evaluateJob: reevaluateBetaJob,
     queueJob: (jobId: string) => setBetaQueueState(jobId, "REVIEWING", "SOURCE_R2_READY"),
   };
+  if (operation === "GET_JOB") {
+    const externalId = capability.requestBinding!.externalId!;
+    const result = await (capability.source === "GREENHOUSE"
+      ? runGreenhouseDetailToQueue({ ...runInput, externalId })
+      : runLeverDetailToQueue({ ...runInput, externalId }));
+    return {
+      ...result,
+      questionCapture:
+        result.status === "COMPLETE"
+          ? captureBoundGreenhouseQuestions(capability, result.runId)
+          : "QUESTION_CAPTURE_BLOCKED",
+    };
+  }
   return capability.source === "GREENHOUSE"
     ? runGreenhouseSourceToQueue(runInput)
     : runLeverSourceToQueue(runInput);

@@ -30,6 +30,16 @@ function capability(overrides: Partial<SourceCapabilityV2> = {}): SourceCapabili
     allowedHost: "api.lever.co",
     allowedPathPrefix: "/v0/postings/fictional",
     allowedOperations: ["GET_JOB"],
+    requestBinding: {
+      provider: "LEVER",
+      region: "GLOBAL",
+      tenant: "fictional",
+      operation: "GET_JOB",
+      externalId: "fixture-1",
+      includeContent: false,
+      includeQuestions: false,
+      readerVersion: "lever-public-v2",
+    },
     approvalState: "APPROVED",
     approvalReference: "fixture-detail-approval",
     approvedAt: "2026-09-01T00:00:00.000Z",
@@ -137,19 +147,49 @@ describe("durable Lever GET_JOB source runner", () => {
   it("fails closed without transport when GET_JOB is not approved", async () => {
     const target = sink();
     const dependencies = transport(posting());
-    const result = await runLeverDetailSourceDiscovery({
-      capability: capability({ allowedOperations: ["LIST_JOBS"] }),
-      sink: target.implementation,
-      ownerReceiptChain: fictionalOwnerReceiptChain,
-      externalId: "fixture-1",
-      now: () => instant,
-      dependencies,
-    });
-    expect(result.status).toBe("STOPPED");
-    expect(result.stopCode).toBe("OPERATION_NOT_APPROVED");
-    expect(result.terminalState).toBe("STOPPED");
+    await expect(
+      runLeverDetailSourceDiscovery({
+        capability: capability({
+          allowedOperations: ["LIST_JOBS"],
+          requestBinding: {
+            provider: "LEVER",
+            region: "GLOBAL",
+            tenant: "fictional",
+            operation: "LIST_JOBS",
+            externalId: null,
+            includeContent: false,
+            includeQuestions: false,
+            readerVersion: "lever-public-v2",
+          },
+        }),
+        sink: target.implementation,
+        ownerReceiptChain: fictionalOwnerReceiptChain,
+        externalId: "fixture-1",
+        now: () => instant,
+        dependencies,
+      }),
+    ).rejects.toThrow("SOURCE_REQUEST_BINDING_MISMATCH");
     expect(dependencies.request).not.toHaveBeenCalled();
     expect(target.calls.persisted).toBe(0);
+    expect(target.calls.start).toBe(0);
+  });
+
+  it("rejects a legacy unbound detail capability before a run or request", async () => {
+    const target = sink();
+    const dependencies = transport(posting());
+    await expect(
+      runLeverDetailSourceDiscovery({
+        capability: capability({ requestBinding: undefined }),
+        sink: target.implementation,
+        ownerReceiptChain: fictionalOwnerReceiptChain,
+        externalId: "fixture-1",
+        now: () => instant,
+        dependencies,
+      }),
+    ).rejects.toThrow("SOURCE_REQUEST_BINDING_REQUIRED");
+    expect(target.calls.start).toBe(0);
+    expect(target.calls.persisted).toBe(0);
+    expect(dependencies.request).not.toHaveBeenCalled();
   });
 
   it("classifies not-found, redirect, and response identity failures without retry", async () => {

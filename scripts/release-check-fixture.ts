@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 
@@ -24,6 +24,8 @@ const migrationFiles = [
   "0010_verified_source_packet_binding.sql",
   "0011_immutable_r2a_derivation_bindings.sql",
   "0012_source_owner_action_receipts.sql",
+  "0013_exact_source_request_binding.sql",
+  "0014_hosted_application_workflow.sql",
 ];
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv): void {
@@ -112,7 +114,7 @@ try {
   run("git", ["diff", "--check"], env);
   run("git", ["fsck", "--strict"], env);
   console.log(
-    "RELEASE_FIXTURE_CHECK PASS fictional_runtime=disposable schema=10 private_profile_read=0",
+    "RELEASE_FIXTURE_CHECK PASS fictional_runtime=disposable schema=14 private_profile_read=0",
   );
 } finally {
   try {
@@ -120,5 +122,15 @@ try {
   } catch {
     // The fixture may already have been cleaned up after a failed setup.
   }
-  rmSync(fixtureRoot, { recursive: true, force: true });
+  const cleanupPath = resolve(fixtureRoot);
+  const cleanupRelative = relative(resolve(privateRoot), cleanupPath);
+  if (
+    !basename(cleanupPath).startsWith("release-fixture-") ||
+    !cleanupRelative ||
+    cleanupRelative === ".." ||
+    cleanupRelative.startsWith(`..${sep}`) ||
+    isAbsolute(cleanupRelative)
+  )
+    throw new Error("RELEASE_FIXTURE_CLEANUP_ESCAPE");
+  rmSync(cleanupPath, { recursive: true, force: true });
 }

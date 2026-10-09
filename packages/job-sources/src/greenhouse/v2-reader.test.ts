@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 import {
   SourceRunBudget,
@@ -89,6 +90,132 @@ function budget(value = capability()) {
 }
 
 describe("Greenhouse V2 bounded reader", () => {
+  it.each([undefined, null, [], [{ value: null, nested: { parent_id: null } }]])(
+    "preserves each documented metadata shape and nested nulls without manufacturing evidence",
+    async (metadata) => {
+      const approved = capability({ allowedOperations: ["LIST_JOBS"] });
+      const raw: Record<string, unknown> = fixtureJob({
+        metadata,
+        departments: [{ parent_id: null }],
+        offices: [{ parent_id: null }],
+      });
+      if (metadata === undefined) delete raw.metadata;
+      const page = await readGreenhousePageV2({
+        capability: approved,
+        budget: budget(approved),
+        now: () => instant,
+        dependencies: dependencies({ jobs: [raw] }),
+      });
+      const record = page.acceptedRecords[0]!;
+      expect(record.rawPayload).toEqual(raw);
+      expect(record.metadata).toEqual(metadata ?? []);
+      const canonical = (value: unknown): string =>
+        Array.isArray(value)
+          ? `[${value.map(canonical).join(",")}]`
+          : value && typeof value === "object"
+            ? `{${Object.entries(value)
+                .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+                .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+                .join(",")}}`
+            : JSON.stringify(value);
+      expect(record.contentDigest).toBe(createHash("sha256").update(canonical(raw)).digest("hex"));
+    },
+  );
+
+  it.each([
+    [{ metadata: "PRIVATE_CANARY" }, "metadata", "ARRAY", "STRING"],
+    [{ metadata: 3 }, "metadata", "ARRAY", "NUMBER"],
+    [{ metadata: false }, "metadata", "ARRAY", "BOOLEAN"],
+    [{ metadata: { privateKey: "PRIVATE_CANARY" } }, "metadata", "ARRAY", "OBJECT"],
+    [{ departments: null }, "departments", "ARRAY", "NULL"],
+    [{ offices: null }, "offices", "ARRAY", "NULL"],
+    [{ location: { name: null } }, "name", "STRING", "NULL"],
+    [{ content: 4 }, "content", "STRING", "NUMBER"],
+    [{ updated_at: false }, "updated_at", "STRING", "BOOLEAN"],
+    [{ absolute_url: {} }, "absolute_url", "STRING", "OBJECT"],
+  ])(
+    "keeps malformed adjacent contract shapes strict: %s",
+    async (override, field, expected, actual) => {
+      const approved = capability({ allowedOperations: ["LIST_JOBS"] });
+      const runBudget = budget(approved);
+      const failure = await readGreenhousePageV2({
+        capability: approved,
+        budget: runBudget,
+        now: () => instant,
+        dependencies: dependencies({ jobs: [fixtureJob(override)] }),
+      }).catch((error) => error as { code: string; schemaDiagnostic: unknown });
+      expect(failure).toMatchObject({
+        code: "SCHEMA_CHANGED",
+        schemaDiagnostic: {
+          schemaVersion: 2,
+          provider: "GREENHOUSE",
+          operation: "LIST_JOBS",
+          issues: [
+            {
+              boundary: "RECORD",
+              recordIndex: 0,
+              expectedStructuralTypes: [expected],
+              actualStructuralType: actual,
+            },
+          ],
+        },
+      });
+      expect(JSON.stringify(failure)).toContain(field);
+      expect(JSON.stringify(failure)).not.toMatch(/PRIVATE_CANARY|privateKey|message|stack/);
+      expect(runBudget.attempts).toBe(1);
+      expect(runBudget.pages).toBe(0);
+    },
+  );
+
+  it.each([{}, { jobs: null }, { jobs: "PRIVATE_CANARY" }, { jobs: {} }])(
+    "retains envelope diagnostics through the actual HTTP parser: %s",
+    async (body) => {
+      const approved = capability({ allowedOperations: ["LIST_JOBS"] });
+      await expect(
+        readGreenhousePageV2({
+          capability: approved,
+          budget: budget(approved),
+          now: () => instant,
+          dependencies: dependencies(body),
+        }),
+      ).rejects.toMatchObject({
+        code: "SCHEMA_CHANGED",
+        schemaDiagnostic: {
+          issues: [{ boundary: "ENVELOPE", path: ["jobs"], expectedStructuralTypes: ["ARRAY"] }],
+        },
+      });
+    },
+  );
+
+  it.each(["LIST_JOBS", "GET_JOB"] as const)(
+    "accepts documented null metadata through %s without changing raw identity",
+    async (operation) => {
+      const approved = capability({ allowedOperations: [operation] });
+      const raw = fixtureJob({ metadata: null });
+      const deps = dependencies(operation === "LIST_JOBS" ? { jobs: [raw] } : raw);
+      const result =
+        operation === "LIST_JOBS"
+          ? await readGreenhousePageV2({
+              capability: approved,
+              budget: budget(approved),
+              now: () => instant,
+              dependencies: deps,
+            })
+          : await readGreenhouseDetailV2({
+              capability: approved,
+              externalId: "123",
+              budget: budget(approved),
+              now: () => instant,
+              dependencies: deps,
+            });
+      const record = "acceptedRecords" in result ? result.acceptedRecords[0] : result.record;
+      expect(record?.rawPayload.metadata).toBeNull();
+      expect(record?.metadata).toEqual([]);
+      expect(deps.request).toHaveBeenCalledOnce();
+      expect(record?.contentDigest).toMatch(/^[a-f0-9]{64}$/);
+    },
+  );
+
   it("reads one exact LIST response, preserves inert content and raw provider metadata", async () => {
     const approved = capability({ allowedOperations: ["LIST_JOBS"] });
     const deps = dependencies({ jobs: [fixtureJob()] });

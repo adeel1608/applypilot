@@ -58,6 +58,8 @@ try {
       "0010_verified_source_packet_binding.sql",
       "0011_immutable_r2a_derivation_bindings.sql",
       "0012_source_owner_action_receipts.sql",
+      "0013_exact_source_request_binding.sql",
+      "0014_hosted_application_workflow.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),

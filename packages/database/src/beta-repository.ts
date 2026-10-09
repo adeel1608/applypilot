@@ -1012,7 +1012,11 @@ export class BetaRepository {
             JSON.stringify({
               ...readiness,
               packetDigest: packetDigest(packet),
-              packetContractVersion: packet.r2EvaluationId ? "r2-packet-v2" : "legacy-packet-v1",
+              packetContractVersion: packet.questionContract
+                ? "hosted-packet-v3"
+                : packet.r2EvaluationId
+                  ? "r2-packet-v2"
+                  : "legacy-packet-v1",
               frozenPacket: packet,
               verificationEvidence: packet.verificationEvidence ?? null,
             }),
@@ -1040,7 +1044,9 @@ export class BetaRepository {
             JSON.stringify({
               ...readiness,
               packetDigest: packetDigest(packet),
-              packetContractVersion: "legacy-packet-v1",
+              packetContractVersion: packet.questionContract
+                ? "hosted-packet-v3"
+                : "legacy-packet-v1",
               frozenPacket: packet,
               verificationEvidence: packet.verificationEvidence ?? null,
             }),
@@ -1083,11 +1089,17 @@ export class BetaRepository {
           this.id(),
           questionId,
           answer.value === null ? null : JSON.stringify(answer.value),
-          answer.truthState,
+          answer.truthState === "OWNER_CHOICE" ? "USER_CONFIRMATION_REQUIRED" : answer.truthState,
           JSON.stringify(answer.factReferences),
           answer.disclosureState,
           now,
         );
+        if (answer.ownerChoice)
+          this.sqlite
+            .prepare(
+              "INSERT INTO hosted_packet_answer_choices(question_id,choice_receipt_id) VALUES(?,?)",
+            )
+            .run(questionId, answer.ownerChoice.receiptId);
       }
       return { packetId: packet.id, version, status: readiness.status };
     })();
