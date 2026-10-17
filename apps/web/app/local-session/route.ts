@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 function safeReturnPath(value: string | null): string {
   return value &&
+    value === value.trim() &&
     /^\/(?:import|jobs(?:\/[A-Za-z0-9._:-]+)?|applications|dashboard|sources)$/.test(value)
     ? value
     : "/dashboard";
@@ -20,11 +21,12 @@ export async function GET(request: NextRequest) {
     forwardedHost: requestHeaders.get("x-forwarded-host"),
   });
   const session = localMutationTokens.createSession();
-  const destination = new URL(
-    safeReturnPath(request.nextUrl.searchParams.get("returnTo")),
-    request.nextUrl.origin,
-  );
-  const response = NextResponse.redirect(destination, 303);
+  // Next can normalize a numeric loopback nextUrl origin to localhost.
+  // A relative destination retains the browser's validated cookie host and port.
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: safeReturnPath(request.nextUrl.searchParams.get("returnTo")) },
+  });
   response.cookies.set(LOCAL_SESSION_COOKIE, session.token, {
     httpOnly: true,
     sameSite: "strict",

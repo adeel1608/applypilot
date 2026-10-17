@@ -113,3 +113,30 @@ test("establishes an HttpOnly same-site local session before rendering mutation 
   expect(session).toMatchObject({ httpOnly: true, sameSite: "Strict" });
   await expect(page.locator('input[name="mutationNonce"]')).toHaveAttribute("value", /.+/);
 });
+
+test("session redirect retains the exact numeric loopback host and host-only cookie", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await context.clearCookies();
+  const requested = new URL("/local-session?returnTo=/import", baseURL);
+  const response = await context.request.get(requested.href, { maxRedirects: 0 });
+  expect(response.status()).toBe(303);
+  expect(response.headers().location).toBe("/import");
+  const destination = new URL(response.headers().location!, requested);
+  expect(destination.origin).toBe(requested.origin);
+  const sessions = (await context.cookies(requested.origin)).filter(
+    ({ name }) => name === "applypilot_local_session",
+  );
+  expect(sessions).toHaveLength(1);
+  expect(sessions[0]).toMatchObject({
+    domain: "127.0.0.1",
+    path: "/",
+    httpOnly: true,
+    sameSite: "Strict",
+  });
+  await page.goto(destination.href);
+  expect(new URL(page.url()).origin).toBe(requested.origin);
+  await expect(page.locator('input[name="mutationNonce"]')).toHaveAttribute("value", /.+/);
+});
