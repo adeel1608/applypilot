@@ -224,8 +224,7 @@ export class HostedApplicationService {
       try {
         this.input.store.stop(session.id, safeHostedError(error), false);
       } finally {
-        await driver?.close();
-        this.drivers.delete(session.id);
+        await this.closeDriver(session.id);
       }
       throw new Error(safeHostedError(error));
     }
@@ -335,16 +334,18 @@ export class HostedApplicationService {
       return this.input.store.getSession(sessionId);
     } catch (error) {
       // Candidate attachment and upload ambiguity are never automatically retried.
-      const session = this.input.store.getSession(sessionId);
       try {
-        this.input.store.stop(
-          sessionId,
-          safeHostedError(error),
-          ["FILLED", "UPLOADED", "VERIFIED", "REVIEW_READY"].includes(session.state),
-        );
+        let uncertain = true;
+        try {
+          uncertain = ["FILLED", "UPLOADED", "VERIFIED", "REVIEW_READY"].includes(
+            this.input.store.getSession(sessionId).state,
+          );
+        } catch {
+          // Lost durable state cannot establish that a candidate mutation did not happen.
+        }
+        this.input.store.stop(sessionId, safeHostedError(error), uncertain);
       } finally {
-        await driver.close();
-        this.drivers.delete(sessionId);
+        await this.closeDriver(sessionId);
       }
       throw new Error(safeHostedError(error));
     } finally {
@@ -386,16 +387,18 @@ export class HostedApplicationService {
       );
       if (!activated) throw new Error(safeHostedError(error));
     } finally {
-      await driver.close();
-      this.drivers.delete(sessionId);
-      this.inFlight.delete(sessionId);
+      try {
+        await this.closeDriver(sessionId);
+      } finally {
+        this.inFlight.delete(sessionId);
+      }
     }
     return this.input.store.getSession(sessionId);
   }
 
   async stop(sessionId: string): Promise<void> {
-    const session = this.input.store.getSession(sessionId);
     try {
+      const session = this.input.store.getSession(sessionId);
       if (
         !["CONFIRMED_SUBMITTED", "CONFIRMED_NOT_SUBMITTED", "OUTCOME_UNKNOWN", "STOPPED"].includes(
           session.state,
@@ -403,11 +406,19 @@ export class HostedApplicationService {
       )
         this.input.store.stop(sessionId, "HOSTED_OWNER_STOP", false);
     } finally {
-      await this.drivers.get(sessionId)?.close();
-      this.drivers.delete(sessionId);
+      await this.closeDriver(sessionId);
     }
   }
   async close(): Promise<void> {
-    for (const id of this.drivers.keys()) await this.stop(id);
+    const results = await Promise.allSettled([...this.drivers.keys()].map((id) => this.stop(id)));
+    if (results.some((result) => result.status === "rejected"))
+      throw new Error("HOSTED_SHUTDOWN_INCOMPLETE");
+  }
+  private async closeDriver(id: string): Promise<void> {
+    try {
+      await this.drivers.get(id)?.close();
+    } finally {
+      this.drivers.delete(id);
+    }
   }
 }

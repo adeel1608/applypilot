@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "reference": "owner-delegation-2026-10-17",
+  "policyId": "owner-delegated-ai-review-v1",
+  "repository": "adeel1608/applypilot",
+  "scope": "LOCAL_PERSONAL_IMPLEMENTATION_AND_TECHNICAL_ROLLOUT",
+  "decisionDate": "2026-10-17",
+  "decision": "DELEGATE_TECHNICAL_REVIEW_TO_AI",
+  "sourceKind": "OWNER_REQUEST_IN_CURRENT_CONVERSATION",
+  "sourceSha256": "b69d98257e80c653a269c6798d73b46f1be0bf307924400f00d18bafc85bdaa8",
+  "instruction": "Replace human-only plan, implementation and technical release reviews for the existing local ApplyPilot release scope with two substantive AI review passes. Operational owner consents remain unchanged.",
+  "historicalHumanReviewClaim": false
+}

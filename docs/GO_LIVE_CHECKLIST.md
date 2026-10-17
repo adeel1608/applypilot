@@ -1,5 +1,7 @@
 # Personal go-live gates and test matrix
 
+Current technical review policy (2026-10-17): [owner-delegated AI review](OWNER_DELEGATED_REVIEW_POLICY.md), two substantive exact-scope passes and zero unresolved blocking findings; no human implementation/plan/technical-release signature is required for this local release scope. Historical human review entries below remain historical. Source, candidate-fact, disclosure, packet/preview, final-submit and real release evidence gates are unchanged.
+
 Status: **RELEASE COMPLETION IMPLEMENTATION UNDER REVIEW; PERSONAL LIVE V1 NOT READY**. Current validation, component readiness, canonical schema and authority are recorded in the active `PROJECT_PLAN.md` matrix. The new Greenhouse/Lever native application implementation has a separate reviewed-build/packet/disclosure/final-consent boundary; its [runbook and supported scope](APPLICATION_RUNNER.md) do not imply live acceptance. Public hosting remains outside this task.
 
 R2A/R2B/R2C/R2D and the offline Personal Live V1 framework are merged. Calibration remains `UNCALIBRATED`. Additive migration 0008 preserves immutable 0000–0007 and adds target operation scope plus a separate inspection lifecycle. Source readiness never implies target authority, and inspection authority never implies candidate disclosure or final submission.

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type BetterSqlite3 from "better-sqlite3";
+import { SourceEnablementRepository } from "@applypilot/database";
 import { z } from "zod";
 import {
   hostedDigest,
@@ -118,7 +119,7 @@ export function personalLiveV1Readiness(
     const q = readFileSync(
       join(root, "data", "private", "runtime", "hosted-quality-evidence.json"),
     );
-    assertHostedBuildEvidence(record, join(root, "apps", "web", ".next"), q);
+    assertHostedBuildEvidence(record, join(root, "apps", "web", ".next"), q, root);
     reviewed = quality && record.build.head === head && record.build.tree === tree;
   } catch {
     /* Missing or invalid reviewed executable/quality evidence stays unproven. */
@@ -137,25 +138,19 @@ export function personalLiveV1Readiness(
     journey = false,
     unresolved = 0;
   if (sqlite) {
-    if (has("source_run_owner_bindings"))
-      source =
-        Number(
-          sqlite
-            .prepare(
-              `SELECT count(*) FROM source_run_checkpoints r
-               JOIN source_run_owner_bindings b ON b.run_id=r.id
-               JOIN source_record_verifications v ON v.run_id=r.id
-               JOIN source_owner_action_receipts a ON a.id=b.approval_receipt_id
-               JOIN source_owner_action_receipts s ON s.id=b.start_receipt_id
-               WHERE r.status='COMPLETE' AND v.qualification_state='QUALIFIED'
-               AND a.action='APPROVE' AND s.action='START' AND a.state='CONSUMED' AND s.state='CONSUMED'
-               AND s.predecessor_receipt_id=a.id AND a.capability_version_id=s.capability_version_id
-               AND a.capability_digest=b.capability_digest AND s.capability_digest=b.capability_digest
-               AND s.operation=b.operation AND b.operation=r.operation`,
-            )
-            .pluck()
-            .get(),
-        ) > 0;
+    if (has("source_run_owner_bindings")) {
+      const repository = new SourceEnablementRepository(sqlite);
+      const runs = sqlite
+        .prepare(
+          `SELECT DISTINCT r.id FROM source_run_checkpoints r
+        JOIN source_record_verifications v ON v.run_id=r.id AND v.capability_version_id=r.capability_version_id
+        WHERE r.status='COMPLETE' AND v.disposition='ACCEPTED' AND v.qualification_state='QUALIFIED'`,
+        )
+        .all() as { id: string }[];
+      source = runs.some(
+        (run) => repository.getRunOwnerProvenance(run.id) === "OWNER_RECEIPTS_BOUND",
+      );
+    }
     if (has("r2_calibration_qualifications"))
       matching =
         Number(
@@ -200,7 +195,9 @@ export function personalLiveV1Readiness(
     if (has("source_run_checkpoints"))
       unresolved += Number(
         sqlite
-          .prepare("SELECT count(*) FROM source_run_checkpoints WHERE status='RUNNING'")
+          .prepare(
+            "SELECT count(*) FROM source_run_checkpoints WHERE status IN ('RUNNING','OUTCOME_UNKNOWN')",
+          )
           .pluck()
           .get(),
       );

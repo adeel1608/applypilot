@@ -16,7 +16,7 @@ Personal Live V1 is a single-owner, local-first assistant that discovers jobs fr
 
 No paid API, AI provider, cloud dashboard or cloud browser is required. All candidate data, source snapshots, SQLite, generated documents, answers and browser sessions remain private local runtime assets. GitHub is PUBLIC; npm `private: true` remains a publication safeguard. Final submission requires an immediate deliberate owner action for one frozen application; never background or batch submission.
 
-The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. The release-completion master request explicitly authorizes the current scoped engineering after the preserved plan; it does not remove human implementation review, repository rules, live owner gates or release acceptance. The earlier documentation-only R2/R1 next-gate advice is historical. Changed scope/security assumptions still require a revised plan first.
+The current technical lifecycle for the existing owner-authorized local release is PLAN -> OWNER-DELEGATED AI PLAN REVIEW -> IMPLEMENT -> TEST -> AI TECHNICAL REVIEW -> GUARDED MERGE -> FRESH MERGED-BUILD VALIDATION -> SEALED ROLLOUT. The owner's prospective 2026-10-17 [delegated review policy](OWNER_DELEGATED_REVIEW_POLICY.md) supersedes the older human-only plan/implementation/technical review rule, including PR79 and the amendment/fixes. Two substantive AI passes with exact cumulative code coverage and resolved blocking findings are required; human technical review count may be zero. Historical train entries below retain their original chronology. Source/disclosure/packet/preview/final-submit owner decisions, candidate truth, official live evidence and actual repository protections remain mandatory. Changed scope/security assumptions still require a revised plan and AI review first.
 
 ## Pre-Beta evidence and capability inventory
 
@@ -192,7 +192,7 @@ Recommend fully local, loopback-bound UI + local SQLite + local browser runner, 
 
 ## Forward release trains
 
-The following common contract applies to **every** train: update the detailed implementation plan and obtain review/merge before code; use separate feature branches/PRs; fictional automated tests only; full quality gates plus train-specific tests; no private CI artifacts; additive/versioned data changes with approved backups; stop on failed safety gate. Rollback disables the new capability and reverts reviewed code without deleting private data; migrations restore only through an owner-approved tested backup procedure. Each train ends with implementation PR review, not automatic merge. No train grants authority for another source, site or final submission.
+Historical train-design contract (the technical review/merge steps are superseded for the current local release by the owner-delegated policy above): update the detailed implementation plan and obtain review/merge before code; use separate feature branches/PRs; fictional automated tests only; full quality gates plus train-specific tests; no private CI artifacts; additive/versioned data changes with approved backups; stop on failed safety gate. Rollback disables the new capability and reverts reviewed code without deleting private data; migrations restore only through an owner-approved tested backup procedure. Each train ended with implementation PR review, not automatic merge. No train grants authority for another source, site or final submission.
 
 ### R0 — Local Activation (old Phase 2.5A; foundations 0/1/2/2.5)
 

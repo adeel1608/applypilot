@@ -78,6 +78,7 @@ export function currentHostedReviewedBuild(): HostedBuild | null {
           "hosted-quality-evidence.json",
         ),
       ),
+      root,
     );
     return review.build;
   } catch {
@@ -196,7 +197,19 @@ export async function runHostedOwnerAction(
   return service().submit(sessionId, proof);
 }
 export async function stopHostedSession(id: string): Promise<void> {
-  await service().stop(id);
+  if (runtime.__applypilotHostedService) {
+    await runtime.__applypilotHostedService.service.stop(id);
+    return;
+  }
+  const store = repository();
+  if (!store) throw new Error("HOSTED_MIGRATION_REQUIRED");
+  const session = store.getSession(id);
+  if (
+    !["CONFIRMED_SUBMITTED", "CONFIRMED_NOT_SUBMITTED", "OUTCOME_UNKNOWN", "STOPPED"].includes(
+      session.state,
+    )
+  )
+    store.stop(id, "HOSTED_OWNER_STOP", false);
 }
 export function hostedPrivatePreview(session: HostedSession, capability = session.capability) {
   if (!capability.packetId || !capability.packetDigest) return null;

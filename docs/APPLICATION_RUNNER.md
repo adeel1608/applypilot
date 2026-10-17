@@ -28,7 +28,7 @@ The source combined action remains one displayed `APPROVE AND RUN <capability-id
 
 ### Review, migration, build and startup
 
-Before merge, record exact-head CI, resolve every change request, and obtain the documented human review. Agent self-review is not human approval. A formal current-head GitHub APPROVED review counts; where remote rules allow, the PR owner may instead leave a COMMENTED review whose body is exactly `APPROVE RELEASE REVIEW <exact-head-sha>`. Human and independent review counts are separate. Required GitHub review rules still apply.
+Before merge, record exact-head CI and resolve every blocking finding/change request. The owner's prospective [owner-delegated AI review policy](OWNER_DELEGATED_REVIEW_POLICY.md) requires two substantive AI passes, correctness and adversarial security/privacy/recovery, covering PR79 plus the complete amendment/fix scope. Publish the actual exact-head structured reports as explicitly AI-authored COMMENTED GitHub reviews through the authorized publisher. Human and independent human counts remain zero for this path; AI activity from a User account is not human evidence. Repository rules still apply. Historical schema1 human-reviewed seals retain their original validated semantics.
 
 On the compatible clean reviewed head, use the established local commands:
 
@@ -37,11 +37,11 @@ npm.cmd run hosted:validate-release
 npm.cmd run backup
 npm.cmd run db:migrate -- --confirm
 npm.cmd run db:status
-npm.cmd run hosted:seal-build -- --pr <reviewed-merged-pr-number>
+npm.cmd run hosted:seal-build -- --pr <final-policy-or-fix-pr-number> --ai-review-ids <pass-A-review-id>,<pass-B-review-id>
 npm.cmd run local:start
 ```
 
-The seal requires the selected human-reviewed PR's exact merge commit as the current build head, exact-current-head successful CI, the actual frozen full release matrix, and unchanged compiled server bytes/manifests/BUILD_ID. An older reviewed ancestor cannot authorize a later unreviewed commit. All PR review pages are checked; comments cannot clear a change request. The seal creates no source or target receipt. The UI and proposal CLI recheck this evidence; missing or changed evidence disables execution. Use the actual `LOCAL_START_PASS` URL/port and owned process readback, never a guessed port.
+The schema2 seal requires the final policy/fix PR's exact actual merge commit as the current build head, exact squash tree equality with the reviewed PR head, both actual retrieved AI reports, the fixed cumulative scope from ad61cbaf through that release, current policy/delegation/file coverage digests, zero blocking findings, successful actual-current-head CI, healthy migrated canonical DB, version2 fresh frozen quality, and unchanged production server/static output, launch manifests and BUILD_ID. Passing PR79 as an ancestor at a later head is rejected. All review pages and threads are checked; AI comments cannot clear an effective change request. The seal creates no source or target receipt. Owned startup, the UI, staging and official readiness revalidate it; missing/changed evidence disables execution. Use the actual `LOCAL_START_PASS` URL/port and owned process readback, never a guessed port. STOP remains available for an existing owned session even when execution admission has become invalid.
 
 `npm.cmd run hosted:stage -- --proposal data/private/<proposal>.json` accepts only a confined strictly parsed REAL proposal for that reviewed build and current exact subject. It atomically stages inert capability metadata and creates zero owner receipts, browser contexts, requests or submissions. No REAL proposal is staged by the offline fixture suite.
 

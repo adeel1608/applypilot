@@ -8,6 +8,7 @@ import {
   assertHostedBuildEvidence,
   assertHostedQualityEvidence,
   compiledHostedBuildDigest,
+  compiledHostedProductionBuildDigest,
   hostedHumanReviewCounts,
   hostedReviewsFromPages,
   assertHostedReviewedMergeHead,
@@ -88,6 +89,57 @@ describe("hosted reviewed executable evidence", () => {
   it("accepts exact compiled bytes plus frozen quality and owner review evidence", () => {
     const f = fixture();
     expect(() => assertHostedBuildEvidence(f.record, f.next, f.quality)).not.toThrow();
+  });
+  it.each([
+    "client.js",
+    "client.css",
+    "page.html",
+    "page.rsc",
+    "required-server-files.json",
+    "build-manifest.json",
+  ])(
+    "version2 production quality rejects changed %s while legacy semantics remain readable",
+    (name) => {
+      const f = fixture();
+      mkdirSync(join(f.next, "static"));
+      for (const manifest of ["required-server-files.json", "build-manifest.json"])
+        writeFileSync(join(f.next, manifest), "{}");
+      const target = join(
+        f.next,
+        name.startsWith("client") ? "static" : name.startsWith("page") ? "server" : "",
+        name,
+      );
+      writeFileSync(target, "FICTIONAL_ORIGINAL");
+      const quality = Buffer.from(
+        JSON.stringify({
+          ...JSON.parse(f.quality.toString()),
+          schemaVersion: 2,
+          buildDigest: compiledHostedProductionBuildDigest(f.next),
+        }),
+      );
+      expect(() =>
+        assertHostedQualityEvidence(quality, f.next, f.record.build.head, f.record.build.tree),
+      ).not.toThrow();
+      writeFileSync(target, "FICTIONAL_CHANGED");
+      expect(() =>
+        assertHostedQualityEvidence(quality, f.next, f.record.build.head, f.record.build.tree),
+      ).toThrow("HOSTED_QUALITY_EVIDENCE_INVALID");
+      expect(() => assertHostedBuildEvidence(f.record, f.next, f.quality)).not.toThrow();
+    },
+  );
+  it("version2 fails closed for missing static output, launch manifest or linked assets", () => {
+    const f = fixture();
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow();
+    mkdirSync(join(f.next, "static"));
+    writeFileSync(join(f.next, "required-server-files.json"), "{}");
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow();
+    writeFileSync(join(f.next, "build-manifest.json"), "{}");
+    symlinkSync(
+      join(f.next, "server"),
+      join(f.next, "static", "linked"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
   });
   it("rejects changed production bytes even when BUILD_ID is unchanged", () => {
     const f = fixture();

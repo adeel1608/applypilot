@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { compiledHostedBuildDigest } from "@applypilot/application-runner";
+import { compiledHostedProductionBuildDigest } from "@applypilot/application-runner";
 import { join } from "node:path";
 import { repositoryRoot } from "./lib/runtime-safety";
 const root = repositoryRoot();
@@ -27,7 +27,7 @@ if (
   throw new Error("HOSTED_FROZEN_HEAD_CHANGED");
 const dir = join(root, "data", "private", "runtime");
 const nextRoot = join(root, "apps", "web", ".next");
-const buildDigest = compiledHostedBuildDigest(nextRoot);
+const buildDigest = compiledHostedProductionBuildDigest(nextRoot);
 const buildIdDigest = createHash("sha256")
   .update(readFileSync(join(nextRoot, "BUILD_ID")))
   .digest("hex");
@@ -35,7 +35,7 @@ mkdirSync(dir, { recursive: true });
 writeFileSync(
   join(dir, "hosted-quality-evidence.json"),
   JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     head,
     tree,
     buildDigest,

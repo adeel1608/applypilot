@@ -38,6 +38,63 @@ import type { QualifiedVerificationEvidence } from "./beta-repository";
 
 const instant = new Date("2026-09-10T00:00:00.000Z");
 
+describe("exact GET_JOB binding is required before owner receipt mutation", () => {
+  it.each(["combined", "approval", "start"])(
+    "rejects unbound legacy detail at %s while preserving existing receipt state",
+    (kind) => {
+      const sqlite = database();
+      try {
+        const repository = new SourceEnablementRepository(sqlite, () => instant);
+        const cap = capability({
+          allowedOperations: kind === "approval" ? ["GET_JOB"] : ["LIST_JOBS", "GET_JOB"],
+        });
+        repository.persistCapabilityVersion(cap);
+        if (kind === "start")
+          repository.recordOwnerApprovalReceipt({
+            capability: cap,
+            gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+            ownerConfirmed: true,
+          });
+        const before = sqlite
+          .prepare("SELECT * FROM source_owner_action_receipts ORDER BY id")
+          .all();
+        const action = () =>
+          kind === "combined"
+            ? repository.createOwnerApprovalAndStartReceipt({
+                capability: cap,
+                operation: "GET_JOB",
+                approvalGateProof: fictionalGateProof(
+                  "SOURCE_CAPABILITY_APPROVE",
+                  instant.toISOString(),
+                ),
+                startGateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+                confirmationText: `APPROVE AND RUN ${cap.capabilityId}`,
+                ownerConfirmed: true,
+              })
+            : kind === "approval"
+              ? repository.recordOwnerApprovalReceipt({
+                  capability: cap,
+                  gateProof: fictionalGateProof("SOURCE_CAPABILITY_APPROVE", instant.toISOString()),
+                  ownerConfirmed: true,
+                })
+              : repository.createOwnerStartReceipt({
+                  capability: cap,
+                  operation: "GET_JOB",
+                  gateProof: fictionalGateProof("SOURCE_RUN_START", instant.toISOString()),
+                  ownerConfirmed: true,
+                });
+        expect(action).toThrow("SOURCE_REQUEST_BINDING_REQUIRED");
+        expect(
+          sqlite.prepare("SELECT * FROM source_owner_action_receipts ORDER BY id").all(),
+        ).toEqual(before);
+        expect(sqlite.prepare("SELECT count(*) FROM source_run_checkpoints").pluck().get()).toBe(0);
+      } finally {
+        sqlite.close();
+      }
+    },
+  );
+});
+
 function database() {
   const sqlite = new BetterSqlite3(":memory:");
   for (const name of [
