@@ -296,10 +296,27 @@ export function listBetaJobs(): BetaJobListItem[] {
   const sqlite = betaSqlite();
   if (!sqlite) return [];
   const hasR2 = new R2Repository(sqlite).available();
+  // Rank both observation endpoints once per snapshot and keep one duplicate state per job.
   const rows = sqlite
     .prepare(
       hasR2
-        ? `SELECT j.id, j.title, j.company, j.location, j.category,
+        ? `WITH duplicate_membership AS (
+           SELECT o.job_id AS job_id, c.state AS state, c.updated_at AS updated_at,
+             c.rowid AS candidate_rowid
+           FROM r2_duplicate_candidates c
+           JOIN source_observations o ON o.id = c.left_observation_id
+           UNION ALL
+           SELECT o.job_id, c.state, c.updated_at, c.rowid
+           FROM r2_duplicate_candidates c
+           JOIN source_observations o ON o.id = c.right_observation_id
+         ), ranked_duplicate_states AS (
+           SELECT job_id, state,
+             ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY
+               CASE state WHEN 'SUGGESTED' THEN 0 ELSE 1 END,
+               updated_at DESC, candidate_rowid ASC) AS ordinal
+           FROM duplicate_membership
+         )
+         SELECT j.id, j.title, j.company, j.location, j.category,
          j.employment_type AS employmentType,
          json_extract(j.normalized_json, '$.source') AS source,
          json_extract(j.normalized_json, '$.state') AS state,
@@ -316,14 +333,11 @@ export function listBetaJobs(): BetaJobListItem[] {
          e.unresolved_conflict_count AS unresolvedConflictCount,
          e.calibration_state AS calibrationState, e.recommended,
          q.freshness AS queueFreshness,
-         (SELECT c.state FROM r2_duplicate_candidates c
-            WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
-               OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
-            ORDER BY CASE c.state WHEN 'SUGGESTED' THEN 0 ELSE 1 END, c.updated_at DESC LIMIT 1)
-           AS duplicateState,
+         d.state AS duplicateState,
          (SELECT o.expires_at FROM source_observations o
             WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt
        FROM jobs j
+       LEFT JOIN ranked_duplicate_states d ON d.job_id = j.id AND d.ordinal = 1
        LEFT JOIN job_versions v ON v.id = (
          SELECT id FROM job_versions WHERE job_id = j.id ORDER BY version DESC LIMIT 1)
        LEFT JOIN r2_evaluation_versions e ON e.id = (
