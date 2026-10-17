@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readdirSync, lstatSync, readFileSync } from "node:fs";
-import { dirname, join, resolve, relative } from "node:path";
+import { dirname, join, resolve, relative, sep } from "node:path";
 import { z } from "zod";
 import { HostedBuildSchema } from "./hosted-contract";
 import {
@@ -165,6 +165,33 @@ export function compiledHostedBuildDigest(nextRoot: string): string {
 export function compiledHostedProductionBuildDigest(nextRoot: string): string {
   return compiledHostedDigest(nextRoot, true);
 }
+
+function isMutableAppPageResponseCache(file: string): boolean {
+  // Match physical components before portable hash-name normalization. A POSIX
+  // filename containing backslashes must not impersonate a Windows cache path.
+  const components = file.split(sep);
+  const owner = components[3];
+  const route = components.slice(5);
+  const leaf = route.at(-1);
+  return (
+    components[0] === "server" &&
+    components[1] === "route-cache" &&
+    components[2] === "APP_PAGE" &&
+    typeof owner === "string" &&
+    owner.length === 64 &&
+    !/[^a-f0-9]/.test(owner) &&
+    components[4] === "$" &&
+    route.length > 0 &&
+    route.every(
+      (part) =>
+        part.length > 0 &&
+        ![".", "..", "$"].includes(part) &&
+        !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\\/]/.test(part),
+    ) &&
+    Boolean(leaf && [".html", ".meta", ".rsc"].some((suffix) => leaf.endsWith(suffix)))
+  );
+}
+
 function compiledHostedDigest(nextRoot: string, production: boolean): string {
   assertHostedPathWithoutLinks(nextRoot);
   assertHostedPathWithoutLinks(join(nextRoot, "server"));
@@ -205,6 +232,10 @@ function compiledHostedDigest(nextRoot: string, production: boolean): string {
       (bytes += stat.size) > 500_000_000
     )
       throw new Error("HOSTED_BUILD_INVALID");
+    // Next writes these scoped response artifacts during normal navigation.
+    // They still consume every traversal/file/byte bound and pass link/type
+    // checks above; only their runtime data is omitted from production identity.
+    if (production && isMutableAppPageResponseCache(file)) continue;
     hash
       .update(file.replaceAll("\\", "/"))
       .update("\0")

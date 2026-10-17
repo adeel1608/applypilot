@@ -227,6 +227,42 @@ afterAll(() => {
   rmSync(path, { recursive: true, force: true });
 });
 describe("FICTIONAL actual seal CLI and owned-start admission", () => {
+  it("admits the unchanged sealed build after native response-cache writes and rejects cached code", () => {
+    const sealedPath = join(root, "data/private/runtime/hosted-reviewed-build.json");
+    const result = runCli(payload);
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: "" });
+    const sealBytes = readFileSync(sealedPath);
+    const before = assertHostedOwnedStartup(root, join(root, "data/applypilot.local.sqlite"));
+    const directory = join(root, "apps/web/.next/server/route-cache/APP_PAGE", "c".repeat(64), "$");
+    const paths = ["settings.html", "settings.meta", "settings.rsc"].map((name) =>
+      join(directory, name),
+    );
+    const code = join(directory, "unexpected.js");
+    mkdirSync(directory, { recursive: true });
+    try {
+      for (const path of paths) writeFileSync(path, "FICTIONAL_TEST_ONLY response-cache data");
+      expect(assertHostedOwnedStartup(root, join(root, "data/applypilot.local.sqlite"))).toEqual(
+        before,
+      );
+      for (const path of paths)
+        writeFileSync(path, "FICTIONAL_TEST_ONLY changed response-cache data");
+      expect(assertHostedOwnedStartup(root, join(root, "data/applypilot.local.sqlite"))).toEqual(
+        before,
+      );
+      expect(readFileSync(sealedPath)).toEqual(sealBytes);
+      writeFileSync(code, "/* FICTIONAL_TEST_ONLY executable must remain bound */");
+      expect(() =>
+        assertHostedOwnedStartup(root, join(root, "data/applypilot.local.sqlite")),
+      ).toThrow("HOSTED_REVIEWED_BUILD_REQUIRED");
+    } finally {
+      for (const path of [...paths, code]) rmSync(path, { force: true });
+    }
+    expect(assertHostedOwnedStartup(root, join(root, "data/applypilot.local.sqlite"))).toEqual(
+      before,
+    );
+    expect(readFileSync(sealedPath)).toEqual(sealBytes);
+  }, 30_000);
+
   it("refuses legacy server-only quality for a new AI seal", () => {
     const qualityPath = join(root, "data/private/runtime/hosted-quality-evidence.json");
     const original = readFileSync(qualityPath);
