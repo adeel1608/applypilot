@@ -91,6 +91,7 @@ export * from "./lever/reader";
 export * from "./lever/v2-reader";
 export * from "./source-capability";
 export * from "./r2a-diagnostic";
+export * from "./schema-diagnostic";
 export * from "./secure-source-transport";
 export * from "./source-runner";
 

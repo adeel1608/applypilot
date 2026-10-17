@@ -223,7 +223,11 @@ function allowedQuery(operation: SourceOperation, capability: SourceCapabilityV2
   if (capability.source === "LEVER") {
     return operation === "LIST_JOBS" ? new Set(["mode", "skip", "limit"]) : new Set(["mode"]);
   }
-  return operation === "LIST_JOBS" ? new Set(["content"]) : new Set();
+  return operation === "LIST_JOBS"
+    ? new Set(["content"])
+    : capability.requestBinding?.includeQuestions
+      ? new Set(["questions"])
+      : new Set();
 }
 
 function exactlyOne(searchParams: URLSearchParams, key: string): string {
@@ -270,6 +274,8 @@ function validateLeverRequestSemantics(
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(suffix) || url.searchParams.size !== 1) {
     throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
   }
+  if (capability.requestBinding && capability.requestBinding.externalId !== suffix)
+    throw new SecureSourceError("SOURCE_REQUEST_BINDING_MISMATCH");
 }
 
 function validateGreenhouseRequestSemantics(
@@ -292,9 +298,16 @@ function validateGreenhouseRequestSemantics(
   }
   const jobsPrefix = root + "/jobs/";
   const suffix = url.pathname.startsWith(jobsPrefix) ? url.pathname.slice(jobsPrefix.length) : "";
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(suffix) || url.searchParams.size !== 0) {
+  const questions = capability.requestBinding?.includeQuestions === true;
+  if (
+    !/^[A-Za-z0-9_-]{1,100}$/.test(suffix) ||
+    url.searchParams.size !== (questions ? 1 : 0) ||
+    (questions && exactlyOne(url.searchParams, "questions") !== "true")
+  ) {
     throw new SecureSourceError("QUERY_NOT_ALLOWLISTED");
   }
+  if (capability.requestBinding && capability.requestBinding.externalId !== suffix)
+    throw new SecureSourceError("SOURCE_REQUEST_BINDING_MISMATCH");
 }
 
 export async function validateSecureSourceUrl(
@@ -308,6 +321,8 @@ export async function validateSecureSourceUrl(
     throw new SecureSourceError("OPERATION_NOT_APPROVED");
   }
   const url = new URL(value);
+  if (capability.requestBinding && capability.requestBinding.operation !== operation)
+    throw new SecureSourceError("SOURCE_REQUEST_BINDING_MISMATCH");
   if (url.protocol !== "https:") throw new SecureSourceError("HTTPS_REQUIRED");
   if (url.username || url.password) throw new SecureSourceError("URL_CREDENTIALS_FORBIDDEN");
   if (url.port && url.port !== "443") throw new SecureSourceError("NON_STANDARD_PORT_FORBIDDEN");

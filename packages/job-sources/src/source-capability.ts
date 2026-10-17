@@ -23,6 +23,23 @@ export const SourceApprovalStateSchema = z.enum([
   "SUPERSEDED",
 ]);
 
+export const SourceRequestBindingSchema = z
+  .object({
+    provider: z.enum(["GREENHOUSE", "LEVER"]),
+    region: z.enum(["GLOBAL", "EU"]),
+    tenant: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
+    operation: SourceOperationSchema,
+    externalId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,100}$/)
+      .nullable(),
+    includeContent: z.boolean(),
+    includeQuestions: z.boolean(),
+    readerVersion: z.enum(["greenhouse-public-v2.1", "lever-public-v2"]),
+  })
+  .strict();
+export type SourceRequestBinding = z.infer<typeof SourceRequestBindingSchema>;
+
 export const SourceCapabilityV2Schema = z
   .object({
     schemaVersion: z.literal(2),
@@ -60,6 +77,7 @@ export const SourceCapabilityV2Schema = z
     maxRetries: z.number().int().min(0).max(2),
     maxConcurrency: z.literal(1),
     parserVersion: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/),
+    requestBinding: SourceRequestBindingSchema.optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
     revokedAt: z.iso.datetime().nullable(),
@@ -69,6 +87,37 @@ export const SourceCapabilityV2Schema = z
   })
   .strict()
   .superRefine((value, context) => {
+    const request = value.requestBinding;
+    if (request) {
+      if (
+        request.provider !== value.source ||
+        request.region !== value.region ||
+        request.tenant !== value.tenant ||
+        value.allowedOperations.length !== 1 ||
+        value.allowedOperations[0] !== request.operation
+      )
+        context.addIssue({ code: "custom", message: "SOURCE_REQUEST_SUBJECT_MISMATCH" });
+      if ((request.operation === "GET_JOB") !== (request.externalId !== null))
+        context.addIssue({ code: "custom", message: "SOURCE_REQUEST_ID_MISMATCH" });
+      if (
+        request.operation === "GET_JOB" &&
+        (value.requestBudget !== 1 ||
+          value.recordCap !== 1 ||
+          value.pageSizeCap !== 1 ||
+          value.maxRedirects !== 0 ||
+          value.maxRetries !== 0)
+      )
+        context.addIssue({ code: "custom", message: "SOURCE_DETAIL_BOUNDS_INVALID" });
+      if (
+        (request.provider === "GREENHOUSE") !==
+          (request.readerVersion === "greenhouse-public-v2.1") ||
+        request.includeContent !==
+          (request.provider === "GREENHOUSE" && request.operation === "LIST_JOBS") ||
+        (request.includeQuestions &&
+          (request.provider !== "GREENHOUSE" || request.operation !== "GET_JOB"))
+      )
+        context.addIssue({ code: "custom", message: "SOURCE_REQUEST_FLAGS_INVALID" });
+    }
     const expectedHost =
       value.source === "GREENHOUSE"
         ? "boards-api.greenhouse.io"
@@ -223,6 +272,30 @@ export function sourceCapabilityDigest(input: SourceCapabilityV2): string {
     .digest("hex");
 }
 
+export function sourceRequestBindingDigest(input: SourceRequestBinding): string {
+  return createHash("sha256")
+    .update(canonical(SourceRequestBindingSchema.parse(input)))
+    .digest("hex");
+}
+
+export function assertSourceRequestBinding(
+  capability: SourceCapabilityV2,
+  operation: SourceOperation,
+  externalId?: string,
+): void {
+  const current = SourceCapabilityV2Schema.parse(capability);
+  const binding = current.requestBinding;
+  if (!binding) {
+    if (operation === "GET_JOB") throw new Error("SOURCE_REQUEST_BINDING_REQUIRED");
+    return;
+  }
+  if (
+    binding.operation !== operation ||
+    (operation === "GET_JOB" && binding.externalId !== externalId)
+  )
+    throw new Error("SOURCE_REQUEST_BINDING_MISMATCH");
+}
+
 export type SourceCapabilityReadiness =
   | { status: "WAITING_FOR_APPROVED_TENANT" }
   | {
@@ -337,7 +410,7 @@ export const SourceSchemaIssueCategorySchema = z.enum([
 ]);
 export type SourceSchemaIssueCategory = z.infer<typeof SourceSchemaIssueCategorySchema>;
 
-export const SourceSchemaDiagnosticSchema = z
+export const LegacySourceSchemaDiagnosticSchema = z
   .object({
     field: SourceSchemaDiagnosticFieldSchema,
     expectedStructuralType: SourceSchemaExpectedTypeSchema,
@@ -345,6 +418,113 @@ export const SourceSchemaDiagnosticSchema = z
     recordIndex: z.number().int().nonnegative().max(1_000_000).optional(),
   })
   .strict();
+
+export const SourceStructuralTypeSchema = z.enum([
+  "MISSING",
+  "NULL",
+  "STRING",
+  "NUMBER",
+  "BOOLEAN",
+  "ARRAY",
+  "OBJECT",
+]);
+export const SourceContractPathTokenSchema = z.enum([
+  "jobs",
+  "id",
+  "title",
+  "absolute_url",
+  "location",
+  "name",
+  "content",
+  "updated_at",
+  "departments",
+  "offices",
+  "metadata",
+  "questions",
+  "required",
+  "fields",
+  "type",
+  "label",
+  "text",
+  "categories",
+  "commitment",
+  "department",
+  "team",
+  "level",
+  "allLocations",
+  "country",
+  "opening",
+  "openingPlain",
+  "description",
+  "descriptionPlain",
+  "descriptionBody",
+  "descriptionBodyPlain",
+  "lists",
+  "additional",
+  "additionalPlain",
+  "hostedUrl",
+  "applyUrl",
+  "workplaceType",
+  "salaryRange",
+  "currency",
+  "interval",
+  "min",
+  "max",
+  "salaryDescription",
+  "salaryDescriptionPlain",
+  "OTHER",
+]);
+export const BoundedSourceSchemaDiagnosticSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    provider: z.enum(["GREENHOUSE", "LEVER"]),
+    operation: SourceOperationSchema,
+    readerVersion: z.enum(["greenhouse-public-v2.1", "lever-public-v2"]),
+    issues: z
+      .array(
+        z
+          .object({
+            boundary: z.enum(["ENVELOPE", "RECORD"]),
+            recordIndex: z.number().int().nonnegative().max(1_000_000).optional(),
+            path: z
+              .array(
+                z.union([
+                  SourceContractPathTokenSchema,
+                  z.number().int().nonnegative().max(1_000_000),
+                ]),
+              )
+              .max(8),
+            expectedStructuralTypes: z.array(SourceStructuralTypeSchema).min(1).max(7),
+            actualStructuralType: SourceStructuralTypeSchema,
+            category: z.enum([
+              "FIELD_TYPE_MISMATCH",
+              "MISSING_REQUIRED",
+              "INVALID_UNION",
+              "INVALID_FORMAT",
+              "INVALID_VALUE",
+              "SIZE_CONSTRAINT",
+              "OTHER",
+            ]),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(16),
+    inspectedIssueCount: z.number().int().min(1).max(256),
+    truncated: z.boolean(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.issues.length > value.inspectedIssueCount)
+      context.addIssue({ code: "custom", message: "DIAGNOSTIC_COUNT_INVALID" });
+    if ((value.provider === "GREENHOUSE") !== (value.readerVersion === "greenhouse-public-v2.1"))
+      context.addIssue({ code: "custom", message: "DIAGNOSTIC_READER_INVALID" });
+  });
+
+export const SourceSchemaDiagnosticSchema = z.union([
+  LegacySourceSchemaDiagnosticSchema,
+  BoundedSourceSchemaDiagnosticSchema,
+]);
 export type SourceSchemaDiagnostic = z.infer<typeof SourceSchemaDiagnosticSchema>;
 
 export const SourceProviderDriftDiagnosticSchema = z
@@ -381,6 +561,8 @@ export const SourceStopCodeSchema = z.enum([
   "CAPABILITY_EXPIRED",
   "POLICY_EXPIRED",
   "OPERATION_NOT_APPROVED",
+  "SOURCE_REQUEST_BINDING_REQUIRED",
+  "SOURCE_REQUEST_BINDING_MISMATCH",
   "REQUEST_BUDGET_EXCEEDED",
   "PAGE_BUDGET_EXCEEDED",
   "RECORD_CAP_EXCEEDED",
@@ -398,6 +580,7 @@ export const SourceStopCodeSchema = z.enum([
   "SCHEMA_CHANGED",
   "DESTINATION_FORBIDDEN",
   "PERSISTENCE_FAILED",
+  "SCHEMA_DIAGNOSTIC_PERSISTENCE_FAILED",
   "SOURCE_PAGE_DUPLICATE_EXTERNAL_ID",
   "DNS_RESOLUTION_FAILED",
   "NETWORK_ROUTE_UNAVAILABLE",

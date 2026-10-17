@@ -9,9 +9,14 @@ const mocks = vi.hoisted(() => ({
   createOwnerStartReceipt: vi.fn(),
   runGreenhouseSourceToQueue: vi.fn(),
   runLeverSourceToQueue: vi.fn(),
+  runGreenhouseDetailToQueue: vi.fn(),
+  runLeverDetailToQueue: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("./source-question-capture", () => ({
+  captureBoundGreenhouseQuestions: vi.fn(() => "CAPTURED"),
+}));
 vi.mock("@applypilot/job-sources", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@applypilot/job-sources")>();
   return { ...actual, loadPrivateSourceAllowlistV2: mocks.loadPrivateSourceAllowlistV2 };
@@ -19,6 +24,8 @@ vi.mock("@applypilot/job-sources", async (importOriginal) => {
 vi.mock("@applypilot/database", () => ({
   runGreenhouseSourceToQueue: mocks.runGreenhouseSourceToQueue,
   runLeverSourceToQueue: mocks.runLeverSourceToQueue,
+  runGreenhouseDetailToQueue: mocks.runGreenhouseDetailToQueue,
+  runLeverDetailToQueue: mocks.runLeverDetailToQueue,
 }));
 vi.mock("./beta-workspace", () => ({
   reevaluateBetaJob: vi.fn(),
@@ -84,7 +91,73 @@ function capability(version: number, state: "APPROVED" | "REVOKED") {
 }
 
 describe("source workspace current capability lookup", () => {
+  it.each(["GREENHOUSE", "LEVER"] as const)(
+    "derives exact %s detail operation and ID solely from immutable capability",
+    async (provider) => {
+      const head = SourceCapabilityV2Schema.parse({
+        ...capability(1, "APPROVED"),
+        source: provider,
+        allowedHost: provider === "GREENHOUSE" ? "boards-api.greenhouse.io" : "api.lever.co",
+        allowedPathPrefix:
+          provider === "GREENHOUSE"
+            ? "/v1/boards/fictional-board/"
+            : "/v0/postings/fictional-board",
+        allowedOperations: ["GET_JOB"],
+        recordCap: 1,
+        pageSizeCap: 1,
+        requestBinding: {
+          provider,
+          region: "GLOBAL",
+          tenant: "fictional-board",
+          operation: "GET_JOB",
+          externalId: "exact-post-123",
+          includeContent: false,
+          includeQuestions: provider === "GREENHOUSE",
+          readerVersion: provider === "GREENHOUSE" ? "greenhouse-public-v2.1" : "lever-public-v2",
+        },
+      });
+      mocks.loadPrivateSourceAllowlistV2.mockResolvedValue({
+        status: "SOURCE_ALLOWLIST_V2_READY",
+        capabilities: [head],
+      });
+      const approval = {
+        action: "SOURCE_CAPABILITY_APPROVE" as const,
+        consumedAt: "2026-10-09T00:00:00.000Z",
+        loopbackValidated: true as const,
+        localSessionValidated: true as const,
+        nonceConsumed: true as const,
+      };
+      await approveAndRunOwnerSource(
+        {
+          capabilityId: head.capabilityId,
+          version: head.version,
+          capabilityDigest: sourceCapabilityDigest(head),
+        },
+        { approval, start: { ...approval, action: "SOURCE_RUN_START" } },
+        `APPROVE AND RUN ${head.capabilityId}`,
+      );
+      expect(mocks.createOwnerApprovalAndStartReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({ capability: head, operation: "GET_JOB" }),
+      );
+      expect(
+        provider === "GREENHOUSE" ? mocks.runGreenhouseDetailToQueue : mocks.runLeverDetailToQueue,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({ capability: head, externalId: "exact-post-123" }),
+      );
+      expect(mocks.runGreenhouseSourceToQueue).not.toHaveBeenCalled();
+      expect(mocks.runLeverSourceToQueue).not.toHaveBeenCalled();
+    },
+  );
+
   beforeEach(() => {
+    mocks.runGreenhouseDetailToQueue.mockResolvedValue({
+      status: "COMPLETE",
+      runId: "fictional-detail-run",
+    });
+    mocks.runLeverDetailToQueue.mockResolvedValue({
+      status: "COMPLETE",
+      runId: "fictional-detail-run",
+    });
     vi.clearAllMocks();
     mocks.getLocalDatabase.mockReturnValue({ sqlite: { prepare: () => ({ all: () => [] }) } });
     mocks.getSourceEnablementRepository.mockReturnValue({

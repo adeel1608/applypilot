@@ -1,6 +1,6 @@
 # Personal go-live gates and test matrix
 
-Status: **SOURCE-ENABLED PERSONAL BETA READY; PERSONAL LIVE V1 NOT READY**. Manual-intake Personal Beta, R2, and owner-reviewed bounded source request #9 are complete. The request #9 capability is revoked and no new source request is authorised. The dedicated Lever `OPEN_AND_INSPECT_ONLY` lane is ready offline, but no employer page has been visited and no target capability is active. Application fill/upload/submit and hosted production remain `NOT_READY`. Exact activation approvals are in [OFFLINE_GO_LIVE_ENABLEMENT](OFFLINE_GO_LIVE_ENABLEMENT.md).
+Status: **RELEASE COMPLETION IMPLEMENTATION UNDER REVIEW; PERSONAL LIVE V1 NOT READY**. Current validation, component readiness, canonical schema and authority are recorded in the active `PROJECT_PLAN.md` matrix. The new Greenhouse/Lever native application implementation has a separate reviewed-build/packet/disclosure/final-consent boundary; its [runbook and supported scope](APPLICATION_RUNNER.md) do not imply live acceptance. Public hosting remains outside this task.
 
 R2A/R2B/R2C/R2D and the offline Personal Live V1 framework are merged. Calibration remains `UNCALIBRATED`. Additive migration 0008 preserves immutable 0000–0007 and adds target operation scope plus a separate inspection lifecycle. Source readiness never implies target authority, and inspection authority never implies candidate disclosure or final submission.
 
@@ -11,11 +11,11 @@ R2A/R2B/R2C/R2D and the offline Personal Live V1 framework are merged. Calibrati
 3. Merged R2 provides typed normalization/evidence, class semantics, versioned uncalibrated scoring, immutable cross-source duplicate evidence, and queue freshness. Ranking remains explicitly `UNCALIBRATED` until private label/pair contents pass approved performance thresholds and every safety gate and receive version-bound owner approval; counts alone are insufficient.
 4. Source-enabled Personal Beta is ready on request #9 evidence only. Readers remain default-disabled, the reviewed capability is revoked, and any later request requires fresh owner approval.
 5. CV/letter preparation uses verified evidence, semantic claim validation, template policy, page/font/text checks, confined PDF/DOCX exports, parity checks, and owner approval. Every real artifact still needs owner review.
-6. Packet preparation and synthetic filling/final-action proofs exist. A separate passive Lever inspection runner is offline-ready, but no real target is approved and no real application action is permitted.
-7. Cloud is unnecessary: loopback UI, local SQLite, and a future separately approved local runner remain the recommended personal topology.
+6. Packet preparation and fictional filling/final-action proofs exist. The new production native hosted lane requires reviewed rollout and exact live owner gates; its fixture results do not prove an actual employer form or authorize a real action.
+7. Cloud is unnecessary: loopback UI, local SQLite and the supervised owned local runner are the intended personal topology.
 8. Scheduling, notifications, broad sources, analytics, AI, and hosting remain optional later work. Truth, privacy, recovery, and immediate human review stay mandatory.
 
-Superseding R2 status: R2A–R2D are merged and software-ready. Executable golden cases use production engines; calibration promotion uses private label/pair outcomes plus approved threshold/safety/owner gates; the UI exposes the separately authorised current PREPARING transition; and legal-hours assertions require current bounded applicability. Calibration remains `UNCALIBRATED`. The ignored database is schema v8 with clean integrity/FKs and preserved history after verified backup/migration.
+Historical R2 status: R2A–R2D were merged and software-ready. Executable golden cases use production engines; calibration promotion uses private label/pair outcomes plus approved threshold/safety/owner gates; PREPARING and legal-hours assertions retain their separate currentness requirements. The schema-v8 checkpoint was historical. The release-completion task baseline is canonical schema12; additive 13/14 are rehearsed on disposable copies before reviewed rollout. Calibration remains `UNCALIBRATED` until actual current private qualification proves otherwise.
 
 ## Release definitions
 
@@ -28,7 +28,7 @@ Superseding R2 status: R2A–R2D are merged and software-ready. Executable golde
 | `PERSONAL LIVE V1`             | R0–R6 plus mandatory R11 controls; approved discovery and application paths; full matrix; owner release                                                                                                  | Scoped supported operation; regression disables affected capability                                         | `NOT_READY`                                                       |
 | `HOSTED PRODUCTION`            | Separate R10/R11 authentication, isolation, keys, pairing, retention, residency, operations, and security approval                                                                                       | Staging/restore/rollback/internet-facing acceptance and explicit deployment authority                       | `NOT_READY`; unnecessary for Personal V1                          |
 
-## Manual-intake Personal Beta acceptance — satisfied
+## Historical Manual-intake Personal Beta acceptance
 
 - [x] PR #10 exact-head CI and human review passed; reviewed head was merged without changing release authority.
 - [x] Real jobs do not use demo profiles; current job/profile/evaluation bindings guard documents and stale inputs invalidate downstream readiness.
@@ -39,7 +39,7 @@ Superseding R2 status: R2A–R2D are merged and software-ready. Executable golde
 - [x] Durable queue/application timeline, backup/restore, migration, database integrity/FKs, default-route, keyboard, zoom, narrow-view, privacy, build, and dependency gates passed at the reviewed implementation head.
 - [x] Private smoke generated no published values and performed zero source calls, employer-form visits, uploads, submissions, or other real application actions.
 
-## R2 and R1 gates — intentionally open
+## Historical R2 and R1 gate record
 
 - [x] R2A 3.1.0 state/modality independence, persistable derivations/invariants, hash/provenance, conservative coverage/conflicts, atomic/idempotent reprocess, legacy/invalid UI, future-schema refusal, fictional corpus, and confirmed backed-up private offline reprocess are implemented and verified; exact-head CI and implementation PR review remain pending.
 - [x] R2B legal/employer/preference outcomes and verified-only scoring/recommendation gates pass.
@@ -54,6 +54,8 @@ Superseding R2 status: R2A–R2D are merged and software-ready. Executable golde
 - [ ] The exact real target capability and frozen private packet receive owner approval before one `OPEN_AND_INSPECT_ONLY` validation. Fill/upload/submit need later separate authority and are not enabled.
 
 ## Test matrix
+
+The evidence column below records the earlier trains. For the release-completion implementation, use the current plan's single component matrix and frozen full gate record. Neither old checked boxes nor fixture results advance the five LIVE milestones. Official Personal Live V1 additionally requires actual current private calibration qualification, a supported confirmed real journey, zero unresolved operations, reviewed executable evidence and separate owner acceptance of R0–R6/R11/full matrix.
 
 U = unit/domain; I = integration/persistence; B = fictional browser; S = security; M = private manual acceptance; P = future scoped source/target smoke. Automated data is fictional. Real M/P evidence publishes only safe counts/codes/statuses, with no screenshot/video/trace or raw profile/job/log dump.
 

@@ -11,6 +11,9 @@ import {
   deriveDuplicatePacketState,
   deriveJobExpiryState,
   type ApplicationPacket,
+  type HostedSubject,
+  type HostedQuestionDiscovery,
+  hostedDigest,
 } from "@applypilot/application-runner";
 import type { CandidateProfile } from "@applypilot/candidate-profile";
 import {
@@ -1256,6 +1259,12 @@ export async function correctBetaJob(
 
 export async function preparePrivatePacket(
   jobId: string,
+  hostedReview?: {
+    subject: HostedSubject;
+    discovery: HostedQuestionDiscovery;
+    answers: ApplicationPacket["answers"];
+    questionContract: NonNullable<ApplicationPacket["questionContract"]>;
+  },
 ): Promise<{ packetId: string; status: string }> {
   const sqlite = betaSqlite();
   const beta = getBetaRepository();
@@ -1310,6 +1319,18 @@ export async function preparePrivatePacket(
     jobVersionId: detail.jobVersionId,
     evaluationVersionId: detail.legacyEvaluationVersionId,
   });
+  if (
+    hostedReview &&
+    (hostedReview.subject.jobId !== jobId ||
+      hostedReview.subject.jobVersionId !== detail.jobVersionId ||
+      hostedReview.subject.profileVersionId !== profileVersion.profileVersionId ||
+      hostedReview.subject.verificationId !== verification.verificationId ||
+      hostedReview.subject.sourceRunId !== verification.runId ||
+      hostedReview.subject.sourceContentHash !== verification.contentHash ||
+      hostedReview.discovery.subjectDigest !== hostedDigest(hostedReview.subject) ||
+      hostedReview.questionContract.discoveryDigest !== hostedDigest(hostedReview.discovery))
+  )
+    throw new Error("HOSTED_PACKET_SOURCE_BINDING_INVALID");
   const currentDocuments = detail.documents.filter(
     ({ stale, approved, format }) => !stale && approved && format === "PDF",
   );
@@ -1330,8 +1351,8 @@ export async function preparePrivatePacket(
     evaluationVersionId: detail.legacyEvaluationVersionId,
     r2EvaluationId: detail.evaluationVersionId,
     eligibilityStatus: detail.eligibilityStatus,
-    targetUrl: null,
-    targetHost: null,
+    targetUrl: hostedReview?.subject.targetUrl ?? null,
+    targetHost: hostedReview ? new URL(hostedReview.subject.targetUrl).hostname : null,
     jobExpiryState,
     verificationEvidence: {
       verificationId: verification.verificationId,
@@ -1358,7 +1379,8 @@ export async function preparePrivatePacket(
         (document.type === "COVER_LETTER" &&
           coverLetterRequirementStatus(detail.job) === "REQUIRED"),
     })),
-    answers: [],
+    answers: hostedReview?.answers ?? [],
+    ...(hostedReview ? { questionContract: hostedReview.questionContract } : {}),
   } satisfies ApplicationPacket);
   const result = beta.persistApplicationPacket(packet);
   const now = new Date().toISOString();

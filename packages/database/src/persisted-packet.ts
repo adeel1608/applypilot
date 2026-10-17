@@ -374,9 +374,23 @@ export function resolvePersistedApplicationPacket(
     const currentRefs = currentAnswer.factReferences
       ? parseJson(currentAnswer.factReferences, "PACKET_PERSISTED_CORRUPT")
       : [];
+    let currentTruthState = currentAnswer.truthState ?? "UNKNOWN";
+    if (answer.ownerChoice) {
+      const choiceBinding = input.sqlite
+        .prepare(
+          `SELECT b.choice_receipt_id AS receiptId FROM hosted_packet_answer_choices b JOIN application_questions q ON q.id=b.question_id WHERE q.packet_id=? AND q.question_key=?`,
+        )
+        .get(loaded.packet.id, answer.questionId) as { receiptId: string } | undefined;
+      if (
+        currentTruthState !== "USER_CONFIRMATION_REQUIRED" ||
+        choiceBinding?.receiptId !== answer.ownerChoice.receiptId
+      )
+        return fail("PACKET_ANSWER_CURRENTNESS_REQUIRED");
+      currentTruthState = "OWNER_CHOICE";
+    }
     if (
       currentValue !== answer.value ||
-      (currentAnswer.truthState ?? "UNKNOWN") !== answer.truthState ||
+      currentTruthState !== answer.truthState ||
       (currentAnswer.disclosureState ?? "UNKNOWN") !== answer.disclosureState ||
       JSON.stringify(currentRefs) !== JSON.stringify(answer.factReferences)
     )

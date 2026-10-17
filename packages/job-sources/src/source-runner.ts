@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
+  assertSourceRequestBinding,
+  sourceRequestBindingDigest,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
@@ -39,6 +41,7 @@ export interface SourceRunSink {
     capabilityId: string;
     capabilityVersion: number;
     capabilityDigest: string;
+    requestBindingDigest?: string;
   }): Promise<void> | void;
   persistPage(input: {
     runId: string;
@@ -117,6 +120,7 @@ export async function runLeverSourceDiscovery(input: {
 }): Promise<LeverSourceRunResult> {
   const capability = SourceCapabilityV2Schema.parse(input.capability);
   if (capability.source !== "LEVER") throw new SecureSourceError("SOURCE_MISMATCH");
+  assertSourceRequestBinding(capability, "LIST_JOBS");
   const now = input.now ?? (() => new Date());
   const readiness = sourceCapabilityReadiness(capability, now());
   if (readiness.status !== "SOURCE_ENABLED") {
@@ -146,6 +150,9 @@ export async function runLeverSourceDiscovery(input: {
         capabilityId: capability.capabilityId,
         capabilityVersion: capability.version,
         capabilityDigest: digest,
+        ...(capability.requestBinding
+          ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+          : {}),
       });
       const page = await readLeverPageV2({
         capability,
@@ -270,6 +277,7 @@ export async function runLeverDetailSourceDiscovery(input: {
     : (() => {
         throw new SecureSourceError("SOURCE_DETAIL_ID_INVALID");
       })();
+  assertSourceRequestBinding(capability, "GET_JOB", externalId);
   const now = input.now ?? (() => new Date());
   const readiness = sourceCapabilityReadiness(capability, now());
   if (readiness.status !== "SOURCE_ENABLED") {
@@ -297,6 +305,9 @@ export async function runLeverDetailSourceDiscovery(input: {
       capabilityId: capability.capabilityId,
       capabilityVersion: capability.version,
       capabilityDigest: digest,
+      ...(capability.requestBinding
+        ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+        : {}),
     });
     const detail = await readLeverDetailV2WithMetadata({
       capability,

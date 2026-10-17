@@ -1,6 +1,8 @@
 # ApplyPilot Personal Live V1 master blueprint
 
-Status: **SOURCE-ENABLED PERSONAL BETA READY; FIRST REAL TARGET VALIDATION PROVEN; PERSONAL LIVE V1 NOT READY.** Manual-intake Personal Beta, R2, and the owner-reviewed request #9 source-ingestion proof are complete. The approved source capability is revoked and no new source request is authorised. After seven safe terminal target stops, the eighth exact owner-authorized visit completed the v7 scriptless passive inspection and produced a bounded value-free form inventory with zero candidate data, clicks, form changes, uploads, or submissions. Its consumed authority is revoked and no target capability is active. Real fill, upload, authentication, submission, scheduling, and hosting remain disabled. See [exact activation approvals](OFFLINE_GO_LIVE_ENABLEMENT.md).
+Status: **RELEASE COMPLETION IMPLEMENTATION UNDER REVIEW; PERSONAL LIVE V1 NOT READY.** The current task implements the documented Greenhouse contract repair, exact owner-bound detail reads and a separate supervised native hosted application workflow. The current component matrix, validation and real authority checkpoint are in `PROJECT_PLAN.md`; the supported scope and runbook are in [Application Runner](APPLICATION_RUNNER.md). Real application operations still require reviewed rollout, a current strict packet and each exact owner action. A separately approved passive inspection can discover questions before that packet. No new live source/target action or submission is established by the offline work.
+
+Historical acceptance: manual-intake Personal Beta, R2 software, owner-reviewed source request #9 and a later v7 scriptless passive target inspection were proven at their recorded heads. Their consumed/revoked authority does not authorize another action. The historical passive visit disclosed no candidate data and performed no fill/upload/submit. These results do not certify the new application implementation or current Personal Live V1.
 
 ## Beta Core implementation snapshot — 2026-09-08
 
@@ -14,7 +16,7 @@ Personal Live V1 is a single-owner, local-first assistant that discovers jobs fr
 
 No paid API, AI provider, cloud dashboard or cloud browser is required. All candidate data, source snapshots, SQLite, generated documents, answers and browser sessions remain private local runtime assets. GitHub is PUBLIC; npm `private: true` remains a publication safeguard. Final submission requires an immediate deliberate owner action for one frozen application; never background or batch submission.
 
-The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. The current next-gate PR is documentation only: [R2 matching quality](R2_MATCHING_QUALITY_PLAN.md) and [R1 source-enabled Beta](R1_SOURCE_ENABLED_BETA_PLAN.md). After its review/merge, a new owner-authorised task may implement only the selected slice; changed scope/security assumptions require a revised plan first.
+The mandatory lifecycle for each material train is PLAN -> HUMAN REVIEW -> MERGE PLAN -> IMPLEMENT -> TEST -> HUMAN REVIEW -> MERGE. The release-completion master request explicitly authorizes the current scoped engineering after the preserved plan; it does not remove human implementation review, repository rules, live owner gates or release acceptance. The earlier documentation-only R2/R1 next-gate advice is historical. Changed scope/security assumptions still require a revised plan first.
 
 ## Pre-Beta evidence and capability inventory
 
@@ -292,4 +294,4 @@ The following common contract applies to **every** train: update the detailed im
 | 18, 19, 20          | R9 optional AI, R10 optional deployment, R11 security throughout          |
 | No single old phase | R8 measurable personal release candidate                                  |
 
-Next human decision: review the documentation-only R2/R1 next-gate PR. If it is accepted and merged, separately authorise **R2A evidence model and normalization** as the next implementation slice. R1 remains a separate train and cannot perform a real request until R1A/R1B are reviewed and the owner approves one exact tenant capability and R1C smoke. Do not interpret blueprint acceptance as permission to implement every train, activate a source, operate a form, upload, or submit.
+Current human dependencies are recorded in the single active project-plan matrix. Complete offline engineering and full frozen-head validation before requesting the smallest remaining review/real-world action. The master request does not authorize a source read, target disclosure or final submission. Official promotion still requires R0–R6, mandatory R11, the full acceptance matrix and a separate exact owner-release decision.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { displaySourceSchemaDiagnostic } from "@applypilot/job-sources";
 
 import {
   approveAndStartSourceRunAction,
@@ -102,6 +103,13 @@ export default async function SourcesPage() {
                   Exact boundary: https://{capability.host}
                   {capability.pathPrefix} · operations {capability.operations.join(" + ")}
                 </p>
+                {capability.exactExternalId ? (
+                  <p>
+                    Exact post {capability.exactExternalId} · application questions{" "}
+                    {capability.includeQuestions ? "included" : "not requested"} · reader{" "}
+                    {capability.readerVersion}
+                  </p>
+                ) : null}
                 <p>
                   Per run: {capability.requestBudget} requests, {capability.recordCap} records,
                   pages of {capability.pageSizeCap}, {capability.responseByteLimit} bytes per
@@ -236,7 +244,10 @@ export default async function SourcesPage() {
                   ? ` Deepest recorded transport stage: ${display(run.transportStage)}.`
                   : ""}
                 {run.schemaDiagnostic
-                  ? ` Contract diagnostic: ${display(run.schemaDiagnostic.issueCategory)} / ${run.schemaDiagnostic.field} / expected ${run.schemaDiagnostic.expectedStructuralType}${run.schemaDiagnostic.recordIndex === undefined ? "" : ` / record ${run.schemaDiagnostic.recordIndex}`}.`
+                  ? ` Contract diagnostic: ${displaySourceSchemaDiagnostic(run.schemaDiagnostic)}.`
+                  : ""}
+                {run.schemaDiagnosticState === "INVALID"
+                  ? " Contract diagnostic unavailable: invalid stored diagnostic rejected."
                   : ""}
                 {run.ownerProvenance === "LEGACY_OWNER_PROVENANCE_UNVERIFIED"
                   ? " LEGACY OWNER ACTION PROVENANCE UNVERIFIED."

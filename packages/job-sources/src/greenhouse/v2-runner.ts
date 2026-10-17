@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   SourceCapabilityV2Schema,
   SourceRunBudget,
+  assertSourceRequestBinding,
+  sourceRequestBindingDigest,
   sourceCapabilityDigest,
   sourceCapabilityReadiness,
   type SourceCapabilityV2,
@@ -38,6 +40,7 @@ export interface GreenhouseSourceRunSink {
     capabilityId: string;
     capabilityVersion: number;
     capabilityDigest: string;
+    requestBindingDigest?: string;
   }): Promise<void> | void;
   persistGreenhousePage(input: {
     runId: string;
@@ -146,6 +149,7 @@ export async function runGreenhouseSourceDiscovery(input: {
 }): Promise<GreenhouseSourceRunResult> {
   const now = input.now ?? (() => new Date());
   const capability = assertEnabledGreenhouse(input.capability, "LIST_JOBS", now());
+  assertSourceRequestBinding(capability, "LIST_JOBS");
   const digest = sourceCapabilityDigest(capability);
   const budget = new SourceRunBudget(capability, now());
   const runId = await input.sink.start({
@@ -164,6 +168,9 @@ export async function runGreenhouseSourceDiscovery(input: {
       capabilityId: capability.capabilityId,
       capabilityVersion: capability.version,
       capabilityDigest: digest,
+      ...(capability.requestBinding
+        ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+        : {}),
     });
     page = await readGreenhousePageV2({
       capability,
@@ -249,6 +256,7 @@ export async function runGreenhouseDetailSourceDiscovery(input: {
   if (!externalId.success) throw new SecureSourceError("SOURCE_DETAIL_ID_INVALID");
   const now = input.now ?? (() => new Date());
   const capability = assertEnabledGreenhouse(input.capability, "GET_JOB", now());
+  assertSourceRequestBinding(capability, "GET_JOB", externalId.data);
   const digest = sourceCapabilityDigest(capability);
   const budget = new SourceRunBudget(capability, now());
   const runId = await input.sink.start({
@@ -267,6 +275,9 @@ export async function runGreenhouseDetailSourceDiscovery(input: {
       capabilityId: capability.capabilityId,
       capabilityVersion: capability.version,
       capabilityDigest: digest,
+      ...(capability.requestBinding
+        ? { requestBindingDigest: sourceRequestBindingDigest(capability.requestBinding) }
+        : {}),
     });
     detail = await readGreenhouseDetailV2({
       capability,

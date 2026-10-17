@@ -44,6 +44,8 @@ const migrationNames = [
   "0010_verified_source_packet_binding.sql",
   "0011_immutable_r2a_derivation_bindings.sql",
   "0012_source_owner_action_receipts.sql",
+  "0013_exact_source_request_binding.sql",
+  "0014_hosted_application_workflow.sql",
 ] as const;
 
 let sqlite: BetterSqlite3.Database | undefined;

@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -950,6 +951,14 @@ export const sourceCapabilityVersions = sqliteTable("source_capability_versions"
   createdAt: text("created_at").notNull(),
 });
 
+export const sourceCapabilityRequestBindings = sqliteTable("source_capability_request_bindings", {
+  capabilityVersionId: text("capability_version_id")
+    .primaryKey()
+    .references(() => sourceCapabilityVersions.id),
+  requestJson: text("request_json").notNull(),
+  requestDigest: text("request_digest").notNull(),
+});
+
 export const sourceRunCheckpoints = sqliteTable("source_run_checkpoints", {
   id: text("id").primaryKey(),
   capabilityVersionId: text("capability_version_id").notNull(),
@@ -1262,7 +1271,194 @@ export const greenBannerChildEvents = sqliteTable("green_banner_child_events", {
   occurredAt: text("occurred_at").notNull(),
 });
 
+export const hostedCapabilityVersions = sqliteTable(
+  "hosted_capability_versions",
+  {
+    id: text("id").primaryKey(),
+    capabilityId: text("capability_id").notNull(),
+    version: integer("version").notNull(),
+    mode: text("mode").notNull(),
+    scope: text("scope").notNull(),
+    capabilityJson: text("capability_json").notNull(),
+    capabilityDigest: text("capability_digest").notNull(),
+    createdAt: text("created_at").notNull(),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("hosted_capability_family_version_idx").on(table.capabilityId, table.version),
+  ],
+);
+export const hostedOwnerConsents = sqliteTable("hosted_owner_consents", {
+  id: text("id").primaryKey(),
+  capabilityVersionId: text("capability_version_id")
+    .notNull()
+    .references(() => hostedCapabilityVersions.id, { onDelete: "restrict" }),
+  action: text("action").notNull(),
+  actionBinding: text("action_binding").notNull(),
+  nonceDigest: text("nonce_digest").notNull().unique(),
+  proofJson: text("proof_json").notNull(),
+  consumedAt: text("consumed_at").notNull(),
+});
+export const hostedQuestionDiscoveries = sqliteTable(
+  "hosted_question_discoveries",
+  {
+    id: text("id").primaryKey(),
+    subjectDigest: text("subject_digest").notNull(),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "restrict" }),
+    jobVersionId: text("job_version_id")
+      .notNull()
+      .references(() => jobVersions.id, { onDelete: "restrict" }),
+    profileVersionId: text("profile_version_id")
+      .notNull()
+      .references(() => candidateProfileVersions.id, { onDelete: "restrict" }),
+    verificationId: text("verification_id")
+      .notNull()
+      .references(() => sourceRecordVerifications.id, { onDelete: "restrict" }),
+    sourceRunId: text("source_run_id")
+      .notNull()
+      .references(() => sourceRunCheckpoints.id, { onDelete: "restrict" }),
+    subjectJson: text("subject_json").notNull(),
+    discoveryJson: text("discovery_json").notNull(),
+    discoveryDigest: text("discovery_digest").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("hosted_discovery_subject_digest_idx").on(
+      table.subjectDigest,
+      table.discoveryDigest,
+    ),
+  ],
+);
+export const hostedQuestionReviewReceipts = sqliteTable("hosted_question_review_receipts", {
+  nonceDigest: text("nonce_digest").primaryKey(),
+  subjectDigest: text("subject_digest").notNull(),
+  discoveryDigest: text("discovery_digest").notNull(),
+  proofJson: text("proof_json").notNull(),
+  consumedAt: text("consumed_at").notNull(),
+});
+export const hostedQuestionChoices = sqliteTable(
+  "hosted_question_choices",
+  {
+    id: text("id").primaryKey(),
+    subjectDigest: text("subject_digest").notNull(),
+    discoveryDigest: text("discovery_digest").notNull(),
+    questionId: text("question_id").notNull(),
+    kind: text("kind").notNull(),
+    value: integer("value", { mode: "boolean" }).notNull(),
+    nonceDigest: text("nonce_digest")
+      .notNull()
+      .references(() => hostedQuestionReviewReceipts.nonceDigest, { onDelete: "restrict" }),
+    proofJson: text("proof_json").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("hosted_question_choice_nonce_idx").on(table.nonceDigest, table.questionId),
+  ],
+);
+export const hostedPacketAnswerChoices = sqliteTable("hosted_packet_answer_choices", {
+  questionId: text("question_id")
+    .primaryKey()
+    .references(() => applicationQuestions.id, { onDelete: "restrict" }),
+  choiceReceiptId: text("choice_receipt_id")
+    .notNull()
+    .references(() => hostedQuestionChoices.id, { onDelete: "restrict" }),
+});
+export const hostedBrowserSessions = sqliteTable("hosted_browser_sessions", {
+  id: text("id").primaryKey(),
+  capabilityVersionId: text("capability_version_id")
+    .notNull()
+    .references(() => hostedCapabilityVersions.id, { onDelete: "restrict" }),
+  inspectionConsentId: text("inspection_consent_id")
+    .notNull()
+    .unique()
+    .references(() => hostedOwnerConsents.id, { onDelete: "restrict" }),
+  disclosureConsentId: text("disclosure_consent_id")
+    .unique()
+    .references(() => hostedOwnerConsents.id, { onDelete: "restrict" }),
+  runtimeId: text("runtime_id").notNull(),
+  state: text("state").notNull(),
+  formJson: text("form_json"),
+  discoveryId: text("discovery_id").references(() => hostedQuestionDiscoveries.id, {
+    onDelete: "restrict",
+  }),
+  mappingJson: text("mapping_json").notNull(),
+  proofsJson: text("proofs_json").notNull(),
+  previewJson: text("preview_json"),
+  requestCount: integer("request_count").notNull().default(0),
+  safeStopCode: text("safe_stop_code"),
+  confirmationDigest: text("confirmation_digest"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+export const hostedOperationClaims = sqliteTable(
+  "hosted_operation_claims",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => hostedBrowserSessions.id, { onDelete: "restrict" }),
+    operation: text("operation").notNull(),
+    state: text("state").notNull(),
+    capabilityDigest: text("capability_digest").notNull(),
+    runtimeId: text("runtime_id").notNull(),
+    claimedAt: text("claimed_at").notNull(),
+    completedAt: text("completed_at"),
+  },
+  (table) => [uniqueIndex("hosted_session_operation_idx").on(table.sessionId, table.operation)],
+);
+export const hostedFinalConsents = sqliteTable("hosted_final_consents", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id")
+    .notNull()
+    .unique()
+    .references(() => hostedBrowserSessions.id, { onDelete: "restrict" }),
+  ownerConsentId: text("owner_consent_id")
+    .notNull()
+    .unique()
+    .references(() => hostedOwnerConsents.id, { onDelete: "restrict" }),
+  previewDigest: text("preview_digest").notNull(),
+  bindingDigest: text("binding_digest").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  consumedAt: text("consumed_at").notNull(),
+});
+export const hostedSubmitGuards = sqliteTable(
+  "hosted_submit_guards",
+  {
+    mode: text("mode").notNull(),
+    provider: text("provider").notNull(),
+    region: text("region").notNull(),
+    tenant: text("tenant").notNull(),
+    externalId: text("external_id").notNull(),
+    sessionId: text("session_id")
+      .notNull()
+      .unique()
+      .references(() => hostedBrowserSessions.id, { onDelete: "restrict" }),
+    claimId: text("claim_id")
+      .notNull()
+      .unique()
+      .references(() => hostedOperationClaims.id, { onDelete: "restrict" }),
+    activatedAt: text("activated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.mode, table.provider, table.region, table.tenant, table.externalId],
+    }),
+  ],
+);
+
 export const schema = {
+  hostedCapabilityVersions,
+  hostedOwnerConsents,
+  hostedQuestionDiscoveries,
+  hostedQuestionReviewReceipts,
+  hostedQuestionChoices,
+  hostedPacketAnswerChoices,
+  hostedBrowserSessions,
+  hostedOperationClaims,
+  hostedFinalConsents,
+  hostedSubmitGuards,
   candidateProfiles,
   candidateProfileVersions,
   jobSources,
@@ -1316,6 +1512,7 @@ export const schema = {
   capabilityConfigs,
   discoveryRuns,
   sourceCapabilityVersions,
+  sourceCapabilityRequestBindings,
   sourceRunCheckpoints,
   sourceOwnerActionReceipts,
   sourceRunOwnerBindings,

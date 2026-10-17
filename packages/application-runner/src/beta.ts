@@ -7,6 +7,7 @@ import { ApplicationRunStateSchema } from "@applypilot/job-model";
 export const DisclosureStateSchema = z.enum(["APPROVED", "NOT_APPROVED", "UNKNOWN"]);
 export const AnswerTruthStateSchema = z.enum([
   "VERIFIED_ANSWER",
+  "OWNER_CHOICE",
   "USER_CONFIRMATION_REQUIRED",
   "UNKNOWN",
 ]);
@@ -21,16 +22,68 @@ export const PacketDocumentSchema = z.object({
   required: z.boolean(),
 });
 
-export const PacketAnswerSchema = z.object({
-  questionId: z.string().min(1),
-  questionText: z.string().min(1),
-  required: z.boolean(),
-  sensitive: z.boolean(),
-  value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
-  truthState: AnswerTruthStateSchema,
-  disclosureState: DisclosureStateSchema,
-  factReferences: z.array(z.string().min(1)),
-});
+export const PacketAnswerSchema = z
+  .object({
+    questionId: z.string().min(1),
+    questionText: z.string().min(1),
+    required: z.boolean(),
+    sensitive: z.boolean(),
+    value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
+    truthState: AnswerTruthStateSchema,
+    disclosureState: DisclosureStateSchema,
+    factReferences: z.array(z.string().min(1)),
+    factTransform: z.literal("JOIN_NAME").optional(),
+    ownerChoice: z
+      .object({ receiptId: z.uuid(), kind: z.enum(["TERMS", "DATA_PROCESSING"]) })
+      .strict()
+      .optional(),
+  })
+  .superRefine((answer, context) => {
+    if (
+      (answer.truthState === "OWNER_CHOICE") !== Boolean(answer.ownerChoice) ||
+      (answer.ownerChoice && (typeof answer.value !== "boolean" || answer.factReferences.length))
+    )
+      context.addIssue({ code: "custom", message: "OWNER_CHOICE_PROVENANCE_INVALID" });
+  });
+
+export const PacketQuestionGroupSchema = z
+  .object({
+    id: z.string().min(1).max(200),
+    required: z.boolean(),
+    alternatives: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("ANSWER"), questionId: z.string().min(1).max(200) }).strict(),
+          z
+            .object({ kind: z.literal("DOCUMENT"), documentType: z.enum(["CV", "COVER_LETTER"]) })
+            .strict(),
+        ]),
+      )
+      .min(1)
+      .max(20),
+    selectedAlternative: z.number().int().nonnegative().nullable(),
+  })
+  .strict()
+  .superRefine((group, context) => {
+    if (
+      group.selectedAlternative !== null &&
+      group.selectedAlternative >= group.alternatives.length
+    )
+      context.addIssue({ code: "custom", message: "QUESTION_GROUP_SELECTION_INVALID" });
+    if (
+      new Set(group.alternatives.map((value) => JSON.stringify(value))).size !==
+      group.alternatives.length
+    )
+      context.addIssue({ code: "custom", message: "QUESTION_GROUP_ALTERNATIVE_DUPLICATE" });
+  });
+export const PacketQuestionContractSchema = z
+  .object({
+    version: z.literal("hosted-questions-v1"),
+    discoveryDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    complete: z.boolean(),
+    groups: z.array(PacketQuestionGroupSchema).max(100),
+  })
+  .strict();
 
 export const VerificationEvidenceSchema = z
   .object({
@@ -64,6 +117,7 @@ export const ApplicationPacketSchema = z
     versionsCurrent: z.boolean(),
     documents: z.array(PacketDocumentSchema),
     answers: z.array(PacketAnswerSchema),
+    questionContract: PacketQuestionContractSchema.optional(),
   })
   .superRefine(({ targetUrl, targetHost }, context) => {
     if ((targetUrl === null) !== (targetHost === null)) {
@@ -129,6 +183,47 @@ export function assessPacketReadiness(
   const packet = ApplicationPacketSchema.parse(input);
   const blockers: string[] = [];
   const warnings: string[] = [];
+  const groupedAnswers = new Set(
+    packet.questionContract?.groups.flatMap((group) =>
+      group.alternatives.flatMap((alternative) =>
+        alternative.kind === "ANSWER" ? [alternative.questionId] : [],
+      ),
+    ) ?? [],
+  );
+  if (packet.questionContract) {
+    if (!packet.questionContract.complete) blockers.push("QUESTION_DISCOVERY_INCOMPLETE");
+    if (
+      new Set(packet.questionContract.groups.map((group) => group.id)).size !==
+      packet.questionContract.groups.length
+    )
+      blockers.push("QUESTION_GROUP_DUPLICATE");
+    for (const group of packet.questionContract.groups) {
+      if (!group.required && group.selectedAlternative === null) continue;
+      if (group.selectedAlternative === null) {
+        blockers.push(`QUESTION_GROUP_SELECTION_REQUIRED:${group.id}`);
+        continue;
+      }
+      const selected = group.alternatives[group.selectedAlternative]!;
+      const ready =
+        selected.kind === "DOCUMENT"
+          ? packet.documents.some(
+              (document) =>
+                document.type === selected.documentType && document.approved && !document.stale,
+            )
+          : packet.answers.some(
+              (answer) =>
+                answer.questionId === selected.questionId &&
+                ["VERIFIED_ANSWER", "OWNER_CHOICE"].includes(answer.truthState) &&
+                (!group.required ||
+                  answer.truthState !== "OWNER_CHOICE" ||
+                  answer.value === true) &&
+                answer.disclosureState === "APPROVED" &&
+                answer.value !== null &&
+                (typeof answer.value !== "string" || answer.value.trim().length > 0),
+            );
+      if (!ready) blockers.push(`QUESTION_GROUP_NOT_READY:${group.id}`);
+    }
+  }
   if (!packet.versionsCurrent) blockers.push("STALE_PACKET_INPUTS");
   if (packet.eligibilityStatus === "INELIGIBLE") blockers.push("JOB_INELIGIBLE");
   if (packet.jobExpiryState === "EXPIRED") blockers.push("JOB_EXPIRED");
@@ -153,6 +248,7 @@ export function assessPacketReadiness(
       blockers.push(`REQUIRED_DOCUMENT_NOT_READY:${document.type}`);
   }
   for (const answer of packet.answers) {
+    if (groupedAnswers.has(answer.questionId)) continue;
     if (answer.required && answer.truthState === "UNKNOWN") {
       blockers.push(`REQUIRED_ANSWER_UNKNOWN:${answer.questionId}`);
     }
@@ -190,8 +286,9 @@ export function packetDigest(packet: ApplicationPacket): string {
   // The pre-R2 packet contract did not contain r2EvaluationId or freshness
   // evidence. Preserve historical digests exactly; new R2 packets use an
   // explicit contract version so the digest change is intentional and visible.
-  const digestInput =
-    parsed.r2EvaluationId || parsed.verificationEvidence
+  const digestInput = parsed.questionContract
+    ? { packetContractVersion: "hosted-packet-v3", ...parsed }
+    : parsed.r2EvaluationId || parsed.verificationEvidence
       ? { packetContractVersion: "r2-packet-v2", ...parsed }
       : (() => {
           const legacy = { ...parsed } as Record<string, unknown>;
