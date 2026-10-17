@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { HOSTED_ADAPTER_VERSION } from "./hosted-contract";
 import {
   assertHostedBuildEvidence,
@@ -31,7 +32,7 @@ afterEach(() => {
       throw new Error("FICTIONAL_CLEANUP_PATH_INVALID");
     rmSync(path, { recursive: true, force: true });
   }
-});
+}, 60_000);
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "applypilot-hosted-build-"));
   roots.push(root);
@@ -76,6 +77,179 @@ function fixture() {
   });
   return { root, next, quality, record };
 }
+function productionFixture() {
+  const f = fixture();
+  mkdirSync(join(f.next, "static"));
+  for (const name of ["required-server-files.json", "build-manifest.json"])
+    writeFileSync(join(f.next, name), "{}");
+  const quality = Buffer.from(
+    JSON.stringify({
+      ...JSON.parse(f.quality.toString()),
+      schemaVersion: 2,
+      buildDigest: compiledHostedProductionBuildDigest(f.next),
+    }),
+  );
+  return { ...f, productionQuality: quality };
+}
+
+function cachePath(next: string, filename = "settings.rsc") {
+  return join(next, "server", "route-cache", "APP_PAGE", "c".repeat(64), "$", filename);
+}
+
+function writeCache(path: string, content = "FICTIONAL_RUNTIME_RESPONSE") {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
+}
+
+describe("native App Page runtime cache and executable identity", () => {
+  it("keeps pre-cache version2 quality valid after native cache creation, updates and removal", () => {
+    const f = productionFixture();
+    const before = compiledHostedProductionBuildDigest(f.next);
+    const paths = [
+      "settings.html",
+      "settings.meta",
+      "settings.rsc",
+      "settings.segments/_full.segment.rsc",
+      "settings.segments/_tree.segment.rsc",
+      "settings.segments/settings/__PAGE__.segment.rsc",
+    ].map((name) => cachePath(f.next, name));
+    const valid = () => {
+      expect(compiledHostedProductionBuildDigest(f.next)).toBe(before);
+      expect(() =>
+        assertHostedQualityEvidence(
+          f.productionQuality,
+          f.next,
+          f.record.build.head,
+          f.record.build.tree,
+        ),
+      ).not.toThrow();
+      expect(() => assertHostedBuildEvidence(f.record, f.next, f.quality)).not.toThrow();
+    };
+    for (const path of paths) writeCache(path);
+    valid();
+    for (const path of paths) writeFileSync(path, "FICTIONAL_CHANGED_RUNTIME_RESPONSE");
+    valid();
+    for (const path of paths) rmSync(path);
+    valid();
+  });
+
+  const namespace = ["server", "route-cache", "APP_PAGE", "c".repeat(64), "$"];
+  it.each(
+    [
+      [...namespace, "module.js"],
+      [...namespace, "module.json"],
+      [...namespace, "asset.css"],
+      [...namespace, "settings.rsc.js"],
+      [...namespace, "$", "settings.rsc"],
+      ["server", "route-cache", "APP_ROUTE", "c".repeat(64), "$", "settings.rsc"],
+      ["server", "route-cache", "app_page", "c".repeat(64), "$", "settings.rsc"],
+      ["server", "route-cache", "APP_PAGE", "C".repeat(64), "$", "settings.rsc"],
+      ["server", "route-cache", "APP_PAGE", "c".repeat(63), "$", "settings.rsc"],
+      ["server", "route-cache", "APP_PAGE", "c".repeat(65), "$", "settings.rsc"],
+      ["server", "route-cache", "APP_PAGE", "c".repeat(64), "settings.rsc"],
+      ["server", "route-cache", "APP_PAGE", "c".repeat(64), "not-dollar", "settings.rsc"],
+      ["server", "route-cache-other", "APP_PAGE", "c".repeat(64), "$", "settings.rsc"],
+      ["server", "app", "route-cache", "APP_PAGE", "c".repeat(64), "$", "settings.rsc"],
+      ["static", "route-cache", "APP_PAGE", "c".repeat(64), "$", "settings.rsc"],
+    ].map((parts) => [parts.join("/"), parts] as const),
+  )("retains hash coverage for code or namespace lookalike %s", (_name, parts) => {
+    const f = productionFixture();
+    writeCache(join(f.next, ...parts));
+    expect(() =>
+      assertHostedQualityEvidence(
+        f.productionQuality,
+        f.next,
+        f.record.build.head,
+        f.record.build.tree,
+      ),
+    ).toThrow("HOSTED_QUALITY_EVIDENCE_INVALID");
+  });
+
+  it.skipIf(sep === "\\")(
+    "does not reinterpret POSIX backslash or control/newline filenames as cache namespaces",
+    () => {
+      for (const parts of [
+        ["server", `route-cache\\APP_PAGE\\${"c".repeat(64)}\\$\\settings.rsc`],
+        [...namespace, "settings.rsc\n"],
+        [...namespace, "settings\n.rsc"],
+        [...namespace, "segment\n", "settings.rsc"],
+        ["server", "route-cache", "APP_PAGE", `${"c".repeat(64)}\n`, "$", "settings.rsc"],
+      ]) {
+        const f = productionFixture();
+        writeCache(join(f.next, ...parts));
+        expect(() =>
+          assertHostedQualityEvidence(
+            f.productionQuality,
+            f.next,
+            f.record.build.head,
+            f.record.build.tree,
+          ),
+        ).toThrow("HOSTED_QUALITY_EVIDENCE_INVALID");
+      }
+    },
+  );
+
+  it("still rejects a junction or symlink inside the recognised cache namespace", () => {
+    const f = productionFixture();
+    const link = cachePath(f.next, "settings.segments");
+    mkdirSync(dirname(link), { recursive: true });
+    symlinkSync(
+      join(f.next, "server", "chunks"),
+      link,
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  });
+
+  it.skipIf(process.platform === "win32")("still rejects a cached special file", () => {
+    const f = productionFixture();
+    const pipe = cachePath(f.next);
+    mkdirSync(dirname(pipe), { recursive: true });
+    execFileSync("mkfifo", [pipe]);
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  });
+
+  it("retains the per-file size bound for omitted cache data", () => {
+    const f = productionFixture();
+    const file = cachePath(f.next);
+    writeCache(file, "");
+    truncateSync(file, 100_000_001);
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  });
+
+  it("retains the total byte bound for omitted cache data", () => {
+    const f = productionFixture();
+    for (let i = 0; i < 6; i++) {
+      const file = cachePath(f.next, `settings-${i}.rsc`);
+      writeCache(file, "");
+      truncateSync(file, 100_000_000);
+    }
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  });
+
+  it("retains the depth bound for omitted cache data", () => {
+    const f = productionFixture();
+    writeCache(cachePath(f.next, `${Array.from({ length: 20 }, () => "nested").join("/")}/x.rsc`));
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  });
+
+  it("retains the file count bound for omitted cache data", () => {
+    const f = productionFixture();
+    const directory = dirname(cachePath(f.next));
+    mkdirSync(directory, { recursive: true });
+    for (let i = 0; i < 10_000; i++) writeFileSync(join(directory, `${i}.rsc`), "");
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  }, 60_000);
+
+  it("retains the entry count bound inside the cache namespace", () => {
+    const f = productionFixture();
+    const directory = dirname(cachePath(f.next));
+    mkdirSync(directory, { recursive: true });
+    for (let i = 0; i < 50_000; i++) mkdirSync(join(directory, `entry-${i}`));
+    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+  }, 60_000);
+});
+
 describe("hosted reviewed executable evidence", () => {
   it("requires the actual reviewed merge head instead of accepting an older reviewed ancestor", () => {
     expect(() => assertHostedReviewedMergeHead("a".repeat(40), "a".repeat(40))).not.toThrow();
