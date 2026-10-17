@@ -3,7 +3,12 @@ import { readdirSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, resolve, relative } from "node:path";
 import { z } from "zod";
 import { HostedBuildSchema } from "./hosted-contract";
-export const HostedReviewedBuildRecordSchema = z
+import {
+  HOSTED_AI_REVIEW_LABEL,
+  HostedAiReviewEvidenceSchema,
+  assertHostedAiReviewAtCheckout,
+} from "./hosted-review";
+export const HostedHumanReviewedBuildRecordSchema = z
   .object({
     schemaVersion: z.literal(1),
     build: HostedBuildSchema,
@@ -23,7 +28,25 @@ export const HostedReviewedBuildRecordSchema = z
     recordedAt: z.iso.datetime(),
   })
   .strict();
-export const HostedQualityEvidenceSchema = z
+export const HostedAiReviewedBuildRecordSchema = HostedHumanReviewedBuildRecordSchema.omit({
+  schemaVersion: true,
+  humanReviewCount: true,
+  independentReviewCount: true,
+})
+  .extend({
+    schemaVersion: z.literal(2),
+    reviewKind: z.literal("OWNER_DELEGATED_AI"),
+    humanReviewCount: z.literal(0),
+    independentReviewCount: z.literal(0),
+    aiReviewPassCount: z.literal(2),
+    aiReviewEvidence: HostedAiReviewEvidenceSchema,
+  })
+  .strict();
+export const HostedReviewedBuildRecordSchema = z.discriminatedUnion("schemaVersion", [
+  HostedHumanReviewedBuildRecordSchema,
+  HostedAiReviewedBuildRecordSchema,
+]);
+const HostedQualityEvidenceFieldsSchema = z
   .object({
     schemaVersion: z.literal(1),
     head: z.string().regex(/^[a-f0-9]{40}$/),
@@ -35,7 +58,12 @@ export const HostedQualityEvidenceSchema = z
     startedAt: z.iso.datetime(),
     completedAt: z.iso.datetime(),
   })
-  .strict()
+  .strict();
+export const HostedQualityEvidenceSchema = z
+  .discriminatedUnion("schemaVersion", [
+    HostedQualityEvidenceFieldsSchema,
+    HostedQualityEvidenceFieldsSchema.extend({ schemaVersion: z.literal(2) }).strict(),
+  ])
   .refine((value) => Date.parse(value.completedAt) >= Date.parse(value.startedAt));
 
 /** REST review pages are reduced to closed evidence fields; every page is required. */
@@ -82,7 +110,14 @@ export function hostedHumanReviewCounts(
   const decisions = new Map<string, (typeof reviews)[number]>();
   const ownerComments = new Map<string, (typeof reviews)[number]>();
   for (const review of reviews) {
-    if (["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state))
+    const ai =
+      review.body.includes(HOSTED_AI_REVIEW_LABEL) || /"reviewerKind"\s*:\s*"AI"/.test(review.body);
+    if (
+      review.state === "CHANGES_REQUESTED" ||
+      (!ai &&
+        (review.state === "DISMISSED" ||
+          (review.state === "APPROVED" && review.commit_id === head)))
+    )
       decisions.set(review.user.login, review);
     if (review.state === "COMMENTED") ownerComments.set(review.user.login, review);
   }
@@ -92,7 +127,11 @@ export function hostedHumanReviewCounts(
     [...decisions.values()]
       .filter(
         (review) =>
-          review.state === "APPROVED" && review.commit_id === head && review.user.type === "User",
+          review.state === "APPROVED" &&
+          review.commit_id === head &&
+          review.user.type === "User" &&
+          !review.body.includes(HOSTED_AI_REVIEW_LABEL) &&
+          !/"reviewerKind"\s*:\s*"AI"/.test(review.body),
       )
       .map((review) => review.user.login),
   );
@@ -118,11 +157,26 @@ export function assertHostedPathWithoutLinks(path: string): void {
     current = parent;
   }
 }
-/** Exact production executable bytes; mutable caches, logs and type output are excluded. */
+/** Historical schema1 digest; retain its original server-only byte semantics. */
 export function compiledHostedBuildDigest(nextRoot: string): string {
+  return compiledHostedDigest(nextRoot, false);
+}
+/** Production output identity; installed dependencies, caches, logs and dev/type output are excluded. */
+export function compiledHostedProductionBuildDigest(nextRoot: string): string {
+  return compiledHostedDigest(nextRoot, true);
+}
+function compiledHostedDigest(nextRoot: string, production: boolean): string {
   assertHostedPathWithoutLinks(nextRoot);
   assertHostedPathWithoutLinks(join(nextRoot, "server"));
   const files: string[] = ["BUILD_ID", "routes-manifest.json", "prerender-manifest.json"];
+  if (production) {
+    assertHostedPathWithoutLinks(join(nextRoot, "static"));
+    // These launch manifests are mandatory. Also bind every other root runtime JS/JSON file.
+    files.push("required-server-files.json", "build-manifest.json");
+    for (const name of readdirSync(nextRoot))
+      if (/\.(?:js|json)$/.test(name) && !name.endsWith(".nft.json") && !files.includes(name))
+        files.push(name);
+  }
   let entries = 0;
   const visit = (dir: string, depth: number) => {
     if (depth > 16) throw new Error("HOSTED_BUILD_INVALID");
@@ -132,12 +186,13 @@ export function compiledHostedBuildDigest(nextRoot: string): string {
       const stat = lstatSync(path);
       if (stat.isSymbolicLink()) throw new Error("HOSTED_BUILD_INVALID");
       if (stat.isDirectory()) visit(path, depth + 1);
-      else if (/\.(?:js|json)$/.test(name) && !name.endsWith(".nft.json"))
+      else if (production || (/\.(?:js|json)$/.test(name) && !name.endsWith(".nft.json")))
         files.push(relative(nextRoot, path));
       if (files.length > 10000) throw new Error("HOSTED_BUILD_INVALID");
     }
   };
   visit(join(nextRoot, "server"), 0);
+  if (production) visit(join(nextRoot, "static"), 0);
   let bytes = 0;
   const hash = createHash("sha256");
   for (const file of files.sort()) {
@@ -175,7 +230,9 @@ export function assertHostedQualityEvidence(
       createHash("sha256")
         .update(readFileSync(/* turbopackIgnore: true */ join(nextRoot, "BUILD_ID")))
         .digest("hex") !== evidence.buildIdDigest ||
-      compiledHostedBuildDigest(nextRoot) !== evidence.buildDigest
+      (evidence.schemaVersion === 2
+        ? compiledHostedProductionBuildDigest(nextRoot)
+        : compiledHostedBuildDigest(nextRoot)) !== evidence.buildDigest
     )
       throw new Error();
     return evidence;
@@ -188,8 +245,10 @@ export function assertHostedBuildEvidence(
   record: z.infer<typeof HostedReviewedBuildRecordSchema>,
   nextRoot: string,
   qualityBytes: Uint8Array,
+  repositoryRoot?: string,
 ): void {
   try {
+    record = HostedReviewedBuildRecordSchema.parse(record);
     const evidence = assertHostedQualityEvidence(
       qualityBytes,
       nextRoot,
@@ -202,6 +261,22 @@ export function assertHostedBuildEvidence(
       createHash("sha256").update(qualityBytes).digest("hex") !== record.qualityEvidenceDigest
     )
       throw new Error();
+    if (record.schemaVersion === 2) {
+      if (
+        !repositoryRoot ||
+        evidence.schemaVersion !== 2 ||
+        record.aiReviewPassCount !== record.aiReviewEvidence.aiReviewPassCount ||
+        record.pullRequests.at(-1) !==
+          `https://github.com/adeel1608/applypilot/pull/${record.aiReviewEvidence.releasePr}`
+      )
+        throw new Error();
+      assertHostedAiReviewAtCheckout(
+        record.aiReviewEvidence,
+        repositoryRoot,
+        record.build.head,
+        record.build.tree,
+      );
+    }
   } catch {
     throw new Error("HOSTED_REVIEWED_BUILD_REQUIRED");
   }

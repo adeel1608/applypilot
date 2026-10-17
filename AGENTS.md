@@ -36,7 +36,13 @@ Never silently change architecture, skip a failed check, or claim unverified beh
 - Record material state transitions and generated artifacts in the audit model.
 - Use fixtures and mocks for job-board behavior until the relevant adapter phase.
 - Preserve existing user changes and avoid destructive Git commands.
-- Work on a feature branch and do not merge pull requests automatically.
+- Work on a feature branch. For the owner-authorized local release scope, use the versioned owner-delegated AI review policy in `config/owner-delegated-review-policy.json` and `docs/OWNER_DELEGATED_REVIEW_POLICY.md`: two substantive AI passes, complete cumulative coverage, resolved blocking findings, passing quality/CI and guarded PR merge. No human plan, implementation or technical release review is required for that scope. Other scopes retain their existing merge rules.
+
+## Current technical review policy
+
+The owner's 2026-10-17 instruction prospectively supersedes older human-only technical review requirements for PR #79, this policy amendment and fixes needed for the existing local personal release. The lifecycle is PLAN -> OWNER-DELEGATED AI PLAN REVIEW -> IMPLEMENT -> TEST -> AI TECHNICAL REVIEW -> GUARDED MERGE -> FRESH MERGED-BUILD VALIDATION -> SEALED ROLLOUT. Historical reviews are never relabelled as human approvals. AI activity remains explicitly AI-authored, including when published through the owner's GitHub account.
+
+Source reads, candidate truth/choices, target inspection/disclosure, packet/preview authorization, final application-specific one-use submission consent and operational release evidence remain subject to their existing owner gates. Technical review delegation does not authorize these actions.
 
 ## Completion gate
 

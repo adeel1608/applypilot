@@ -1266,6 +1266,12 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
   }): { id: string; created: true } {
     this.requireOwnerReceiptSchema();
     const capability = SourceCapabilityV2Schema.parse(input.capability);
+    if (capability.allowedOperations.every((operation) => operation === "GET_JOB"))
+      assertSourceRequestBinding(
+        capability,
+        "GET_JOB",
+        capability.requestBinding?.externalId ?? undefined,
+      );
     if (input.ownerConfirmed !== true) throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
     this.assertGateProof(input.gateProof, "SOURCE_CAPABILITY_APPROVE");
     const now = this.now();
@@ -1321,6 +1327,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
   }): SourceOwnerReceiptChain {
     this.requireOwnerReceiptSchema();
     const capability = SourceCapabilityV2Schema.parse(input.capability);
+    assertSourceRequestBinding(
+      capability,
+      input.operation,
+      capability.requestBinding?.externalId ?? undefined,
+    );
     const expectedConfirmation = `APPROVE AND RUN ${capability.capabilityId}`;
     if (input.ownerConfirmed !== true || input.confirmationText !== expectedConfirmation) {
       throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
@@ -1513,6 +1524,11 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
   }): SourceOwnerReceiptChain {
     this.requireOwnerReceiptSchema();
     const capability = SourceCapabilityV2Schema.parse(input.capability);
+    assertSourceRequestBinding(
+      capability,
+      input.operation,
+      capability.requestBinding?.externalId ?? undefined,
+    );
     if (input.ownerConfirmed !== true) throw new Error("EXACT_OWNER_CONFIRMATION_REQUIRED");
     this.assertGateProof(input.gateProof, "SOURCE_RUN_START");
     if (!capability.allowedOperations.includes(input.operation)) {

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "policyId": "owner-delegated-ai-review-v1",
+  "repository": "adeel1608/applypilot",
+  "scope": "LOCAL_PERSONAL_IMPLEMENTATION_AND_TECHNICAL_ROLLOUT",
+  "scopeBase": "ad61cbaf2327d99547306801e3d22d0cba4717c1",
+  "delegationReference": "owner-delegation-2026-10-17",
+  "trustedReviewPublisher": "adeel1608",
+  "requiredHumanImplementationReviews": 0,
+  "requiredAiReviewPasses": 2,
+  "independentHumanReviewRequired": false,
+  "requirePassingQualityEvidence": true,
+  "requireExactReviewedCodeCoverage": true,
+  "requireNoBlockingFindings": true,
+  "operationalOwnerConsentsUnchanged": true
+}

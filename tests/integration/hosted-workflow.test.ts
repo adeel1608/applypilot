@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { personalLiveV1Readiness } from "../../scripts/lib/personal-live-readiness";
 import { writeFile, readFile, mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../helpers/hosted-fixture";
 const fixtures: Awaited<ReturnType<typeof createHostedFixture>>[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const fixture of fixtures.splice(0)) await fixture.close();
 });
 async function fixture(
@@ -26,6 +28,44 @@ async function fixture(
   return value;
 }
 describe("FICTIONAL production hosted workflow acceptance", () => {
+  it("official readiness uses canonical owner provenance and counts unknown source outcomes", async () => {
+    const f = await fixture("LEVER");
+    const readiness = () =>
+      personalLiveV1Readiness(f.root, f.sqlite, "a".repeat(40), "b".repeat(40), true);
+    expect(readiness().blockers).not.toContain("R1_APPROVED_DISCOVERY_EVIDENCE_REQUIRED");
+    f.sqlite
+      .prepare(
+        "UPDATE source_owner_action_receipts SET confirmation_digest=? WHERE action='APPROVE'",
+      )
+      .run("f".repeat(64));
+    expect(readiness().blockers).toContain("R1_APPROVED_DISCOVERY_EVIDENCE_REQUIRED");
+    f.sqlite.prepare("UPDATE source_run_checkpoints SET status='OUTCOME_UNKNOWN'").run();
+    expect(readiness().blockers).toContain("UNRESOLVED_OPERATION_OUTCOME");
+  });
+  it("closes the owned browser when prepare failure also makes durable session state unreadable", async () => {
+    const f = await fixture("LEVER");
+    const inspected = await f.service.inspect(
+      f.passiveCap,
+      fictionalHostedProof(hostedOwnerAction("INSPECT", f.passiveCap)),
+    );
+    const prepared = await f.preparePacket(inspected.id);
+    const close = vi.spyOn(PlaywrightHostedApplicationDriver.prototype, "close");
+    vi.spyOn(PlaywrightHostedApplicationDriver.prototype, "map").mockImplementation(async () => {
+      vi.spyOn(f.store, "getSession").mockImplementation(() => {
+        throw new Error("FICTIONAL_SESSION_CORRUPT");
+      });
+      throw new Error("HOSTED_FORM_CHANGED");
+    });
+    await expect(
+      f.service.prepare(
+        inspected.id,
+        prepared.applicationCap,
+        fictionalHostedProof(hostedOwnerAction("DISCLOSE", prepared.applicationCap, inspected.id)),
+      ),
+    ).rejects.toThrow();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(f.stats().confirmedPosts).toBe(0);
+  }, 30000);
   it.each(["GREENHOUSE", "LEVER"] as const)(
     "runs %s actual HTTP readers, repositories, R2, packet, browser service and one confirmed fictional submission",
     async (provider) => {

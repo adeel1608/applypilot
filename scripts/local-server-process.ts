@@ -4,7 +4,8 @@ import { join } from "node:path";
 import next from "next";
 
 import { assertConfiguredLocalHost, configuredLocalPort, localHost } from "./lib/local-process";
-import { repositoryRoot } from "./lib/runtime-safety";
+import { repositoryRoot, localDatabasePath } from "./lib/runtime-safety";
+import { assertHostedOwnedStartup } from "./lib/hosted-startup";
 
 async function main(): Promise<void> {
   const markerIndex = process.argv.indexOf("--owner-marker");
@@ -13,6 +14,7 @@ async function main(): Promise<void> {
     throw new Error("OWNED_PROCESS_MARKER_REQUIRED");
   }
   const host = assertConfiguredLocalHost();
+  const reviewedBuild = assertHostedOwnedStartup(repositoryRoot(), localDatabasePath()).build;
   const port = configuredLocalPort();
   const app = next({
     dev: false,
@@ -31,7 +33,9 @@ async function main(): Promise<void> {
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   server.listen(port, localHost, () =>
-    console.log(`LOCAL_SERVER_READY host=${localHost} port=${port}`),
+    console.log(
+      `LOCAL_SERVER_READY host=${localHost} port=${port} head=${reviewedBuild.head} tree=${reviewedBuild.tree} build=${reviewedBuild.buildDigest}`,
+    ),
   );
 }
 

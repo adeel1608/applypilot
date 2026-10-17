@@ -17,10 +17,12 @@ import {
   waitForPort,
   writeOwnedProcessMetadata,
 } from "./lib/local-process";
-import { repositoryRoot } from "./lib/runtime-safety";
+import { repositoryRoot, localDatabasePath } from "./lib/runtime-safety";
+import { assertHostedOwnedStartup } from "./lib/hosted-startup";
 
 async function main(): Promise<void> {
   const root = repositoryRoot();
+  const reviewedBuild = assertHostedOwnedStartup(root, localDatabasePath()).build;
   const host = assertConfiguredLocalHost();
   const port = configuredLocalPort();
   const paths = localRuntimePaths(root);
@@ -83,7 +85,9 @@ async function main(): Promise<void> {
     throw new Error("LOCAL_SERVER_START_TIMEOUT_IDENTITY_UNVERIFIED");
   }
   if (!existsSync(paths.metadata)) throw new Error("LOCAL_PROCESS_METADATA_MISSING");
-  console.log(`LOCAL_START_PASS host=${host} port=${port} pid=${child.pid}`);
+  console.log(
+    `LOCAL_START_PASS host=${host} port=${port} pid=${child.pid} head=${reviewedBuild.head} tree=${reviewedBuild.tree} build=${reviewedBuild.buildDigest}`,
+  );
 }
 
 void main();

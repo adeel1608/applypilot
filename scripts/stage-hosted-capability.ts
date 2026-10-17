@@ -6,6 +6,7 @@ import {
   HostedCapabilitySchema,
   HostedReviewedBuildRecordSchema,
   compiledHostedBuildDigest,
+  compiledHostedProductionBuildDigest,
   assertHostedBuildEvidence,
   assertHostedPathWithoutLinks,
   hostedCapabilityDigest,
@@ -54,13 +55,17 @@ function main(): void {
         "package.json",
         "package-lock.json",
       ).length ||
-      compiledHostedBuildDigest(join(root, "apps", "web", ".next")) !== record.build.buildDigest
+      (record.schemaVersion === 2
+        ? compiledHostedProductionBuildDigest(join(root, "apps", "web", ".next"))
+        : compiledHostedBuildDigest(join(root, "apps", "web", ".next"))) !==
+        record.build.buildDigest
     )
       throw new Error("HOSTED_REVIEWED_BUILD_REQUIRED");
     assertHostedBuildEvidence(
       record,
       join(root, "apps", "web", ".next"),
       readFileSync(join(root, "data", "private", "runtime", "hosted-quality-evidence.json")),
+      root,
     );
     return record.build;
   };

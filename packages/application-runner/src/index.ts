@@ -15,6 +15,7 @@ export * from "./hosted-artifact";
 export * from "./hosted-transport";
 export * from "./hosted-driver";
 export * from "./hosted-build";
+export * from "./hosted-review";
 export * from "./hosted-workflow";
 export * from "./hosted-packet";
 
