@@ -21,6 +21,11 @@ import {
   approveCalibrationQualification,
 } from "@web/lib/calibration-workspace";
 
+type CalibrationTarget =
+  | "/calibration"
+  | `/calibration?campaign=${string}`
+  | `/calibration?notice=${"expired" | "rejected"}`;
+
 function one(form: FormData, name: string): string {
   const values = form.getAll(name);
   if (values.length !== 1 || typeof values[0] !== "string")
@@ -42,7 +47,7 @@ function integer(form: FormData, name: string): number {
 function previous(form: FormData): string | null {
   return one(form, "previousEventId") || null;
 }
-function rejected(error: unknown): string {
+function rejected(error: unknown): "expired" | "rejected" {
   return error instanceof Error && error.message === "MUTATION_NONCE_EXPIRED"
     ? "expired"
     : "rejected";
@@ -56,8 +61,8 @@ async function gate(action: string, form: FormData) {
 }
 
 export async function createCalibrationCampaignAction(form: FormData): Promise<never> {
-  let target = "/calibration",
-    success = false;
+  let target: CalibrationTarget = "/calibration";
+  let success = false;
   try {
     fields(form, [
       "jobId",
@@ -92,8 +97,8 @@ export async function createCalibrationCampaignAction(form: FormData): Promise<n
 }
 
 export async function recordCalibrationLabelAction(form: FormData): Promise<never> {
-  let target = "/calibration",
-    success = false;
+  let target: CalibrationTarget = "/calibration";
+  let success = false;
   try {
     fields(form, [
       "campaignId",
@@ -126,8 +131,8 @@ export async function recordCalibrationLabelAction(form: FormData): Promise<neve
 }
 
 export async function recordCalibrationPairAction(form: FormData): Promise<never> {
-  let target = "/calibration",
-    success = false;
+  let target: CalibrationTarget = "/calibration";
+  let success = false;
   try {
     fields(form, [
       "campaignId",
@@ -160,8 +165,8 @@ export async function recordCalibrationPairAction(form: FormData): Promise<never
 }
 
 export async function approveCalibrationQualificationAction(form: FormData): Promise<never> {
-  let target = "/calibration",
-    success = false;
+  let target: CalibrationTarget = "/calibration";
+  let success = false;
   try {
     fields(form, ["campaignId", "assessmentDigest", "approvalChoice"]);
     if (one(form, "approvalChoice") !== "APPROVE")

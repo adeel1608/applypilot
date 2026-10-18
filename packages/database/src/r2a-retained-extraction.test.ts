@@ -168,11 +168,56 @@ describe("retained production-source extraction regressions", () => {
   it.each([
     "You must have the ability to remain composed when helping customers.",
     "Ability to communicate when a customer has questions is required.",
+    "Ability to assist customers when needed is required.",
   ])("keeps operational skill context separate from applicant conditions: %s", (text) => {
     const { normalization } = normalizePosting(text);
     expect(normalization.requirementEvidence).toContainEqual(
       expect.objectContaining({ canonicalKind: "SKILL", modality: "REQUIRED", condition: null }),
     );
+  });
+
+  it.each([
+    "Ability to operate equipment when medically cleared is required.",
+    "Ability to operate equipment when authorised is required.",
+    "Ability to operate equipment when a medical clearance has been provided is required.",
+    "Ability to operate equipment when the prerequisite is satisfied is required.",
+    "Ability to assist customers when needed and after medical clearance is required.",
+    "Ability to assist customers when needed when medically cleared is required.",
+    "Ability to assist customers when needed is required if assigned to the counter.",
+    "Ability to assist customers when needed is required unless supervised.",
+  ])("retains genuine or ambiguous when prerequisites in the complete skill row: %s", (text) => {
+    const { normalization } = normalizePosting(text);
+    expect(normalization.requirementEvidence).toHaveLength(1);
+    expect(normalization.requirementEvidence[0]).toMatchObject({
+      canonicalKind: "SKILL",
+      family: "SKILLS",
+      state: "SOURCE_STATED",
+      modality: "CONDITIONAL",
+      condition: text.slice(text.indexOf("when")).replace(/\.$/, ""),
+      normalizedValue: { kind: "TEXT", value: text },
+      source: { excerpt: text },
+      extractorVersion: "3.6.5",
+      ownerCorrectionId: null,
+      derivationInputIds: [],
+      conflictSetId: null,
+    });
+  });
+
+  it.each([
+    ["Ability to assist customers when needed is not required.", "NEGATED"],
+    ["Ability to assist customers when needed is preferred.", "PREFERRED"],
+  ])("preserves the polarity of routine wording: %s", (text, modality) => {
+    const { normalization } = normalizePosting(text);
+    expect(normalization.requirementEvidence).toHaveLength(1);
+    expect(normalization.requirementEvidence[0]).toMatchObject({
+      canonicalKind: "SKILL",
+      family: "SKILLS",
+      state: "SOURCE_STATED",
+      modality,
+      condition: null,
+      normalizedValue: { kind: "TEXT", value: text },
+      source: { excerpt: text },
+    });
   });
 
   it("preserves a genuine conditional skill prerequisite", () => {

@@ -901,8 +901,15 @@ function modality(text: string): { modality: RequirementModality; condition: str
   ) {
     return { modality: "NEGATED", condition: null };
   }
+  const whenContext = text.match(/\bwhen\s+([^.\n]*)/i)?.[1]?.trim() ?? "";
+  // Exempt only a complete routine context. A later or unfamiliar prerequisite stays conditional.
   const operationalAbility =
-    /\b(?:ability|able)\s+to\b[^.\n]*\bwhen\b/i.test(text) && !/\b(?:if|unless)\b/i.test(text);
+    /\b(?:ability|able)\s+to\b[^.\n]*\bwhen\b/i.test(text) &&
+    (text.match(/\bwhen\b/gi)?.length ?? 0) === 1 &&
+    !/\b(?:if|unless)\b/i.test(text) &&
+    /^(?:needed|busy|under pressure|(?:helping|assisting|serving|dealing with)\s+(?:customers?|clients?)|(?:a\s+)?customer has questions)(?:\s+(?:is|are)\s+(?:required|mandatory|necessary|essential))?$/i.test(
+      whenContext,
+    );
   const actualCondition =
     /\b(?:may be required|where applicable|depending on|subject to|willing to obtain|must (?:be )?obtain(?:ed)? within|if|unless)\b/i.test(
       text,

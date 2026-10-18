@@ -161,6 +161,7 @@ describe("calibration actions use the real one-use local nonce store", () => {
           nonceConsumed: true,
         }),
       );
+      expect(state.revalidate).toHaveBeenCalledExactlyOnceWith("/calibration");
       await expect(test.action(data)).rejects.toThrow("REDIRECT:/calibration?notice=rejected");
       expect(test.mock).toHaveBeenCalledTimes(1);
     },
@@ -227,5 +228,23 @@ describe("calibration actions use the real one-use local nonce store", () => {
       "REDIRECT:/calibration?notice=rejected",
     );
     expect(state.revalidate).not.toHaveBeenCalled();
+  });
+  it.each(cases)("$purpose cannot accept a posted redirect destination", async (test) => {
+    const data = await form(test);
+    data.set("returnTo", "https://foreign.invalid/redirect-canary");
+    await expect(test.action(data)).rejects.toThrow("REDIRECT:/calibration?notice=rejected");
+    expect(test.mock).not.toHaveBeenCalled();
+    expect(state.revalidate).not.toHaveBeenCalled();
+  });
+  it("keeps a returned campaign identifier encoded within the fixed local query destination", async () => {
+    // A deliberately malformed trusted-boundary fixture verifies the existing URL encoding;
+    // the real repository separately validates generated campaign identifiers.
+    const identifier = "//foreign.invalid/path?next=/sources#redirect-canary";
+    state.create.mockResolvedValue(identifier);
+    await expect(createCalibrationCampaignAction(await form(cases[0]!))).rejects.toThrow(
+      `REDIRECT:/calibration?campaign=${encodeURIComponent(identifier)}`,
+    );
+    expect(state.create).toHaveBeenCalledOnce();
+    expect(state.revalidate).toHaveBeenCalledExactlyOnceWith("/calibration");
   });
 });

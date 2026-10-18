@@ -199,6 +199,9 @@ test("owner calibration precommits blank policy and records only explicit fictio
       await expect(radio).not.toBeChecked();
     await page.locator(`input[name="preferredComparisonId"][value="${members[0]!.id}"]`).check();
     await page.getByRole("button", { name: "Record my preference", exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: "Review recorded pair revision 1", exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Qualification assessment" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Approve this matching qualification" }),

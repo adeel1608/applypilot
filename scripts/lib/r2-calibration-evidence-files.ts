@@ -114,7 +114,7 @@ export function createCalibrationEvidenceDirectory(rootInput: string, path: stri
   for (const part of path.split("/")) {
     directory(current);
     current = join(current, part);
-    if (!existsSync(current)) mkdirSync(current, { mode: 0o700 });
+    if (!existsSync(/* turbopackIgnore: true */ current)) mkdirSync(current, { mode: 0o700 });
     directory(current);
   }
 }
@@ -170,7 +170,7 @@ export function installCurrentCalibrationEvidence(rootInput: string, temporaryPa
     final = targetPath(root, destination).target,
     finalParents = ancestors(root, final);
   regular(target, 1_000_000);
-  if (existsSync(final)) regular(final, 1_000_000);
+  if (existsSync(/* turbopackIgnore: true */ final)) regular(final, 1_000_000);
   verifyAncestors(parents);
   verifyAncestors(finalParents);
   renameSync(target, final);
