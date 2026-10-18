@@ -2,6 +2,7 @@ import type BetterSqlite3 from "better-sqlite3";
 
 import { R2_MINIMUM_EXTRACTION_COVERAGE } from "@applypilot/eligibility-engine";
 import { R2_RECOMMENDATION_THRESHOLD } from "@applypilot/fit-scorer";
+import { r2CurrentEvaluationSql } from "./r2-evaluation-currentness";
 
 type StoredReason = {
   code?: unknown;
@@ -30,6 +31,7 @@ export interface R2ReadinessSummary {
   queueFreshness: string | null;
   duplicateState: "CLEAR" | "UNRESOLVED" | "NONE";
   calibrationState: string | null;
+  storedCalibrationState: string | null;
   ownerQuestionIds: string[];
   observedMaterialFamilyCount: number;
   resolvedObservedMaterialFamilyCount: number;
@@ -202,7 +204,14 @@ function summaryFromRow(
         : row.duplicateState === "CLEAR"
           ? "CLEAR"
           : "NONE",
-    calibrationState: typeof row.calibrationState === "string" ? row.calibrationState : null,
+    // This DB-only read has no trusted private-profile/safety context to qualify a stored run.
+    calibrationState:
+      row.calibrationState === "CALIBRATED"
+        ? "CALIBRATION_PENDING"
+        : typeof row.calibrationState === "string"
+          ? row.calibrationState
+          : null,
+    storedCalibrationState: typeof row.calibrationState === "string" ? row.calibrationState : null,
     ownerQuestionIds,
     ...scope,
   };
@@ -210,12 +219,19 @@ function summaryFromRow(
 
 const readinessSelect = `
   SELECT e.job_id AS jobId,e.job_version_id AS jobVersionId,e.id AS evaluationId,e.eligibility_status AS eligibilityStatus,
-         e.eligibility_reasons_json AS reasons,e.fit_score AS fitScore,e.recommended,
+         e.eligibility_reasons_json AS reasons,e.fit_score AS fitScore,
+         CASE WHEN e.stale=0 AND ${r2CurrentEvaluationSql()} THEN e.recommended ELSE 0 END AS recommended,
          e.coverage_percent AS coveragePercent,e.unresolved_unknown_count AS unknownCount,
          e.unresolved_condition_count AS conditionCount,e.unresolved_conflict_count AS conflictCount,
-         e.stale,e.calibration_state AS calibrationState,
+         CASE WHEN e.stale<>0 OR NOT ${r2CurrentEvaluationSql()} THEN 1 ELSE 0 END AS stale,
+         e.calibration_state AS calibrationState,
          (SELECT q.state FROM r2_queue_decision_versions q WHERE q.job_id=e.job_id ORDER BY q.version DESC LIMIT 1) AS queueState,
-         (SELECT q.freshness FROM r2_queue_decision_versions q WHERE q.job_id=e.job_id ORDER BY q.version DESC LIMIT 1) AS queueFreshness,
+         (SELECT CASE WHEN q.freshness='CURRENT' AND e.stale=0 AND ${r2CurrentEvaluationSql()}
+            AND q.r2_evaluation_id=e.id AND q.job_version_id=e.job_version_id
+            AND q.profile_version_id=e.profile_version_id
+            AND q.evidence_contract_version=e.evidence_contract_version AND q.coverage_version=e.coverage_version
+           THEN 'CURRENT' ELSE 'STALE' END
+          FROM r2_queue_decision_versions q WHERE q.job_id=e.job_id ORDER BY q.version DESC LIMIT 1) AS queueFreshness,
          CASE WHEN EXISTS (
            SELECT 1 FROM r2_duplicate_candidates d
            WHERE d.state='SUGGESTED' AND (

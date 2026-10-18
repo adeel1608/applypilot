@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 
 import {
   JobFieldFamilySchema,
+  R2A_PARSER_VERSION,
+  R2A_NORMALIZATION_VERSION,
+  R2A_EVIDENCE_CONTRACT_VERSION,
   R2ANormalizationSchema,
   type R2ANormalization,
   type R2JobFieldEvidence,
@@ -34,7 +37,7 @@ export function r2FieldEvidence(
     modality: null,
     source,
     normalizedValue,
-    extractorVersion: "3.1.0",
+    extractorVersion: R2A_PARSER_VERSION,
     ruleId: "R2_FIXTURE_FIELD",
     derivationInputIds: [],
     ownerCorrectionId: null,
@@ -61,7 +64,7 @@ export function r2RequirementEvidence(
     condition: null,
     source,
     normalizedValue,
-    extractorVersion: "3.1.0",
+    extractorVersion: R2A_PARSER_VERSION,
     ruleId: "R2_FIXTURE_REQUIREMENT",
     derivationInputIds: [],
     ownerCorrectionId: null,
@@ -84,9 +87,9 @@ export function r2TestNormalization(input: {
   return R2ANormalizationSchema.parse({
     sourceObservationId: "observation-r2-fixture",
     sourceLength: sourceText.length,
-    parserVersion: "3.1.0",
-    evidenceContractVersion: "3.1.0",
-    normalizationVersion: "3.1.0",
+    parserVersion: R2A_PARSER_VERSION,
+    evidenceContractVersion: R2A_EVIDENCE_CONTRACT_VERSION,
+    normalizationVersion: R2A_NORMALIZATION_VERSION,
     fieldEvidence: fields,
     requirementEvidence: requirements,
     conflicts: input.conflicts ?? [],
@@ -107,7 +110,7 @@ export function r2TestNormalization(input: {
         ...requirements.filter((item) => item.family === family).map(({ id }) => id),
       ],
       unparsedSpans: [],
-      parserVersion: "3.1.0",
+      parserVersion: R2A_PARSER_VERSION,
     })),
   });
 }
@@ -117,7 +120,7 @@ export const currentR2Bindings = {
   currentJobVersionId: "job-version-current",
   profileVersionId: "profile-version-current",
   currentProfileVersionId: "profile-version-current",
-  evidenceContractVersion: "3.1.0",
-  currentEvidenceContractVersion: "3.1.0",
+  evidenceContractVersion: R2A_EVIDENCE_CONTRACT_VERSION,
+  currentEvidenceContractVersion: R2A_EVIDENCE_CONTRACT_VERSION,
   evaluationVersionId: "evaluation-r2-current",
 };

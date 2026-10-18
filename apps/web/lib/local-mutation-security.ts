@@ -34,7 +34,10 @@ export const localMutationTokens =
 processState.__applypilotLocalMutationTokens = localMutationTokens;
 
 function safeReturnPath(value: string): string {
-  return /^\/(?:import|jobs(?:\/[A-Za-z0-9._:-]+)?|applications|dashboard|sources)$/.test(value)
+  return value === value.trim() &&
+    /^\/(?:import|jobs(?:\/[A-Za-z0-9._:-]+)?|applications|dashboard|sources|calibration)$/.test(
+      value,
+    )
     ? value
     : "/dashboard";
 }

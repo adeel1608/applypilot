@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type BetterSqlite3 from "better-sqlite3";
-import { SourceEnablementRepository } from "@applypilot/database";
+import {
+  SourceEnablementRepository,
+  readCurrentCalibrationQualification,
+} from "@applypilot/database";
+import {
+  readCurrentR2CalibrationSafety,
+  readCurrentR2CalibrationProfileHash,
+} from "./r2-calibration-safety";
 import { z } from "zod";
 import {
   hostedDigest,
@@ -10,11 +17,6 @@ import {
   assertHostedBuildEvidence,
   assertHostedQualityEvidence,
 } from "@applypilot/application-runner";
-import {
-  R2_FIT_SCORER_VERSION,
-  R2_FIT_WEIGHT_VERSION,
-  R2_GOLDEN_CORPUS_VERSION,
-} from "@applypilot/fit-scorer";
 export const PERSONAL_LIVE_CRITERIA = [
   "R0",
   "R1",
@@ -26,6 +28,44 @@ export const PERSONAL_LIVE_CRITERIA = [
   "R11",
   "FULL_MATRIX",
 ] as const;
+
+/** Aggregate legacy rows are history; current private qualification needs exact intake provenance. */
+export function currentPrivateMatchingQualified(
+  root: string,
+  sqlite: BetterSqlite3.Database,
+): boolean {
+  try {
+    if (
+      !sqlite
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='r2_calibration_intake_qualifications'",
+        )
+        .get() ||
+      Number(
+        sqlite.prepare("SELECT count(*) FROM r2_calibration_intake_qualifications").pluck().get(),
+      ) === 0
+    )
+      return false;
+    const active = sqlite
+      .prepare(
+        "SELECT v.id,v.content_hash AS contentHash FROM candidate_profiles p JOIN candidate_profile_versions v ON v.id=p.active_version_id",
+      )
+      .all() as { id: string; contentHash: string }[];
+    if (active.length !== 1 || readCurrentR2CalibrationProfileHash(root) !== active[0]!.contentHash)
+      return false;
+    const safety = readCurrentR2CalibrationSafety(root);
+    return (
+      readCurrentCalibrationQualification(sqlite, {
+        expectedEngine: safety.bundle.engine,
+        profileVersionId: active[0]!.id,
+        profileHash: active[0]!.contentHash,
+        safetyEvidence: safety,
+      }) !== null
+    );
+  } catch {
+    return false;
+  }
+}
 const decisionSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -151,16 +191,7 @@ export function personalLiveV1Readiness(
         (run) => repository.getRunOwnerProvenance(run.id) === "OWNER_RECEIPTS_BOUND",
       );
     }
-    if (has("r2_calibration_qualifications"))
-      matching =
-        Number(
-          sqlite
-            .prepare(
-              "SELECT count(*) FROM r2_calibration_qualifications q JOIN r2_calibration_runs r ON r.id=q.run_id WHERE r.state='CALIBRATED' AND r.scorer_version=? AND r.weight_version=? AND r.corpus_version=? AND q.owner_approval_id IS NOT NULL AND q.owner_approved_at IS NOT NULL AND q.performance_threshold_version IS NOT NULL AND q.safety_gate_version IS NOT NULL AND q.compared_label_count>0 AND q.compared_pair_count>0 AND json_array_length(q.blocker_codes_json)=0",
-            )
-            .pluck()
-            .get(R2_FIT_SCORER_VERSION, R2_FIT_WEIGHT_VERSION, R2_GOLDEN_CORPUS_VERSION),
-        ) > 0;
+    matching = currentPrivateMatchingQualified(root, sqlite);
     if (has("hosted_browser_sessions")) {
       journey =
         Number(

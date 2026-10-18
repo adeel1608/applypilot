@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import BetterSqlite3 from "better-sqlite3";
 import {
@@ -71,7 +72,16 @@ async function main(): Promise<void> {
       const observation = await baseAdapter.upload(value, currentBinding);
       writeFileSync(
         barrierPath,
-        JSON.stringify({ accepted: true, uploadEvidence: observation.uploadEvidence }),
+        JSON.stringify({
+          accepted: true,
+          workerPid: process.pid,
+          parentPid: process.ppid,
+          workerScript: resolve(process.argv[1]),
+          databasePath: resolve(databasePath),
+          runId,
+          uploadEvidence: observation.uploadEvidence,
+        }),
+        { flag: "wx", mode: 0o600 },
       );
       while (!existsSync(releasePath)) await new Promise((resolve) => setTimeout(resolve, 10));
       return observation;

@@ -64,6 +64,18 @@ import { normalizeImportedJob } from "./job-import-repository";
 import { BetaRepository, immutableR2ADerivationDigest } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
 import { R2Repository } from "./r2-repository";
+import { r2CurrentEvaluationSql } from "./r2-evaluation-currentness";
+import {
+  structuredLeverRecord,
+  structuredGreenhouseRecord,
+  structuredGreenhouseEvidenceRecord,
+  evidenceLines,
+} from "./retained-source-projection";
+
+export {
+  structuredGreenhouseRecord,
+  structuredGreenhouseEvidenceRecord,
+} from "./retained-source-projection";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -134,120 +146,6 @@ function employmentType(
   if (/intern/i.test(value)) return "INTERNSHIP";
   if (/contract|temporary|fixed[ -]?term/i.test(value)) return "CONTRACT";
   return "UNKNOWN";
-}
-
-function structuredLeverRecord(
-  record: LeverPostingRecordV2,
-  capability: SourceCapabilityV2,
-): Record<string, unknown> {
-  const locations = record.allLocations.length
-    ? record.allLocations
-    : record.location
-      ? [record.location]
-      : [];
-  const sections = record.sections.map(({ heading, content, kind }) => ({
-    heading,
-    content,
-    kind,
-  }));
-  return {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    identifier: { name: capability.tenant, value: record.externalId },
-    title: record.title,
-    hiringOrganization: { name: capability.alias },
-    jobLocation: locations.map((location) => ({ address: location })),
-    employmentType: record.commitment,
-    description: record.description,
-    datePosted: record.postedAt,
-    jobLocationType: record.workplaceType,
-    baseSalary: record.salaryRange
-      ? {
-          currency: record.salaryRange.currency,
-          value: {
-            minValue: record.salaryRange.min,
-            maxValue: record.salaryRange.max,
-            unitText: record.salaryRange.interval,
-          },
-        }
-      : null,
-    sourceUrl: record.sourceUrl,
-    applicationUrl: record.applicationUrl,
-    department: record.department,
-    team: record.team,
-    country: record.country,
-    sourceSections: sections,
-    requirementTexts: evidenceLines(record, "REQUIREMENTS"),
-    responsibilities: evidenceLines(record, "RESPONSIBILITIES"),
-    benefitTexts: sections.filter(({ kind }) => kind === "BENEFITS").map(({ content }) => content),
-  };
-}
-
-export function structuredGreenhouseRecord(
-  record: GreenhousePostingRecordV2,
-  capability: SourceCapabilityV2,
-): Record<string, unknown> {
-  return {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    identifier: { name: capability.tenant, value: record.externalId },
-    title: record.title,
-    hiringOrganization: { name: capability.alias },
-    jobLocation: [{ address: record.location }],
-    description: record.description,
-    datePosted: null,
-    dateModified: record.updatedAt,
-    sourceUrl: record.sourceUrl,
-    applicationUrl: record.applicationUrl,
-    departments: record.departments,
-    offices: record.offices,
-    providerMetadata: record.metadata,
-  };
-}
-
-/** Opaque provider fields remain in rawPayload and are not R2A evidence inputs. */
-export function structuredGreenhouseEvidenceRecord(
-  record: GreenhousePostingRecordV2,
-  capability: SourceCapabilityV2,
-): Record<string, unknown> {
-  const evidenceRecord = structuredGreenhouseRecord(record, capability);
-  delete evidenceRecord.departments;
-  delete evidenceRecord.offices;
-  delete evidenceRecord.providerMetadata;
-  return evidenceRecord;
-}
-
-const evidenceChunkLength = 500;
-
-function boundedEvidenceChunks(value: string): string[] {
-  const chunks: string[] = [];
-  let remainder = value.trim();
-  while (remainder) {
-    if (remainder.length <= evidenceChunkLength) {
-      chunks.push(remainder);
-      break;
-    }
-    let end = evidenceChunkLength;
-    if (/^[\uDC00-\uDFFF]$/.test(remainder[end] ?? "")) end -= 1;
-    const candidate = remainder.slice(0, end);
-    const trailingWord = candidate.search(/\s+\S*$/);
-    const splitAt = trailingWord >= evidenceChunkLength / 2 ? trailingWord : end;
-    const chunk = remainder.slice(0, splitAt).trim();
-    if (chunk) chunks.push(chunk);
-    remainder = remainder.slice(splitAt).trimStart();
-  }
-  return chunks;
-}
-
-function evidenceLines(record: LeverPostingRecordV2, kind: "REQUIREMENTS" | "RESPONSIBILITIES") {
-  return record.sections
-    .filter((section) => section.kind === kind)
-    .flatMap(({ content }) => content.split("\n"))
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap(boundedEvidenceChunks)
-    .slice(0, 500)
-    .map((line) => line.slice(0, evidenceChunkLength));
 }
 
 export interface PersistedSourcePageResult {
@@ -2652,24 +2550,52 @@ export class SourceEnablementRepository implements SourceRunSink, GreenhouseSour
       if (!version) throw new Error("SOURCE_JOB_VERSION_REQUIRED");
       const evaluation = this.sqlite
         .prepare(
-          `SELECT id FROM r2_evaluation_versions
-           WHERE job_id=? AND job_version_id=? AND stale=0
+          `SELECT e.id,e.profile_version_id AS profileVersionId,
+             e.evidence_contract_version AS evidenceContractVersion,e.coverage_version AS coverageVersion
+           FROM r2_evaluation_versions e
+           WHERE e.job_id=? AND e.job_version_id=? AND e.stale=0 AND ${r2CurrentEvaluationSql()}
              AND EXISTS (SELECT 1 FROM candidate_profiles
-               WHERE active_version_id=r2_evaluation_versions.profile_version_id)
-           ORDER BY evaluated_at DESC,rowid DESC LIMIT 1`,
+               WHERE active_version_id=e.profile_version_id)
+           ORDER BY e.evaluated_at DESC,e.rowid DESC LIMIT 1`,
         )
-        .get(jobId, version.id) as { id: string } | undefined;
+        .get(jobId, version.id) as
+        | {
+            id: string;
+            profileVersionId: string;
+            evidenceContractVersion: string;
+            coverageVersion: string;
+          }
+        | undefined;
       if (!evaluation) {
         work.push({ jobId, evaluationId: null });
         continue;
       }
       const queue = this.sqlite
         .prepare(
-          `SELECT freshness,r2_evaluation_id AS evaluationId
+          `SELECT freshness,r2_evaluation_id AS evaluationId,job_version_id AS jobVersionId,
+             profile_version_id AS profileVersionId,evidence_contract_version AS evidenceContractVersion,
+             coverage_version AS coverageVersion
            FROM r2_queue_decision_versions WHERE job_id=? ORDER BY version DESC LIMIT 1`,
         )
-        .get(jobId) as { freshness: string; evaluationId: string } | undefined;
-      if (queue?.freshness === "CURRENT" && queue.evaluationId === evaluation.id) continue;
+        .get(jobId) as
+        | {
+            freshness: string;
+            evaluationId: string;
+            jobVersionId: string;
+            profileVersionId: string;
+            evidenceContractVersion: string;
+            coverageVersion: string;
+          }
+        | undefined;
+      if (
+        queue?.freshness === "CURRENT" &&
+        queue.evaluationId === evaluation.id &&
+        queue.jobVersionId === version.id &&
+        queue.profileVersionId === evaluation.profileVersionId &&
+        queue.evidenceContractVersion === evaluation.evidenceContractVersion &&
+        queue.coverageVersion === evaluation.coverageVersion
+      )
+        continue;
       work.push({ jobId, evaluationId: evaluation.id });
     }
     return work;

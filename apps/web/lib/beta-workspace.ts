@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   ApplicationPacketSchema,
@@ -36,6 +36,7 @@ import {
   R2ARepository,
   R2Repository,
   assertCurrentDocumentGenerationTuple,
+  r2CurrentEvaluationSql,
 } from "@applypilot/database";
 import { legacyStatusToBeta } from "@applypilot/application-tracker";
 import {
@@ -72,6 +73,18 @@ import {
   hasBetaSchema,
 } from "@web/lib/local-database";
 import { resolveLocalDataDirectory } from "@web/lib/local-data-directory";
+import { createCurrentR2CalibrationStatusReader } from "@web/lib/r2-calibration-status";
+
+const r2EvaluationStaleSql = `CASE WHEN e.id IS NULL THEN NULL
+  WHEN e.stale<>0 OR NOT ${r2CurrentEvaluationSql()} THEN 1 ELSE 0 END`;
+const r2RecommendedSql = `CASE WHEN e.stale=0 AND ${r2CurrentEvaluationSql()}
+  THEN e.recommended ELSE 0 END`;
+const r2QueueFreshnessSql = `CASE WHEN q.id IS NULL THEN NULL
+  WHEN q.freshness='CURRENT' AND e.stale=0 AND ${r2CurrentEvaluationSql()}
+    AND q.r2_evaluation_id=e.id AND q.job_version_id=e.job_version_id
+    AND q.profile_version_id=e.profile_version_id
+    AND q.evidence_contract_version=e.evidence_contract_version AND q.coverage_version=e.coverage_version
+  THEN 'CURRENT' ELSE 'STALE' END`;
 
 interface JobListRow {
   id: string;
@@ -98,6 +111,7 @@ interface JobListRow {
   unresolvedConditionCount: number | null;
   unresolvedConflictCount: number | null;
   calibrationState: string | null;
+  calibrationRunId: string | null;
   recommended: number | null;
   queueFreshness: string | null;
   duplicateState: string | null;
@@ -128,6 +142,7 @@ export interface BetaJobListItem {
   unresolvedConditionCount: number;
   unresolvedConflictCount: number;
   calibrationState: "UNCALIBRATED" | "CALIBRATION_PENDING" | "CALIBRATED" | null;
+  storedCalibrationState: BetaJobListItem["calibrationState"];
   recommended: boolean;
   queueFreshness: "CURRENT" | "STALE" | null;
   duplicateState: string | null;
@@ -175,6 +190,7 @@ export interface BetaJobDetail {
   unresolvedConditionCount: number;
   unresolvedConflictCount: number;
   calibrationState: BetaJobListItem["calibrationState"];
+  storedCalibrationState: BetaJobListItem["calibrationState"];
   recommended: boolean;
   queueFreshness: BetaJobListItem["queueFreshness"];
   duplicateCandidates: Array<{
@@ -325,14 +341,15 @@ export function listBetaJobs(): BetaJobListItem[] {
          (SELECT id FROM evaluation_versions WHERE job_id = j.id ORDER BY evaluated_at DESC, rowid DESC LIMIT 1)
            AS legacyEvaluationVersionId,
          e.eligibility_status AS eligibilityStatus, e.fit_score AS fitScore,
-         NULL AS coverageJson, e.stale AS evaluationStale,
+         NULL AS coverageJson, ${r2EvaluationStaleSql} AS evaluationStale,
          q.state AS queueState, q.reason_code AS queueReason,
          e.coverage_percent AS coveragePercent,
          e.unresolved_unknown_count AS unknownRequirementCount,
          e.unresolved_condition_count AS unresolvedConditionCount,
          e.unresolved_conflict_count AS unresolvedConflictCount,
-         e.calibration_state AS calibrationState, e.recommended,
-         q.freshness AS queueFreshness,
+         e.calibration_state AS calibrationState, e.calibration_run_id AS calibrationRunId,
+         ${r2RecommendedSql} AS recommended,
+         ${r2QueueFreshnessSql} AS queueFreshness,
          d.state AS duplicateState,
          (SELECT o.expires_at FROM source_observations o
             WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt
@@ -358,7 +375,7 @@ export function listBetaJobs(): BetaJobListItem[] {
          e.coverage_json AS coverageJson, e.stale AS evaluationStale,
          q.state AS queueState, q.reason_code AS queueReason,
          NULL AS coveragePercent, NULL AS unresolvedConditionCount,
-         NULL AS unresolvedConflictCount, NULL AS calibrationState,
+         NULL AS unresolvedConflictCount, NULL AS calibrationState, NULL AS calibrationRunId,
          NULL AS recommended, NULL AS queueFreshness, NULL AS duplicateState,
          (SELECT o.expires_at FROM source_observations o
             WHERE o.job_id = j.id ORDER BY o.observed_at DESC, o.rowid DESC LIMIT 1) AS expiresAt,
@@ -376,7 +393,11 @@ export function listBetaJobs(): BetaJobListItem[] {
          e.fit_score DESC, j.date_discovered DESC`,
     )
     .all() as JobListRow[];
-  return rows.map((row) => ({
+  const calibrationIsCurrent = createCurrentR2CalibrationStatusReader(
+    sqlite,
+    dirname(resolveLocalDataDirectory()),
+  );
+  return rows.map(({ calibrationRunId, ...row }) => ({
     ...row,
     eligibilityStatus: row.eligibilityStatus as BetaJobListItem["eligibilityStatus"],
     coverage: row.coverageJson
@@ -391,7 +412,11 @@ export function listBetaJobs(): BetaJobListItem[] {
     queueState: row.queueState as BetaJobListItem["queueState"],
     unresolvedConditionCount: row.unresolvedConditionCount ?? 0,
     unresolvedConflictCount: row.unresolvedConflictCount ?? 0,
-    calibrationState: row.calibrationState as BetaJobListItem["calibrationState"],
+    storedCalibrationState: row.calibrationState as BetaJobListItem["calibrationState"],
+    calibrationState:
+      row.calibrationState === "CALIBRATED" && !calibrationIsCurrent(calibrationRunId)
+        ? "CALIBRATION_PENDING"
+        : (row.calibrationState as BetaJobListItem["calibrationState"]),
     recommended: Boolean(row.recommended),
     queueFreshness: row.queueFreshness as BetaJobListItem["queueFreshness"],
   }));
@@ -483,9 +508,10 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
          e.unresolved_unknown_count AS unresolvedUnknownCount,
          e.unresolved_condition_count AS unresolvedConditionCount,
          e.unresolved_conflict_count AS unresolvedConflictCount,
-         e.calibration_state AS calibrationState, e.recommended,
-         e.stale AS evaluationStale, q.state AS queueState,
-         q.reason_code AS queueReason, q.freshness AS queueFreshness,
+         e.calibration_state AS calibrationState, e.calibration_run_id AS calibrationRunId,
+         ${r2RecommendedSql} AS recommended,
+         ${r2EvaluationStaleSql} AS evaluationStale, q.state AS queueState,
+         q.reason_code AS queueReason, ${r2QueueFreshnessSql} AS queueFreshness,
          (SELECT c.state FROM r2_duplicate_candidates c
             WHERE c.left_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
                OR c.right_observation_id IN (SELECT id FROM source_observations WHERE job_id = j.id)
@@ -508,7 +534,7 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
          q.reason_code AS queueReason,
          NULL AS coveragePercent, 0 AS unresolvedUnknownCount,
          0 AS unresolvedConditionCount, 0 AS unresolvedConflictCount,
-         NULL AS calibrationState, 0 AS recommended, NULL AS queueFreshness,
+         NULL AS calibrationState, NULL AS calibrationRunId, 0 AS recommended, NULL AS queueFreshness,
          (SELECT c.state FROM duplicate_clusters c
             LEFT JOIN duplicate_cluster_members m ON m.cluster_id = c.id
             WHERE c.canonical_job_id = j.id OR m.source_observation_id = v.source_observation_id
@@ -541,6 +567,7 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
         unresolvedConditionCount: number | null;
         unresolvedConflictCount: number | null;
         calibrationState: BetaJobListItem["calibrationState"];
+        calibrationRunId: string | null;
         recommended: number | null;
         queueFreshness: BetaJobListItem["queueFreshness"];
       }
@@ -704,7 +731,15 @@ export function getBetaJob(jobId: string): BetaJobDetail | null {
     unresolvedUnknownCount: row.unresolvedUnknownCount ?? 0,
     unresolvedConditionCount: row.unresolvedConditionCount ?? 0,
     unresolvedConflictCount: row.unresolvedConflictCount ?? 0,
-    calibrationState: row.calibrationState,
+    storedCalibrationState: row.calibrationState,
+    calibrationState:
+      row.calibrationState === "CALIBRATED" &&
+      !createCurrentR2CalibrationStatusReader(
+        sqlite,
+        dirname(resolveLocalDataDirectory()),
+      )(row.calibrationRunId)
+        ? "CALIBRATION_PENDING"
+        : row.calibrationState,
     recommended: Boolean(row.recommended),
     evaluationStale: Boolean(row.evaluationStale),
     queueState: row.queueState,

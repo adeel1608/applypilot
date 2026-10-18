@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 function safeReturnPath(value: string | null): string {
   return value &&
     value === value.trim() &&
-    /^\/(?:import|jobs(?:\/[A-Za-z0-9._:-]+)?|applications|dashboard|sources)$/.test(value)
+    /^\/(?:import|jobs(?:\/[A-Za-z0-9._:-]+)?|applications|dashboard|sources|calibration)$/.test(
+      value,
+    )
     ? value
     : "/dashboard";
 }

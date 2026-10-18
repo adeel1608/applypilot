@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -66,6 +66,7 @@ const migrationNames = [
   "0012_source_owner_action_receipts.sql",
   "0013_exact_source_request_binding.sql",
   "0014_hosted_application_workflow.sql",
+  "0015_r2_calibration_intake.sql",
 ] as const;
 
 async function createDiskFixture() {
@@ -90,8 +91,8 @@ async function createDiskFixture() {
       await readFile(join(process.cwd(), "packages", "database", "drizzle", name), "utf8"),
     );
   }
-  if (sqlite.pragma("user_version", { simple: true }) !== 14) {
-    throw new Error("R46_07_SCHEMA14_REQUIRED");
+  if (sqlite.pragma("user_version", { simple: true }) !== 15) {
+    throw new Error("R46_07_SCHEMA15_REQUIRED");
   }
   return { root, databasePath, documentsRoot, reportsRoot, sqlite };
 }
@@ -586,6 +587,39 @@ test("stops after an accepted upload when checkpoint persistence is interrupted"
   }
 });
 
+/** Observe immediately so a fast exit cannot be missed; terminate only this owned ChildProcess. */
+function fixtureWorkerReaper(worker: ChildProcess): () => Promise<void> {
+  const exited = new Promise<{
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    failed: boolean;
+  }>((resolve) => {
+    worker.once("exit", (code, signal) => resolve({ code, signal, failed: false }));
+    worker.once("error", () => resolve({ code: null, signal: null, failed: true }));
+  });
+  let reaping: Promise<void> | null = null;
+  return () =>
+    (reaping ??= (async () => {
+      if (worker.exitCode === null && worker.signalCode === null) worker.kill("SIGKILL");
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const termination = await Promise.race([
+          exited,
+          new Promise<never>((_, reject) => {
+            deadline = setTimeout(
+              () => reject(new Error("R46_09_WORKER_TERMINATION_UNPROVEN")),
+              10_000,
+            );
+          }),
+        ]);
+        if (termination.failed || (termination.code === null && termination.signal === null))
+          throw new Error("R46_09_WORKER_TERMINATION_UNPROVEN");
+      } finally {
+        if (deadline) clearTimeout(deadline);
+      }
+    })());
+}
+
 test.describe.configure({ retries: 0 });
 
 test("persists source verification through canonical R2 and packet services to a SQLite-backed browser preview without submit, including answer and disclosure revisions", async ({
@@ -597,6 +631,7 @@ test("persists source verification through canonical R2 and packet services to a
     const { server, targetUrl, counts } = await fixtureServer();
     const transportCounts = { dns: 0, requests: 0 };
     let sqlite = fixture.sqlite;
+    let reapWorker: (() => Promise<void>) | null = null;
     try {
       const { profile, profileVersionId } = installFixtureProfile(sqlite);
       const capabilityValue = fixtureCapability();
@@ -907,9 +942,11 @@ test("persists source verification through canonical R2 and packet services to a
       });
       const barrierPath = join(fixture.root, `r46-09-upload-${repetition}.accepted`);
       const releasePath = join(fixture.root, `r46-09-upload-${repetition}.release`);
+      const workerScript = join(process.cwd(), "scripts", "r46-09-upload-worker.ts");
       const workerArgs = [
-        join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
-        "scripts/r46-09-upload-worker.ts",
+        "--import",
+        "tsx",
+        workerScript,
         fixture.databasePath,
         packet.id,
         persistedPacketDigest,
@@ -921,7 +958,9 @@ test("persists source verification through canonical R2 and packet services to a
       const worker = spawn(process.execPath, workerArgs, {
         cwd: process.cwd(),
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
+      reapWorker = fixtureWorkerReaper(worker);
       let workerStdout = "";
       let workerStderr = "";
       worker.stdout?.on("data", (chunk) => (workerStdout += String(chunk)));
@@ -940,23 +979,20 @@ test("persists source verification through canonical R2 and packet services to a
         }
       };
       await waitForBarrier();
+      const acceptedUpload = JSON.parse(await readFile(barrierPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(acceptedUpload.workerPid, "R46_09_WORKER_PID_MISMATCH").toBe(worker.pid);
+      expect(acceptedUpload).toMatchObject({
+        accepted: true,
+        parentPid: process.pid,
+        workerScript,
+        databasePath: fixture.databasePath,
+        runId: interruptionRunId,
+      });
       expect(counts.uploads).toBe(1);
-      const workerExited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
-        (resolve) => worker.once("exit", (code, signal) => resolve({ code, signal })),
-      );
-      worker.kill("SIGKILL");
-      const termination = await Promise.race([
-        workerExited,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
-      ]);
-      if (termination === null && worker.exitCode === null && worker.signalCode === null) {
-        throw new Error("R46_09_WORKER_TERMINATION_UNPROVEN");
-      }
-      expect(
-        termination !== null
-          ? termination.code !== null || termination.signal !== null
-          : worker.exitCode !== null || worker.signalCode !== null,
-      ).toBe(true);
+      await reapWorker();
       const recoverySqlite = new BetterSqlite3(fixture.databasePath);
       recoverySqlite.pragma("foreign_keys = ON");
       expect(
@@ -970,8 +1006,7 @@ test("persists source verification through canonical R2 and packet services to a
       });
       recoverySqlite.close();
       await writeFile(releasePath, "release");
-      // Keep the barrier configuration until server shutdown; the released
-      // request may still be unwinding after the worker is terminated.
+      // The exact SQLite-owning worker has exited; release cannot resume its checkpoint write.
       const freshContextSqlite = new BetterSqlite3(fixture.databasePath);
       freshContextSqlite.pragma("foreign_keys = ON");
       const reloadedPacket = loadPersistedApplicationPacket({
@@ -1156,6 +1191,22 @@ test("persists source verification through canonical R2 and packet services to a
       expect(preview.state).toBe("FILL_PREVIEW");
       expect(preview.previewDigest).toMatch(/^[a-f0-9]{64}$/);
       expect(counts).toEqual({ uploads: 2, submissions: 0 });
+      expect(
+        new SqliteNonSubmitRunStore(sqlite, interruptionRunId, persistedPacketDigest).load(
+          bindingDigest,
+        ),
+      ).toMatchObject({
+        recoveryRequired: true,
+        recoveryReason: "UPLOAD_OUTCOME_UNKNOWN",
+        activeOperation: "UPLOAD",
+      });
+      expect(
+        sqlite
+          .prepare(
+            "SELECT state,effect_json AS effectJson FROM application_run_operations WHERE run_id=? AND operation='UPLOAD'",
+          )
+          .get(interruptionRunId),
+      ).toEqual({ state: "CLAIMED", effectJson: "{}" });
       expect(
         sqlite.prepare("SELECT count(*) AS count FROM application_run_operations").get(),
       ).toEqual({ count: 8 });
@@ -1342,6 +1393,7 @@ test("persists source verification through canonical R2 and packet services to a
       });
       sqlite.close();
     } finally {
+      await reapWorker?.();
       if (sqlite.open) {
         try {
           sqlite.pragma("wal_checkpoint(TRUNCATE)");

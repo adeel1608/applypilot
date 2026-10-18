@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const navigation = [
   ["Dashboard", "/dashboard"],
   ["Jobs", "/jobs"],
+  ["Calibration", "/calibration"],
   ["Import", "/import"],
   ["Sources", "/sources"],
   ["Applications", "/applications"],

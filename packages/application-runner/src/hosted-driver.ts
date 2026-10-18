@@ -49,6 +49,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
   private denyingProxy: Server | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private closing: Promise<void> | null = null;
   private capability: HostedCapability | null = null;
   private form: HostedForm | null = null;
   private controls: Locator[][] = [];
@@ -969,15 +970,40 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
   }
 
   async close(): Promise<void> {
-    await this.context?.close().catch(() => undefined);
-    await this.browser?.close().catch(() => undefined);
+    if (this.closing) return this.closing;
+    const context = this.context,
+      browser = this.browser,
+      proxy = this.denyingProxy;
+    // Transfer ownership before awaiting; concurrent callers share this cleanup and never retry it.
     this.page = null;
     this.context = null;
     this.browser = null;
-    if (this.denyingProxy) {
-      this.denyingProxy.closeAllConnections();
-      await new Promise<void>((resolve) => this.denyingProxy!.close(() => resolve()));
-      this.denyingProxy = null;
-    }
+    this.denyingProxy = null;
+    this.closing = (async () => {
+      let failed = false;
+      for (const resource of [context, browser]) {
+        try {
+          await resource?.close();
+        } catch {
+          failed = true;
+        }
+      }
+      if (proxy) {
+        try {
+          proxy.closeAllConnections();
+        } catch {
+          failed = true;
+        }
+        try {
+          await new Promise<void>((resolve, reject) =>
+            proxy.close((error) => (error ? reject(error) : resolve())),
+          );
+        } catch {
+          failed = true;
+        }
+      }
+      if (failed) throw new Error("HOSTED_DRIVER_CLEANUP_FAILED");
+    })();
+    return this.closing;
   }
 }

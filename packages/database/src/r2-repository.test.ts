@@ -29,6 +29,7 @@ import { r2GoldenCorpus } from "../../../fixtures/r2/manifest";
 import { BetaRepository } from "./beta-repository";
 import { R2ARepository } from "./r2a-repository";
 import { R2Repository, validateR2AuditMetadata } from "./r2-repository";
+import { currentR2EvaluationVersions } from "./r2-evaluation-currentness";
 
 const databases: BetterSqlite3.Database[] = [];
 const roots: string[] = [];
@@ -706,7 +707,7 @@ describe("R2 persistence", () => {
     ).toThrow();
   });
 
-  it("persists a qualified calibration context only when it binds its durable run", () => {
+  it("preserves aggregate qualification history without admitting new calibrated evaluations", () => {
     const { sqlite, job, normalization } = setup();
     let sequence = 0;
     const repository = new R2Repository(
@@ -738,7 +739,7 @@ describe("R2 persistence", () => {
       calibrationContextVersion: `r2-calibration-context-1:${runId}`,
       calibrationRunId: runId,
     };
-    expect(
+    expect(() =>
       repository.recordEvaluation({
         jobId: job.id,
         jobVersionId: "job-version-current",
@@ -746,13 +747,13 @@ describe("R2 persistence", () => {
         normalization,
         eligibility: result.eligibility,
         fit: calibratedFit,
-      }).created,
-    ).toBe(true);
+      }),
+    ).toThrow("R2_CALIBRATION_INTAKE_PROVENANCE_REQUIRED");
     expect(
       sqlite
         .prepare("SELECT calibration_state, calibration_run_id FROM r2_evaluation_versions")
         .get(),
-    ).toEqual({ calibration_state: "CALIBRATED", calibration_run_id: runId });
+    ).toBeUndefined();
     expect(
       sqlite
         .prepare(
@@ -1058,6 +1059,66 @@ describe("R2 persistence", () => {
       "R2_QUEUE_CURRENT_PREPARING_REQUIRED",
     );
   });
+
+  it.each(Object.keys(currentR2EvaluationVersions()))(
+    "refuses mutually bound historical %s tuples without rewriting history",
+    (field) => {
+      const { sqlite, job } = setup(),
+        normalization = recommendedNormalization();
+      const repository = new R2Repository(sqlite, () => new Date(now));
+      const evaluation = repository.recordEvaluation({
+        jobId: job.id,
+        jobVersionId: "job-version-current",
+        profileVersionId: "profile-version-current",
+        normalization,
+        ...currentEvaluation(normalization),
+      });
+      const decision = {
+        jobId: job.id,
+        state: "PREPARING" as const,
+        r2EvaluationId: evaluation.id,
+        duplicateResolutionVersion: repository.duplicateResolutionVersion(job.id),
+        actor: "OWNER" as const,
+        reasonCode: "FICTIONAL_CURRENT",
+      };
+      repository.recordQueueDecision(decision);
+      expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).not.toThrow();
+      const columns = {
+        evidenceContractVersion: "evidence_contract_version",
+        normalizationVersion: "normalization_version",
+        coverageVersion: "coverage_version",
+        eligibilityEngineVersion: "eligibility_engine_version",
+        scorerVersion: "fit_scorer_version",
+        weightVersion: "weight_version",
+      };
+      const column = columns[field as keyof typeof columns];
+      sqlite
+        .prepare(`UPDATE r2_evaluation_versions SET ${column}=? WHERE id=?`)
+        .run("historical-version", evaluation.id);
+      if (field === "evidenceContractVersion" || field === "coverageVersion")
+        sqlite
+          .prepare(`UPDATE r2_queue_decision_versions SET ${column}=? WHERE r2_evaluation_id=?`)
+          .run("historical-version", evaluation.id);
+      expect(() => repository.assertCurrentPreparing(job.id, evaluation.id)).toThrow(
+        "R2_QUEUE_CURRENT_PREPARING_REQUIRED",
+      );
+      expect(() => repository.recordQueueDecision(decision)).toThrow(
+        "R2_QUEUE_PREPARING_NOT_READY",
+      );
+      expect(
+        sqlite
+          .prepare("SELECT stale FROM r2_evaluation_versions WHERE id=?")
+          .pluck()
+          .get(evaluation.id),
+      ).toBe(0);
+      expect(
+        sqlite.prepare("SELECT state,freshness FROM r2_queue_decision_versions").get(),
+      ).toEqual({ state: "PREPARING", freshness: "CURRENT" });
+      expect(sqlite.prepare("SELECT count(*) FROM r2_queue_decision_versions").pluck().get()).toBe(
+        1,
+      );
+    },
+  );
 
   it("stales PREPARING and invalidates a packet when a duplicate decision changes", () => {
     const { sqlite, job } = setup();

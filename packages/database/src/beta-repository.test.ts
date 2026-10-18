@@ -18,6 +18,7 @@ import { BetaRepository } from "./beta-repository";
 import { SqliteNonSubmitRunStore } from "./non-submit-run-store";
 import { loadPersistedApplicationPacket } from "./persisted-packet";
 import { R2Repository } from "./r2-repository";
+import { currentR2EvaluationVersions } from "./r2-evaluation-currentness";
 
 function migratedDatabase(): BetterSqlite3.Database {
   const sqlite = new BetterSqlite3(":memory:");
@@ -56,6 +57,7 @@ describe("Beta repository", () => {
     const databasePath = join(tmpdir(), `applypilot-r46-08-${randomUUID()}.sqlite`);
     const sqlite = migratedR2Database(databasePath);
     const now = "2026-09-22T00:00:00.000Z";
+    const currentVersions = currentR2EvaluationVersions();
     sqlite
       .prepare(
         `INSERT INTO jobs
@@ -103,11 +105,11 @@ describe("Beta repository", () => {
           eligibility_engine_version,fit_scorer_version,weight_version,calibration_state,
           calibration_context_version,calibration_run_id,recommended,coverage_percent,
           unresolved_unknown_count,unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
-         VALUES ('r2:current','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2','r2-contract-v1',
-          'r2-normalization-v1','r2-coverage-v1','ELIGIBLE','[]',90,'[]','r2-eligibility-v1',
-          'r2-fit-v1','r2-weight-v1','UNCALIBRATED','r2-calibration-context-v1',NULL,1,100,0,0,0,0,?)`,
+         VALUES ('r2:current','job:r2-packet','job:r2-packet:v1','profile:r2-packet:v2',?,
+          ?,?,'ELIGIBLE','[]',90,'[]',?,
+          ?,?,'UNCALIBRATED','r2-calibration-context-v1',NULL,1,100,0,0,0,0,?)`,
       )
-      .run(now);
+      .run(...Object.values(currentVersions), now);
     sqlite
       .prepare(
         `INSERT INTO r2_queue_decision_versions
@@ -115,10 +117,15 @@ describe("Beta repository", () => {
           evidence_contract_version,duplicate_resolution_version,coverage_version,actor,reason_code,
           supersedes_decision_id,created_at)
          VALUES ('queue:r2-current','job:r2-packet',1,'PREPARING','CURRENT','job:r2-packet:v1',
-          'profile:r2-packet:v2','r2:current','r2-contract-v1',?,'r2-coverage-v1',
+          'profile:r2-packet:v2','r2:current',?,?,?,
           'OWNER','OWNER_PREPARING',NULL,?)`,
       )
-      .run(new R2Repository(sqlite).duplicateResolutionVersion("job:r2-packet"), now);
+      .run(
+        currentVersions.evidenceContractVersion,
+        new R2Repository(sqlite).duplicateResolutionVersion("job:r2-packet"),
+        currentVersions.coverageVersion,
+        now,
+      );
     const repository = new BetaRepository(sqlite, () => new Date(now));
     repository.recordDocumentArtifact({
       id: "document:r2-packet",
