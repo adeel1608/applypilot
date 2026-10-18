@@ -225,6 +225,7 @@ it("rejects raw/extra-key evidence and caps later rejections without replacing f
   for (let i = 0; i < 1100; i++)
     recorder.record(
       hostedDiagnostic("HOSTED_DESTINATION_FORBIDDEN", { site: "PROXY_CONNECT_DENIED" }),
+      true,
     );
   expect(recorder.snapshot()).toEqual({
     ...first,
@@ -240,4 +241,28 @@ it("rejects raw/extra-key evidence and caps later rejections without replacing f
     expect(HostedRejectionDiagnosticSchema.safeParse(invalid).success).toBe(false);
     expect(new HostedDiagnosticError("private-canary", invalid).diagnostic).toBeNull();
   }
+});
+
+it("counts only directly observed proxy callbacks after a prior proxy fault", async () => {
+  const driver = new PlaywrightHostedApplicationDriver({ now: () => diagnosticInstant });
+  const { boundary, frame } = routeBoundary(driver);
+  const proxy = driver as unknown as {
+    proxyFailure(site: "PROXY_CONNECT_DENIED" | "PROXY_HTTP_DENIED", method: string): void;
+  };
+  proxy.proxyFailure("PROXY_CONNECT_DENIED", "CONNECT");
+  await boundary.route(diagnosticRoute(boundary.capability.subject.targetUrl, { frame }).route);
+  expect(driver.getRejectionDiagnostic()).toMatchObject({
+    site: "PROXY_CONNECT_DENIED",
+    proxyDenialCount: 1,
+    secondaryRejectionCount: 1,
+    secondaryProxyDenialCount: 0,
+  });
+  proxy.proxyFailure("PROXY_HTTP_DENIED", "GET");
+  expect(driver.getRejectionDiagnostic()).toMatchObject({
+    site: "PROXY_CONNECT_DENIED",
+    proxyDenialCount: 1,
+    secondaryRejectionCount: 2,
+    secondaryProxyDenialCount: 1,
+  });
+  await driver.close();
 });

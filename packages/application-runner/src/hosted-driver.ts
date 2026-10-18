@@ -97,6 +97,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
             }
           : {}),
       }),
+      fields.site === "PROXY_HTTP_DENIED" || fields.site === "PROXY_CONNECT_DENIED",
     );
     this.fault ??= safeHostedError(error);
   }

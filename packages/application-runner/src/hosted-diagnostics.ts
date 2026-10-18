@@ -254,13 +254,12 @@ export class HostedRejectionRecorder {
   private first: HostedRejectionDiagnostic | null = null;
   private secondary = 0;
   private secondaryProxy = 0;
-  record(diagnostic: HostedRejectionDiagnostic): void {
+  record(diagnostic: HostedRejectionDiagnostic, observedProxyDenial = false): void {
     const value = HostedRejectionDiagnosticSchema.parse(diagnostic);
     if (!this.first) this.first = value;
     else {
       this.secondary = Math.min(1000, this.secondary + 1);
-      if (value.site === "PROXY_HTTP_DENIED" || value.site === "PROXY_CONNECT_DENIED")
-        this.secondaryProxy = Math.min(1000, this.secondaryProxy + 1);
+      if (observedProxyDenial) this.secondaryProxy = Math.min(1000, this.secondaryProxy + 1);
     }
   }
   snapshot(): HostedRejectionDiagnostic | null {
