@@ -106,6 +106,90 @@ beforeEach(() => {
 });
 
 describe("source receipt UI", () => {
+  it("shows expiry recovery with current bindings and an empty unchecked confirmation", async () => {
+    const tree = await SourcesPage({
+      searchParams: Promise.resolve({ notice: "confirmation-expired" }),
+    });
+    const rendered = elements(tree);
+    expect(textContent(tree)).toContain("Source confirmation expired");
+    expect(textContent(tree)).toContain("Review the current receipts and runs below");
+    const form = rendered.find((element) => element.props.action === mocks.combinedAction);
+    const inputs = elements(form).filter((element) => element.type === "input");
+    expect(inputs.find((input) => input.props.name === "capabilityVersion")?.props.value).toBe(3);
+    expect(inputs.find((input) => input.props.name === "capabilityDigest")?.props.value).toBe(
+      capability.configurationDigest,
+    );
+    const phrase = inputs.find((input) => input.props.name === "confirmationText");
+    expect(phrase?.props.value).toBeUndefined();
+    expect(phrase?.props.defaultValue).toBeUndefined();
+    const checkbox = inputs.find((input) => input.props.name === "ownerConfirmed");
+    expect(checkbox?.props.checked).not.toBe(true);
+    expect(checkbox?.props.defaultChecked).not.toBe(true);
+    expect(mocks.combinedAction).not.toHaveBeenCalled();
+    expect(mocks.startAction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    undefined,
+    "other",
+    "confirmation-expired\n",
+    "<script>untrusted</script>",
+    ["confirmation-expired"],
+    ["confirmation-expired", "other"],
+  ])("ignores a missing, unknown or ambiguous notice %j", async (notice) => {
+    const tree = await SourcesPage({ searchParams: Promise.resolve({ notice }) });
+    expect(textContent(tree)).not.toContain("Source confirmation expired");
+    expect(textContent(tree)).not.toContain("<script>untrusted</script>");
+  });
+
+  it.each(["RUNNING", "COMPLETE", "OUTCOME_UNKNOWN"])(
+    "expiry recovery cannot restore start authority over a consumed %s run",
+    async (status) => {
+      mocks.getSourceEnablementView.mockResolvedValueOnce({
+        status: "SOURCE_ALLOWLIST_V2_READY",
+        capabilities: [{ ...capability, ownerApprovalState: "CONSUMED", canOwnerStart: false }],
+        recentRuns: [{ id: "existing-run", status, source: "LEVER", alias: "Fictional Tenant" }],
+      });
+      const tree = await SourcesPage({
+        searchParams: Promise.resolve({ notice: "confirmation-expired" }),
+      });
+      const rendered = elements(tree);
+      expect(textContent(tree)).toContain(status.replaceAll("_", " "));
+      expect(rendered.some((element) => element.props.action === mocks.combinedAction)).toBe(false);
+      expect(rendered.some((element) => element.props.action === mocks.startAction)).toBe(false);
+      expect(mocks.issueLocalMutationNonce).not.toHaveBeenCalledWith(
+        "SOURCE_CAPABILITY_APPROVE",
+        "/sources",
+      );
+      expect(mocks.issueLocalMutationNonce).not.toHaveBeenCalledWith(
+        "SOURCE_RUN_START",
+        "/sources",
+      );
+    },
+  );
+
+  it("expiry notice cannot override a revoked head or a CURRENT approval with start blocked", async () => {
+    for (const current of [
+      { ...capability, readiness: "SOURCE_DISABLED", ownerApprovalState: "REVOKED" },
+      { ...capability, ownerApprovalState: "CURRENT", canOwnerStart: false },
+    ]) {
+      mocks.getSourceEnablementView.mockResolvedValueOnce({
+        status: "SOURCE_ALLOWLIST_V2_READY",
+        capabilities: [current],
+        recentRuns: [],
+      });
+      const tree = await SourcesPage({
+        searchParams: Promise.resolve({ notice: "confirmation-expired" }),
+      });
+      expect(elements(tree).some((element) => element.props.action === mocks.combinedAction)).toBe(
+        false,
+      );
+      expect(elements(tree).some((element) => element.props.action === mocks.startAction)).toBe(
+        false,
+      );
+    }
+  });
+
   it("shows one combined owner form for APPROVAL_REQUIRED and leaves boxes unchecked", async () => {
     const tree = await SourcesPage();
     const rendered = elements(tree);

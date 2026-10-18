@@ -15,7 +15,10 @@ export const dynamic = "force-dynamic";
 
 const display = (value: string) => value.replaceAll("_", " ");
 
-export default async function SourcesPage() {
+export default async function SourcesPage({
+  searchParams,
+}: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+  const confirmationExpired = (await searchParams)?.notice === "confirmation-expired";
   const view = await getSourceEnablementView();
   const nonces = await Promise.all(
     view.capabilities.map(async (capability) => {
@@ -51,6 +54,17 @@ export default async function SourcesPage() {
           private capability version and an exact owner confirmation entered below.
         </p>
       </section>
+
+      {confirmationExpired ? (
+        <section className="panel" role="status">
+          <h2>Source confirmation expired</h2>
+          <p>
+            The submitted form expired before this action could start. Review the current receipts
+            and runs below before completing a fresh confirmation, if one is available. Nothing
+            starts automatically.
+          </p>
+        </section>
+      ) : null}
 
       <section className="panel" aria-labelledby="source-state-heading">
         <div className="panel-heading">
