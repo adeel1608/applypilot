@@ -1,5 +1,23 @@
 import { expect, test } from "@playwright/test";
 
+test("expired source confirmation recovery displays current state without starting an action", async ({
+  page,
+}) => {
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") posts.push(request.url());
+  });
+  await page.goto("/sources?notice=confirmation-expired");
+  await expect(page.getByRole("heading", { name: "Source confirmation expired" })).toBeVisible();
+  await expect(page.getByText(/Review the current receipts and runs below/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "WAITING FOR APPROVED TENANT" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /start bounded source read/i })).toHaveCount(0);
+  await page.reload();
+  expect(posts).toEqual([]);
+  await page.goto("/sources?notice=untrusted");
+  await expect(page.getByRole("heading", { name: "Source confirmation expired" })).toHaveCount(0);
+});
+
 test("source approval surface remains disabled without an approved private tenant", async ({
   page,
 }) => {

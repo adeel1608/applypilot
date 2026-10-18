@@ -186,4 +186,38 @@ describe("source owner action gates", () => {
     expect(mocks.consumeLocalMutationNonce).toHaveBeenCalledWith("SOURCE_REVOKE", form);
     expect(mocks.revokeSourceCapability).toHaveBeenCalledWith(capabilityBinding);
   });
+
+  it.each([
+    "MUTATION_NONCE_INVALID",
+    "MUTATION_NONCE_REPLAYED",
+    "MUTATION_NONCE_ACTION_MISMATCH",
+    "MUTATION_NONCE_FIELD_AMBIGUOUS",
+    "MUTATION_NONCE_DUPLICATE",
+    "LOCAL_SESSION_REQUIRED",
+    "NEXT_REDIRECT",
+    "UNEXPECTED_FAILURE",
+  ])("preserves the original %s rejection for both source start entrypoints", async (code) => {
+    const failure = new Error(code);
+    mocks.consumeLocalMutationNonceBatch.mockRejectedValueOnce(failure);
+    mocks.consumeLocalMutationNonce.mockRejectedValueOnce(failure);
+    await expect(
+      approveAndStartSourceRunAction(ownerForm(`APPROVE AND RUN ${capabilityId}`)),
+    ).rejects.toBe(failure);
+    await expect(startSourceRunAction(ownerForm(`RUN ${capabilityId}`))).rejects.toBe(failure);
+    expect(mocks.approveAndRunOwnerSource).not.toHaveBeenCalled();
+    expect(mocks.runOwnerApprovedSource).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it.each(["MUTATION_NONCE_EXPIRED", { message: "MUTATION_NONCE_EXPIRED" }])(
+    "does not interpret non-Error rejection %j as expiry",
+    async (failure) => {
+      mocks.consumeLocalMutationNonceBatch.mockRejectedValueOnce(failure);
+      await expect(
+        approveAndStartSourceRunAction(ownerForm(`APPROVE AND RUN ${capabilityId}`)),
+      ).rejects.toBe(failure);
+      expect(mocks.approveAndRunOwnerSource).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
+    },
+  );
 });

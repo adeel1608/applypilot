@@ -45,8 +45,18 @@ function confirm(formData: FormData, phrase: string): void {
   }
 }
 
+// Only nonce consumption may recover here. Errors after receipt creation or dispatch must propagate.
+function recoverExpiredConfirmation(error: unknown): never {
+  if (error instanceof Error && error.message === "MUTATION_NONCE_EXPIRED") {
+    redirect("/sources?notice=confirmation-expired");
+  }
+  throw error;
+}
+
 export async function startSourceRunAction(formData: FormData) {
-  const gateProof = await consumeLocalMutationNonce("SOURCE_RUN_START", formData);
+  const gateProof = await consumeLocalMutationNonce("SOURCE_RUN_START", formData).catch(
+    recoverExpiredConfirmation,
+  );
   const binding = capabilityBinding(formData);
   confirm(formData, `RUN ${binding.capabilityId}`);
   await runOwnerApprovedSource(binding, gateProof);
@@ -63,7 +73,7 @@ export async function approveAndStartSourceRunAction(formData: FormData) {
       { action: "SOURCE_RUN_START", fieldName: "startMutationNonce" },
     ] as const,
     formData,
-  );
+  ).catch(recoverExpiredConfirmation);
   const binding = capabilityBinding(formData);
   const confirmationText = `APPROVE AND RUN ${binding.capabilityId}`;
   confirm(formData, confirmationText);
