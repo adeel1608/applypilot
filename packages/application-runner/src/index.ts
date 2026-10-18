@@ -13,6 +13,7 @@ export * from "./hosted-contract";
 export * from "./hosted-questions";
 export * from "./hosted-artifact";
 export * from "./hosted-transport";
+export * from "./hosted-diagnostics";
 export * from "./hosted-driver";
 export * from "./hosted-build";
 export * from "./hosted-review";

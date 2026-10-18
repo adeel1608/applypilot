@@ -25,90 +25,20 @@ import {
 } from "./hosted-contract";
 import { pinnedHostedHttpTransport, type HostedHttpTransport } from "./hosted-transport";
 
-const safeCodes = new Set([
-  "HOSTED_REQUEST_BUDGET_EXHAUSTED",
-  "HOSTED_DESTINATION_FORBIDDEN",
-  "HOSTED_METHOD_FORBIDDEN",
-  "HOSTED_REDIRECT_FORBIDDEN",
-  "HOSTED_RESPONSE_TOO_LARGE",
-  "HOSTED_NETWORK_ADDRESS_FORBIDDEN",
-  "HOSTED_NETWORK_ADDRESS_CHANGED",
-  "HOSTED_DNS_FAILED",
-  "HOSTED_CONTENT_ENCODING_UNSUPPORTED",
-  "HOSTED_RATE_LIMIT",
-  "HOSTED_AUTHENTICATION_REQUIRED",
-  "HOSTED_ACCESS_CONTROL",
-  "HOSTED_BOT_PROTECTION",
-  "HOSTED_HTTP_FAILURE",
-  "HOSTED_UPLOAD_ACK_INVALID",
-  "HOSTED_OUTGOING_CONTENT_CHANGED",
-  "HOSTED_SESSION_EXPIRED",
-  "HOSTED_UNSUPPORTED_CONTROL",
-  "HOSTED_FORM_CHANGED",
-  "HOSTED_NATIVE_VALIDATION_FAILED",
-  "HOSTED_DESTINATION_CHANGED",
-  "HOSTED_CONTEXT_LOST",
-  "HOSTED_CONFIRMATION_UNPROVEN",
-  "HOSTED_TRANSPORT_OUTCOME_UNKNOWN",
-  "HOSTED_ACTION_TIMEOUT",
-  "HOSTED_NAVIGATION_TIMEOUT",
-  "HOSTED_ANSWER_NOT_VERIFIED",
-  "HOSTED_APPLICATION_BINDING_INVALID",
-  "HOSTED_APPROVED_DOCUMENT_REQUIRED",
-  "HOSTED_AUDIT_PERSISTENCE_FAILED",
-  "HOSTED_CAPABILITY_CORRUPT",
-  "HOSTED_CAPABILITY_EXPIRED",
-  "HOSTED_CAPABILITY_FAMILY_CHANGED",
-  "HOSTED_CAPABILITY_IMMUTABLE",
-  "HOSTED_CAPABILITY_NOT_CURRENT",
-  "HOSTED_CAPABILITY_SEQUENCE_INVALID",
-  "HOSTED_DISCLOSURE_REPLAYED",
-  "HOSTED_FACT_QUESTION_UNSUPPORTED",
-  "HOSTED_FINAL_PREVIEW_CHANGED",
-  "HOSTED_FINAL_PREVIEW_REQUIRED",
-  "HOSTED_INSPECTION_REPLAYED",
-  "HOSTED_MAPPING_CHANGED",
-  "HOSTED_MODE_MISMATCH",
-  "HOSTED_OPERATION_CLAIM_MISSING",
-  "HOSTED_OPERATION_COMPLETION_INVALID",
-  "HOSTED_OPERATION_SEQUENCE_INVALID",
-  "HOSTED_OWNER_CHOICE_INVALID",
-  "HOSTED_OWNER_CONSENT_INVALID",
-  "HOSTED_OWNER_NONCE_REPLAY",
-  "HOSTED_PACKET_BINDING_REQUIRED",
-  "HOSTED_PACKET_NOT_READY",
-  "HOSTED_PRIVATE_PROFILE_CHANGED",
-  "HOSTED_QUESTION_CONTRACT_REQUIRED",
-  "HOSTED_QUESTION_DISCOVERY_CORRUPT",
-  "HOSTED_QUESTION_SUBJECT_CHANGED",
-  "HOSTED_REVIEWED_BUILD_REQUIRED",
-  "HOSTED_SESSION_CORRUPT",
-  "HOSTED_SESSION_NOT_FOUND",
-  "HOSTED_SOURCE_BINDING_INVALID",
-  "HOSTED_SOURCE_STALE",
-  "HOSTED_SUBJECT_NOT_CURRENT",
-  "HOSTED_SUBMIT_ACTIVATION_GUARDED",
-  "HOSTED_OPERATION_IN_PROGRESS",
-  "HOSTED_REQUIRED_ANSWER_UNKNOWN",
-  "HOSTED_QUESTION_CONTRACT_CHANGED",
-  "HOSTED_QUESTION_REVIEW_INVALID",
-  "HOSTED_ANSWER_OPTION_UNSUPPORTED",
-  "HOSTED_APPROVED_ARTIFACT_ADMISSION_FAILED",
-  "HOSTED_OWNER_CONFIRMATION_REQUIRED",
-  "HOSTED_QUESTION_REVIEW_REQUIRED",
-  "HOSTED_RENDERED_BINDING_CHANGED",
-  "HOSTED_OWNED_RUNTIME_BUILD_CHANGED",
-  "HOSTED_REVIEWED_ROLLOUT_REQUIRED",
-  "HOSTED_OPERATION_STOPPED",
-]);
-export function hostedSafeErrorCode(value: unknown): string | null {
-  return typeof value === "string" && safeCodes.has(value) ? value : null;
-}
-export function safeHostedError(error: unknown): string {
-  return error instanceof Error && safeCodes.has(error.message)
-    ? error.message
-    : "HOSTED_OPERATION_STOPPED";
-}
+export { hostedSafeErrorCode, safeHostedError } from "./hosted-diagnostics";
+import {
+  safeHostedError,
+  HostedDiagnosticError,
+  HostedRejectionRecorder,
+  hostedDiagnostic,
+  hostedErrorDiagnostic,
+  hostedExactMatches,
+  hostedMethodClass,
+  hostedUrlShape,
+  type HostedRejectionDiagnostic,
+  type HostedRejectionSite,
+  type HostedTransportPhase,
+} from "./hosted-diagnostics";
 const csrfNames = new Set(["csrf_token", "csrfmiddlewaretoken", "authenticity_token", "_token"]);
 const digestBytes = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
@@ -124,6 +54,8 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
   private controls: Locator[][] = [];
   private stage: "READ" | "MAP" | "FILL" | "UPLOAD" | "VERIFY" | "REVIEW" | "SUBMIT" = "READ";
   private fault: string | null = null;
+  private readonly rejections = new HostedRejectionRecorder();
+  private proxyDenials = 0;
   private requests = 0;
   private openedAt = 0;
   private pending = new Set<Promise<void>>();
@@ -145,8 +77,41 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
     } = {},
   ) {}
 
+  getRejectionDiagnostic(): HostedRejectionDiagnostic | null {
+    return this.rejections.snapshot();
+  }
+  private observeFailure(error: unknown, fields: Partial<HostedRejectionDiagnostic> = {}): void {
+    const inherited = hostedErrorDiagnostic(error);
+    this.rejections.record(
+      hostedDiagnostic(safeHostedError(error), {
+        stage: this.stage,
+        routeAttemptCount: Math.min(1000, this.requests),
+        proxyDenialCount: this.proxyDenials,
+        ...fields,
+        ...(inherited
+          ? {
+              site: inherited.site,
+              transportPhase: inherited.transportPhase,
+              transportConfig: inherited.transportConfig,
+              urlShape: inherited.urlShape,
+            }
+          : {}),
+      }),
+      fields.site === "PROXY_HTTP_DENIED" || fields.site === "PROXY_CONNECT_DENIED",
+    );
+    this.fault ??= safeHostedError(error);
+  }
+  private proxyFailure(site: "PROXY_HTTP_DENIED" | "PROXY_CONNECT_DENIED", method?: string): void {
+    this.proxyDenials = Math.min(1000, this.proxyDenials + 1);
+    this.observeFailure(new Error("HOSTED_DESTINATION_FORBIDDEN"), {
+      site,
+      method: hostedMethodClass(method),
+      transportPhase: "NOT_INVOKED",
+    });
+  }
+
   private assertHealthy(): void {
-    if (this.fault) throw new Error(this.fault);
+    if (this.fault) throw new HostedDiagnosticError(this.fault, this.getRejectionDiagnostic());
     if (!this.capability || !this.page || this.page.isClosed())
       throw new Error("HOSTED_CONTEXT_LOST");
     const now = this.options.now?.().getTime() ?? Date.now();
@@ -158,11 +123,38 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
   }
 
   private async route(route: Route): Promise<void> {
+    let site: HostedRejectionSite = "UNKNOWN_REJECTION_SITE";
+    let phase: HostedTransportPhase = "NOT_INVOKED";
+    let observed: Partial<HostedRejectionDiagnostic> = {};
     try {
       this.assertHealthy();
       const capability = this.capability!;
       const request = route.request();
       const url = new URL(request.url());
+      const resource = request.resourceType();
+      const resources: Record<string, HostedRejectionDiagnostic["resource"]> = {
+        document: "DOCUMENT",
+        stylesheet: "STYLESHEET",
+        image: "IMAGE",
+        font: "FONT",
+        script: "SCRIPT",
+        xhr: "XHR_FETCH",
+        fetch: "XHR_FETCH",
+      };
+      let isMainFrame: boolean | null = null;
+      try {
+        isMainFrame = request.frame() === this.page!.mainFrame();
+      } catch {
+        /* No frame observed. */
+      }
+      observed = {
+        method: hostedMethodClass(request.method()),
+        resource: resources[resource] ?? "OTHER",
+        isNavigationRequest: request.isNavigationRequest(),
+        isMainFrame,
+        urlShape: hostedUrlShape(url),
+        ...hostedExactMatches(url, capability, this.stage),
+      };
       if (
         url.protocol !== "https:" ||
         url.port ||
@@ -170,8 +162,10 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
         url.password ||
         url.search ||
         url.hash
-      )
+      ) {
+        site = "ROUTE_URL_SHAPE";
         throw new Error("HOSTED_DESTINATION_FORBIDDEN");
+      }
       const matches = (destination: { origin: string; path: string }) =>
         destination.origin === url.origin && destination.path === url.pathname;
       const method = request.method();
@@ -179,9 +173,18 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
         (value) => matches(value) && value.operation === this.stage,
       );
       if (method === "GET") {
-        if (!capability.allowedReads.some(matches) || request.postDataBuffer())
+        if (!capability.allowedReads.some(matches)) {
+          site = "ROUTE_READ_DESTINATION";
           throw new Error("HOSTED_DESTINATION_FORBIDDEN");
-      } else if (method !== "POST" || !write) throw new Error("HOSTED_METHOD_FORBIDDEN");
+        }
+        if (request.postDataBuffer()) {
+          site = "ROUTE_GET_BODY";
+          throw new Error("HOSTED_DESTINATION_FORBIDDEN");
+        }
+      } else if (method !== "POST" || !write) {
+        site = "ROUTE_METHOD_SCOPE";
+        throw new Error("HOSTED_METHOD_FORBIDDEN");
+      }
       const body = request.postDataBuffer();
       const headers = await request.allHeaders();
       if (body && body.length > 5_000_000) throw new Error("HOSTED_OUTGOING_CONTENT_CHANGED");
@@ -190,6 +193,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
       if (++this.requests > capability.requestBudget)
         throw new Error("HOSTED_REQUEST_BUDGET_EXHAUSTED");
       this.options.onRequest?.(method as "GET" | "POST", this.stage);
+      phase = "UNKNOWN";
       const response = await (this.options.transport ?? pinnedHostedHttpTransport)({
         url,
         method: method as "GET" | "POST",
@@ -198,6 +202,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
         byteLimit: capability.responseByteLimit,
         timeoutMs: capability.requestTimeoutMs,
       });
+      phase = this.options.transport ? "UNKNOWN" : "BODY_COMPLETED";
       if (response.status >= 300 && response.status < 400)
         throw new Error("HOSTED_REDIRECT_FORBIDDEN");
       if (response.status === 429) throw new Error("HOSTED_RATE_LIMIT");
@@ -253,7 +258,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
         body: response.body,
       });
     } catch (error) {
-      this.fault = safeHostedError(error);
+      this.observeFailure(error, { ...observed, site, transportPhase: phase });
       await route.abort("blockedbyclient").catch(() => undefined);
     }
   }
@@ -267,17 +272,22 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
     const capability = HostedCapabilitySchema.parse(input);
     if (this.browser || capability.scope !== "PASSIVE_INSPECTION")
       throw new Error("HOSTED_CONTEXT_LOST");
-    if (capability.mode === "REAL" && (this.options.fictionalTransport || this.options.transport))
-      throw new Error("HOSTED_DESTINATION_FORBIDDEN");
+    if (capability.mode === "REAL" && (this.options.fictionalTransport || this.options.transport)) {
+      this.observeFailure(new Error("HOSTED_DESTINATION_FORBIDDEN"), {
+        site: "DRIVER_REAL_MODE_INJECTION",
+        transportPhase: "NOT_INVOKED",
+      });
+      throw new HostedDiagnosticError(this.fault!, this.getRejectionDiagnostic());
+    }
     this.capability = capability;
     this.openedAt = this.options.now?.().getTime() ?? Date.now();
-    this.denyingProxy = createServer((_request, response) => {
-      this.fault = "HOSTED_DESTINATION_FORBIDDEN";
+    this.denyingProxy = createServer((request, response) => {
+      this.proxyFailure("PROXY_HTTP_DENIED", request.method);
       response.writeHead(403);
       response.end();
     });
     this.denyingProxy.on("connect", (_request, socket) => {
-      this.fault = "HOSTED_DESTINATION_FORBIDDEN";
+      this.proxyFailure("PROXY_CONNECT_DENIED", "CONNECT");
       socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
     });
     await new Promise<void>((resolve) => this.denyingProxy!.listen(0, "127.0.0.1", resolve));
@@ -295,16 +305,16 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
     this.page = await this.context.newPage();
     this.context.on("page", (page) => {
       if (page !== this.page) {
-        this.fault = "HOSTED_UNSUPPORTED_CONTROL";
+        this.observeFailure(new Error("HOSTED_UNSUPPORTED_CONTROL"));
         void page.close();
       }
     });
     this.page.on("download", (download) => {
-      this.fault = "HOSTED_UNSUPPORTED_CONTROL";
+      this.observeFailure(new Error("HOSTED_UNSUPPORTED_CONTROL"));
       void download.cancel();
     });
     this.page.on("crash", () => {
-      this.fault = "HOSTED_CONTEXT_LOST";
+      this.observeFailure(new Error("HOSTED_CONTEXT_LOST"));
     });
     await this.context.route("**/*", (route) => {
       const task = this.route(route);
@@ -893,6 +903,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
     state: "CONFIRMED_SUBMITTED" | "OUTCOME_UNKNOWN";
     confirmationDigest: string | null;
     safeStopCode: string | null;
+    rejectionDiagnostic?: HostedRejectionDiagnostic | null;
   }> {
     if (this.submitAttempted) throw new Error("HOSTED_CONTEXT_LOST");
     await this.assertForm();
@@ -950,6 +961,7 @@ export class PlaywrightHostedApplicationDriver implements HostedApplicationDrive
               ? "HOSTED_NAVIGATION_TIMEOUT"
               : "HOSTED_ACTION_TIMEOUT"
             : safeHostedError(error)),
+        rejectionDiagnostic: this.getRejectionDiagnostic(),
       };
     } finally {
       this.stage = "REVIEW";

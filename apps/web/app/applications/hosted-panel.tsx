@@ -16,6 +16,7 @@ import {
   hostedPacketReviewAction,
   hostedStopAction,
 } from "./hosted-actions";
+import { HostedRejectionDetails } from "./hosted-rejection-details";
 
 export async function HostedApplicationPanel() {
   await requireLocalSession("/applications");
@@ -127,6 +128,9 @@ export async function HostedApplicationPanel() {
                   {session.safeStopCode ?? "no recorded stop"}. Review-ready is inactive and
                   preserves the same owned browser until expiry or owner stop.
                 </p>
+              )}
+              {session?.safeStopCode && (
+                <HostedRejectionDetails diagnostic={session.rejectionDiagnostic} />
               )}
               {review?.session.discovery && questionNonce && (
                 <form action={hostedPacketReviewAction} className="import-form">
