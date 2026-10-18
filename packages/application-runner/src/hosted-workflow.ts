@@ -21,6 +21,13 @@ import {
 } from "./hosted-contract";
 import { questionsFromHostedForm, reconcileHostedQuestions } from "./hosted-questions";
 import { safeHostedError } from "./hosted-driver";
+import {
+  HostedDiagnosticError,
+  HostedRejectionDiagnosticSchema,
+  hostedDiagnostic,
+  hostedErrorDiagnostic,
+  type HostedRejectionDiagnostic,
+} from "./hosted-diagnostics";
 
 export const HostedOwnerProofSchema = z
   .object({
@@ -66,6 +73,8 @@ export interface HostedSession {
   requestCount: number;
   safeStopCode: string | null;
   confirmationDigest: string | null;
+  rejectionDiagnostic?: HostedRejectionDiagnostic | null;
+  cleanupFailed?: boolean;
 }
 export interface HostedWorkflowStore {
   assertCapability(capability: HostedCapability, reviewedBuild: HostedBuild): void;
@@ -105,9 +114,15 @@ export interface HostedWorkflowStore {
       preview?: HostedPreview;
       confirmationDigest?: string | null;
       safeStopCode?: string | null;
+      rejectionDiagnostic?: HostedRejectionDiagnostic | null;
     },
   ): void;
-  stop(id: string, safeCode: string, outcomeUnknown: boolean): void;
+  stop(
+    id: string,
+    safeCode: string,
+    outcomeUnknown: boolean,
+    diagnostic?: HostedRejectionDiagnostic | null,
+  ): void;
   recordRequest(id: string): void;
   sourceQuestionDiscovery(subject: HostedSubject): HostedQuestionDiscovery | null;
   authorizeSubmit(
@@ -200,6 +215,46 @@ export class HostedApplicationService {
   recover(): { stopped: number; outcomeUnknown: number } {
     return this.input.store.recoverLostContexts(this.runtimeId);
   }
+  private failure(error: unknown, driver?: HostedApplicationDriver | null): HostedDiagnosticError {
+    const code = safeHostedError(error);
+    let diagnostic = hostedDiagnostic(code);
+    try {
+      const parsed = HostedRejectionDiagnosticSchema.safeParse(
+        driver?.getRejectionDiagnostic?.() ?? hostedErrorDiagnostic(error),
+      );
+      if (parsed.success) diagnostic = parsed.data;
+    } catch {
+      /* Optional evidence cannot prevent terminalization or owned cleanup. */
+    }
+    return new HostedDiagnosticError(code, diagnostic);
+  }
+  private stopFailure(
+    id: string,
+    error: unknown,
+    unknown: boolean,
+    driver?: HostedApplicationDriver | null,
+  ): HostedDiagnosticError {
+    const failure = this.failure(error, driver);
+    try {
+      this.input.store.stop(id, failure.message, unknown, failure.diagnostic);
+    } catch {
+      return new HostedDiagnosticError(failure.message, failure.diagnostic, true);
+    }
+    return failure;
+  }
+  private async closeAfterFailure(id: string, failure: HostedDiagnosticError): Promise<never> {
+    try {
+      await this.closeDriver(id);
+    } catch {
+      throw new HostedDiagnosticError(
+        failure.message,
+        failure.diagnostic,
+        failure.auditPersistenceFailed,
+        true,
+      );
+    }
+    throw failure;
+  }
 
   async inspect(input: HostedCapability, proof: HostedOwnerProof): Promise<HostedSession> {
     const cap = HostedCapabilitySchema.parse(input);
@@ -221,12 +276,8 @@ export class HostedApplicationService {
       this.input.store.inspectComplete(session.id, form, discovery);
       return this.input.store.getSession(session.id);
     } catch (error) {
-      try {
-        this.input.store.stop(session.id, safeHostedError(error), false);
-      } finally {
-        await this.closeDriver(session.id);
-      }
-      throw new Error(safeHostedError(error));
+      const failure = this.stopFailure(session.id, error, false, driver);
+      return await this.closeAfterFailure(session.id, failure);
     }
   }
 
@@ -334,7 +385,8 @@ export class HostedApplicationService {
       return this.input.store.getSession(sessionId);
     } catch (error) {
       // Candidate attachment and upload ambiguity are never automatically retried.
-      try {
+      let failure: HostedDiagnosticError;
+      {
         let uncertain = true;
         try {
           uncertain = ["FILLED", "UPLOADED", "VERIFIED", "REVIEW_READY"].includes(
@@ -343,11 +395,9 @@ export class HostedApplicationService {
         } catch {
           // Lost durable state cannot establish that a candidate mutation did not happen.
         }
-        this.input.store.stop(sessionId, safeHostedError(error), uncertain);
-      } finally {
-        await this.closeDriver(sessionId);
+        failure = this.stopFailure(sessionId, error, uncertain, driver);
       }
-      throw new Error(safeHostedError(error));
+      return await this.closeAfterFailure(sessionId, failure);
     } finally {
       this.inFlight.delete(sessionId);
     }
@@ -359,6 +409,8 @@ export class HostedApplicationService {
     if (this.inFlight.has(sessionId)) throw new Error("HOSTED_OPERATION_IN_PROGRESS");
     this.inFlight.add(sessionId);
     let activated = false;
+    let primaryFailure: HostedDiagnosticError | null = null;
+    let cleanupFailed = false;
     try {
       const session = this.input.store.getSession(sessionId);
       const packet = this.input.store.resolvePacket(session.capability);
@@ -380,20 +432,36 @@ export class HostedApplicationService {
       const result = await driver.submit();
       this.input.store.complete(sessionId, claimId, result.state, result);
     } catch (error) {
-      this.input.store.stop(
+      const failure = this.stopFailure(
         sessionId,
-        activated ? "HOSTED_TRANSPORT_OUTCOME_UNKNOWN" : safeHostedError(error),
+        activated
+          ? new HostedDiagnosticError(
+              "HOSTED_TRANSPORT_OUTCOME_UNKNOWN",
+              this.failure(error, driver).diagnostic,
+            )
+          : error,
         activated,
+        driver,
       );
-      if (!activated) throw new Error(safeHostedError(error));
+      if (!activated || failure.auditPersistenceFailed) primaryFailure = failure;
     } finally {
       try {
         await this.closeDriver(sessionId);
+      } catch {
+        cleanupFailed = true;
       } finally {
         this.inFlight.delete(sessionId);
       }
     }
-    return this.input.store.getSession(sessionId);
+    if (primaryFailure)
+      throw new HostedDiagnosticError(
+        primaryFailure.message,
+        primaryFailure.diagnostic,
+        primaryFailure.auditPersistenceFailed,
+        cleanupFailed,
+      );
+    const result = this.input.store.getSession(sessionId);
+    return cleanupFailed ? { ...result, cleanupFailed: true } : result;
   }
 
   async stop(sessionId: string): Promise<void> {

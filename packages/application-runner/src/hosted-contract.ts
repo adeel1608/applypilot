@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { PacketQuestionGroupSchema, type ApplicationPacket } from "./beta";
+import type { HostedRejectionDiagnostic } from "./hosted-diagnostics";
 
 export const HOSTED_ADAPTER_VERSION = "hosted-native-v1" as const;
 export const HOSTED_DISCLOSURE =
@@ -367,6 +368,7 @@ export type HostedVerifiedArtifact = {
 };
 export interface HostedApplicationDriver {
   readonly adapterVersion: typeof HOSTED_ADAPTER_VERSION;
+  getRejectionDiagnostic?(): HostedRejectionDiagnostic | null;
   inspect(capability: HostedCapability): Promise<HostedForm>;
   map(
     capability: HostedCapability,
@@ -387,6 +389,7 @@ export interface HostedApplicationDriver {
     state: "CONFIRMED_SUBMITTED" | "OUTCOME_UNKNOWN";
     confirmationDigest: string | null;
     safeStopCode: string | null;
+    rejectionDiagnostic?: HostedRejectionDiagnostic | null;
   }>;
   close(): Promise<void>;
 }

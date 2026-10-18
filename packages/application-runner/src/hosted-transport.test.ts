@@ -5,12 +5,20 @@ const mocks = vi.hoisted(() => ({ lookup: vi.fn(), request: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 import { pinnedHostedHttpTransport, type HostedHttpRequest } from "./hosted-transport";
+import { hostedErrorDiagnostic } from "./hosted-diagnostics";
+import { PlaywrightHostedApplicationDriver } from "./hosted-driver";
+import {
+  diagnosticCapability,
+  diagnosticInstant,
+} from "../../../tests/helpers/hosted-diagnostic-fixture";
 let reply: {
   status: number;
   connected: string;
   headers: Record<string, string | string[]>;
   bytes: Buffer;
   error?: string;
+  observeSocket?: boolean;
+  responseError?: boolean;
 };
 const input = (): HostedHttpRequest => ({
   url: new URL("https://jobs.lever.co/fictional/one/apply"),
@@ -34,6 +42,7 @@ beforeEach(() => {
     outgoing.write = () => undefined;
     outgoing.end = () =>
       queueMicrotask(() => {
+        if (reply.observeSocket) outgoing.emit("socket", {});
         if (reply.error) {
           outgoing.emit("error", new Error(reply.error));
           return;
@@ -44,9 +53,189 @@ beforeEach(() => {
           socket: { remoteAddress: reply.connected },
         });
         callback(response);
+        if (reply.responseError) {
+          response.emit("error", new Error("private-canary"));
+          return;
+        }
         if (!response.destroyed) response.end(reply.bytes);
       });
     return outgoing;
+  });
+});
+
+describe("prospective native transport diagnoses with DNS/HTTPS mocked below the REAL admission boundary", () => {
+  const originalReject = (request: HostedHttpRequest) =>
+    request.url.protocol !== "https:" ||
+    !!(
+      request.url.username ||
+      request.url.password ||
+      request.url.port ||
+      request.url.search ||
+      request.url.hash
+    ) ||
+    !["GET", "POST"].includes(request.method) ||
+    !Number.isInteger(request.timeoutMs) ||
+    request.timeoutMs < 100 ||
+    request.timeoutMs > 30000 ||
+    !Number.isInteger(request.byteLimit) ||
+    request.byteLimit < 1000 ||
+    request.byteLimit > 5_000_000 ||
+    (request.body?.length ?? 0) > 5_000_000 ||
+    !!(request.method === "GET" && request.body);
+  const invalids: { name: string; patch: Partial<HostedHttpRequest>; site: string }[] = [
+    ...[
+      "http://fictional.test/path",
+      "https://fictional.test:444/path",
+      "https://user:private-canary@fictional.test/path",
+      "https://fictional.test/path?private-canary=value",
+      "https://fictional.test/path#private-canary",
+    ].map((url) => ({
+      name: "URL shape",
+      patch: { url: new URL(url) },
+      site: "TRANSPORT_URL_SHAPE",
+    })),
+    { name: "method", patch: { method: "DELETE" as "GET" }, site: "TRANSPORT_METHOD" },
+    ...[99, 30001, NaN, 1.5].map((timeoutMs) => ({
+      name: "timeout",
+      patch: { timeoutMs },
+      site: "TRANSPORT_TIMEOUT_RANGE",
+    })),
+    ...[999, 5_000_001, NaN, 1000.5].map((byteLimit) => ({
+      name: "byte limit",
+      patch: { byteLimit },
+      site: "TRANSPORT_BYTE_LIMIT_RANGE",
+    })),
+    {
+      name: "large body",
+      patch: { method: "POST", body: Buffer.alloc(5_000_001) },
+      site: "TRANSPORT_BODY_LIMIT",
+    },
+    { name: "GET empty body", patch: { body: Buffer.alloc(0) }, site: "TRANSPORT_GET_BODY" },
+  ];
+  it("preserves native admission over boundary/configuration combinations", async () => {
+    for (const method of ["GET", "POST", "DELETE"] as const)
+      for (const body of [null, Buffer.alloc(0), Buffer.from("fictional")])
+        for (const timeoutMs of [99, 100, 30000, 30001])
+          for (const byteLimit of [999, 1000, 5_000_000, 5_000_001]) {
+            mocks.lookup.mockClear();
+            mocks.request.mockClear();
+            const request = {
+              ...input(),
+              method: method as "GET" | "POST",
+              body,
+              timeoutMs,
+              byteLimit,
+            };
+            const rejected = originalReject(request);
+            const result = await pinnedHostedHttpTransport(request).then(
+              () => true,
+              () => false,
+            );
+            expect(result).toBe(!rejected);
+            expect(mocks.lookup).toHaveBeenCalledTimes(rejected ? 0 : 1);
+            expect(mocks.request).toHaveBeenCalledTimes(rejected ? 0 : 1);
+          }
+  });
+  it.each(invalids)("retains original denial before DNS: $name", async ({ patch, site }) => {
+    const request = { ...input(), ...patch, headers: { cookie: "private-canary" } };
+    expect(originalReject(request)).toBe(true);
+    const error = await pinnedHostedHttpTransport(request).catch((error) => error);
+    expect(error.message).toBe("HOSTED_DESTINATION_FORBIDDEN");
+    expect(hostedErrorDiagnostic(error)).toMatchObject({ site, transportPhase: "VALIDATING" });
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(JSON.stringify(hostedErrorDiagnostic(error))).not.toContain("private-canary");
+  });
+  it.each(["DNS", "request without socket", "socket", "headers", "body"] as const)(
+    "records only observed phase for failure at %s",
+    async (kind) => {
+      if (kind === "DNS") mocks.lookup.mockRejectedValue(new Error("private-canary"));
+      if (kind === "request without socket" || kind === "socket") reply.error = "private-canary";
+      if (kind === "socket") reply.observeSocket = true;
+      if (kind === "headers") reply.headers["content-encoding"] = "gzip";
+      if (kind === "body") reply.responseError = true;
+      const error = await pinnedHostedHttpTransport(input()).catch((error) => error);
+      expect(hostedErrorDiagnostic(error)?.transportPhase).toBe(
+        kind === "DNS" || kind === "request without socket"
+          ? "DNS_STARTED"
+          : kind === "socket"
+            ? "SOCKET_OBSERVED"
+            : "RESPONSE_HEADERS_OBSERVED",
+      );
+      expect(JSON.stringify(error)).not.toContain("private-canary");
+    },
+  );
+  it("freezes failure phase before later socket, headers and body events", async () => {
+    mocks.request.mockImplementation((_url, _options, callback) => {
+      const outgoing = Object.assign(new EventEmitter(), {
+        write: () => undefined,
+        end: () =>
+          queueMicrotask(() => {
+            outgoing.emit("error", new Error("private-canary"));
+            outgoing.emit("socket", {});
+            const response = Object.assign(new PassThrough(), {
+              statusCode: 200,
+              headers: {},
+              socket: { remoteAddress: "93.184.216.34" },
+            });
+            callback(response);
+            response.end("fictional");
+          }),
+      });
+      return outgoing;
+    });
+    const error = await pinnedHostedHttpTransport(input()).catch((error) => error);
+    expect(hostedErrorDiagnostic(error)).toMatchObject({
+      safeCode: "HOSTED_TRANSPORT_OUTCOME_UNKNOWN",
+      transportPhase: "DNS_STARTED",
+    });
+    expect(JSON.stringify(error)).not.toContain("private-canary");
+  });
+  it.each([200, 403])(
+    "uses REAL native transport and actual Chromium/proxy/route/fulfill with status %s",
+    async (status) => {
+      reply.status = status;
+      reply.observeSocket = true;
+      reply.bytes = Buffer.from(
+        '<form method="post" action="/fictional/post/apply"><label>Fictional name<input name="name"></label><button type="submit">Apply</button></form>',
+      );
+      const driver = new PlaywrightHostedApplicationDriver({ now: () => diagnosticInstant });
+      try {
+        const result = driver.inspect({ ...diagnosticCapability(), mode: "REAL" });
+        if (status === 200) {
+          expect((await result).controls).toHaveLength(2);
+          expect(driver.getRejectionDiagnostic()).toBeNull();
+        } else {
+          await expect(result).rejects.toThrow("HOSTED_ACCESS_CONTROL");
+          expect(driver.getRejectionDiagnostic()).toMatchObject({
+            transportPhase: "BODY_COMPLETED",
+            resource: "DOCUMENT",
+            isMainFrame: true,
+            routeAttemptCount: 1,
+          });
+        }
+        expect(mocks.lookup).toHaveBeenCalledTimes(1);
+        expect(mocks.request).toHaveBeenCalledTimes(1);
+      } finally {
+        await driver.close();
+      }
+    },
+    30000,
+  );
+  it("still refuses injected transports in REAL before Chromium or DNS", async () => {
+    const transport = vi.fn();
+    const driver = new PlaywrightHostedApplicationDriver({ transport });
+    await expect(driver.inspect({ ...diagnosticCapability(), mode: "REAL" })).rejects.toThrow(
+      "HOSTED_DESTINATION_FORBIDDEN",
+    );
+    expect(driver.getRejectionDiagnostic()).toMatchObject({
+      site: "DRIVER_REAL_MODE_INJECTION",
+      resource: "UNKNOWN",
+      transportPhase: "NOT_INVOKED",
+    });
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(transport).not.toHaveBeenCalled();
+    await driver.close();
   });
 });
 afterEach(() => vi.useRealTimers());

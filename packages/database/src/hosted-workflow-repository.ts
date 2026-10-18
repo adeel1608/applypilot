@@ -12,6 +12,7 @@ import {
   HostedPreviewSchema,
   HostedQuestionDiscoverySchema,
   HostedSubjectSchema,
+  HostedRejectionDiagnosticSchema,
   PRIVATE_PREPARATION_VERIFICATION_POLICY,
   admitHostedPdf,
   assessVerificationFreshness,
@@ -37,6 +38,7 @@ import {
   type HostedUploadProof,
   type HostedWorkflowStore,
   type ApplicationPacket,
+  type HostedRejectionDiagnostic,
 } from "@applypilot/application-runner";
 import { BetaRepository } from "./beta-repository";
 import { SourceEnablementRepository } from "./source-enablement-repository";
@@ -400,10 +402,32 @@ export class HostedWorkflowRepository implements HostedWorkflowStore {
         requestCount: row.requestCount,
         safeStopCode: row.safeStopCode,
         confirmationDigest: row.confirmationDigest,
+        rejectionDiagnostic: this.readRejectionDiagnostic(id),
       };
     } catch {
       throw new Error("HOSTED_SESSION_CORRUPT");
     }
+  }
+  /** Only the first terminal audit can supply evidence. Never backfill from later events. */
+  private readRejectionDiagnostic(id: string): HostedRejectionDiagnostic | null {
+    const audits = this.sqlite
+      .prepare(
+        "SELECT event_type AS event,redacted_metadata_json AS json FROM audit_events WHERE entity_type='HOSTED_APPLICATION' AND entity_id=? AND event_type IN ('HOSTED_SESSION_STOPPED','HOSTED_OPERATION_COMPLETE') ORDER BY rowid LIMIT 100",
+      )
+      .all(id) as { event: string; json: string }[];
+    for (const audit of audits) {
+      if (audit.json.length > 8000) return null;
+      try {
+        const value = JSON.parse(audit.json);
+        if (audit.event !== "HOSTED_SESSION_STOPPED" && value?.state !== "OUTCOME_UNKNOWN")
+          continue;
+        const diagnostic = HostedRejectionDiagnosticSchema.safeParse(value?.rejectionDiagnostic);
+        return diagnostic.success ? diagnostic.data : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
   recordDiscovery(subject: HostedSubject, input: HostedQuestionDiscovery): string {
     this.assertSubject(subject);
@@ -853,6 +877,7 @@ export class HostedWorkflowRepository implements HostedWorkflowStore {
       preview?: HostedPreview;
       confirmationDigest?: string | null;
       safeStopCode?: string | null;
+      rejectionDiagnostic?: HostedRejectionDiagnostic | null;
     } = {},
   ): void {
     this.sqlite
@@ -951,6 +976,13 @@ export class HostedWorkflowRepository implements HostedWorkflowStore {
           state,
           mode: session.capability.mode,
           previewDigest: preview ? hostedDigest(preview) : null,
+          ...(state === "OUTCOME_UNKNOWN" && evidence.rejectionDiagnostic
+            ? {
+                rejectionDiagnostic: HostedRejectionDiagnosticSchema.parse(
+                  evidence.rejectionDiagnostic,
+                ),
+              }
+            : {}),
         });
       })
       .immediate();
@@ -1047,7 +1079,12 @@ export class HostedWorkflowRepository implements HostedWorkflowStore {
       })
       .immediate();
   }
-  stop(id: string, safeCode: string, outcomeUnknown: boolean): void {
+  stop(
+    id: string,
+    safeCode: string,
+    outcomeUnknown: boolean,
+    diagnostic?: HostedRejectionDiagnostic | null,
+  ): void {
     if (!/^HOSTED_[A-Z_]{1,70}$/.test(safeCode)) safeCode = "HOSTED_OPERATION_STOPPED";
     const claims = this.sqlite
       .prepare(
@@ -1079,7 +1116,13 @@ export class HostedWorkflowRepository implements HostedWorkflowStore {
       this.sqlite
         .transaction(() => {
           update();
-          this.audit(id, "HOSTED_SESSION_STOPPED", { state, safeCode });
+          this.audit(id, "HOSTED_SESSION_STOPPED", {
+            state,
+            safeCode,
+            ...(diagnostic
+              ? { rejectionDiagnostic: HostedRejectionDiagnosticSchema.parse(diagnostic) }
+              : {}),
+          });
         })
         .immediate();
     } catch {
