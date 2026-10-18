@@ -12,6 +12,7 @@ import {
   type R2CalibrationGateInput,
   type R2FitResult,
   type R2GoldenMetrics,
+  type ValidatedR2CalibrationSafety,
 } from "@applypilot/fit-scorer";
 import {
   R2ANormalizationSchema,
@@ -27,6 +28,14 @@ import {
 
 import { ownerCorrectedR2Normalization, r2CorrectionValueDigest } from "./r2-corrections";
 import { mergePacketReadinessJson } from "./packet-envelope";
+import {
+  r2EvaluationVersionsAreCurrent,
+  type R2EvaluationVersions,
+} from "./r2-evaluation-currentness";
+import {
+  assertCurrentCalibrationQualification,
+  currentR2CalibrationEngine,
+} from "./r2-calibration-currentness";
 
 export const R2_DUPLICATE_DETECTOR_VERSION = "r2-duplicate-1";
 export const R2_CORRECTION_APPLICABILITY_VERSION = "r2-correction-applicability-1";
@@ -161,6 +170,7 @@ export class R2Repository {
     private readonly sqlite: BetterSqlite3.Database,
     private readonly now: () => Date = () => new Date(),
     private readonly id: () => string = randomUUID,
+    private readonly context?: { calibrationSafety: () => ValidatedR2CalibrationSafety },
   ) {}
 
   available(): boolean {
@@ -205,6 +215,11 @@ export class R2Repository {
                 e.profile_version_id AS evaluationProfileVersionId,
                 e.evidence_contract_version AS evaluationEvidenceContractVersion,
                 e.coverage_version AS evaluationCoverageVersion,
+                e.evidence_contract_version AS evidenceContractVersion,
+                e.normalization_version AS normalizationVersion,
+                e.coverage_version AS coverageVersion,
+                e.eligibility_engine_version AS eligibilityEngineVersion,
+                e.fit_scorer_version AS scorerVersion, e.weight_version AS weightVersion,
                 e.eligibility_status AS eligibilityStatus, e.recommended, e.stale,
                 (SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1)
                   AS currentJobVersionId,
@@ -215,7 +230,7 @@ export class R2Repository {
          WHERE q.job_id = ? ORDER BY q.version DESC LIMIT 1`,
       )
       .get(jobId, jobId) as
-      | {
+      | (R2EvaluationVersions & {
           state: string;
           freshness: string;
           queueJobVersionId: string;
@@ -233,7 +248,7 @@ export class R2Repository {
           stale: number;
           currentJobVersionId: string | null;
           currentProfile: number;
-        }
+        })
       | undefined;
     const unresolvedDuplicate = this.sqlite
       .prepare(
@@ -258,6 +273,7 @@ export class R2Repository {
       row.eligibilityStatus !== "ELIGIBLE" ||
       !row.recommended ||
       row.stale !== 0 ||
+      !r2EvaluationVersionsAreCurrent(row) ||
       row.queueDuplicateResolutionVersion !== this.duplicateResolutionVersion(jobId) ||
       unresolvedDuplicate
     ) {
@@ -326,6 +342,29 @@ export class R2Repository {
     if (input.fit.calibrationState === "CALIBRATED" && !calibrationRunId) {
       throw new Error("R2_CALIBRATION_RUN_REQUIRED");
     }
+    const assertIntakeQualification = () => {
+      if (input.fit.calibrationState !== "CALIBRATED") return;
+      if (!this.context) throw new Error("R2_CALIBRATION_INTAKE_PROVENANCE_REQUIRED");
+      const profile = this.sqlite
+        .prepare("SELECT content_hash AS hash FROM candidate_profile_versions WHERE id=?")
+        .get(profileVersionId) as { hash: string } | undefined;
+      if (!profile) throw new Error("R2_CALIBRATION_ACTIVE_PROFILE_REQUIRED");
+      assertCurrentCalibrationQualification(this.sqlite, {
+        runId: calibrationRunId!,
+        expectedEngine: {
+          ...currentR2CalibrationEngine(),
+          parserVersion: normalization.parserVersion,
+          normalizationVersion: normalization.normalizationVersion,
+          evidenceContractVersion: normalization.evidenceContractVersion,
+          eligibilityEngineVersion: input.eligibility.engineVersion,
+          scorerVersion: input.fit.scorerVersion,
+          weightVersion: input.fit.weightVersion,
+        },
+        profileVersionId,
+        profileHash: profile.hash,
+        safetyEvidence: this.context.calibrationSafety(),
+      });
+    };
     if (calibrationRunId) {
       const calibration = this.sqlite
         .prepare(
@@ -367,6 +406,7 @@ export class R2Repository {
         throw new Error("R2_CALIBRATION_RUN_NOT_QUALIFIED");
       }
     }
+    assertIntakeQualification();
     const latestJob = this.sqlite
       .prepare("SELECT id FROM job_versions WHERE job_id = ? ORDER BY version DESC LIMIT 1")
       .get(jobId) as { id: string } | undefined;
@@ -438,6 +478,8 @@ export class R2Repository {
       return { id: existing.id, created: false };
     }
     return this.sqlite.transaction(() => {
+      // Recheck inside the write transaction; a current run read before BEGIN is not write admission.
+      assertIntakeQualification();
       const now = this.now().toISOString();
       this.sqlite
         .prepare("UPDATE r2_evaluation_versions SET stale = 1 WHERE job_id = ? AND stale = 0")
@@ -689,12 +731,15 @@ export class R2Repository {
       .prepare(
         `SELECT id, job_version_id AS jobVersionId, profile_version_id AS profileVersionId,
                 evidence_contract_version AS evidenceContractVersion,
+                normalization_version AS normalizationVersion,
+                eligibility_engine_version AS eligibilityEngineVersion,
+                fit_scorer_version AS scorerVersion, weight_version AS weightVersion,
                 coverage_version AS coverageVersion, eligibility_status AS eligibilityStatus,
                 recommended, stale
          FROM r2_evaluation_versions WHERE id = ? AND job_id = ?`,
       )
       .get(input.r2EvaluationId, jobId) as
-      | {
+      | (R2EvaluationVersions & {
           id: string;
           jobVersionId: string;
           profileVersionId: string;
@@ -703,7 +748,7 @@ export class R2Repository {
           eligibilityStatus: string;
           recommended: number;
           stale: number;
-        }
+        })
       | undefined;
     if (!evaluation || evaluation.stale) throw new Error("R2_CURRENT_EVALUATION_REQUIRED");
     const currentJobVersion = this.sqlite
@@ -729,6 +774,7 @@ export class R2Repository {
       input.state === "PREPARING" &&
       (evaluation.eligibilityStatus !== "ELIGIBLE" ||
         !evaluation.recommended ||
+        !r2EvaluationVersionsAreCurrent(evaluation) ||
         unresolvedDuplicate)
     ) {
       throw new Error("R2_QUEUE_PREPARING_NOT_READY");

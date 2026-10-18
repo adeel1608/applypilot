@@ -8,9 +8,13 @@ import { fixtureJob, testProfile } from "../../../tests/fixture-data";
 const mocks = vi.hoisted(() => ({
   sqlite: null as unknown,
   beta: null as unknown,
+  calibrationRunIsCurrent: vi.fn<(runId: string | null | undefined) => boolean>(() => false),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@web/lib/r2-calibration-status", () => ({
+  createCurrentR2CalibrationStatusReader: () => mocks.calibrationRunIsCurrent,
+}));
 vi.mock("@web/lib/local-database", async (importOriginal) => {
   const database = await importOriginal<typeof import("@applypilot/database")>();
   return {
@@ -27,8 +31,8 @@ vi.mock("@web/lib/local-database", async (importOriginal) => {
   };
 });
 
-import { BetaRepository } from "@applypilot/database";
-import { listBetaJobs, preparePrivatePacket } from "@web/lib/beta-workspace";
+import { BetaRepository, currentR2EvaluationVersions } from "@applypilot/database";
+import { getBetaJob, listBetaJobs, preparePrivatePacket } from "@web/lib/beta-workspace";
 
 const migrationNames = [
   "0000_applypilot_foundation.sql",
@@ -46,6 +50,7 @@ const migrationNames = [
   "0012_source_owner_action_receipts.sql",
   "0013_exact_source_request_binding.sql",
   "0014_hosted_application_workflow.sql",
+  "0015_r2_calibration_intake.sql",
 ] as const;
 
 let sqlite: BetterSqlite3.Database | undefined;
@@ -132,6 +137,17 @@ function fixtureDatabase(): BetterSqlite3.Database {
         'ELIGIBLE','[]',80,'[]','1.0.0','2.2.0','r2-weights-1','UNCALIBRATED',
         'r2-calibration-context-1:unreviewed',NULL,1,100,0,0,0,0,?)`,
   ).run(job.id, jobVersionId, profileVersionId, now);
+  const installed = currentR2EvaluationVersions();
+  db.prepare(
+    `UPDATE r2_evaluation_versions SET evidence_contract_version=?,normalization_version=?,coverage_version=?,eligibility_engine_version=?,fit_scorer_version=?,weight_version=? WHERE id='r2-evaluation:inspection-packet-gate'`,
+  ).run(
+    installed.evidenceContractVersion,
+    installed.normalizationVersion,
+    installed.coverageVersion,
+    installed.eligibilityEngineVersion,
+    installed.scorerVersion,
+    installed.weightVersion,
+  );
   return db;
 }
 
@@ -140,6 +156,7 @@ afterEach(() => {
   sqlite = undefined;
   mocks.sqlite = null;
   mocks.beta = null;
+  mocks.calibrationRunIsCurrent.mockReset().mockReturnValue(false);
   vi.restoreAllMocks();
 });
 
@@ -165,6 +182,163 @@ describe("private packet preparation verification gate", () => {
     expect(sqlite.prepare("SELECT count(*) AS count FROM application_packets").get()).toEqual({
       count: 0,
     });
+  });
+});
+
+function addCurrentDashboardQueue() {
+  const current = currentR2EvaluationVersions();
+  sqlite!
+    .prepare(
+      `INSERT INTO r2_queue_decision_versions (id,job_id,version,state,freshness,job_version_id,profile_version_id,r2_evaluation_id,evidence_contract_version,duplicate_resolution_version,coverage_version,actor,reason_code,created_at)
+    VALUES ('queue:installed','job-persisted-inspection-packet-gate',1,'PREPARING','CURRENT','job-version-persisted-inspection-packet-gate','profile-version-persisted-inspection-packet-gate','r2-evaluation:inspection-packet-gate',?,'fictional-duplicate-version',?,'OWNER','FICTIONAL_OWNER_ACTION',?)`,
+    )
+    .run(current.evidenceContractVersion, current.coverageVersion, "2026-10-18T00:00:00.000Z");
+}
+
+describe("installed R2 versions in job views", () => {
+  it.each([
+    ["CALIBRATED", false, "CALIBRATION_PENDING"],
+    ["CALIBRATED", true, "CALIBRATED"],
+    ["CALIBRATION_PENDING", true, "CALIBRATION_PENDING"],
+    ["UNCALIBRATED", true, "UNCALIBRATED"],
+  ] as const)(
+    "projects stored %s with current qualification %s without changing matching or history",
+    (storedState, isCurrent, projectedState) => {
+      sqlite = fixtureDatabase();
+      mocks.sqlite = sqlite;
+      addCurrentDashboardQueue();
+      sqlite
+        .prepare(
+          `INSERT INTO r2_calibration_runs
+        (id,scorer_version,weight_version,corpus_version,fictional_case_count,private_reviewed_count,
+         role_family_count,status_count,ordinal_agreement_basis_points,top_k,top_k_utility_basis_points,state,created_at)
+        VALUES ('fictional-exact-run','fixture','fixture','fixture',0,0,0,0,0,0,0,'CALIBRATION_PENDING','2026-10-18')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          "UPDATE r2_evaluation_versions SET calibration_state=?,calibration_run_id='fictional-exact-run'",
+        )
+        .run(storedState);
+      mocks.calibrationRunIsCurrent.mockReturnValue(isCurrent);
+      const before = JSON.stringify(sqlite.prepare("SELECT * FROM r2_evaluation_versions").all());
+      const queueBefore = JSON.stringify(
+        sqlite.prepare("SELECT * FROM r2_queue_decision_versions").all(),
+      );
+      sqlite.pragma("query_only=ON");
+      const expected = {
+        calibrationState: projectedState,
+        storedCalibrationState: storedState,
+        evaluationStale: false,
+        eligibilityStatus: "ELIGIBLE",
+        fitScore: 80,
+        recommended: true,
+        queueState: "PREPARING",
+        queueFreshness: "CURRENT",
+      };
+      expect(listBetaJobs()[0]).toMatchObject(expected);
+      expect(getBetaJob("job-persisted-inspection-packet-gate")).toMatchObject(expected);
+      if (storedState === "CALIBRATED") {
+        expect(mocks.calibrationRunIsCurrent).toHaveBeenCalledTimes(2);
+        expect(mocks.calibrationRunIsCurrent).toHaveBeenNthCalledWith(1, "fictional-exact-run");
+        expect(mocks.calibrationRunIsCurrent).toHaveBeenNthCalledWith(2, "fictional-exact-run");
+      } else {
+        expect(mocks.calibrationRunIsCurrent).not.toHaveBeenCalled();
+      }
+      expect(JSON.stringify(sqlite.prepare("SELECT * FROM r2_evaluation_versions").all())).toBe(
+        before,
+      );
+      expect(JSON.stringify(sqlite.prepare("SELECT * FROM r2_queue_decision_versions").all())).toBe(
+        queueBefore,
+      );
+    },
+  );
+
+  it("treats a missing exact calibration run as pending and does not check unevaluated rows", () => {
+    sqlite = fixtureDatabase();
+    mocks.sqlite = sqlite;
+    sqlite
+      .prepare(
+        "UPDATE r2_evaluation_versions SET calibration_state='CALIBRATED',calibration_run_id=NULL",
+      )
+      .run();
+    addDashboardJob("job-fictional-unscored-calibration");
+    const rows = listBetaJobs();
+    expect(rows.find(({ id }) => id === "job-persisted-inspection-packet-gate")).toMatchObject({
+      calibrationState: "CALIBRATION_PENDING",
+      storedCalibrationState: "CALIBRATED",
+    });
+    expect(rows.find(({ id }) => id === "job-fictional-unscored-calibration")).toMatchObject({
+      calibrationState: null,
+      storedCalibrationState: null,
+    });
+    expect(mocks.calibrationRunIsCurrent).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it.each([
+    "evidence_contract_version",
+    "normalization_version",
+    "coverage_version",
+    "eligibility_engine_version",
+    "fit_scorer_version",
+    "weight_version",
+  ])("projects %s drift as stale without rewriting history", (column) => {
+    sqlite = fixtureDatabase();
+    mocks.sqlite = sqlite;
+    addCurrentDashboardQueue();
+    sqlite.prepare(`UPDATE r2_evaluation_versions SET ${column}='historical'`).run();
+    if (column === "evidence_contract_version" || column === "coverage_version")
+      sqlite.prepare(`UPDATE r2_queue_decision_versions SET ${column}='historical'`).run();
+    const before = JSON.stringify(sqlite.prepare("SELECT * FROM r2_evaluation_versions").all());
+    const queueBefore = JSON.stringify(
+      sqlite.prepare("SELECT * FROM r2_queue_decision_versions").all(),
+    );
+    sqlite.pragma("query_only=ON");
+    expect(
+      listBetaJobs().find(({ id }) => id === "job-persisted-inspection-packet-gate"),
+    ).toMatchObject({
+      evaluationStale: true,
+      recommended: false,
+      queueState: "PREPARING",
+      queueFreshness: "STALE",
+    });
+    expect(getBetaJob("job-persisted-inspection-packet-gate")).toMatchObject({
+      evaluationStale: true,
+      recommended: false,
+      queueFreshness: "STALE",
+    });
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM r2_evaluation_versions").all())).toBe(
+      before,
+    );
+    expect(JSON.stringify(sqlite.prepare("SELECT * FROM r2_queue_decision_versions").all())).toBe(
+      queueBefore,
+    );
+  });
+
+  it("retains genuine current evaluation and queue projections", () => {
+    sqlite = fixtureDatabase();
+    mocks.sqlite = sqlite;
+    addCurrentDashboardQueue();
+    sqlite.pragma("query_only=ON");
+    expect(listBetaJobs()[0]).toMatchObject({
+      evaluationStale: false,
+      recommended: true,
+      queueFreshness: "CURRENT",
+    });
+    expect(getBetaJob("job-persisted-inspection-packet-gate")).toMatchObject({
+      evaluationStale: false,
+      recommended: true,
+      queueFreshness: "CURRENT",
+    });
+  });
+
+  it("projects a queue bound to another evaluation as stale", () => {
+    sqlite = fixtureDatabase();
+    mocks.sqlite = sqlite;
+    addCurrentDashboardQueue();
+    sqlite.prepare("UPDATE r2_queue_decision_versions SET coverage_version='historical'").run();
+    expect(listBetaJobs()[0]?.queueFreshness).toBe("STALE");
+    expect(getBetaJob("job-persisted-inspection-packet-gate")?.queueFreshness).toBe("STALE");
   });
 });
 

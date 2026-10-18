@@ -6,7 +6,12 @@ import { join, resolve } from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 
 import { CandidateProfileSchema, candidateProfileContentHash } from "@applypilot/candidate-profile";
-import { BetaRepository, R2ARepository, R2Repository } from "@applypilot/database";
+import {
+  BetaRepository,
+  R2ARepository,
+  R2Repository,
+  currentR2EvaluationVersions,
+} from "@applypilot/database";
 import { normalizeR2AJobEvidence } from "@applypilot/job-importer";
 import { fixtureJob, testProfile } from "../tests/fixture-data";
 
@@ -60,6 +65,7 @@ try {
       "0012_source_owner_action_receipts.sql",
       "0013_exact_source_request_binding.sql",
       "0014_hosted_application_workflow.sql",
+      "0015_r2_calibration_intake.sql",
     ]
       .map((file) => readFileSync(resolve("packages", "database", "drizzle", file), "utf8"))
       .join("\n"),
@@ -215,6 +221,16 @@ Documents
     const verificationId = `verification:e2e:${suffix}`;
     const legacyEvaluationId = `evaluation:legacy:e2e:${suffix}`;
     const r2EvaluationId = `evaluation:r2:e2e:${suffix}`;
+    const versions = input.stalePreparingQueue
+      ? {
+          evidenceContractVersion: "3.1.0",
+          normalizationVersion: "3.1.0",
+          coverageVersion: "3.1.0:3.1.0",
+          eligibilityEngineVersion: "2.0.0",
+          scorerVersion: "2.0.0",
+          weightVersion: "r2-weights-1",
+        }
+      : currentR2EvaluationVersions();
     const fixture = {
       ...job,
       id: input.jobId,
@@ -390,11 +406,18 @@ Documents
            weight_version,calibration_state,calibration_context_version,calibration_run_id,
            recommended,coverage_percent,unresolved_unknown_count,
            unresolved_condition_count,unresolved_conflict_count,stale,evaluated_at)
-         VALUES (?,?,?,'profile-version:e2e','3.1.0','3.1.0','3.1.0:3.1.0','ELIGIBLE','[]',
-           82,'[]','2.0.0','2.0.0','r2-weights-1','UNCALIBRATED',
+         VALUES (?,?,?,'profile-version:e2e',?,?,?,'ELIGIBLE','[]',
+           82,'[]',?,?,?,'UNCALIBRATED',
            'r2-calibration-context-1:unreviewed',NULL,?,100,0,0,0,0,?)`,
       )
-      .run(r2EvaluationId, input.jobId, jobVersionId, input.recommended ? 1 : 0, now);
+      .run(
+        r2EvaluationId,
+        input.jobId,
+        jobVersionId,
+        ...Object.values(versions),
+        input.recommended ? 1 : 0,
+        now,
+      );
     if (input.stalePreparingQueue) {
       sqlite
         .prepare(

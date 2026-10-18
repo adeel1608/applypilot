@@ -15,6 +15,10 @@ import {
 } from "@applypilot/application-runner";
 
 import { R2Repository } from "./r2-repository";
+import {
+  r2EvaluationVersionsAreCurrent,
+  type R2EvaluationVersions,
+} from "./r2-evaluation-currentness";
 
 const ReadinessEnvelopeSchema = z
   .object({
@@ -134,17 +138,21 @@ function currentVersionState(sqlite: BetterSqlite3.Database, row: PacketRow): bo
   const r2 = sqlite
     .prepare(
       `SELECT job_id AS jobId,job_version_id AS jobVersionId,profile_version_id AS profileVersionId,
+              evidence_contract_version AS evidenceContractVersion,
+              normalization_version AS normalizationVersion, coverage_version AS coverageVersion,
+              eligibility_engine_version AS eligibilityEngineVersion,
+              fit_scorer_version AS scorerVersion, weight_version AS weightVersion,
               eligibility_status AS eligibilityStatus,stale
        FROM r2_evaluation_versions WHERE id=?`,
     )
     .get(row.r2EvaluationId) as
-    | {
+    | (R2EvaluationVersions & {
         jobId: string;
         jobVersionId: string;
         profileVersionId: string;
         eligibilityStatus: string;
         stale: number;
-      }
+      })
     | undefined;
   const queue = sqlite
     .prepare(
@@ -164,6 +172,7 @@ function currentVersionState(sqlite: BetterSqlite3.Database, row: PacketRow): bo
   return Boolean(
     r2 &&
       r2.stale === 0 &&
+      r2EvaluationVersionsAreCurrent(r2) &&
       r2.jobId === row.jobId &&
       r2.jobVersionId === row.jobVersionId &&
       r2.profileVersionId === row.profileVersionId &&

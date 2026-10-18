@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { parse, parseFragment } from "parse5";
 
 import {
   JobFieldFamilySchema,
@@ -21,8 +22,9 @@ import {
   type SourceEvidencePointer,
 } from "@applypilot/job-model";
 
-import { extractInertHtmlText } from "./sanitize";
 import { normalizeText } from "@applypilot/shared";
+import { IMPORT_LIMITS } from "./limits";
+import { ImportValidationError } from "./sanitize";
 import {
   R2ADiagnosticContext,
   R2ADiagnosticError,
@@ -243,6 +245,7 @@ function clauseSpans(span: Span): Span[] {
 }
 
 function structuredRequirementClauses(span: Span): Span[] {
+  if (explanatoryLicenceDefinition(span.text)) return [];
   if (
     !span.sourcePath.startsWith("structured.") ||
     /\.clause\[\d+\]$/.test(span.sourcePath) ||
@@ -516,11 +519,186 @@ function structuredStringLineChunks(
   );
 }
 
+type LocatedHtmlNode = {
+  nodeName: string;
+  tagName?: string;
+  value?: string;
+  childNodes?: LocatedHtmlNode[];
+  sourceCodeLocation?: { startOffset: number; endOffset: number } | null;
+};
+
+/** Map parse5's decoded text back to the retained HTML, then to JSON UTF16 offsets. */
+function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[] {
+  const discarded = new Set([
+    "script",
+    "style",
+    "noscript",
+    "template",
+    "iframe",
+    "frame",
+    "object",
+    "embed",
+    "applet",
+    "form",
+    "input",
+    "button",
+    "textarea",
+    "select",
+    "option",
+    "link",
+    "meta",
+    "base",
+    "img",
+    "picture",
+    "audio",
+    "video",
+    "source",
+    "track",
+    "svg",
+    "math",
+    "canvas",
+  ]);
+  const blocks = new Set(["p", "div", "li", "article", "section", "h1", "h2", "h3", "br"]);
+  const jsonOffsets = jsonStringOffsets(html);
+  const result: Span[] = [];
+  let text = "";
+  let offsets: number[] = [];
+  const flush = () => {
+    let cursor = 0;
+    while (cursor < text.length) {
+      while (cursor < text.length && /\s/.test(text[cursor]!)) cursor += 1;
+      if (cursor === text.length) break;
+      let end = cursor;
+      let whitespace = cursor;
+      while (end < text.length) {
+        const next = end + (text.codePointAt(end)! > 0xffff ? 2 : 1);
+        if (next - cursor > 500 || offsets[next]! - offsets[cursor]! > 900) break;
+        end = next;
+        if (/\s/.test(text.slice(end - 1, end))) whitespace = end;
+      }
+      if (end === cursor) throw new Error("R2A_HTML_SOURCE_MAPPING_INVALID");
+      if (end < text.length && whitespace - cursor >= 250) end = whitespace;
+      let trimmedEnd = end;
+      while (trimmedEnd > cursor && /\s/.test(text[trimmedEnd - 1]!)) trimmedEnd -= 1;
+      if (trimmedEnd > cursor) {
+        const sourceOffsets = offsets.slice(cursor, trimmedEnd + 1);
+        const start = sourceOffsets[0]!;
+        const finish = sourceOffsets.at(-1)!;
+        if (finish <= start || source.slice(start, finish).length > sourceEvidenceExcerptLimit)
+          throw new Error("R2A_HTML_SOURCE_MAPPING_INVALID");
+        result.push({
+          text: text.slice(cursor, trimmedEnd),
+          start,
+          end: finish,
+          sourcePath: `structured.description.item.${result.length}`,
+          sourceOffsets,
+        });
+      }
+      cursor = end;
+    }
+    text = "";
+    offsets = [];
+  };
+  const append = (value: string, rawStart: number, rawEnd: number) => {
+    if (value === "\n") {
+      flush();
+      return;
+    }
+    const start = parent.start + 1 + jsonOffsets[rawStart]!;
+    const end = parent.start + 1 + jsonOffsets[rawEnd]!;
+    if (offsets.length && start < offsets.at(-1)!) flush();
+    // A boundary between inline nodes includes only intervening inert markup.
+    if (offsets.length) offsets[offsets.length - 1] = start;
+    else offsets.push(start);
+    text += value;
+    for (let index = 1; index < value.length; index += 1) offsets.push(start);
+    offsets.push(end);
+  };
+  const appendTextNode = (node: LocatedHtmlNode) => {
+    const location = node.sourceCodeLocation;
+    if (!location || !node.value) return;
+    const raw = html.slice(location.startOffset, location.endOffset);
+    let reconstructed = "";
+    for (let index = 0; index < raw.length; ) {
+      let consumed = 1;
+      let decoded = raw[index]!;
+      if (decoded === "\r") {
+        consumed = raw[index + 1] === "\n" ? 2 : 1;
+        decoded = "\n";
+      } else if (decoded === "\0") decoded = "";
+      else if (decoded === "&") {
+        const candidate = raw
+          .slice(index)
+          .match(/^&(?:#(?:x[0-9a-f]+|[0-9]+)|[a-z][a-z0-9]{0,40});?/i)?.[0];
+        if (candidate) {
+          const fragment = parseFragment(candidate);
+          const decodedCandidate = fragment.childNodes
+            .map((child) => (child.nodeName === "#text" && "value" in child ? child.value : ""))
+            .join("");
+          if (decodedCandidate !== candidate) {
+            let rawEnd = candidate.length;
+            let decodedEnd = decodedCandidate.length;
+            while (
+              rawEnd > 1 &&
+              decodedEnd > 0 &&
+              candidate[rawEnd - 1] === decodedCandidate[decodedEnd - 1]
+            ) {
+              rawEnd -= 1;
+              decodedEnd -= 1;
+            }
+            consumed = rawEnd;
+            decoded = decodedCandidate.slice(0, decodedEnd);
+          }
+        }
+      } else if (raw.codePointAt(index)! > 0xffff) {
+        consumed = 2;
+        decoded = raw.slice(index, index + 2);
+      }
+      reconstructed += decoded;
+      if (decoded)
+        append(decoded, location.startOffset + index, location.startOffset + index + consumed);
+      index += consumed;
+    }
+    if (reconstructed !== node.value) throw new Error("R2A_HTML_SOURCE_MAPPING_INVALID");
+  };
+  const pending: Array<{ node: LocatedHtmlNode; closing: boolean; depth: number }> = [
+    {
+      node: parse(html, { sourceCodeLocationInfo: true }) as LocatedHtmlNode,
+      closing: false,
+      depth: 0,
+    },
+  ];
+  while (pending.length) {
+    const { node, closing, depth } = pending.pop()!;
+    if (depth > IMPORT_LIMITS.maximumHtmlDepth)
+      throw new ImportValidationError("HTML_TOO_DEEP", "The supplied HTML is too deeply nested.");
+    const tag = node.tagName?.toLowerCase();
+    if (closing) {
+      flush();
+      continue;
+    }
+    if (tag && discarded.has(tag)) continue;
+    if (node.nodeName === "#text") {
+      appendTextNode(node);
+      continue;
+    }
+    if (tag && blocks.has(tag)) {
+      flush();
+      pending.push({ node, closing: true, depth });
+    }
+    for (let index = (node.childNodes?.length ?? 0) - 1; index >= 0; index -= 1)
+      pending.push({ node: node.childNodes![index]!, closing: false, depth: depth + 1 });
+  }
+  flush();
+  return result;
+}
+
 function normalizedSourceLine(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function materialFamilies(text: string): JobFieldFamily[] {
+  if (isApplicantInvitation(text)) return [];
   const formalEducationCredential =
     /\b(?:degree|diploma|qualification|education|studying|certificate\s+[ivx]+)\b/i.test(text);
   const explicitCertificationMarker =
@@ -559,6 +737,7 @@ function materialFamilies(text: string): JobFieldFamily[] {
       ([family, pattern]) =>
         pattern.test(text) &&
         !(family === "SKILLS" && physicalOnlyAbility) &&
+        !(family === "LICENCES" && explanatoryLicenceDefinition(text)) &&
         !(family === "CERTIFICATIONS" && certificateIsEducationContext),
     )
     .map(([family]) => family);
@@ -722,11 +901,16 @@ function modality(text: string): { modality: RequirementModality; condition: str
   ) {
     return { modality: "NEGATED", condition: null };
   }
-  if (
-    /\b(?:may be required|where applicable|depending on|subject to|willing to obtain|must (?:be )?obtain(?:ed)? within|if|when|unless)\b/i.test(
+  const operationalAbility =
+    /\b(?:ability|able)\s+to\b[^.\n]*\bwhen\b/i.test(text) && !/\b(?:if|unless)\b/i.test(text);
+  const actualCondition =
+    /\b(?:may be required|where applicable|depending on|subject to|willing to obtain|must (?:be )?obtain(?:ed)? within|if|unless)\b/i.test(
       text,
-    )
-  ) {
+    ) ||
+    (/\bwhen\b/i.test(text) &&
+      /\b(?:must|required|mandatory|necessary|essential|need to)\b/i.test(text) &&
+      !operationalAbility);
+  if (actualCondition) {
     const found = text.match(
       /\b(?:may be required|where applicable|depending on[^.\n]*|subject to[^.\n]*|willing to obtain[^.\n]*|must (?:be )?obtain(?:ed)? within[^.\n]*|if[^.\n]*|when[^.\n]*|unless[^.\n]*)/i,
     )?.[0];
@@ -764,6 +948,12 @@ function requirementKind(text: string): RequirementKind {
   if (/\b(?:availability|roster|shift|overnight|weekend|weekday|on-call)\b/i.test(text))
     return "AVAILABILITY";
   if (/\b(?:on[ -]?site|remote|hybrid|travel|commute|location)\b/i.test(text)) return "LOCATION";
+  if (
+    /\b\d{1,3}\+?\s*(?:years?\s+(?:old|of age)|y\/?o)\b|\baged?\s+(?:at least\s+)?\d{1,3}\b/i.test(
+      text,
+    )
+  )
+    return "AGE";
   if (/\b(?:experience|years?|months?|background in)\b/i.test(text)) return "EXPERIENCE";
   if (/\b(?:lift|lifting|stand|standing|physical|manual handling)\b/i.test(text)) return "PHYSICAL";
   if (/\b(?:aged?|over|under)\s+\d{1,2}\b/i.test(text)) return "AGE";
@@ -1007,8 +1197,81 @@ function innerRequirementHeading(text: string): "MODALITY" | "CONTEXT_ONLY" | nu
   ) {
     return "MODALITY";
   }
-  if (/^you(?:'|’)ll thrive here if you\s*:$/i.test(label)) return "CONTEXT_ONLY";
+  if (
+    /^(?:you(?:'|’)ll thrive here if you|you could be the one if you have|location\s+(?:and|&)\s+hours|how to apply|application (?:process|instructions))\s*(?::|\.{3}|…)?$/i.test(
+      label,
+    )
+  )
+    return "CONTEXT_ONLY";
   return null;
+}
+
+function explanatoryLicenceDefinition(text: string): boolean {
+  const contrastedVendorTypes =
+    /\bfreelancer\b/i.test(text) &&
+    /\bprivate individual\b/i.test(text) &&
+    (text.match(/\bbusiness licen[cs]es?\b/gi)?.length ?? 0) >= 2 &&
+    /\b(?:not|no|without|don(?:'|’)t|doesn(?:'|’)t)\b/i.test(text);
+  return (
+    /\b(?:private individual|freelancer|vendor|sole trader)\b/i.test(text) &&
+    /\blicen[cs]e\b/i.test(text) &&
+    (/\b(?:means|defined as|refers to|whereas|is (?:a |an )?(?:person|individual))\b/i.test(text) ||
+      contrastedVendorTypes) &&
+    !/\b(?:must|required|mandatory|essential|need to|shall|applicants? (?:need|have|hold))\b/i.test(
+      text,
+    )
+  );
+}
+
+function isApplicantInvitation(text: string): boolean {
+  const invitation =
+    /^if you(?:'|’| a| )[^.\n]*\b(?:excited|interested|keen)\b[^.\n]*\b(?:click|apply|application|hear from you)\b/i.test(
+      text,
+    );
+  const waivedCriteriaInvitation =
+    /^even if you\b[^.\n]*(?:don(?:'|’)t|do not)\b[^.\n]*\b(?:tick|meet)\b[^.\n]*\b(?:box(?:es)?|criteria|requirements?)\b[^.\n]*\b(?:hear from you|apply)\b/i.test(
+      text,
+    );
+  return (
+    (waivedCriteriaInvitation || (invitation && requirementKind(text) === "GENERAL")) &&
+    !/\b(?:must|required|mandatory|essential|need to|needs to|shall|attach|upload|submit|provide|include)\b/i.test(
+      text,
+    )
+  );
+}
+
+/** These are narrative/invitation boundaries, never inferred applicant facts. */
+function applicantContentSpans(spans: Span[], keepHeadings = false): Span[] {
+  let hypothetical = false;
+  return spans.filter((span) => {
+    const text = span.text.trim();
+    if (
+      /^if you (?:were|had been) (?:here|with us) (?:last|the previous)\b[^.\n]*\bmight have\b/i.test(
+        text,
+      )
+    ) {
+      hypothetical = true;
+      return false;
+    }
+    if (isHeading(span) !== undefined || innerRequirementHeading(text)) {
+      hypothetical = false;
+      return keepHeadings;
+    }
+    if (hypothetical) {
+      const statement = modality(text);
+      const directive =
+        /\b(?:must|required|mandatory|essential|need to|needs to|you will have|shall|attach|upload|submit|provide)\b/i.test(
+          text,
+        );
+      if (
+        (statement.modality === "UNKNOWN" && !directive) ||
+        (statement.modality === "CONDITIONAL" && !directive)
+      )
+        return false;
+      hypothetical = false;
+    }
+    return !isApplicantInvitation(text);
+  });
 }
 
 function extractRequirementEvidence(
@@ -1018,6 +1281,7 @@ function extractRequirementEvidence(
   sectionDefaultModality: RequirementModality | null = null,
   parentStatement: ReturnType<typeof modality> | null = null,
 ): R2RequirementEvidence[] {
+  if (explanatoryLicenceDefinition(span.text) || isApplicantInvitation(span.text)) return [];
   const kind = requirementKind(span.text);
   const lexicalStatement = modality(span.text);
   const inheritedParentStatement =
@@ -1233,9 +1497,34 @@ function hoursValues(
   text: string,
 ): Array<{ value: R2NormalizedValue; match: string; index: number }> {
   const result: Array<{ value: R2NormalizedValue; match: string; index: number }> = [];
+  const paired: Array<{ start: number; end: number }> = [];
+  // Only one explicitly coordinated proposition in the same unit is a range.
+  const coordinated =
+    /\b(?:minimum(?: of)?|at least)\s+(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:per|a|\/)\s*(day|week|fortnight|month)\s*(?:,\s*(?:and\s+)?|and\s+)(?:a\s+)?(?:maximum(?: of)?|at most|up to)\s+(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:per|a|\/)\s*\2\b/gi;
+  for (const match of text.matchAll(coordinated)) {
+    const minimum = finiteNonnegative(match[1]);
+    const maximum = finiteNonnegative(match[3]);
+    if (minimum === null || maximum === null || maximum < minimum || !match[2]) continue;
+    const start = match.index ?? 0;
+    result.push({
+      value: {
+        kind: "HOURS",
+        value: {
+          minimum,
+          maximum,
+          unit: match[2].toUpperCase() as "DAY" | "WEEK" | "FORTNIGHT" | "MONTH",
+        },
+      },
+      match: match[0],
+      index: start,
+    });
+    paired.push({ start, end: start + match[0].length });
+  }
   const pattern =
     /\b(\d+(?:\.\d+)?)\s*(?:-|–|to)?\s*(\d+(?:\.\d+)?)?\s*(?:hours?|hrs?)\s*(?:per|a|\/)\s*(day|week|fortnight|month)\b/gi;
   for (const match of text.matchAll(pattern)) {
+    if (paired.some(({ start, end }) => (match.index ?? 0) >= start && (match.index ?? 0) < end))
+      continue;
     if (!match[1] || !match[3]) continue;
     const minimum = finiteNonnegative(match[1]);
     const maximum = finiteNonnegative(match[2] ?? match[1]);
@@ -1619,7 +1908,7 @@ function normalizeR2AJobEvidenceInternal(
       diagnostics,
     );
     let localHeading = heading;
-    for (const span of spans) {
+    for (const span of applicantContentSpans(spans, true)) {
       if (section.kind === "REQUIREMENTS") {
         const innerHeading = innerRequirementHeading(span.text);
         if (innerHeading) {
@@ -1657,18 +1946,11 @@ function normalizeR2AJobEvidenceInternal(
   const structuredDescriptionSpans = (() => {
     if (!descriptionValue || !descriptionSource) return [];
     if (structuredDescriptionIsHtml) {
-      return lineSpans(extractInertHtmlText(descriptionValue))
-        .filter((span) => isHeading(span) === undefined)
-        .flatMap(clauseSpans)
-        .map((span, index) => ({
-          text: span.text.replace(/^(?:-|\*|\u2022)\s+/, "").trim(),
-          start: descriptionSource.start,
-          end: descriptionSource.end,
-          sourcePath: `structured.description.item.${index}`,
-        }));
+      return applicantContentSpans(
+        htmlDescriptionSpans(source, descriptionSource, descriptionValue),
+      );
     }
-    const lines = lineSpans(descriptionValue).filter((span) => {
-      if (isHeading(span) !== undefined) return false;
+    const lines = applicantContentSpans(lineSpans(descriptionValue)).filter((span) => {
       return !sectionTextLines.has(normalizedSourceLine(span.text));
     });
     return lines.flatMap((span, index) =>
@@ -1685,7 +1967,7 @@ function normalizeR2AJobEvidenceInternal(
   })();
   const candidateSpans = [
     ...sections.flatMap(({ items }) => items.flatMap(clauseSpans)),
-    ...standaloneSpans,
+    ...applicantContentSpans(standaloneSpans),
     ...structuredDescriptionSpans,
     ...structuredSectionFieldSpans,
   ];

@@ -28,6 +28,7 @@ try {
         queueFreshness: summary.queueFreshness,
         duplicateState: summary.duplicateState,
         calibrationState: summary.calibrationState,
+        storedCalibrationState: summary.storedCalibrationState,
         ownerQuestionIds: summary.ownerQuestionIds,
         observedMaterialFamilyCount: summary.observedMaterialFamilyCount,
         resolvedObservedMaterialFamilyCount: summary.resolvedObservedMaterialFamilyCount,

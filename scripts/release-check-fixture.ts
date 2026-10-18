@@ -26,6 +26,7 @@ const migrationFiles = [
   "0012_source_owner_action_receipts.sql",
   "0013_exact_source_request_binding.sql",
   "0014_hosted_application_workflow.sql",
+  "0015_r2_calibration_intake.sql",
 ];
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv): void {
@@ -114,7 +115,7 @@ try {
   run("git", ["diff", "--check"], env);
   run("git", ["fsck", "--strict"], env);
   console.log(
-    "RELEASE_FIXTURE_CHECK PASS fictional_runtime=disposable schema=14 private_profile_read=0",
+    "RELEASE_FIXTURE_CHECK PASS fictional_runtime=disposable schema=15 private_profile_read=0",
   );
 } finally {
   try {

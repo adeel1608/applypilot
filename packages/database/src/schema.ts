@@ -1448,7 +1448,153 @@ export const hostedSubmitGuards = sqliteTable(
   ],
 );
 
+export const r2CalibrationCampaigns = sqliteTable("r2_calibration_campaigns", {
+  id: text("id").primaryKey(),
+  schemaVersion: integer("schema_version").notNull(),
+  engineJson: text("engine_json").notNull(),
+  engineDigest: text("engine_digest").notNull(),
+  profileVersionId: text("profile_version_id")
+    .notNull()
+    .references(() => candidateProfileVersions.id, { onDelete: "restrict" }),
+  profileHash: text("profile_hash").notNull(),
+  memberDigest: text("member_digest").notNull(),
+  corpusVersion: text("corpus_version").notNull(),
+  taxonomyVersion: text("taxonomy_version").notNull(),
+  thresholdsVersion: text("thresholds_version").notNull().unique(),
+  thresholdsJson: text("thresholds_json").notNull(),
+  thresholdsDigest: text("thresholds_digest").notNull(),
+  createRequestJson: text("create_request_json").notNull(),
+  provenanceJson: text("provenance_json").notNull(),
+  gateDigest: text("gate_digest").notNull().unique(),
+  campaignDigest: text("campaign_digest").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const r2CalibrationComparisons = sqliteTable(
+  "r2_calibration_comparisons",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => r2CalibrationCampaigns.id, { onDelete: "restrict" }),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "restrict" }),
+    jobVersionId: text("job_version_id")
+      .notNull()
+      .references(() => jobVersions.id, { onDelete: "restrict" }),
+    sourceObservationId: text("source_observation_id")
+      .notNull()
+      .references(() => sourceObservations.id, { onDelete: "restrict" }),
+    originalIdentity: text("original_identity").notNull(),
+    snapshotJson: text("snapshot_json").notNull(),
+    snapshotDigest: text("snapshot_digest").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("r2_calibration_comparisons_job_idx").on(table.campaignId, table.jobId),
+    uniqueIndex("r2_calibration_comparisons_identity_idx").on(
+      table.campaignId,
+      table.originalIdentity,
+    ),
+  ],
+);
+
+export const r2CalibrationLabelEvents = sqliteTable(
+  "r2_calibration_label_events",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => r2CalibrationCampaigns.id, { onDelete: "restrict" }),
+    comparisonId: text("comparison_id")
+      .notNull()
+      .references(() => r2CalibrationComparisons.id, { onDelete: "restrict" }),
+    revision: integer("revision").notNull(),
+    supersedesId: text("supersedes_id")
+      .unique()
+      .references((): AnySQLiteColumn => r2CalibrationLabelEvents.id, { onDelete: "restrict" }),
+    label: text("label").notNull(),
+    occupationalFamily: text("occupational_family").notNull(),
+    requestJson: text("request_json").notNull(),
+    provenanceJson: text("provenance_json").notNull(),
+    gateDigest: text("gate_digest").notNull().unique(),
+    eventDigest: text("event_digest").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("r2_calibration_label_revision_idx").on(table.comparisonId, table.revision),
+  ],
+);
+
+export const r2CalibrationPairEvents = sqliteTable(
+  "r2_calibration_pair_events",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => r2CalibrationCampaigns.id, { onDelete: "restrict" }),
+    leftComparisonId: text("left_comparison_id")
+      .notNull()
+      .references(() => r2CalibrationComparisons.id, { onDelete: "restrict" }),
+    rightComparisonId: text("right_comparison_id")
+      .notNull()
+      .references(() => r2CalibrationComparisons.id, { onDelete: "restrict" }),
+    preferredComparisonId: text("preferred_comparison_id")
+      .notNull()
+      .references(() => r2CalibrationComparisons.id, { onDelete: "restrict" }),
+    revision: integer("revision").notNull(),
+    supersedesId: text("supersedes_id")
+      .unique()
+      .references((): AnySQLiteColumn => r2CalibrationPairEvents.id, { onDelete: "restrict" }),
+    requestJson: text("request_json").notNull(),
+    provenanceJson: text("provenance_json").notNull(),
+    gateDigest: text("gate_digest").notNull().unique(),
+    eventDigest: text("event_digest").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("r2_calibration_pair_revision_idx").on(
+      table.campaignId,
+      table.leftComparisonId,
+      table.rightComparisonId,
+      table.revision,
+    ),
+  ],
+);
+
+export const r2CalibrationIntakeQualifications = sqliteTable(
+  "r2_calibration_intake_qualifications",
+  {
+    runId: text("run_id")
+      .primaryKey()
+      .references(() => r2CalibrationRuns.id, { onDelete: "restrict" }),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => r2CalibrationCampaigns.id, { onDelete: "restrict" }),
+    assessmentDigest: text("assessment_digest").notNull(),
+    snapshotJson: text("snapshot_json").notNull(),
+    snapshotDigest: text("snapshot_digest").notNull(),
+    safetyBundleDigest: text("safety_bundle_digest").notNull(),
+    approvalId: text("approval_id").notNull().unique(),
+    provenanceJson: text("provenance_json").notNull(),
+    gateDigest: text("gate_digest").notNull().unique(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("r2_calibration_intake_assessment_idx").on(
+      table.campaignId,
+      table.assessmentDigest,
+    ),
+  ],
+);
+
 export const schema = {
+  r2CalibrationCampaigns,
+  r2CalibrationComparisons,
+  r2CalibrationLabelEvents,
+  r2CalibrationPairEvents,
+  r2CalibrationIntakeQualifications,
   hostedCapabilityVersions,
   hostedOwnerConsents,
   hostedQuestionDiscoveries,

@@ -118,7 +118,7 @@ describe("Greenhouse R2A evidence projection", () => {
     },
   );
 
-  it("preserves distinct evidence IDs for parser-accepted escaped HTML items sharing one source span", () => {
+  it("preserves exact escaped HTML occurrences and the historical shared-span collision proof", () => {
     const record = readGreenhousePostingV2FromPayload({
       payload: {
         id: 7001,
@@ -156,8 +156,9 @@ describe("Greenhouse R2A evidence projection", () => {
       "structured.description.item.1",
     ]);
     expect(new Set(employment.map(({ id }) => id)).size).toBe(2);
-    expect(new Set(employment.map(({ source }) => source.start)).size).toBe(1);
-    expect(new Set(employment.map(({ source }) => source.end)).size).toBe(1);
+    expect(new Set(employment.map(({ source }) => source.start)).size).toBe(2);
+    expect(new Set(employment.map(({ source }) => source.end)).size).toBe(2);
+    expect(employment.map(({ source }) => source.excerpt)).toEqual(["full time", "full time"]);
     expect(employment.map(({ normalizedValue }) => normalizedValue.kind)).toEqual([
       "EMPLOYMENT_TYPE",
       "EMPLOYMENT_TYPE",
@@ -168,7 +169,8 @@ describe("Greenhouse R2A evidence projection", () => {
         "3.6.1",
         item.sourceObservationId,
         item.canonicalField,
-        String(item.source.start),
+        // Before the HTML provenance repair every item borrowed the JSON parent start.
+        String(sourceText.indexOf(JSON.stringify(record.description))),
         JSON.stringify(item.normalizedValue),
       ].join("\n");
     expect(oldIdentity(employment[0]!)).toBe(oldIdentity(employment[1]!));

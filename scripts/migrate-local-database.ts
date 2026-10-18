@@ -9,6 +9,7 @@ import {
   CURRENT_DATABASE_SCHEMA_VERSION,
   assertMigrationSchemaSupported,
   databaseSchemaStatus,
+  applyTransactionMigration,
 } from "./lib/database-schema";
 import { localDatabasePath } from "./lib/runtime-safety";
 
@@ -284,6 +285,15 @@ async function main(): Promise<void> {
           );
         })
         .immediate();
+    }
+    if (version < 15) {
+      applyTransactionMigration(
+        sqlite,
+        readFileSync(
+          new URL("../packages/database/drizzle/0015_r2_calibration_intake.sql", import.meta.url),
+          "utf8",
+        ),
+      );
     }
     const migratedSnapshot = sqlite
       .prepare(
