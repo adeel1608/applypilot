@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { HOSTED_ADAPTER_VERSION } from "./hosted-contract";
@@ -17,8 +18,18 @@ import {
 } from "./hosted-build";
 
 const roots: string[] = [];
+const pendingFixtureWork = new Set<Promise<void>>();
+function trackFixtureWork(work: () => Promise<void>) {
+  const pending = work();
+  pendingFixtureWork.add(pending);
+  const forget = () => pendingFixtureWork.delete(pending);
+  void pending.then(forget, forget);
+  return pending;
+}
 const sha = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-afterEach(() => {
+afterEach(async () => {
+  // A runner timeout may enter cleanup before its test promise has settled.
+  await Promise.allSettled([...pendingFixtureWork]);
   for (const root of roots.splice(0)) {
     const path = resolve(root),
       rel = relative(resolve(tmpdir()), path);
@@ -241,13 +252,76 @@ describe("native App Page runtime cache and executable identity", () => {
     expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
   }, 60_000);
 
-  it("retains the entry count bound inside the cache namespace", () => {
-    const f = productionFixture();
-    const directory = dirname(cachePath(f.next));
-    mkdirSync(directory, { recursive: true });
-    for (let i = 0; i < 50_000; i++) mkdirSync(join(directory, `entry-${i}`));
-    expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
-  }, 60_000);
+  it(
+    "retains the entry count bound inside the cache namespace",
+    ({ signal }) =>
+      trackFixtureWork(async () => {
+        const f = productionFixture();
+        const before = compiledHostedProductionBuildDigest(f.next);
+        const directory = dirname(cachePath(f.next));
+        mkdirSync(directory, { recursive: true });
+        const name = (prefix: string, index: number) =>
+          `${prefix}${index.toString(16).padStart(7, "0")}`;
+        const indices = (count: number, start = 0) =>
+          Array.from({ length: count }, (_, i) => start + i);
+        const batches = async <T>(values: T[], size: number, work: (value: T) => Promise<void>) => {
+          for (let start = 0; start < values.length; start += size) {
+            signal.throwIfAborted();
+            // Join every worker, including on failure, before the owned cleanup hook.
+            const results = await Promise.allSettled(values.slice(start, start + size).map(work));
+            signal.throwIfAborted();
+            expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+          }
+        };
+        const createBucket = async (index: number) => {
+          const path = join(directory, name("b", index));
+          await mkdir(path);
+          await batches(indices(199), 32, async (leaf) => {
+            await mkdir(join(path, name("e", leaf)));
+          });
+        };
+        const inventory = async (expectedBuckets: number) => {
+          const buckets = await readdir(directory, { withFileTypes: true });
+          expect(buckets.map((entry) => entry.name).sort()).toEqual(
+            indices(expectedBuckets)
+              .map((index) => name("b", index))
+              .sort(),
+          );
+          expect(buckets.every((entry) => entry.isDirectory() && !entry.isSymbolicLink())).toBe(
+            true,
+          );
+          let count = buckets.length;
+          const leaves: string[] = [];
+          await batches(buckets, 32, async (bucket) => {
+            const path = join(directory, bucket.name);
+            const children = await readdir(path, { withFileTypes: true });
+            expect(children.map((entry) => entry.name).sort()).toEqual(
+              indices(199)
+                .map((index) => name("e", index))
+                .sort(),
+            );
+            expect(children.every((entry) => entry.isDirectory() && !entry.isSymbolicLink())).toBe(
+              true,
+            );
+            count += children.length;
+            leaves.push(...children.map((entry) => join(path, entry.name)));
+          });
+          await batches(leaves, 128, async (path) => {
+            expect(await readdir(path)).toHaveLength(0);
+          });
+          expect(count).toBe(expectedBuckets * 200);
+          return count;
+        };
+        await batches(indices(4), 4, createBucket);
+        expect(await inventory(4)).toBe(800);
+        expect(compiledHostedProductionBuildDigest(f.next)).toBe(before);
+        await batches(indices(246, 4), 4, createBucket);
+        // 250 buckets plus 49,750 leaves; baseline entries also count in the scanner.
+        expect(await inventory(250)).toBe(50_000);
+        expect(() => compiledHostedProductionBuildDigest(f.next)).toThrow("HOSTED_BUILD_INVALID");
+      }),
+    60_000,
+  );
 });
 
 describe("hosted reviewed executable evidence", () => {
