@@ -148,16 +148,26 @@ beforeEach(() => {
 describe("local calibration owner context and blank controls", () => {
   it("shows measured failure separately from sample sufficiency and zero sample", async () => {
     const data = view();
+    data.campaign!.thresholds = {
+      version: "fictional-policy",
+      minimumLabelAgreementBasisPoints: 7500,
+      minimumPairComparisons: 9,
+      minimumPairAgreementBasisPoints: 7500,
+    };
+    data.campaign!.members = Array.from({ length: 5 }, (_, i) => member(`fictional-${i}`));
+    data.campaign!.assessment.sourcePairCount = 7;
+    data.campaign!.assessment.comparedPairCount = 7;
+    data.campaign!.assessment.pairAgreementBasisPoints = 4286;
     data.campaign!.assessment.pairDiagnostics = {
-      agrees: 1,
+      agrees: 3,
       ties: 2,
       opposite: 2,
       incomplete: 0,
       sample: "INSUFFICIENT",
       performance: "FAIL",
-      requiredComparisons: 15,
-      requiredAgreementsAtObservedSample: 4,
-      requiredAgreementsAtMinimumSample: 12,
+      requiredComparisons: 9,
+      requiredAgreementsAtObservedSample: 6,
+      requiredAgreementsAtMinimumSample: 7,
     };
     state.view.mockResolvedValue(data);
     const rendered = text(await page({ campaign: "campaign-1" })).replace(/\s+/g, " ");
@@ -187,32 +197,30 @@ describe("local calibration owner context and blank controls", () => {
       },
       thresholds: {
         version: "old-policy",
-        minimumPairComparisons: 15,
-        minimumPairAgreementBasisPoints: 8000,
-        minimumLabelAgreementBasisPoints: 8000,
+        minimumPairComparisons: 9,
+        minimumPairAgreementBasisPoints: 7500,
+        minimumLabelAgreementBasisPoints: 7500,
       },
-      members: [
-        {
-          id: "old-member",
-          title: "<script>historical-canary</script>",
-          score: 0,
-          eligibility: "REVIEW_REQUIRED",
-          recommended: false,
-          coveragePercent: 50,
-        },
-      ],
-      comparedPairCount: 5,
-      pairAgreementBasisPoints: 2000,
+      members: Array.from({ length: 5 }, (_, i) => ({
+        id: `old-member-${i}`,
+        title: "<script>historical-canary</script>",
+        score: 0,
+        eligibility: "REVIEW_REQUIRED",
+        recommended: false,
+        coveragePercent: 50,
+      })),
+      comparedPairCount: 7,
+      pairAgreementBasisPoints: 4286,
       pairDiagnostics: {
-        agrees: 1,
+        agrees: 3,
         ties: 2,
         opposite: 2,
         incomplete: 0,
         sample: "INSUFFICIENT",
         performance: "FAIL",
-        requiredComparisons: 15,
-        requiredAgreementsAtObservedSample: 4,
-        requiredAgreementsAtMinimumSample: 12,
+        requiredComparisons: 9,
+        requiredAgreementsAtObservedSample: 6,
+        requiredAgreementsAtMinimumSample: 7,
       },
     };
     state.view.mockResolvedValue(data);

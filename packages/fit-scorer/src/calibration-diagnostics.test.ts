@@ -7,14 +7,14 @@ const base: R2CalibrationGateInput = {
   pairs: [],
   performanceThresholds: {
     version: "fictional",
-    minimumLabelAgreementBasisPoints: 8000,
-    minimumPairComparisons: 15,
-    minimumPairAgreementBasisPoints: 8000,
+    minimumLabelAgreementBasisPoints: 7500,
+    minimumPairComparisons: 9,
+    minimumPairAgreementBasisPoints: 7500,
   },
   safetyGates: null,
   ownerApproval: null,
 };
-function assess(scores: Array<[number | null, number | null]>, threshold = 8000, minimum = 15) {
+function assess(scores: Array<[number | null, number | null]>, threshold = 7500, minimum = 9) {
   return assessR2Calibration({
     ...base,
     sourcePairCount: scores.length,
@@ -35,25 +35,23 @@ describe("observed calibration pair diagnostics", () => {
     const a = assess([
       [7, 0],
       [8, 0],
-      [0, 0],
-      [0, 0],
+      [9, 0],
       [1, 1],
       [2, 2],
       [0, 9],
       [0, 8],
-      [0, 7],
-      [0, 6],
     ]);
+    expect(a.pairAgreementBasisPoints).toBe(4286);
     expect(a.pairDiagnostics).toEqual({
-      agrees: 2,
-      ties: 4,
-      opposite: 4,
+      agrees: 3,
+      ties: 2,
+      opposite: 2,
       incomplete: 0,
       sample: "INSUFFICIENT",
       performance: "FAIL",
-      requiredComparisons: 15,
-      requiredAgreementsAtObservedSample: 8,
-      requiredAgreementsAtMinimumSample: 12,
+      requiredComparisons: 9,
+      requiredAgreementsAtObservedSample: 6,
+      requiredAgreementsAtMinimumSample: 7,
     });
     expect(a.blockerCodes).toContain("PRIVATE_PAIR_SAMPLE_INSUFFICIENT");
     expect(a.blockerCodes).toContain("PRIVATE_PAIR_PERFORMANCE_BELOW_THRESHOLD");
