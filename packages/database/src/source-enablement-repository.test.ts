@@ -5110,7 +5110,7 @@ describe("stopped-run persisted-source inspection", () => {
       parserVersion: "3.6.6",
       normalizationVersion: "3.6.6",
       evidenceContractVersion: "3.1.0",
-      scorerVersion: "2.3.0",
+      scorerVersion: "2.4.0",
       weightVersion: "r2-weights-1",
       scoreThreshold: 50,
       minimumCoverageThreshold: 60,

@@ -1,55 +1,31 @@
 import { type CandidateProfile } from "@applypilot/candidate-profile";
 import type { R2RequirementEvidence } from "@applypilot/job-model";
-import { matchesEvidenceText } from "@applypilot/shared";
-
-// These markers make a whole statement unsuitable as proof of an unqualified capability.
-// Reject rather than trying to infer which neighbouring clause a qualification modifies.
-const qualifiedScope =
-  /\b(?:no|not|never|without|if|unless|when|could|would|may|might|only|limited|learning|beginner|basic|exposure|supervision|supervised|or|either|lack|lacks|lacking|unfamiliar|unable|partial|partially|except|excluding|assisted|guidance|trainee|incomplete|unearned|equivalent|free|less|cannot|contingent|pending|aspiring|depending|can['’]t|don['’]t|doesn['’]t|didn['’]t|isn['’]t|wasn['’]t|haven['’]t|hasn['’]t|aren['’]t|weren['’]t|won['’]t|wouldn['’]t|couldn['’]t|shouldn['’]t)\b|\//i;
-const wrapper =
-  /^(?:(?:experience|proficiency|proficient|skills?|knowledge)\s+(?:in|with|of)\s+|ability\s+to\s+|must\s+(?:have|possess)\s+)+/i;
-
-/** A verified fact must contain the entire bounded requirement, in that direction. */
-export function supportsR2CapabilityText(candidate: string, required: string): boolean {
-  if (
-    qualifiedScope.test(candidate) ||
-    qualifiedScope.test(required) ||
-    /\bnon[-\s]+/i.test(candidate) ||
-    /\bnon[-\s]+/i.test(required)
-  )
-    return false;
-  const target = required
-    .trim()
-    .replace(
-      /\s+(?:(?:is|are)\s+)?(?:required|essential|mandatory|preferred|desirable)\s*[.!]?$/i,
-      "",
-    )
-    .replace(wrapper, "")
-    .replace(/\s+skills?$/i, "")
-    .trim();
-  if (!target || !matchesEvidenceText(candidate, target)) return false;
-  // The symmetric utility retains conservative short-token / punctuation rules.
-  // This extra check prevents its reverse containment from accepting partial scope.
-  const tokens = (text: string) =>
-    text
-      .normalize("NFKD")
-      .toLocaleLowerCase("en-AU")
-      .match(/c\+\+\d*|c#\d*|f#\d*|\.net\d*|[a-z0-9]+/g) ?? [];
-  const fact = tokens(candidate),
-    need = tokens(target);
-  return need.length > 0 && fact.some((_, i) => need.every((token, j) => fact[i + j] === token));
-}
+import {
+  supportsR2CapabilityText,
+  wholeR2CapabilityLabel,
+  isR2ExplicitlyUnsupported,
+  r2FactReference,
+  r2SemanticFactKey,
+  r2VerifiedSkillFacts,
+  r2RequirementHasExcludedScope,
+} from "./r2-capability-evidence";
+export { supportsR2CapabilityText } from "./r2-capability-evidence";
 
 export interface R2CapabilityMatch {
   reference: string;
   kind: "SKILL" | "EXPERIENCE" | "EDUCATION";
+  references: string[];
+  semanticKey: string;
 }
 
 function wholeCapabilityLabel(fact: string, required: string): boolean {
-  return supportsR2CapabilityText(fact, required) && supportsR2CapabilityText(required, fact);
+  return wholeR2CapabilityLabel(fact, required);
 }
 
 function employmentSupports(fact: string, required: string): boolean {
+  // This affirmative modifier narrows the candidate's assertion; it does not
+  // allow a bare skill to satisfy a requirement for independent work.
+  fact = fact.replace(/\s+without supervision\s*[.!]?$/i, "");
   if (!supportsR2CapabilityText(fact, required)) return false;
   if (wholeCapabilityLabel(fact, required)) return true;
   const direct =
@@ -70,12 +46,15 @@ export function matchR2Capability(
 ): R2CapabilityMatch | null {
   // A narrower unsupported advanced claim does not deny a separately verified basic fact.
   // A direct negative for the required scope still prevents positive admission.
-  const contradicted = (text: string) =>
-    [...profile.unsupportedExperience, ...profile.forbiddenClaims].some((negative) =>
-      supportsR2CapabilityText(text, negative),
-    );
   const value = requirement.normalizedValue;
+  const contradicted = (text: string) =>
+    isR2ExplicitlyUnsupported(profile, text, value.kind === "EXPERIENCE");
   if (
+    r2RequirementHasExcludedScope(requirement) ||
+    !["SKILL", "EXPERIENCE", "QUALIFICATION", "PHYSICAL", "GENERAL"].includes(
+      requirement.canonicalKind,
+    ) ||
+    !["SOURCE_STATED", "OWNER_CORRECTED", "DERIVED"].includes(requirement.state) ||
     requirement.condition !== null ||
     ["CONDITIONAL", "NEGATED", "UNKNOWN"].includes(requirement.modality)
   )
@@ -83,11 +62,12 @@ export function matchR2Capability(
   if (value.kind === "EDUCATION") {
     const need = value.value;
     if (need.condition || (!need.level && !need.field)) return null;
-    const match = profile.education
-      .filter((e) => e.verification === "VERIFIED")
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .find(
-        (e) =>
+    const matches = profile.education
+      .map((e, index) => ({ e, index }))
+      .filter(({ e }) => e.verification === "VERIFIED")
+      .sort((a, b) => a.e.id.localeCompare(b.e.id) || a.index - b.index)
+      .filter(
+        ({ e }) =>
           (!need.level || supportsR2CapabilityText(e.qualification, need.level)) &&
           (!need.field || supportsR2CapabilityText(e.field, need.field)) &&
           (e.status === "COMPLETED" ||
@@ -96,7 +76,14 @@ export function matchR2Capability(
               need.completionRequired !== true)) &&
           !contradicted([need.level, need.field].filter(Boolean).join(" ")),
       );
-    return match ? { reference: `education.${match.id}`, kind: "EDUCATION" } : null;
+    const match = matches[0];
+    if (!match) return null;
+    const semanticKey = r2SemanticFactKey("EDUCATION", match.e);
+    const references = matches
+      .filter(({ e }) => r2SemanticFactKey("EDUCATION", e) === semanticKey)
+      .map(({ index }) => r2FactReference("education", profile.education, index))
+      .sort();
+    return { reference: references[0]!, references, semanticKey, kind: "EDUCATION" };
   }
   if (!["TEXT", "PHYSICAL", "EXPERIENCE"].includes(value.kind)) return null;
   if (
@@ -115,19 +102,50 @@ export function matchR2Capability(
         ? value.value
         : null;
   if (!text || contradicted(text)) return null;
-  const skill = profile.skills
-    .filter((s) => s.verification === "VERIFIED")
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .find((s) => wholeCapabilityLabel(s.name, text));
-  if (skill) return { reference: `skills.${skill.id}`, kind: "SKILL" };
-  for (const role of profile.employment
-    .filter((e) => e.verification === "VERIFIED")
-    .sort((a, b) => a.id.localeCompare(b.id))) {
+  const skills = r2VerifiedSkillFacts(profile)
+    .filter((s) => wholeCapabilityLabel(s.record.name, text))
+    .sort(
+      (a, b) =>
+        a.semanticKey.localeCompare(b.semanticKey) || a.reference.localeCompare(b.reference),
+    );
+  const skill = skills[0];
+  if (skill) {
+    const references = skills
+      .filter((s) => s.semanticKey === skill.semanticKey)
+      .map((s) => s.reference)
+      .sort();
+    return { reference: references[0]!, references, semanticKey: skill.semanticKey, kind: "SKILL" };
+  }
+  const roleMatches: R2CapabilityMatch[] = [];
+  for (const { role, index: roleIndex } of profile.employment
+    .map((role, index) => ({ role, index }))
+    .filter(({ role }) => role.verification === "VERIFIED")
+    .sort((a, b) => a.role.id.localeCompare(b.role.id) || a.index - b.index)) {
+    const baseReference = r2FactReference("employment", profile.employment, roleIndex);
+    const baseKey = r2SemanticFactKey("EXPERIENCE", role);
     if (value.kind === "EXPERIENCE" && wholeCapabilityLabel(role.title, text))
-      return { reference: `employment.${role.id}.title`, kind: "EXPERIENCE" };
+      roleMatches.push({
+        reference: `${baseReference}.title`,
+        references: [`${baseReference}.title`],
+        semanticKey: `${baseKey}:title`,
+        kind: "EXPERIENCE",
+      });
     const index = role.responsibilities.findIndex((r) => employmentSupports(r, text));
     if (index >= 0)
-      return { reference: `employment.${role.id}.responsibilities.${index}`, kind: "EXPERIENCE" };
+      roleMatches.push({
+        reference: `${baseReference}.responsibilities.${index}`,
+        references: [`${baseReference}.responsibilities.${index}`],
+        semanticKey: `${baseKey}:responsibilities.${index}`,
+        kind: "EXPERIENCE",
+      });
   }
-  return null;
+  const match = roleMatches.sort(
+    (a, b) => a.semanticKey.localeCompare(b.semanticKey) || a.reference.localeCompare(b.reference),
+  )[0];
+  if (!match) return null;
+  const references = roleMatches
+    .filter((m) => m.semanticKey === match.semanticKey)
+    .map((m) => m.reference)
+    .sort();
+  return { ...match, references, reference: references[0]! };
 }

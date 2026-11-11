@@ -1,8 +1,4 @@
-import {
-  CandidateProfileSchema,
-  isExplicitlyUnsupported,
-  type CandidateProfile,
-} from "@applypilot/candidate-profile";
+import { CandidateProfileSchema, type CandidateProfile } from "@applypilot/candidate-profile";
 import {
   R2ANormalizationSchema,
   R2A_EVIDENCE_CONTRACT_VERSION,
@@ -11,12 +7,17 @@ import {
   type R2JobFieldEvidence,
   type R2RequirementEvidence,
 } from "@applypilot/job-model";
-import { matchesEvidenceText, normalizeText, VerificationStatus } from "@applypilot/shared";
+import { normalizeText, VerificationStatus } from "@applypilot/shared";
 
 import type { EvaluationEvidenceClass } from "./types";
-import { matchR2Capability } from "./r2-capability-match";
+import { matchR2Capability, supportsR2CapabilityText } from "./r2-capability-match";
+import {
+  isR2ExplicitlyUnsupported as isExplicitlyUnsupported,
+  r2FactReference,
+  r2RequirementHasCondition,
+} from "./r2-capability-evidence";
 
-export const R2_ELIGIBILITY_ENGINE_VERSION = "2.3.0";
+export const R2_ELIGIBILITY_ENGINE_VERSION = "2.4.0";
 export const R2_MINIMUM_EXTRACTION_COVERAGE = 60;
 
 export interface R2EvaluationBindings {
@@ -107,17 +108,20 @@ function normalizedIncludes(left: string, right: string): boolean {
 
 function verifiedNames(
   values: Array<{ id: string; name: string; verification: string }>,
-): Array<{ id: string; name: string }> {
-  return values
-    .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
-    .map(({ id, name }) => ({ id, name }));
+  family: string,
+): Array<{ id: string; name: string; index: number; reference: string }> {
+  return values.flatMap(({ id, name, verification }, index) =>
+    verification === VerificationStatus.VERIFIED
+      ? [{ id, name, index, reference: r2FactReference(family, values, index) }]
+      : [],
+  );
 }
 
 function hasVerifiedMatch(
-  candidates: Array<{ id: string; name: string }>,
+  candidates: Array<{ id: string; name: string; index: number; reference: string }>,
   required: string,
-): { id: string; name: string } | undefined {
-  return candidates.find(({ name }) => matchesEvidenceText(name, required));
+): { id: string; name: string; index: number; reference: string } | undefined {
+  return candidates.find(({ name }) => supportsR2CapabilityText(name, required));
 }
 
 function minutes(value: string): number {
@@ -328,13 +332,15 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
         [],
         "A material employer requirement is unknown and was not treated as satisfied.",
       );
-    } else if (requirement.modality === "CONDITIONAL" || requirement.state === "CONDITIONAL") {
+    } else if (r2RequirementHasCondition(requirement)) {
       add(
-        "R2_MATERIAL_CONDITION_UNRESOLVED",
+        requirement.normalizedValue.kind === "WORK_RIGHTS"
+          ? "R2_WORK_RIGHT_CONDITION_REVIEW_REQUIRED"
+          : "R2_MATERIAL_CONDITION_UNRESOLVED",
         "REVIEW",
-        "EMPLOYER_REQUIREMENT",
+        requirement.normalizedValue.kind === "WORK_RIGHTS" ? "LEGAL_LIMIT" : "EMPLOYER_REQUIREMENT",
         [requirement.id],
-        [],
+        requirement.normalizedValue.kind === "WORK_RIGHTS" ? ["workRights"] : [],
         "A material condition remains unresolved.",
       );
     }
@@ -363,7 +369,10 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
   }
 
   const requiredUsable = materialRequirements.filter(
-    (requirement) => requirement.modality === "REQUIRED" && currentUsableState(requirement.state),
+    (requirement) =>
+      requirement.modality === "REQUIRED" &&
+      currentUsableState(requirement.state) &&
+      !r2RequirementHasCondition(requirement),
   );
 
   for (const requirement of requiredUsable) {
@@ -490,13 +499,15 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     }
   }
 
-  const licences = verifiedNames(profile.licences);
-  const certifications = verifiedNames(profile.certifications);
+  const licences = verifiedNames(profile.licences, "licences");
+  const certifications = verifiedNames(profile.certifications, "certifications");
   for (const requirement of requiredUsable) {
     if (requirement.normalizedValue.kind !== "LICENCE_CERTIFICATION") continue;
     const required = requirement.normalizedValue.value;
     const candidates = required.type === "LICENCE" ? licences : certifications;
-    const match = hasVerifiedMatch(candidates, required.name);
+    const match = isExplicitlyUnsupported(profile, required.name)
+      ? undefined
+      : hasVerifiedMatch(candidates, required.name);
     if (!match) {
       const unsupported = isExplicitlyUnsupported(profile, required.name);
       add(
@@ -513,18 +524,28 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
       );
       continue;
     }
+    if (required.class) {
+      add(
+        "R2_LICENCE_CLASS_UNCONFIRMED",
+        "REVIEW",
+        "EMPLOYER_REQUIREMENT",
+        [requirement.id],
+        [match.reference],
+        "An explicit licence class is not established by a validated typed candidate class fact; a generic name was not treated as class evidence.",
+      );
+    }
     if (required.jurisdiction) {
       const record =
         required.type === "LICENCE"
-          ? profile.licences.find(({ id }) => id === match.id)
-          : profile.certifications.find(({ id }) => id === match.id);
+          ? profile.licences[match.index]
+          : profile.certifications[match.index];
       if (!record || !("jurisdiction" in record) || !record.jurisdiction) {
         add(
           "R2_LICENCE_JURISDICTION_UNCONFIRMED",
           "REVIEW",
           "EMPLOYER_REQUIREMENT",
           [requirement.id],
-          [required.type === "LICENCE" ? `licences.${match.id}` : `certifications.${match.id}`],
+          [match.reference],
           "The required jurisdiction is explicit but the candidate jurisdiction is not verified.",
         );
       } else if (!normalizedIncludes(record.jurisdiction, required.jurisdiction)) {
@@ -533,7 +554,7 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
           "REVIEW",
           "EMPLOYER_REQUIREMENT",
           [requirement.id],
-          [`licences.${match.id}`],
+          [match.reference],
           "An overseas or different-jurisdiction licence was not treated as the stated licence.",
         );
       }
@@ -541,15 +562,15 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     if (required.validityRequirement) {
       const record =
         required.type === "LICENCE"
-          ? profile.licences.find(({ id }) => id === match.id)
-          : profile.certifications.find(({ id }) => id === match.id);
+          ? profile.licences[match.index]
+          : profile.certifications[match.index];
       if (!record?.expiresOn) {
         add(
           "R2_CREDENTIAL_EXPIRY_UNCONFIRMED",
           "REVIEW",
           "EMPLOYER_REQUIREMENT",
           [requirement.id],
-          [`${required.type === "LICENCE" ? "licences" : "certifications"}.${match.id}`],
+          [match.reference],
           "The source requires current validity but the candidate expiry is unknown.",
         );
       } else if (new Date(`${record.expiresOn}T23:59:59.999Z`) < evaluatedAt) {
@@ -558,7 +579,7 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
           "BLOCKER",
           "EMPLOYER_REQUIREMENT",
           [requirement.id],
-          [`${required.type === "LICENCE" ? "licences" : "certifications"}.${match.id}`],
+          [match.reference],
           "The verified credential is expired at the bound evaluation time.",
         );
       }
@@ -600,7 +621,11 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     ) {
       continue;
     }
-    const unsupported = isExplicitlyUnsupported(profile, text);
+    const unsupported = isExplicitlyUnsupported(
+      profile,
+      text,
+      requirement.normalizedValue.kind === "EXPERIENCE",
+    );
     add(
       unsupported ? "R2_MANDATORY_CAPABILITY_MISMATCH" : "R2_MANDATORY_CAPABILITY_UNCONFIRMED",
       unsupported ? "BLOCKER" : "REVIEW",

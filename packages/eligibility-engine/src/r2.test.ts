@@ -55,15 +55,13 @@ describe("R2 eligibility", () => {
     (name) => {
       const requirement = r2RequirementEvidence("fictional-exact-skill", "SKILLS", "SKILL", {
         kind: "TEXT",
-        value: name,
+        value: `${name} programming`,
       });
       const normalization = r2TestNormalization({ requirements: [requirement] });
       const profile = (verification: "VERIFIED" | "USER_CONFIRMATION_REQUIRED") =>
         CandidateProfileSchema.parse({
           ...testProfile,
           skills: [{ id: "fictional-technical-label", name, verification }],
-          unsupportedExperience: [],
-          forbiddenClaims: [],
           employment: [],
           education: [],
           licences: [],

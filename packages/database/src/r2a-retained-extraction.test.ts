@@ -91,7 +91,9 @@ describe("retained production-source extraction regressions", () => {
       expect(normalization.requirementEvidence).toContainEqual(
         expect.objectContaining({
           canonicalKind: "LICENCE",
-          modality: "UNKNOWN",
+          modality: "REQUIRED",
+          condition: null,
+          ruleId: "R2A_LICENCE_REQUIRED_SECTION_DEFAULT",
           source: expect.objectContaining({
             excerpt: "Forklift licence",
             sourcePath: expect.stringContaining("structured.description.item."),
@@ -99,6 +101,16 @@ describe("retained production-source extraction regressions", () => {
         }),
       );
       expect(normalization.requirementEvidence).toHaveLength(1);
+      const unknownHeading = normalizePosting(
+        `&lt;div&gt;If you were here last week, you might have${gap}&lt;h2&gt;Other information&lt;/h2&gt;&lt;p&gt;Forklift licence&lt;/p&gt;&lt;/div&gt;`,
+      ).normalization;
+      expect(unknownHeading.requirementEvidence).toHaveLength(1);
+      expect(unknownHeading.requirementEvidence[0]).toMatchObject({
+        canonicalKind: "LICENCE",
+        modality: "UNKNOWN",
+        condition: null,
+        source: { excerpt: "Forklift licence" },
+      });
     },
   );
   it("preserves the existing inert HTML depth boundary", () => {
@@ -196,7 +208,7 @@ describe("retained production-source extraction regressions", () => {
       condition: text.slice(text.indexOf("when")).replace(/\.$/, ""),
       normalizedValue: { kind: "TEXT", value: text },
       source: { excerpt: text },
-      extractorVersion: "3.6.5",
+      extractorVersion: "3.6.6",
       ownerCorrectionId: null,
       derivationInputIds: [],
       conflictSetId: null,

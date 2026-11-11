@@ -55,6 +55,244 @@ const skill = (id: string, text: string) =>
   r2RequirementEvidence(id, "SKILLS", "SKILL", { kind: "TEXT", value: text });
 
 describe("fictional ranking scope generalization", () => {
+  it("preserves exact named-language programming evidence with unrelated negative claims", () => {
+    for (const name of ["C++", "C#", ".NET", "Python"]) {
+      const p = profile(name);
+      p.forbiddenClaims = ["cash-handling experience", "expert Python developer"];
+      expect(run(p, [skill("language", `${name} programming`)]).fit.score).toBe(7);
+    }
+    const p = profile("C++");
+    p.skills[0]!.verification = "UNKNOWN";
+    const a = run(p, [skill("unverified", "C++ programming")]);
+    expect(a.eligibility.status).not.toBe("INELIGIBLE");
+    expect(a.fit.contributions.filter((c) => c.points > 0)).toEqual([]);
+  });
+  it("preserves exact Basic scope and affirmative unassisted use without inventing higher scope", () => {
+    expect(run(profile("Basic Python"), [skill("basic", "Basic Python")]).fit.score).toBe(7);
+    expect(
+      run(profile(null, "Used Python without supervision"), [skill("used", "Python")]).fit.score,
+    ).toBe(7);
+    expect(
+      run(profile("Basic Python"), [skill("advanced", "Advanced Python")]).eligibility.reasons,
+    ).toContainEqual(expect.objectContaining({ code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED" }));
+  });
+  it("keeps literal overlap separate from a complete compound prerequisite and mixed-source support", () => {
+    const p = profile("Python");
+    p.unsupportedExperience = [];
+    p.forbiddenClaims = [];
+    const compound = skill("compound", "Python and aircraft certification");
+    const preferred = { ...skill("whole", "Python"), modality: "PREFERRED" as const };
+    const result = run(p, [compound, preferred]);
+    expect(result.fit.score).toBe(7);
+    expect(result.eligibility.reasons).toContainEqual(
+      expect.objectContaining({
+        code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED",
+        jobEvidenceReferences: ["compound"],
+      }),
+    );
+    expect(result.fit.contributions[0]).toMatchObject({
+      requirementSupport: [
+        { jobEvidenceReference: "compound", scope: "PARTIAL_EVIDENCE" },
+        { jobEvidenceReference: "whole", scope: "FULL_REQUIREMENT" },
+      ],
+    });
+    expect(result.fit).toMatchObject({
+      evidenceOpportunity: {
+        usableRequirementCount: 2,
+        fullySupportedRequirementIds: ["whole"],
+        partialEvidenceRequirementIds: ["compound"],
+        unmatchedUsableRequirementIds: [],
+      },
+    });
+    expect(result.fit.recommended).toBe(false);
+    expect(run(p, [preferred, compound]).fit).toEqual(result.fit);
+  });
+  it("preserves distinct knowledge behind colliding IDs and coalesces identical semantic facts", () => {
+    const p = CandidateProfileSchema.parse({
+      ...profile(null),
+      forbiddenClaims: [],
+      unsupportedExperience: [],
+      skills: [
+        { id: "collision", name: "C", verification: "VERIFIED" },
+        { id: "collision", name: "C++", verification: "VERIFIED" },
+        { id: "duplicate", name: "C++", verification: "VERIFIED" },
+      ],
+    });
+    const result = run(p, [skill("c", "C"), skill("cpp", "C++ programming")]);
+    expect(result.fit.score).toBe(14);
+    expect(result.fit.contributions.flatMap((c) => c.candidateFactReferences).sort()).toEqual([
+      "skills.collision.records.0",
+      "skills.collision.records.1",
+      "skills.duplicate",
+    ]);
+    expect(new Set(result.fit.contributions.flatMap((c) => c.jobEvidenceReferences))).toEqual(
+      new Set(["c", "cpp"]),
+    );
+  });
+  it("retains every reference for identical verified employment records without multiplying points", () => {
+    const p = profile(null, "Used Python");
+    p.employment.push({ ...p.employment[0]!, id: "fictional-role-copy" });
+    const a = run(p, [skill("python", "Python")]);
+    expect(a.fit.score).toBe(7);
+    expect(a.fit.contributions[0]?.candidateFactReferences).toEqual([
+      "employment.fictional-role-copy.responsibilities.0",
+      "employment.fictional-role.responsibilities.0",
+    ]);
+  });
+  it.each([
+    ["C+", "C"],
+    ["C+++", "C++"],
+    ["C##", "C#"],
+    [".NET+", ".NET"],
+    ["C++17", "C++17.0 programming"],
+    [".NET", "ASP.NET programming"],
+  ])("preserves malformed or different technical identifiers %s / %s", (fact, required) => {
+    expect(
+      run(profile(fact), [skill("identifier", required)]).fit.contributions.filter(
+        (c) => c.points > 0,
+      ),
+    ).toEqual([]);
+  });
+  it("excludes every explicit condition and unknown source state from support and opportunity", () => {
+    const licence = r2RequirementEvidence(
+      "licence",
+      "LICENCES",
+      "LICENCE",
+      {
+        kind: "LICENCE_CERTIFICATION",
+        value: {
+          type: "LICENCE",
+          name: "Example driving licence",
+          jurisdiction: null,
+          class: null,
+          alternatives: [],
+          validityRequirement: null,
+          condition: null,
+        },
+      },
+      { condition: "if authorised" },
+    );
+    const p = CandidateProfileSchema.parse({
+      ...profile("Python"),
+      licences: [{ id: "held", name: "Example driving licence", verification: "VERIFIED" }],
+    });
+    const typed = r2RequirementEvidence("typed-condition", "EXPERIENCE", "EXPERIENCE", {
+      kind: "EXPERIENCE",
+      value: {
+        domain: "Python",
+        minimum: null,
+        maximum: null,
+        unit: "UNKNOWN",
+        recency: null,
+        alternatives: [],
+        condition: "if assigned",
+      },
+    });
+    const unknown = { ...skill("unknown-state", "Python"), state: "UNKNOWN" as const };
+    for (const evidence of [licence, typed, unknown]) {
+      const a = run(p, [evidence]);
+      expect(a.fit.contributions.filter((c) => c.points > 0)).toEqual([]);
+      expect(a.fit.evidenceOpportunity).toMatchObject({
+        usableRequirementCount: 0,
+        excludedRequirementIds: [evidence.id],
+      });
+      expect(a.eligibility.status).toBe("REVIEW_REQUIRED");
+      if (evidence !== unknown)
+        expect(a.eligibility.unresolvedMaterialConditions).toBeGreaterThan(0);
+    }
+  });
+  it("retains affirmative optional language evidence while rejecting its conditional variant", () => {
+    const preferred = {
+      ...skill("optional", "Python programming is preferred but not essential."),
+      modality: "PREFERRED" as const,
+    };
+    expect(run(profile("Python"), [preferred]).fit.score).toBe(4);
+    expect(
+      run(profile("Python"), [
+        {
+          ...preferred,
+          normalizedValue: {
+            kind: "TEXT",
+            value: "Python programming is preferred but not essential if authorised.",
+          },
+        },
+      ]).fit.score,
+    ).toBe(0);
+  });
+  it("does not turn a generic credential name into a more specific held credential", () => {
+    const p = CandidateProfileSchema.parse({
+      ...profile(null),
+      licences: [{ id: "generic", name: "Driving licence", verification: "VERIFIED" }],
+    });
+    const requirement = r2RequirementEvidence("specific-licence", "LICENCES", "LICENCE", {
+      kind: "LICENCE_CERTIFICATION",
+      value: {
+        type: "LICENCE",
+        name: "Class MR driving licence",
+        class: null,
+        jurisdiction: null,
+        alternatives: [],
+        validityRequirement: null,
+        condition: null,
+      },
+    });
+    const result = run(p, [requirement]);
+    expect(result.fit.score).toBe(0);
+    expect(result.eligibility.status).toBe("REVIEW_REQUIRED");
+  });
+  it("keeps typed licence class unresolved and rejects an exact forbidden credential claim", () => {
+    const p = CandidateProfileSchema.parse({
+      ...profile(null),
+      forbiddenClaims: [],
+      unsupportedExperience: [],
+      licences: [{ id: "held", name: "Driving licence", verification: "VERIFIED" }],
+    });
+    const requirement = r2RequirementEvidence("typed-class", "LICENCES", "LICENCE", {
+      kind: "LICENCE_CERTIFICATION",
+      value: {
+        type: "LICENCE",
+        name: "Driving licence",
+        class: "MR",
+        jurisdiction: null,
+        alternatives: [],
+        validityRequirement: null,
+        condition: null,
+      },
+    });
+    expect(run(p, [requirement]).eligibility.status).toBe("REVIEW_REQUIRED");
+    const exact = {
+      ...requirement,
+      id: "forbidden-credential",
+      normalizedValue: {
+        kind: "LICENCE_CERTIFICATION" as const,
+        value: {
+          type: "LICENCE" as const,
+          name: "Driving licence",
+          class: null,
+          jurisdiction: null,
+          alternatives: [],
+          validityRequirement: null,
+          condition: null,
+        },
+      },
+    };
+    p.forbiddenClaims = ["Driving licence"];
+    const result = run(p, [exact]);
+    expect(result.fit.contributions.filter((c) => c.points > 0)).toEqual([]);
+    expect(result.eligibility.status).toBe("INELIGIBLE");
+  });
+  it.each([
+    "Python-free systems",
+    "No Python experience necessary",
+    "Python if authorised",
+    "Recruit Python developers",
+    "Manage a team of Python experts",
+    "Train others in Python",
+  ])("does not count incidental or negative/conditional literal overlap: %s", (text) => {
+    expect(
+      run(profile("Python"), [skill("scope", text)]).fit.contributions.filter((c) => c.points > 0),
+    ).toEqual([]);
+  });
   it("orders separate fictional positive, composite, repeated and adversarial pairs without private judgments", () => {
     const p = CandidateProfileSchema.parse({
       ...profile(null),
@@ -101,7 +339,7 @@ describe("fictional ranking scope generalization", () => {
     const result = run(profile(text.includes("communication") ? "communication" : "Python"), [
       skill("scope", text),
     ]);
-    expect(result.fit.score).toBe(0);
+    expect(result.fit.score).toBe(/only|supervision/.test(text) ? 0 : 7);
     expect(result.eligibility.reasons).toContainEqual(
       expect.objectContaining({ code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED" }),
     );
@@ -135,12 +373,26 @@ describe("fictional ranking scope generalization", () => {
     "Python-free systems",
     "Don't use Python",
   ])("rejects qualified required scope %s", (text) => {
-    expect(run(profile("Python"), [skill("scope", text)]).fit.score).toBe(0);
+    const result = run(profile("Python"), [skill("scope", text)]);
+    expect(result.fit.score).toBe(text === "Python or Rust" ? 7 : 0);
+    if (text === "Python or Rust")
+      expect(result.fit.contributions[0]?.requirementSupport).toEqual([
+        { jobEvidenceReference: "scope", scope: "PARTIAL_EVIDENCE" },
+      ]);
   });
   it.each(["Python", "robotics", "control"])(
     "does not infer programming scope from the shorter fact %s",
     (name) => {
-      expect(run(profile(name), [skill("scope", `${name} programming`)]).fit.score).toBe(0);
+      const result = run(profile(name), [skill("scope", `${name} programming`)]);
+      expect(result.fit.score).toBe(7);
+      if (name !== "Python") {
+        expect(result.fit.contributions[0]?.requirementSupport).toEqual([
+          { jobEvidenceReference: "scope", scope: "PARTIAL_EVIDENCE" },
+        ]);
+        expect(result.eligibility.reasons).toContainEqual(
+          expect.objectContaining({ code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED" }),
+        );
+      }
     },
   );
   it("recognizes identical bounded skills in verified affirmative employment sentences", () => {
@@ -202,7 +454,10 @@ describe("fictional ranking scope generalization", () => {
         },
       });
       const result = run(profile("Python"), [requirement]);
-      expect(result.fit.score).toBe(0);
+      expect(result.fit.score).toBe(7);
+      expect(result.fit.contributions[0]?.requirementSupport).toEqual([
+        { jobEvidenceReference: "years", scope: "PARTIAL_EVIDENCE" },
+      ]);
       expect(result.eligibility.reasons).toContainEqual(
         expect.objectContaining({ code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED" }),
       );
