@@ -3955,7 +3955,7 @@ describe("offline source-to-R2 queue persistence", () => {
       ["Teamwork", "PREFERRED"],
       ["Backend engineering", "PREFERRED"],
     ]);
-    expect(normalization.parserVersion).toBe("3.6.5");
+    expect(normalization.parserVersion).toBe("3.6.6");
     expect(
       sqlite.prepare("SELECT qualification_state FROM source_record_verifications").pluck().get(),
     ).toBe("QUALIFIED");
@@ -4116,12 +4116,12 @@ describe("offline source-to-R2 queue persistence", () => {
     const old = new R2ARepository(sqlite).getNormalization(verification.jobVersionId)!;
     expect(old.parserVersion).toBe("3.1.0");
     const derived = repository.rederiveLeverObservation({ verificationId: verification.id });
-    expect(derived.parserVersion).toBe("3.6.5");
-    expect(derived.normalizationVersion).toBe("3.6.5");
+    expect(derived.parserVersion).toBe("3.6.6");
+    expect(derived.normalizationVersion).toBe("3.6.6");
     expect(derived.parentJobVersionId).toBe(verification.jobVersionId);
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.5");
+    ).toBe("3.6.6");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -4220,14 +4220,14 @@ describe("offline source-to-R2 queue persistence", () => {
 
     const derived = repository.rederiveGreenhouseObservation({ verificationId: verification.id });
     expect(derived).toMatchObject({
-      parserVersion: "3.6.5",
-      normalizationVersion: "3.6.5",
+      parserVersion: "3.6.6",
+      normalizationVersion: "3.6.6",
       parentJobVersionId: verification.jobVersionId,
       created: true,
     });
     expect(
       new R2ARepository(sqlite).getNormalization(derived.derivedJobVersionId)?.parserVersion,
-    ).toBe("3.6.5");
+    ).toBe("3.6.6");
     const jobId = (
       sqlite
         .prepare("SELECT job_id AS jobId FROM job_versions WHERE id=?")
@@ -5097,8 +5097,8 @@ describe("stopped-run persisted-source inspection", () => {
       parentJobVersionId: verification.jobVersionId,
       providerDriftWarnings: [],
       normalization: {
-        parserVersion: "3.6.5",
-        normalizationVersion: "3.6.5",
+        parserVersion: "3.6.6",
+        normalizationVersion: "3.6.6",
         evidenceContractVersion: "3.1.0",
       },
     });
@@ -5107,10 +5107,10 @@ describe("stopped-run persisted-source inspection", () => {
       sourceQualificationState: "PAGE_PERSISTED",
       sourceRunStatus: "STOPPED",
       sourceStopCode: "RUN_TIMEOUT",
-      parserVersion: "3.6.5",
-      normalizationVersion: "3.6.5",
+      parserVersion: "3.6.6",
+      normalizationVersion: "3.6.6",
       evidenceContractVersion: "3.1.0",
-      scorerVersion: "2.2.0",
+      scorerVersion: "2.3.0",
       weightVersion: "r2-weights-1",
       scoreThreshold: 50,
       minimumCoverageThreshold: 60,
@@ -5196,7 +5196,7 @@ describe("stopped-run persisted-source inspection", () => {
         },
       ]);
       expect(inspection.job).not.toHaveProperty("workplaceType");
-      expect(inspection.normalization.parserVersion).toBe("3.6.5");
+      expect(inspection.normalization.parserVersion).toBe("3.6.6");
     } finally {
       fixture.sqlite.close();
     }
@@ -5455,7 +5455,7 @@ describe("stopped-run persisted-source inspection", () => {
     }
   });
 
-  it("reconstructs current 3.6.5 evidence over an older 3.2.0 parent without rewriting it", async () => {
+  it("reconstructs current 3.6.6 evidence over an older 3.2.0 parent without rewriting it", async () => {
     const fixture = await stoppedInspectionFixture();
     try {
       const { sqlite, repository, verification } = fixture;
@@ -5480,8 +5480,8 @@ describe("stopped-run persisted-source inspection", () => {
       });
       const after = inspectionStateSnapshot(sqlite);
       expect(inspection.normalization).toMatchObject({
-        parserVersion: "3.6.5",
-        normalizationVersion: "3.6.5",
+        parserVersion: "3.6.6",
+        normalizationVersion: "3.6.6",
         evidenceContractVersion: "3.1.0",
       });
       expect(

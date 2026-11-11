@@ -15,6 +15,67 @@ import {
 } from "./r2a-normalization";
 
 describe("R2A evidence normalization", () => {
+  it.each([
+    "Benefits",
+    "Responsibilities",
+    "Duties",
+    "Perks",
+    "Examples",
+    "Requirements and benefits",
+    "Required and preferred skills",
+  ])("resets a trusted requirement section at its closed inner context heading %s", (context) => {
+    const structured = {
+      sourceSections: [
+        {
+          kind: "REQUIREMENTS",
+          heading: "Required skills",
+          content: `Python programming\n${context}\nCommunication skills training\nSoftware testing is required.`,
+        },
+      ],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      structured,
+      sourceText,
+      sourceObservationId: "fictional:inner-context-reset",
+    });
+    expect(
+      result.requirementEvidence.map(({ source, modality }) => [source.excerpt, modality]),
+    ).toEqual([
+      ["Python programming", "REQUIRED"],
+      ["Communication skills training", "UNKNOWN"],
+      ["Software testing is required.", "REQUIRED"],
+    ]);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+  });
+  it("keeps inner unmarked alternatives unknown while retaining explicit mandatory clauses", () => {
+    const structured = {
+      sourceSections: [
+        {
+          kind: "REQUIREMENTS",
+          heading: "Required skills",
+          content:
+            "At least one of the following\nPython programming\nRust programming\nSoftware testing is required.",
+        },
+      ],
+    };
+    const sourceText = JSON.stringify(structured);
+    const result = normalizeR2AJobEvidence({
+      structured,
+      sourceText,
+      sourceObservationId: "fictional:inner-alternatives",
+    });
+    expect(
+      result.requirementEvidence.map(({ source, modality }) => [source.excerpt, modality]),
+    ).toEqual([
+      ["Python programming", "UNKNOWN"],
+      ["Rust programming", "UNKNOWN"],
+      ["Software testing is required.", "REQUIRED"],
+    ]);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+  });
   it("preserves nested preference scope without counting headings as requirements", () => {
     const structured = {
       description: "Fictional role.",
@@ -260,7 +321,7 @@ describe("R2A evidence normalization", () => {
       explicitLocation: fixture.location,
     });
     assertR2ASourcePointers(result, fixture.text);
-    expect(result.parserVersion).toBe("3.6.5");
+    expect(result.parserVersion).toBe("3.6.6");
     expect(result.coverage).toHaveLength(17);
     for (const family of fixture.expectedFamilies) {
       expect(result.coverage.find((item) => item.family === family)?.state).not.toBe("UNKNOWN");

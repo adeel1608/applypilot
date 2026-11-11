@@ -47,6 +47,8 @@ const safeCodes = new Set([
   "R2_CALIBRATION_SAFETY_EVIDENCE_REQUIRED",
   "R2_CALIBRATION_ASSESSMENT_CHANGED",
   "R2_CALIBRATION_NOT_QUALIFIABLE",
+  "R2_CALIBRATION_CAMPAIGN_BINDING_INVALID",
+  "R2_CALIBRATION_HISTORY_INVALID",
 ]);
 
 export interface CalibrationMemberView {
@@ -111,6 +113,7 @@ export interface CalibrationView {
   campaigns: ReturnType<R2CalibrationIntakeRepository["listCampaigns"]>;
   selection: { jobIds: string[]; contextDigest: string; members: CalibrationMemberView[] } | null;
   campaign: CalibrationCampaignView | null;
+  historical?: ReturnType<R2CalibrationIntakeRepository["readHistoricalSummary"]> | null;
 }
 
 function context() {
@@ -298,14 +301,24 @@ export async function getCalibrationView(
       };
     }
     if (query.campaignId) {
-      const state = c.repository.readCampaign(
-        R2CalibrationIdSchema.parse(query.campaignId),
-        c.profileHash,
-      );
-      view.campaign = campaignView(
-        state,
-        c.repository.previewAssessment(state.campaign.id, currentSafety, c.profileHash),
-      );
+      const id = R2CalibrationIdSchema.parse(query.campaignId);
+      try {
+        const state = c.repository.readCampaign(id, c.profileHash);
+        view.campaign = campaignView(
+          state,
+          c.repository.previewAssessment(state.campaign.id, currentSafety, c.profileHash),
+        );
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !["R2_CALIBRATION_CAMPAIGN_BINDING_INVALID", "R2_CALIBRATION_CONTEXT_STALE"].includes(
+            error.message,
+          )
+        )
+          throw error;
+        view.historical = c.repository.readHistoricalSummary(id);
+        view.safeCode = error.message;
+      }
     }
   } catch (error) {
     const code = error instanceof Error ? error.message : "";

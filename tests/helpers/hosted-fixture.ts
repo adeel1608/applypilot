@@ -358,7 +358,7 @@ export async function createHostedFixture(
       });
       sqlite
         .prepare(
-          "INSERT INTO evaluation_versions(id,job_id,job_version_id,profile_version_id,evaluation_context,eligibility_status,eligibility_reasons_json,fit_score,fit_contributions_json,coverage_json,eligibility_engine_version,fit_engine_version,weight_version,stale,evaluated_at) VALUES(?,?,?,?,'PRIVATE_LOCAL_PROFILE',?,?,?,?,?,'2.2.0','2.2.0','r2-weights-1',0,?)",
+          "INSERT INTO evaluation_versions(id,job_id,job_version_id,profile_version_id,evaluation_context,eligibility_status,eligibility_reasons_json,fit_score,fit_contributions_json,coverage_json,eligibility_engine_version,fit_engine_version,weight_version,stale,evaluated_at) VALUES(?,?,?,?,'PRIVATE_LOCAL_PROFILE',?,?,?,?,?,'2.3.0','2.3.0','r2-weights-1',0,?)",
         )
         .run(
           `legacy:${evaluationId}`,

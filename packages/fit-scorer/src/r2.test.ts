@@ -155,6 +155,7 @@ describe("R2 fit scoring", () => {
           id: "fictional-education",
           qualification: "Fictional Bachelor Degree",
           field: "Systems Engineering",
+          status: "COMPLETED",
           verification: "VERIFIED",
         },
       ],
@@ -199,12 +200,12 @@ describe("R2 fit scoring", () => {
       })),
     ).toEqual([
       {
-        code: "R2_EXPERIENCE_VERIFIED_MATCH",
-        candidateFactReferences: ["employment.fictional-employment"],
-      },
-      {
         code: "R2_EDUCATION_VERIFIED_MATCH",
         candidateFactReferences: ["education.fictional-education"],
+      },
+      {
+        code: "R2_EXPERIENCE_VERIFIED_MATCH",
+        candidateFactReferences: ["employment.fictional-employment.responsibilities.0"],
       },
     ]);
   });

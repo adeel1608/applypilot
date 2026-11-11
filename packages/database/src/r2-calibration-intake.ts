@@ -34,6 +34,7 @@ import {
   calibrationEventDigest,
   assertUniqueCalibrationMembers,
   assessCurrentR2CalibrationCampaign,
+  readHistoricalR2CalibrationSummary,
   type R2CalibrationCampaign,
   type R2CalibrationLabelEvent,
   type R2CalibrationPairEvent,
@@ -157,6 +158,11 @@ export class R2CalibrationIntakeRepository {
       thresholdsVersion: string;
       memberCount: number;
     }>;
+  }
+
+  /** Historical display only; no current campaign or mutation binding is returned. */
+  readHistoricalSummary(campaignId: string) {
+    return readHistoricalR2CalibrationSummary(this.sqlite, campaignId);
   }
 
   previewCampaign(jobIds: string[], expectedProfileHash?: string) {

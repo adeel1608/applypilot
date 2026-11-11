@@ -53,6 +53,7 @@ import {
   R2A_PARSER_VERSION,
   R2A_NORMALIZATION_VERSION,
   R2A_EVIDENCE_CONTRACT_VERSION,
+  R2ANormalizationSchema,
   type Job,
   type R2ANormalization,
 } from "@applypilot/job-model";
@@ -580,6 +581,41 @@ export function readCurrentR2CalibrationCampaign(
   campaignIdInput: string,
   expectedProfileHash?: string,
 ): R2CurrentCalibrationCampaign {
+  return readCalibrationCampaign(sqlite, campaignIdInput, expectedProfileHash, false);
+}
+
+/** No current-state object or approval binding escapes this historical-only entry point. */
+export function readHistoricalR2CalibrationSummary(
+  sqlite: BetterSqlite3.Database,
+  campaignId: string,
+) {
+  const state = readCalibrationCampaign(sqlite, campaignId, undefined, true);
+  const assessment = assessCurrentR2CalibrationCampaign(state, null).assessment;
+  return {
+    status: "HISTORICAL_NOT_CURRENT" as const,
+    campaignId: state.campaign.id,
+    engine: state.campaign.engine,
+    thresholds: state.campaign.thresholds,
+    comparedPairCount: assessment.comparedPairCount,
+    pairAgreementBasisPoints: assessment.pairAgreementBasisPoints,
+    pairDiagnostics: assessment.pairDiagnostics,
+    members: state.comparisons.map((m) => ({
+      id: m.id,
+      title: m.job.title,
+      score: m.fit.score,
+      recommended: m.fit.recommended,
+      eligibility: m.eligibility.status,
+      coveragePercent: m.eligibility.coveragePercent,
+    })),
+  };
+}
+
+function readCalibrationCampaign(
+  sqlite: BetterSqlite3.Database,
+  campaignIdInput: string,
+  expectedProfileHash: string | undefined,
+  historical: boolean,
+): R2CurrentCalibrationCampaign {
   const campaignId = R2CalibrationIdSchema.parse(campaignIdInput);
   const raw = sqlite
     .prepare("SELECT * FROM r2_calibration_campaigns WHERE id=?")
@@ -613,7 +649,7 @@ export function readCurrentR2CalibrationCampaign(
   if (
     Number(raw.schema_version) !== 1 ||
     campaign.taxonomyVersion !== R2_OCCUPATION_TAXONOMY_VERSION ||
-    campaign.engineDigest !== digest(currentR2CalibrationEngine()) ||
+    (!historical && campaign.engineDigest !== digest(currentR2CalibrationEngine())) ||
     campaign.engineDigest !== digest(campaign.engine) ||
     campaign.thresholds.version !== raw.thresholds_version ||
     digest(campaign.thresholds) !== campaign.thresholdsDigest ||
@@ -623,22 +659,97 @@ export function readCurrentR2CalibrationCampaign(
     calibrationCampaignDigest(campaignBody) !== campaignDigest
   )
     throw new Error("R2_CALIBRATION_CAMPAIGN_BINDING_INVALID");
-  const selection = readR2CalibrationSelection(sqlite, createRequest.jobIds, expectedProfileHash);
+  const rows = sqlite
+    .prepare(
+      "SELECT * FROM r2_calibration_comparisons WHERE campaign_id=? ORDER BY job_id LIMIT 301",
+    )
+    .all(campaignId) as Array<Record<string, string>>;
+  const selection = historical
+    ? (() => {
+        const row = sqlite
+          .prepare("SELECT snapshot_json,content_hash FROM candidate_profile_versions WHERE id=?")
+          .get(campaign.profileVersionId) as
+          | { snapshot_json: string; content_hash: string }
+          | undefined;
+        if (!row) throw new Error("R2_CALIBRATION_HISTORY_INVALID");
+        const profile = CandidateProfileSchema.parse(calibrationJson(row.snapshot_json));
+        if (
+          candidateProfileContentHash(profile) !== campaign.profileHash ||
+          row.content_hash !== campaign.profileHash
+        )
+          throw new Error("R2_CALIBRATION_HISTORY_INVALID");
+        return {
+          profile: {
+            profile,
+            profileVersionId: campaign.profileVersionId,
+            profileHash: campaign.profileHash,
+          },
+          contextDigest: createRequest.expectedContextDigest,
+          comparisons: [] as R2CalibrationComparison[],
+        };
+      })()
+    : readR2CalibrationSelection(sqlite, createRequest.jobIds, expectedProfileHash);
   if (
     selection.contextDigest !== createRequest.expectedContextDigest ||
     campaign.profileVersionId !== selection.profile.profileVersionId ||
     campaign.profileHash !== selection.profile.profileHash
   )
     throw new Error("R2_CALIBRATION_CONTEXT_STALE");
-  const rows = sqlite
-    .prepare(
-      "SELECT * FROM r2_calibration_comparisons WHERE campaign_id=? ORDER BY job_id LIMIT 301",
-    )
-    .all(campaignId) as Array<Record<string, string>>;
   if (rows.length !== createRequest.jobIds.length)
     throw new Error("R2_CALIBRATION_COMPARISON_INCOMPLETE");
   const currentMembers = new Map(selection.comparisons.map((m) => [m.jobId, m]));
   const comparisons = rows.map((row) => {
+    if (historical) {
+      const snapshot = calibrationJson(row.snapshot_json!);
+      const shape = z
+        .object({
+          schemaVersion: z.literal(1),
+          purpose: z.literal("CALIBRATION_OFFLINE"),
+          id: R2CalibrationIdSchema,
+          jobId: R2CalibrationIdSchema,
+          jobVersionId: R2CalibrationIdSchema,
+          sourceObservationId: R2CalibrationIdSchema,
+          originalIdentity: z.string().min(1),
+          profileVersionId: R2CalibrationIdSchema,
+          profileHash: R2CalibrationDigestSchema,
+          engine: R2CalibrationSafetyEngineSchema,
+          engineDigest: R2CalibrationDigestSchema,
+          job: JobSchema,
+          normalization: R2ANormalizationSchema,
+          fit: z.object({
+            score: z.number().int().min(0).max(100),
+            recommended: z.boolean(),
+            scorerVersion: z.string(),
+            weightVersion: z.string(),
+          }),
+          eligibility: z.object({
+            status: z.enum(["ELIGIBLE", "INELIGIBLE", "REVIEW_REQUIRED"]),
+            engineVersion: z.string(),
+            coveragePercent: z.number().min(0).max(100),
+          }),
+        })
+        .parse(snapshot);
+      if (
+        digest(snapshot) !== row.snapshot_digest ||
+        shape.id !== calibrationComparisonId(campaignId, row.job_id!) ||
+        shape.id !== row.id ||
+        shape.jobId !== row.job_id ||
+        !createRequest.jobIds.includes(shape.jobId) ||
+        shape.jobVersionId !== row.job_version_id ||
+        shape.sourceObservationId !== row.source_observation_id ||
+        shape.originalIdentity !== row.original_identity ||
+        shape.profileVersionId !== campaign.profileVersionId ||
+        shape.profileHash !== campaign.profileHash ||
+        shape.engineDigest !== campaign.engineDigest ||
+        digest(shape.engine) !== campaign.engineDigest ||
+        shape.fit.scorerVersion !== campaign.engine.scorerVersion ||
+        shape.fit.weightVersion !== campaign.engine.weightVersion ||
+        shape.eligibility.engineVersion !== campaign.engine.eligibilityEngineVersion ||
+        row.created_at !== campaign.createdAt
+      )
+        throw new Error("R2_CALIBRATION_HISTORY_INVALID");
+      return snapshot as R2CalibrationComparison;
+    }
     const member = currentMembers.get(row.job_id!);
     if (!member) throw new Error("R2_CALIBRATION_COMPARISON_CHANGED");
     const expected = bindR2CalibrationComparison(
@@ -659,7 +770,12 @@ export function readCurrentR2CalibrationCampaign(
       throw new Error("R2_CALIBRATION_COMPARISON_CHANGED");
     return expected;
   });
-  assertUniqueCalibrationMembers(sqlite, comparisons);
+  if (!historical) assertUniqueCalibrationMembers(sqlite, comparisons);
+  else if (
+    new Set(comparisons.map((m) => m.jobId)).size !== comparisons.length ||
+    new Set(comparisons.map((m) => m.originalIdentity)).size !== comparisons.length
+  )
+    throw new Error("R2_CALIBRATION_HISTORY_INVALID");
   if (
     campaign.memberDigest !== digest(comparisons.map((m) => ({ id: m.id, digest: digest(m) }))) ||
     campaign.corpusVersion !== `r2-private-v1:${campaign.memberDigest.slice(0, 32)}`

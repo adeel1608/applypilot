@@ -327,6 +327,78 @@ afterEach(() => {
 });
 
 describe("real retained-source calibration intake", () => {
+  it(
+    "reports measured pair failure alongside insufficient sample through the real repository without writing assessment rows",
+    { timeout: 15_000 },
+    async () => {
+      const c = await setup(3),
+        id = campaign(c, { ...threshold, minimumPairComparisons: 3 });
+      const state = c.repository.readCampaign(id),
+        ordered = [...state.comparisons].sort((a, b) => a.fit.score - b.fit.score);
+      const request = {
+        campaignId: id,
+        leftComparisonId: ordered[0]!.id,
+        rightComparisonId: ordered.at(-1)!.id,
+        preferredComparisonId: ordered[0]!.id,
+        expectedContextDigest: state.contextDigest,
+        previousEventId: null,
+      };
+      c.repository.recordPair(request, ownerGate("PAIR", r2CalibrationPairBinding(request)));
+      const before = c.sqlite.serialize();
+      const preview = c.repository.previewAssessment(id, null);
+      expect(preview.assessment.pairDiagnostics).toMatchObject({
+        sample: "INSUFFICIENT",
+        performance: "FAIL",
+        agrees: 0,
+        opposite: 1,
+      });
+      expect(preview.assessment.blockerCodes).toEqual(
+        expect.arrayContaining([
+          "PRIVATE_PAIR_SAMPLE_INSUFFICIENT",
+          "PRIVATE_PAIR_PERFORMANCE_BELOW_THRESHOLD",
+        ]),
+      );
+      expect(preview.readyForOwnerApproval).toBe(false);
+      const historical = c.repository.readHistoricalSummary(id);
+      expect(historical.pairDiagnostics).toEqual(preview.assessment.pairDiagnostics);
+      expect(historical).not.toHaveProperty("assessmentDigest");
+      expect(historical).not.toHaveProperty("contextDigest");
+      expect(c.sqlite.serialize()).toEqual(before);
+      c.sqlite
+        .prepare("UPDATE source_observation_payloads SET payload_json='fictional changed payload'")
+        .run();
+      expect(() => c.repository.readCampaign(id)).toThrow();
+      expect(c.repository.readHistoricalSummary(id)).toEqual(historical);
+      c.sqlite.exec("DROP TRIGGER r2_cal_pair_no_update");
+      // Change a binding field unconditionally; no recalculated provenance is accepted as history.
+      c.sqlite
+        .prepare("UPDATE r2_calibration_pair_events SET event_digest=? WHERE campaign_id=?")
+        .run("0".repeat(64), id);
+      expect(() => c.repository.readHistoricalSummary(id)).toThrow(
+        "R2_CALIBRATION_PAIR_PROVENANCE_INVALID",
+      );
+    },
+  );
+  it("rejects tampered historical campaign and comparison digests", async () => {
+    const c = await setup(2),
+      id = campaign(c);
+    const original = c.sqlite
+      .prepare("SELECT snapshot_json FROM r2_calibration_comparisons WHERE campaign_id=? LIMIT 1")
+      .pluck()
+      .get(id) as string;
+    c.sqlite.exec("DROP TRIGGER r2_cal_comparison_no_update");
+    c.sqlite
+      .prepare("UPDATE r2_calibration_comparisons SET snapshot_json=? WHERE campaign_id=?")
+      .run(original.replace('"score":', '"score":99,"oldScore":'), id);
+    expect(() => c.repository.readHistoricalSummary(id)).toThrow();
+    c.sqlite.exec("DROP TRIGGER r2_cal_campaign_no_update");
+    c.sqlite
+      .prepare("UPDATE r2_calibration_campaigns SET campaign_digest=? WHERE id=?")
+      .run("0".repeat(64), id);
+    expect(() => c.repository.readHistoricalSummary(id)).toThrow(
+      "R2_CALIBRATION_CAMPAIGN_BINDING_INVALID",
+    );
+  });
   it("offers only provisional retained-data hints without deriving outcomes or writing intake", async () => {
     const c = await setup();
     expect(c.repository.listCandidates().map((candidate) => candidate.availabilityHint)).toEqual(

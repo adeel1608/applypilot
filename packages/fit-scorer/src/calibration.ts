@@ -121,6 +121,7 @@ export type R2CalibrationOwnerApproval = z.infer<typeof R2CalibrationOwnerApprov
 export type R2CalibrationGateInput = z.infer<typeof R2CalibrationGateInputSchema>;
 
 export interface R2CalibrationAssessment {
+  assessmentVersion: "r2-calibration-assessment-2";
   state: R2CalibrationState;
   sourceLabelCount: number;
   comparedLabelCount: number;
@@ -130,6 +131,17 @@ export interface R2CalibrationAssessment {
   statusCount: number;
   labelAgreementBasisPoints: number;
   pairAgreementBasisPoints: number;
+  pairDiagnostics: {
+    agrees: number;
+    ties: number;
+    opposite: number;
+    incomplete: number;
+    sample: "SUFFICIENT" | "INSUFFICIENT" | "THRESHOLDS_MISSING";
+    performance: "PASS" | "FAIL" | "NO_SAMPLE" | "THRESHOLDS_MISSING";
+    requiredComparisons: number | null;
+    requiredAgreementsAtObservedSample: number | null;
+    requiredAgreementsAtMinimumSample: number | null;
+  };
   blockerCodes: string[];
 }
 
@@ -144,6 +156,18 @@ export interface R2GoldenMetrics {
 
 function basisPoints(passing: number, total: number): number {
   return total === 0 ? 0 : Math.round((passing / total) * 10_000);
+}
+
+// Match the actual rounded-basis-point predicate, including arbitrary approved thresholds.
+function requiredAgreements(total: number, threshold: number): number {
+  let low = 0,
+    high = total;
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2);
+    if (basisPoints(middle, total) >= threshold) high = middle;
+    else low = middle + 1;
+  }
+  return low;
 }
 
 function labelOutcomeAgrees(outcome: R2PrivateCalibrationLabelOutcome): boolean {
@@ -192,6 +216,39 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
     ).length,
     completePairs.length,
   );
+  const agrees = completePairs.filter((p) => p.preferredScore! > p.otherScore!).length;
+  const ties = completePairs.filter((p) => p.preferredScore === p.otherScore).length;
+  const thresholds = gate.performanceThresholds;
+  const pairDiagnostics: R2CalibrationAssessment["pairDiagnostics"] = {
+    agrees,
+    ties,
+    opposite: completePairs.length - agrees - ties,
+    incomplete: Math.max(0, gate.sourcePairCount - completePairs.length),
+    sample: !thresholds
+      ? "THRESHOLDS_MISSING"
+      : completePairs.length >= thresholds.minimumPairComparisons
+        ? "SUFFICIENT"
+        : "INSUFFICIENT",
+    performance:
+      completePairs.length === 0
+        ? "NO_SAMPLE"
+        : !thresholds
+          ? "THRESHOLDS_MISSING"
+          : pairAgreementBasisPoints >= thresholds.minimumPairAgreementBasisPoints
+            ? "PASS"
+            : "FAIL",
+    requiredComparisons: thresholds?.minimumPairComparisons ?? null,
+    requiredAgreementsAtObservedSample:
+      thresholds && completePairs.length > 0
+        ? requiredAgreements(completePairs.length, thresholds.minimumPairAgreementBasisPoints)
+        : null,
+    requiredAgreementsAtMinimumSample: thresholds
+      ? requiredAgreements(
+          thresholds.minimumPairComparisons,
+          thresholds.minimumPairAgreementBasisPoints,
+        )
+      : null,
+  };
   const blockers = new Set<string>();
   const uniqueLabelIds = new Set(gate.labels.map(({ id }) => id));
   const uniquePairIds = new Set(gate.pairs.map(({ id }) => id));
@@ -223,7 +280,9 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
     }
     if (completePairs.length < gate.performanceThresholds.minimumPairComparisons) {
       blockers.add("PRIVATE_PAIR_SAMPLE_INSUFFICIENT");
-    } else if (
+    }
+    if (
+      completePairs.length > 0 &&
       pairAgreementBasisPoints < gate.performanceThresholds.minimumPairAgreementBasisPoints
     ) {
       blockers.add("PRIVATE_PAIR_PERFORMANCE_BELOW_THRESHOLD");
@@ -256,6 +315,7 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
         ? "CALIBRATED"
         : "CALIBRATION_PENDING";
   return {
+    assessmentVersion: "r2-calibration-assessment-2",
     state,
     sourceLabelCount: gate.sourceLabelCount,
     comparedLabelCount: completeLabels.length,
@@ -265,6 +325,7 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
     statusCount,
     labelAgreementBasisPoints,
     pairAgreementBasisPoints,
+    pairDiagnostics,
     blockerCodes: [...blockers].sort(),
   };
 }

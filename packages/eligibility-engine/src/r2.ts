@@ -14,8 +14,9 @@ import {
 import { matchesEvidenceText, normalizeText, VerificationStatus } from "@applypilot/shared";
 
 import type { EvaluationEvidenceClass } from "./types";
+import { matchR2Capability } from "./r2-capability-match";
 
-export const R2_ELIGIBILITY_ENGINE_VERSION = "2.2.0";
+export const R2_ELIGIBILITY_ENGINE_VERSION = "2.3.0";
 export const R2_MINIMUM_EXTRACTION_COVERAGE = 60;
 
 export interface R2EvaluationBindings {
@@ -589,30 +590,10 @@ export function evaluateR2Eligibility(input: R2EligibilityInput): R2EligibilityR
     }
   }
 
-  const candidateEvidence = [
-    ...verifiedNames(profile.skills),
-    ...profile.employment
-      .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
-      .flatMap((role) => [
-        { id: `employment.${role.id}.title`, name: role.title },
-        ...role.responsibilities.map((name, index) => ({
-          id: `employment.${role.id}.responsibilities.${index}`,
-          name,
-        })),
-      ]),
-  ];
-  const qualifications = profile.education
-    .filter(({ verification }) => verification === VerificationStatus.VERIFIED)
-    .flatMap((item) => [
-      { id: `education.${item.id}.qualification`, name: item.qualification },
-      { id: `education.${item.id}.field`, name: item.field },
-    ]);
   for (const requirement of requiredUsable) {
     const text = textFromRequirement(requirement);
     if (!text) continue;
-    const candidates =
-      requirement.normalizedValue.kind === "EDUCATION" ? qualifications : candidateEvidence;
-    const match = hasVerifiedMatch(candidates, text);
+    const match = matchR2Capability(profile, requirement);
     if (match) continue;
     if (
       !["TEXT", "PHYSICAL", "EXPERIENCE", "EDUCATION"].includes(requirement.normalizedValue.kind)

@@ -7,6 +7,7 @@ import {
 } from "@applypilot/job-model";
 import {
   R2_MINIMUM_EXTRACTION_COVERAGE,
+  matchR2Capability,
   type EvaluationEvidenceClass,
   type R2EligibilityResult,
 } from "@applypilot/eligibility-engine";
@@ -19,7 +20,7 @@ import {
   type R2CalibrationState,
 } from "./calibration";
 
-export const R2_FIT_SCORER_VERSION = "2.2.0";
+export const R2_FIT_SCORER_VERSION = "2.3.0";
 export const R2_FIT_WEIGHT_VERSION = "r2-weights-1";
 export const R2_RECOMMENDATION_THRESHOLD = 50;
 export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-2";
@@ -182,21 +183,13 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
     ({ state, modality }) =>
       usableState(state) && modality !== "UNKNOWN" && modality !== "CONDITIONAL",
   );
-  const verifiedSkills = profile.skills.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedEmployment = profile.employment.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedEducation = profile.education.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
   const verifiedLicences = profile.licences.filter(
     ({ verification }) => verification === VerificationStatus.VERIFIED,
   );
   const verifiedCertifications = profile.certifications.filter(
     ({ verification }) => verification === VerificationStatus.VERIFIED,
   );
+  const capabilityContributions = new Map<string, R2FitContribution>();
 
   for (const evidence of usableRequirements) {
     if (evidence.modality === "NEGATED") continue;
@@ -207,78 +200,71 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
         ? weights.preferredEvidenceMatch
         : weights.requiredEvidenceMatch;
     const evidenceClass: EvaluationEvidenceClass = "EMPLOYER_REQUIREMENT";
-    if (evidence.normalizedValue.kind === "EDUCATION") {
-      const match = verifiedEducation.find(
-        ({ qualification, field }) => matches(qualification, text) || matches(field, text),
-      );
-      if (match) {
-        add(
-          "R2_EDUCATION_VERIFIED_MATCH",
-          weight,
-          [`education.${match.id}`],
-          [evidence.id],
-          evidenceClass,
-          "A current verified education fact matches current usable job evidence.",
-        );
-      } else if (isExplicitlyUnsupported(profile, text)) {
-        add(
-          "R2_EDUCATION_VERIFIED_MISMATCH",
-          -weight,
-          ["unsupportedExperience"],
-          [evidence.id],
-          evidenceClass,
-          "A current explicit negative constraint conflicts with the job evidence.",
-        );
-      }
-      continue;
-    }
     if (evidence.normalizedValue.kind === "LICENCE_CERTIFICATION") {
       const value = evidence.normalizedValue.value;
       const candidates = value.type === "LICENCE" ? verifiedLicences : verifiedCertifications;
       const match = candidates.find(({ name }) => matches(name, value.name));
       if (match) {
-        add(
-          `R2_${value.type}_VERIFIED_MATCH`,
-          weight,
-          [`${value.type === "LICENCE" ? "licences" : "certifications"}.${match.id}`],
-          [evidence.id],
-          evidenceClass,
-          `A current verified ${value.type.toLocaleLowerCase("en-AU")} matches current usable job evidence.`,
-        );
+        const reference = `${value.type === "LICENCE" ? "licences" : "certifications"}.${match.id}`;
+        const key = `${value.type}:${reference}`;
+        const existing = capabilityContributions.get(key);
+        if (existing) {
+          existing.points = Math.max(existing.points, weight);
+          existing.jobEvidenceReferences = [
+            ...new Set([...existing.jobEvidenceReferences, evidence.id]),
+          ].sort();
+        } else
+          capabilityContributions.set(key, {
+            code: `R2_${value.type}_VERIFIED_MATCH`,
+            points: weight,
+            candidateFactReferences: [reference],
+            jobEvidenceReferences: [evidence.id],
+            evidenceClass,
+            scorerVersion: R2_FIT_SCORER_VERSION,
+            weightVersion: weights.version,
+            safeExplanation:
+              "A verified credential matches usable job evidence; repeated support counts once at its strongest weight.",
+          });
       }
       continue;
     }
-    const skill = verifiedSkills.find(({ name }) => matches(name, text));
-    if (skill) {
-      add(
-        evidence.modality === "PREFERRED"
-          ? "R2_PREFERRED_SKILL_VERIFIED_MATCH"
-          : "R2_REQUIRED_SKILL_VERIFIED_MATCH",
-        weight,
-        [`skills.${skill.id}`],
-        [evidence.id],
-        evidenceClass,
-        "A current verified candidate skill matches current usable job evidence.",
-      );
-      continue;
-    }
-    const role = verifiedEmployment.find(
-      ({ title, responsibilities }) =>
-        matches(title, text) ||
-        responsibilities.some((responsibility) => matches(responsibility, text)),
-    );
-    if (role) {
-      add(
-        "R2_EXPERIENCE_VERIFIED_MATCH",
-        weight,
-        [`employment.${role.id}`],
-        [evidence.id],
-        evidenceClass,
-        "A current verified employment fact matches current usable job evidence.",
-      );
+    const match = matchR2Capability(profile, evidence);
+    if (match) {
+      const key = `${match.kind}:${match.reference}`;
+      const code =
+        match.kind === "SKILL"
+          ? evidence.modality === "PREFERRED"
+            ? "R2_PREFERRED_SKILL_VERIFIED_MATCH"
+            : "R2_REQUIRED_SKILL_VERIFIED_MATCH"
+          : `R2_${match.kind}_VERIFIED_MATCH`;
+      const existing = capabilityContributions.get(key);
+      if (existing) {
+        existing.jobEvidenceReferences = [
+          ...new Set([...existing.jobEvidenceReferences, evidence.id]),
+        ].sort();
+        if (weight > existing.points || (weight === existing.points && code < existing.code)) {
+          existing.points = weight;
+          existing.code = code;
+        }
+      } else {
+        const contribution: R2FitContribution = {
+          code,
+          points: weight,
+          candidateFactReferences: [match.reference],
+          jobEvidenceReferences: [evidence.id],
+          evidenceClass,
+          scorerVersion: R2_FIT_SCORER_VERSION,
+          weightVersion: weights.version,
+          safeExplanation:
+            "A verified fact supports the full bounded requirement; repeated support counts once at its strongest weight.",
+        };
+        capabilityContributions.set(key, contribution);
+      }
     } else if (isExplicitlyUnsupported(profile, text)) {
       add(
-        "R2_CAPABILITY_VERIFIED_MISMATCH",
+        evidence.normalizedValue.kind === "EDUCATION"
+          ? "R2_EDUCATION_VERIFIED_MISMATCH"
+          : "R2_CAPABILITY_VERIFIED_MISMATCH",
         -weight,
         ["unsupportedExperience"],
         [evidence.id],
@@ -287,6 +273,11 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
       );
     }
   }
+  contributions.push(
+    ...[...capabilityContributions.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, contribution]) => contribution),
+  );
 
   const employmentEvidence = usableFields.find(
     ({ normalizedValue }) => normalizedValue.kind === "EMPLOYMENT_TYPE",

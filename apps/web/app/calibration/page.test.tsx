@@ -91,6 +91,7 @@ function view(): CalibrationView {
       ],
       pairs: [],
       assessment: {
+        assessmentVersion: "r2-calibration-assessment-2",
         state: "UNCALIBRATED",
         sourceLabelCount: 1,
         comparedLabelCount: 0,
@@ -100,6 +101,17 @@ function view(): CalibrationView {
         statusCount: 0,
         labelAgreementBasisPoints: 0,
         pairAgreementBasisPoints: 0,
+        pairDiagnostics: {
+          agrees: 0,
+          ties: 0,
+          opposite: 0,
+          incomplete: 0,
+          sample: "INSUFFICIENT",
+          performance: "NO_SAMPLE",
+          requiredComparisons: 5,
+          requiredAgreementsAtObservedSample: null,
+          requiredAgreementsAtMinimumSample: 4,
+        },
         blockerCodes: ["PRIVATE_ROLE_FAMILY_COVERAGE_INCOMPLETE"],
       },
       assessmentDigest: "c".repeat(64),
@@ -134,6 +146,89 @@ beforeEach(() => {
 });
 
 describe("local calibration owner context and blank controls", () => {
+  it("shows measured failure separately from sample sufficiency and zero sample", async () => {
+    const data = view();
+    data.campaign!.assessment.pairDiagnostics = {
+      agrees: 1,
+      ties: 2,
+      opposite: 2,
+      incomplete: 0,
+      sample: "INSUFFICIENT",
+      performance: "FAIL",
+      requiredComparisons: 15,
+      requiredAgreementsAtObservedSample: 4,
+      requiredAgreementsAtMinimumSample: 12,
+    };
+    state.view.mockResolvedValue(data);
+    const rendered = text(await page({ campaign: "campaign-1" })).replace(/\s+/g, " ");
+    expect(rendered).toContain("Observed pair performance: FAIL");
+    expect(rendered).toContain("Pair sample: INSUFFICIENT");
+    expect(rendered).toContain("Ties count as disagreements");
+    expect(rendered).toContain("More pairs alone do not repair poor agreement");
+    state.view.mockResolvedValue(view());
+    expect(text(await page({ campaign: "campaign-1" })).replace(/\s+/g, " ")).toContain(
+      "Observed pair performance: NO_SAMPLE",
+    );
+  });
+  it("shows historical diagnostics with no historical owner mutation or qualification forms", async () => {
+    const data = view();
+    data.campaign = null;
+    data.historical = {
+      status: "HISTORICAL_NOT_CURRENT",
+      campaignId: "old-campaign",
+      engine: {
+        parserVersion: "old-parser",
+        normalizationVersion: "old-normalizer",
+        scorerVersion: "old-scorer",
+        eligibilityEngineVersion: "old-eligibility",
+        evidenceContractVersion: "old-evidence",
+        weightVersion: "old-weights",
+        goldenCorpusVersion: "old-golden",
+      },
+      thresholds: {
+        version: "old-policy",
+        minimumPairComparisons: 15,
+        minimumPairAgreementBasisPoints: 8000,
+        minimumLabelAgreementBasisPoints: 8000,
+      },
+      members: [
+        {
+          id: "old-member",
+          title: "<script>historical-canary</script>",
+          score: 0,
+          eligibility: "REVIEW_REQUIRED",
+          recommended: false,
+          coveragePercent: 50,
+        },
+      ],
+      comparedPairCount: 5,
+      pairAgreementBasisPoints: 2000,
+      pairDiagnostics: {
+        agrees: 1,
+        ties: 2,
+        opposite: 2,
+        incomplete: 0,
+        sample: "INSUFFICIENT",
+        performance: "FAIL",
+        requiredComparisons: 15,
+        requiredAgreementsAtObservedSample: 4,
+        requiredAgreementsAtMinimumSample: 12,
+      },
+    };
+    state.view.mockResolvedValue(data);
+    const tree = await page({ campaign: "old-campaign" });
+    expect(text(tree).replace(/\s+/g, " ")).toContain("Historical observed pair performance: FAIL");
+    expect(text(tree)).toContain("old-parser");
+    expect(
+      elements(tree).filter(
+        (e) =>
+          e.props.action === state.label ||
+          e.props.action === state.pair ||
+          e.props.action === state.qualify,
+      ),
+    ).toHaveLength(0);
+    expect(renderToStaticMarkup(tree)).not.toContain("<script>historical-canary</script>");
+  });
   it("requires the actual local session before reading private context", async () => {
     state.session = "";
     await expect(page()).rejects.toThrow("REDIRECT:/local-session?returnTo=%2Fcalibration");
