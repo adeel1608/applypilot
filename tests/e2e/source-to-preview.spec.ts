@@ -229,7 +229,7 @@ Fixed Monday-Friday 09:00-13:00 AEST`;
       {
         text: "Requirements",
         content:
-          "<ul><li>Customer service experience required</li><li>Communication skills required</li><li>Teamwork required</li><li>CV required</li></ul>",
+          "<ul><li>Customer service skills required</li><li>Communication skills required</li><li>Teamwork required</li><li>CV required</li></ul>",
       },
       { text: "Benefits", content: "<p>Fictional mentoring.</p>" },
     ],

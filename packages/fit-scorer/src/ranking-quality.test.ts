@@ -55,6 +55,35 @@ const skill = (id: string, text: string) =>
   r2RequirementEvidence(id, "SKILLS", "SKILL", { kind: "TEXT", value: text });
 
 describe("fictional ranking scope generalization", () => {
+  it("does not replace a full employment-experience clause with a shorter skill in the ready journey fixture", () => {
+    const p = profile("Customer service");
+    const experience = r2RequirementEvidence("experience-clause", "EXPERIENCE", "EXPERIENCE", {
+      kind: "EXPERIENCE",
+      value: {
+        domain: "Customer service experience required",
+        minimum: null,
+        maximum: null,
+        unit: "UNKNOWN",
+        recency: null,
+        alternatives: [],
+        condition: null,
+      },
+    });
+    const ambiguous = run(p, [experience]);
+    expect(ambiguous.eligibility.status).toBe("REVIEW_REQUIRED");
+    expect(ambiguous.eligibility.reasons).toContainEqual(
+      expect.objectContaining({ code: "R2_MANDATORY_CAPABILITY_UNCONFIRMED" }),
+    );
+    expect(ambiguous.fit.contributions[0]?.requirementSupport).toEqual([
+      { jobEvidenceReference: "experience-clause", scope: "PARTIAL_EVIDENCE" },
+    ]);
+    const atomic = run(p, [skill("atomic-skill", "Customer service skills required")]);
+    expect(atomic.eligibility.status).toBe("ELIGIBLE");
+    expect(atomic.fit.score).toBe(ambiguous.fit.score);
+    expect(atomic.fit.contributions[0]?.requirementSupport).toEqual([
+      { jobEvidenceReference: "atomic-skill", scope: "FULL_REQUIREMENT" },
+    ]);
+  });
   it("preserves exact named-language programming evidence with unrelated negative claims", () => {
     for (const name of ["C++", "C#", ".NET", "Python"]) {
       const p = profile(name);
