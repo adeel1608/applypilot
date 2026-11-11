@@ -94,6 +94,15 @@ export function structuredGreenhouseEvidenceRecord(
   delete evidenceRecord.departments;
   delete evidenceRecord.offices;
   delete evidenceRecord.providerMetadata;
+  // Keep actual immutable HTML structure in the evidence projection. The reader's
+  // inert description remains the canonical job description. Entity-encoded
+  // markup follows its existing single-decode path through record.description.
+  const payload = record.rawPayload;
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const content = (payload as Record<string, unknown>).content;
+    if (typeof content === "string" && /<[A-Za-z!/]/.test(content))
+      evidenceRecord.description = content;
+  }
   return evidenceRecord;
 }
 

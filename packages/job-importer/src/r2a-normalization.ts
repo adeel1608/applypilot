@@ -43,6 +43,10 @@ type Span = {
   end: number;
   sourcePath: string;
   sourceOffsets?: number[];
+  htmlHeading?: boolean;
+  htmlStandaloneEmphasis?: boolean;
+  htmlListItem?: boolean;
+  htmlHidden?: boolean;
 };
 type Section = { family: JobFieldFamily | null; heading: string; items: Span[] };
 type RequirementSpan = {
@@ -524,6 +528,7 @@ type LocatedHtmlNode = {
   tagName?: string;
   value?: string;
   childNodes?: LocatedHtmlNode[];
+  attrs?: Array<{ name: string; value: string }>;
   sourceCodeLocation?: { startOffset: number; endOffset: number } | null;
 };
 
@@ -558,11 +563,30 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
     "math",
     "canvas",
   ]);
-  const blocks = new Set(["p", "div", "li", "article", "section", "h1", "h2", "h3", "br"]);
+  const blocks = new Set([
+    "p",
+    "div",
+    "li",
+    "article",
+    "section",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "br",
+  ]);
   const jsonOffsets = jsonStringOffsets(html);
   const result: Span[] = [];
   let text = "";
   let offsets: number[] = [];
+  let headingDepth = 0;
+  let emphasisDepth = 0;
+  let listItemDepth = 0;
+  let hiddenDepth = 0;
+  let onlyEmphasis = true;
+  let hasEmphasis = false;
   const flush = () => {
     let cursor = 0;
     while (cursor < text.length) {
@@ -592,12 +616,18 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
           end: finish,
           sourcePath: `structured.description.item.${result.length}`,
           sourceOffsets,
+          htmlHeading: headingDepth > 0,
+          htmlStandaloneEmphasis: onlyEmphasis && hasEmphasis,
+          htmlListItem: listItemDepth > 0,
+          htmlHidden: hiddenDepth > 0,
         });
       }
       cursor = end;
     }
     text = "";
     offsets = [];
+    onlyEmphasis = true;
+    hasEmphasis = false;
   };
   const append = (value: string, rawStart: number, rawEnd: number) => {
     if (value === "\n") {
@@ -611,6 +641,10 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
     if (offsets.length) offsets[offsets.length - 1] = start;
     else offsets.push(start);
     text += value;
+    if (value.trim()) {
+      if (emphasisDepth === 0) onlyEmphasis = false;
+      else hasEmphasis = true;
+    }
     for (let index = 1; index < value.length; index += 1) offsets.push(start);
     offsets.push(end);
   };
@@ -661,7 +695,12 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
     }
     if (reconstructed !== node.value) throw new Error("R2A_HTML_SOURCE_MAPPING_INVALID");
   };
-  const pending: Array<{ node: LocatedHtmlNode; closing: boolean; depth: number }> = [
+  const pending: Array<{
+    node: LocatedHtmlNode;
+    closing: boolean;
+    depth: number;
+    hidden?: boolean;
+  }> = [
     {
       node: parse(html, { sourceCodeLocationInfo: true }) as LocatedHtmlNode,
       closing: false,
@@ -669,12 +708,18 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
     },
   ];
   while (pending.length) {
-    const { node, closing, depth } = pending.pop()!;
+    const { node, closing, depth, hidden = false } = pending.pop()!;
     if (depth > IMPORT_LIMITS.maximumHtmlDepth)
       throw new ImportValidationError("HTML_TOO_DEEP", "The supplied HTML is too deeply nested.");
     const tag = node.tagName?.toLowerCase();
+    const heading = /^h[1-6]$/.test(tag ?? "");
+    const emphasis = tag === "strong" || tag === "b";
     if (closing) {
-      flush();
+      if (tag && (blocks.has(tag) || hidden)) flush();
+      if (heading) headingDepth -= 1;
+      if (emphasis) emphasisDepth -= 1;
+      if (tag === "li") listItemDepth -= 1;
+      if (hidden) hiddenDepth -= 1;
       continue;
     }
     if (tag && discarded.has(tag)) continue;
@@ -682,10 +727,25 @@ function htmlDescriptionSpans(source: string, parent: Span, html: string): Span[
       appendTextNode(node);
       continue;
     }
-    if (tag && blocks.has(tag)) {
-      flush();
-      pending.push({ node, closing: true, depth });
-    }
+    if (tag && blocks.has(tag)) flush();
+    const isHidden = Boolean(
+      node.attrs?.some(
+        ({ name, value }) =>
+          name === "hidden" ||
+          (name === "aria-hidden" && value.toLowerCase() === "true") ||
+          (name === "style" &&
+            /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:!important)?\s*(?:;|$)/i.test(
+              value,
+            )),
+      ),
+    );
+    if (heading) headingDepth += 1;
+    if (emphasis) emphasisDepth += 1;
+    if (tag === "li") listItemDepth += 1;
+    if (isHidden) hiddenDepth += 1;
+    if (isHidden) flush();
+    if (tag && (blocks.has(tag) || emphasis || isHidden))
+      pending.push({ node, closing: true, depth, hidden: isHidden });
     for (let index = (node.childNodes?.length ?? 0) - 1; index >= 0; index -= 1)
       pending.push({ node: node.childNodes![index]!, closing: false, depth: depth + 1 });
   }
@@ -890,11 +950,14 @@ function createFieldEvidence(input: {
   });
 }
 
-function modality(text: string): { modality: RequirementModality; condition: string | null } {
-  if (/\b(desirable|preferred|advantage(?:ous)?)\b[^.\n]{0,80}\bnot essential\b/i.test(text)) {
-    return { modality: "PREFERRED", condition: null };
-  }
+function modality(
+  text: string,
+  inheritedRequirement = false,
+): { modality: RequirementModality; condition: string | null } {
+  const preferredButNotEssential =
+    /\b(desirable|preferred|advantage(?:ous)?)\b[^.\n]{0,80}\bnot essential\b/i.test(text);
   if (
+    !preferredButNotEssential &&
     /\b(?:no|not)\b[^.\n]{0,40}\b(?:required|necessary|essential)\b|\bwithout the need for\b/i.test(
       text,
     )
@@ -915,7 +978,9 @@ function modality(text: string): { modality: RequirementModality; condition: str
       text,
     ) ||
     (/\bwhen\b/i.test(text) &&
-      /\b(?:must|required|mandatory|necessary|essential|need to)\b/i.test(text) &&
+      (inheritedRequirement ||
+        preferredButNotEssential ||
+        /\b(?:must|required|mandatory|necessary|essential|need to)\b/i.test(text)) &&
       !operationalAbility);
   if (actualCondition) {
     const found = text.match(
@@ -999,7 +1064,7 @@ function familyForKind(kind: RequirementKind): JobFieldFamily {
   return mapping[kind] ?? "SKILLS";
 }
 
-function experienceValue(text: string): R2NormalizedValue {
+function experienceValue(text: string, condition = modality(text).condition): R2NormalizedValue {
   const range = text.match(
     /\b(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(years?|months?)\b/i,
   );
@@ -1024,12 +1089,12 @@ function experienceValue(text: string): R2NormalizedValue {
           : "UNKNOWN",
       recency: text.match(/\b(?:within|in the last)\s+[^,.]+/i)?.[0]?.slice(0, 300) ?? null,
       alternatives: /\bor equivalent\b/i.test(text) ? ["EQUIVALENT"] : [],
-      condition: modality(text).condition,
+      condition,
     },
   };
 }
 
-function educationValue(text: string): R2NormalizedValue {
+function educationValue(text: string, condition = modality(text).condition): R2NormalizedValue {
   return {
     kind: "EDUCATION",
     value: {
@@ -1044,12 +1109,16 @@ function educationValue(text: string): R2NormalizedValue {
       )
         ? true
         : null,
-      condition: modality(text).condition,
+      condition,
     },
   };
 }
 
-function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2NormalizedValue {
+function licenceValue(
+  text: string,
+  type: "LICENCE" | "CERTIFICATION",
+  condition = modality(text).condition,
+): R2NormalizedValue {
   const explicitName =
     text.match(
       /\b(?:RSA|responsible service of alcohol|first aid|food safety|WWCC|working with children check|police check|white card|forklift licence|driver'?s? licence|class\s+(?:C|LR|MR|HR|HC|MC) licence)\b/i,
@@ -1072,12 +1141,12 @@ function licenceValue(text: string, type: "LICENCE" | "CERTIFICATION"): R2Normal
             .filter(Boolean)
             .map((value) => value.slice(0, 500))
         : [],
-      condition: modality(text).condition,
+      condition,
     },
   };
 }
 
-function workRightsValues(text: string): R2NormalizedValue[] {
+function workRightsValues(text: string, condition = modality(text).condition): R2NormalizedValue[] {
   type WorkRightKind =
     | "VALID_AUSTRALIAN_WORK_RIGHTS"
     | "UNRESTRICTED_WORK_RIGHTS"
@@ -1107,7 +1176,7 @@ function workRightsValues(text: string): R2NormalizedValue[] {
   if (kinds.length === 0) kinds.push("UNKNOWN");
   return [...new Set(kinds)].map((kind) => ({
     kind: "WORK_RIGHTS" as const,
-    value: { kind, wording: text.slice(0, 1000), condition: modality(text).condition },
+    value: { kind, wording: text.slice(0, 1000), condition },
   }));
 }
 
@@ -1125,11 +1194,11 @@ function normalizedRequirementValues(
   text: string,
   statement: ReturnType<typeof modality>,
 ): R2NormalizedValue[] {
-  if (kind === "EXPERIENCE") return [experienceValue(text)];
-  if (kind === "QUALIFICATION") return [educationValue(text)];
-  if (kind === "LICENCE") return [licenceValue(text, "LICENCE")];
-  if (kind === "CERTIFICATION") return [licenceValue(text, "CERTIFICATION")];
-  if (kind === "WORK_RIGHTS") return workRightsValues(text);
+  if (kind === "EXPERIENCE") return [experienceValue(text, statement.condition)];
+  if (kind === "QUALIFICATION") return [educationValue(text, statement.condition)];
+  if (kind === "LICENCE") return [licenceValue(text, "LICENCE", statement.condition)];
+  if (kind === "CERTIFICATION") return [licenceValue(text, "CERTIFICATION", statement.condition)];
+  if (kind === "WORK_RIGHTS") return workRightsValues(text, statement.condition);
   if (kind === "DOCUMENT") {
     return documentKinds.flatMap(([documentKind, pattern]) =>
       pattern.test(text)
@@ -1213,6 +1282,63 @@ function innerRequirementHeading(text: string): "MODALITY" | "CONTEXT_ONLY" | nu
   return null;
 }
 
+function closedRequirementContextBoundary(text: string): boolean {
+  const label = normalizedHeading(text);
+  return (
+    /^(?:benefits?|perks?|responsibilities|duties|examples?)$/i.test(label) ||
+    /^(?:requirements? (?:and|&|\/) (?:benefits?|responsibilities|duties)|(?:benefits?|responsibilities|duties) (?:and|&|\/) requirements?)$/i.test(
+      label,
+    ) ||
+    /^(?:(?:required|essential) (?:and|&|\/) (?:preferred|desired|desirable)|(?:preferred|desired|desirable) (?:and|&|\/) (?:required|essential))(?: (?:skills?|qualifications?|requirements?))?$/i.test(
+      label,
+    )
+  );
+}
+
+function alternativeRequirementIntroduction(text: string): boolean {
+  const label = text.trim();
+  return (
+    /^(?:(?:you (?:must|should|will) have|must have|need to have|requires?)\s+)?(?:at least\s+)?(?:one|some|any(?: one)?|one or more|either)\s+of\s+(?:the\s+)?(?:following|these)(?:\s+(?:skills?|requirements?|qualifications?|capabilities|technologies))?\s*[:.]?$/i.test(
+      label,
+    ) ||
+    /^(?:optional (?:skills?|requirements?|qualifications?|capabilities|technologies) include|(?:the )?following (?:skills?|requirements?|qualifications?|capabilities|technologies) are optional)\s*[:.]?$/i.test(
+      label,
+    )
+  );
+}
+
+/** Only structural headings and bounded standalone labels can supply a default. */
+function htmlRequirementHeading(span: Span): string | null | undefined {
+  if (alternativeRequirementIntroduction(span.text) || closedRequirementContextBoundary(span.text))
+    return null;
+  const label = normalizedHeading(span.text);
+  const required =
+    /^(?:requirements?|qualifications?|candidate skills|about you|what you(?:'|’)ll need|what you will need|(?:required|essential|mandatory|minimum|basic)(?: (?:qualifications?|skills?|requirements?))?)$/i.test(
+      label,
+    );
+  const preferred =
+    /^(?:(?:preferred|desired|desirable)(?: (?:qualifications?|skills?|requirements?))?|nice to have(?: \((?:or happy to help you learn|optional)\))?|not required but highly regarded)$/i.test(
+      label,
+    );
+  const context =
+    /^(?:responsibilities|duties|benefits?|perks?|examples?|skills|experience|candidate skills|about you)$/i.test(
+      label,
+    );
+  const standaloneLabel =
+    !span.htmlListItem &&
+    label.length <= 100 &&
+    (required ||
+      preferred ||
+      context ||
+      (span.htmlStandaloneEmphasis && /^[\p{L}\s&/'’?-]{1,100}$/u.test(label)) ||
+      /^[\p{L}\s&/'’?-]{1,100}:$/u.test(span.text.trim()));
+  if (!span.htmlHeading && !standaloneLabel) return undefined;
+  if (span.htmlHidden) return null;
+  if (required) return "Required";
+  if (preferred) return "Preferred";
+  return null;
+}
+
 function explanatoryLicenceDefinition(text: string): boolean {
   const contrastedVendorTypes =
     /\bfreelancer\b/i.test(text) &&
@@ -1260,7 +1386,7 @@ function applicantContentSpans(spans: Span[], keepHeadings = false): Span[] {
       hypothetical = true;
       return false;
     }
-    if (isHeading(span) !== undefined || innerRequirementHeading(text)) {
+    if (span.htmlHeading || isHeading(span) !== undefined || innerRequirementHeading(text)) {
       hypothetical = false;
       return keepHeadings;
     }
@@ -1290,7 +1416,10 @@ function extractRequirementEvidence(
 ): R2RequirementEvidence[] {
   if (explanatoryLicenceDefinition(span.text) || isApplicantInvitation(span.text)) return [];
   const kind = requirementKind(span.text);
-  const lexicalStatement = modality(span.text);
+  const lexicalStatement = modality(
+    span.text,
+    sectionDefaultModality === "REQUIRED" || sectionDefaultModality === "PREFERRED",
+  );
   const inheritedParentStatement =
     lexicalStatement.modality === "UNKNOWN" && parentStatement?.modality !== "UNKNOWN"
       ? parentStatement
@@ -1917,6 +2046,13 @@ function normalizeR2AJobEvidenceInternal(
     let localHeading = heading;
     for (const span of applicantContentSpans(spans, true)) {
       if (section.kind === "REQUIREMENTS") {
+        if (
+          alternativeRequirementIntroduction(span.text) ||
+          closedRequirementContextBoundary(span.text)
+        ) {
+          localHeading = "Some of the following requirements";
+          continue;
+        }
         const innerHeading = innerRequirementHeading(span.text);
         if (innerHeading) {
           if (innerHeading === "MODALITY") localHeading = span.text;
@@ -1950,12 +2086,33 @@ function normalizeR2AJobEvidenceInternal(
   const structuredDescriptionIsHtml = Boolean(
     descriptionValue && /<[A-Za-z!/]/.test(descriptionValue),
   );
+  const structuredDescriptionRequirementSpans: RequirementSpan[] = [];
   const structuredDescriptionSpans = (() => {
     if (!descriptionValue || !descriptionSource) return [];
     if (structuredDescriptionIsHtml) {
-      return applicantContentSpans(
+      const spans = applicantContentSpans(
         htmlDescriptionSpans(source, descriptionSource, descriptionValue),
+        true,
       );
+      let heading: string | null = null;
+      const content: Span[] = [];
+      for (const span of spans) {
+        const nextHeading = htmlRequirementHeading(span);
+        if (nextHeading !== undefined) {
+          heading = nextHeading;
+          continue;
+        }
+        content.push(span);
+        structuredDescriptionRequirementSpans.push(
+          ...structuredRequirementClauses(span).map((child) => ({
+            span: child,
+            ...(heading && !span.htmlHidden
+              ? { sectionContext: { kind: "REQUIREMENTS", heading } }
+              : {}),
+          })),
+        );
+      }
+      return content;
     }
     const lines = applicantContentSpans(lineSpans(descriptionValue)).filter((span) => {
       return !sectionTextLines.has(normalizedSourceLine(span.text));
@@ -2288,9 +2445,11 @@ function normalizeR2AJobEvidenceInternal(
     ? structuredSectionInputCount > 0
       ? [...structuredSectionRequirementSpans, ...structuredArrayRequirementSpans]
       : [
-          ...structuredDescriptionSpans.flatMap((span) =>
-            structuredRequirementClauses(span).map((child) => ({ span: child })),
-          ),
+          ...(structuredDescriptionIsHtml
+            ? structuredDescriptionRequirementSpans
+            : structuredDescriptionSpans.flatMap((span) =>
+                structuredRequirementClauses(span).map((child) => ({ span: child })),
+              )),
           ...structuredArrayRequirementSpans,
         ]
     : uniqueSpans.map((span) => ({ span }));
@@ -2592,7 +2751,10 @@ function normalizeR2AJobEvidenceInternal(
       ? sectionRequirementDefaultModality(item.sectionContext.kind, item.sectionContext.heading)
       : null;
     requirements.push(...requirementEvidence(source, observationId, item.span, sectionDefault));
-    const parentStatement = modality(item.span.text);
+    const parentStatement = modality(
+      item.span.text,
+      sectionDefault === "REQUIRED" || sectionDefault === "PREFERRED",
+    );
     for (const child of secondaryRequirementSpans(source, item.span)) {
       const evidence = requirementEvidence(
         source,

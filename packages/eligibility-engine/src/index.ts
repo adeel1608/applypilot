@@ -11,6 +11,8 @@ import type { EvaluationEvidenceClass } from "./types";
 
 export * from "./types";
 export * from "./r2";
+export * from "./r2-capability-match";
+export * from "./r2-capability-evidence";
 
 export const ELIGIBILITY_ENGINE_VERSION = "1.0.0";
 

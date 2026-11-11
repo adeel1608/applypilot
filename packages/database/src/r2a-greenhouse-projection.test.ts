@@ -77,7 +77,10 @@ function normalizeFictionalPosting(content: string) {
     },
     capability,
   });
+  const recordBeforeProjection = JSON.stringify(record);
   const structured = structuredGreenhouseEvidenceRecord(record, capability);
+  expect(JSON.stringify(record)).toBe(recordBeforeProjection);
+  expect(structuredGreenhouseRecord(record, capability).description).toBe(record.description);
   const sourceText = JSON.stringify(structured);
   const normalization = normalizeR2AJobEvidence({
     sourceText,
@@ -88,10 +91,315 @@ function normalizeFictionalPosting(content: string) {
   });
   assertR2ASourcePointers(normalization, sourceText);
   assertR2AExcerptHashes(normalization);
-  return { normalization, sourceText };
+  return { normalization, sourceText, record, structured };
+}
+
+// Greenhouse can retain entity-encoded markup: the reader's inert decode leaves
+// this HTML representation for the normalizer, without executing it.
+function normalizeFictionalHtmlPosting(content: string) {
+  return normalizeFictionalPosting(
+    content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+  );
 }
 
 describe("Greenhouse R2A evidence projection", () => {
+  it("retains bounded HTML requirement and preference headings through the real reader", () => {
+    const { normalization, sourceText } = normalizeFictionalHtmlPosting(
+      "<h3>Required qualifications</h3><ul><li>Python programming</li>" +
+        "<li>No certification is required.</li><li>Linux knowledge when a customer requests deployment.</li>" +
+        "<li>Networking skills are preferred.</li></ul>" +
+        "<h4>Preferred skills</h4><p>Software testing experience</p>" +
+        "<p><strong>Required:</strong></p><p>Embedded systems knowledge</p>" +
+        "<h5>Benefits</h5><p>Communication skills training</p>" +
+        "<h6>Examples</h6><p>C++ programming</p>",
+    );
+    expect(
+      normalization.requirementEvidence.map(({ normalizedValue, modality }) => [
+        normalizedValue.kind === "TEXT"
+          ? normalizedValue.value
+          : normalizedValue.kind === "EXPERIENCE"
+            ? normalizedValue.value.domain
+            : normalizedValue.kind === "LICENCE_CERTIFICATION"
+              ? normalizedValue.value.name
+              : normalizedValue.kind,
+        modality,
+      ]),
+    ).toEqual([
+      ["Python programming", "REQUIRED"],
+      ["No certification is required.", "NEGATED"],
+      ["Linux knowledge when a customer requests deployment.", "CONDITIONAL"],
+      ["Networking skills are preferred.", "PREFERRED"],
+      ["Software testing experience", "PREFERRED"],
+      ["Embedded systems knowledge", "REQUIRED"],
+      ["Communication skills training", "UNKNOWN"],
+      ["C++ programming", "UNKNOWN"],
+    ]);
+    assertR2ASourcePointers(normalization, sourceText);
+    assertR2AExcerptHashes(normalization);
+  });
+
+  it.each([
+    "<h2>Responsibilities</h2>",
+    "<h2>Unknown context</h2>",
+    "<h2>Requirements and benefits</h2>",
+    "<h2>Some of the following requirements</h2>",
+    "<p><strong>Examples:</strong></p>",
+    "<p><strong>Responsibilities:</strong></p>",
+    "<p><strong>Company benefits</strong></p>",
+    "<p><b>Unknown context</b></p>",
+    "<p>Preferred:</p><p>Unknown context:</p>",
+  ])("resets inherited scope at the HTML context boundary %s", (boundary) => {
+    const { normalization } = normalizeFictionalHtmlPosting(
+      "<h2>Requirements</h2><p>Python programming</p>" +
+        boundary +
+        "<p>Communication skills</p><p>Software testing is required.</p>",
+    );
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Python programming",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Communication skills",
+      ),
+    ).toMatchObject({ modality: "UNKNOWN" });
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Software testing is required.",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+  });
+
+  it("keeps inline emphasis inert, alternative scope unknown, and repeated clauses stable", () => {
+    const content =
+      "<h2>Some of the following requirements</h2>" +
+      "<p>Python programming</p><h2>Required skills</h2>" +
+      "<ul><li>Experience with <strong>Preferred:</strong> programming tools.</li>" +
+      "<li>Communication skills</li><li>Communication skills</li></ul>" +
+      "<script><h2>Preferred</h2></script><p>Embedded systems knowledge</p>" +
+      "<p><strong>Required:</strong> explanatory prose</p><p>Software testing experience</p>";
+    const first = normalizeFictionalHtmlPosting(content);
+    expect(
+      first.normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Python programming",
+      ),
+    ).toMatchObject({ modality: "UNKNOWN" });
+    expect(
+      first.normalization.requirementEvidence.filter(
+        ({ source }) => source.excerpt === "Communication skills",
+      ),
+    ).toHaveLength(2);
+    expect(
+      first.normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Embedded systems knowledge",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+    expect(
+      first.normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Software testing experience",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+    expect(normalizeFictionalHtmlPosting(content).normalization).toEqual(first.normalization);
+  });
+
+  it("retains ordinary raw HTML structure separately from the reader's inert job description", () => {
+    const { normalization } = normalizeFictionalPosting(
+      "<h2>Required</h2><p>Python programming</p>" +
+        "<h2>Unmarked context</h2><p>Communication skills</p>",
+    );
+    expect(normalization.requirementEvidence).toHaveLength(2);
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Python programming",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Communication skills",
+      ),
+    ).toMatchObject({ modality: "UNKNOWN" });
+  });
+
+  it("does not infer defaults from plain text with unmarked context boundaries", () => {
+    const { normalization } = normalizeFictionalPosting(
+      "Required\nPython programming\nUnmarked context\nCommunication skills",
+    );
+    expect(normalization.requirementEvidence).toHaveLength(2);
+    expect(normalization.requirementEvidence.every(({ modality }) => modality === "UNKNOWN")).toBe(
+      true,
+    );
+  });
+
+  it("gives raw and entity-encoded HTML the same bounded modality without changing source identity", () => {
+    const html =
+      "<h2>Required skills</h2><p>Python programming</p>" +
+      "<p><strong>Company benefits</strong></p><p>Communication skills training</p>" +
+      "<p><strong>Required:</strong></p><p>Experience with <strong>Python</strong> programming.</p>" +
+      "<h2 hidden>Preferred</h2><p>Software testing experience</p>";
+    const modalities: unknown[] = [];
+    for (const normalize of [normalizeFictionalPosting, normalizeFictionalHtmlPosting]) {
+      const { normalization, sourceText, record, structured } = normalize(html);
+      assertR2ASourcePointers(normalization, sourceText);
+      assertR2AExcerptHashes(normalization);
+      const expectedPayload =
+        normalize === normalizeFictionalPosting
+          ? html
+          : html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      expect((record.rawPayload as { content: string }).content).toBe(expectedPayload);
+      expect(record.contentDigest).toMatch(/^[a-f0-9]{64}$/);
+      expect(structured.description).toBe(html);
+      expect(sourceText).toContain(JSON.stringify(html));
+      expect(record.description.includes("<h2>")).toBe(normalize === normalizeFictionalHtmlPosting);
+      modalities.push(
+        normalization.requirementEvidence.map(({ normalizedValue, modality }) => [
+          normalizedValue,
+          modality,
+        ]),
+      );
+    }
+    expect(modalities[0]).toEqual(modalities[1]);
+  });
+
+  it.each([
+    "At least one of the following",
+    "Some of these skills",
+    "Any of the following",
+    "Either of the following",
+    "You must have one of the following requirements",
+    "Any one of the following",
+    "Optional skills include",
+    "The following skills are optional",
+  ])(
+    "does not promote each alternative after an unmarked closed introduction %s",
+    (introduction) => {
+      const { normalization } = normalizeFictionalHtmlPosting(
+        "<h2>Required skills</h2><p>" +
+          introduction +
+          "</p>" +
+          "<ul><li>Python programming</li><li>Rust programming</li></ul>" +
+          "<p>Software testing is required.</p>",
+      );
+      expect(
+        normalization.requirementEvidence.find(
+          ({ source }) => source.excerpt === "Python programming",
+        ),
+      ).toMatchObject({ modality: "UNKNOWN" });
+      expect(
+        normalization.requirementEvidence.find(
+          ({ source }) => source.excerpt === "Rust programming",
+        ),
+      ).toMatchObject({ modality: "UNKNOWN" });
+      expect(
+        normalization.requirementEvidence.find(
+          ({ source }) => source.excerpt === "Software testing is required.",
+        ),
+      ).toMatchObject({ modality: "REQUIRED" });
+    },
+  );
+
+  it.each([
+    "<h2>Required and Preferred skills</h2>",
+    "<h2 hidden>Preferred</h2>",
+    '<div aria-hidden="true"><h2>Required</h2></div>',
+    '<h2 style="display:none">Required</h2>',
+  ])("cannot acquire required scope from a mixed or hidden heading %s", (heading) => {
+    const { normalization } = normalizeFictionalHtmlPosting(heading + "<p>Python programming</p>");
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Python programming",
+      ),
+    ).toMatchObject({ modality: "UNKNOWN" });
+  });
+
+  it("does not treat encoded markup or discarded content as an actual heading", () => {
+    const { normalization } = normalizeFictionalHtmlPosting(
+      "<h2>Required</h2><p>&lt;h2&gt;Preferred&lt;/h2&gt;</p>" +
+        "<script><h2>Preferred</h2></script><style>Preferred:</style>" +
+        "<p>Python programming</p>",
+    );
+    expect(
+      normalization.requirementEvidence.find(
+        ({ source }) => source.excerpt === "Python programming",
+      ),
+    ).toMatchObject({ modality: "REQUIRED" });
+  });
+
+  it("preserves inherited prerequisites, lexical exceptions and exact escaped Unicode spans", () => {
+    const clauses = [
+      ["Python programming when the assignment requires it.", "CONDITIONAL"],
+      ["Linux knowledge if deployed at a customer site.", "CONDITIONAL"],
+      ["Embedded systems knowledge unless the assignment excludes it.", "CONDITIONAL"],
+      ["Ability to communicate when under pressure.", "REQUIRED"],
+      ["No certification is required.", "NEGATED"],
+      ["C++ programming is preferred.", "PREFERRED"],
+      ['Software testing skills 🧪 with quoted "checks" & review.', "REQUIRED"],
+    ];
+    for (const ordered of [clauses, [...clauses].reverse()]) {
+      const { normalization, sourceText } = normalizeFictionalHtmlPosting(
+        "<h2>Required skills</h2>" + ordered.map(([text]) => "<p>" + text + "</p>").join(""),
+      );
+      const modalities = new Map(
+        normalization.requirementEvidence.map(({ normalizedValue, modality }) => [
+          normalizedValue.kind === "TEXT"
+            ? normalizedValue.value
+            : normalizedValue.kind === "LICENCE_CERTIFICATION"
+              ? normalizedValue.value.name
+              : "",
+          modality,
+        ]),
+      );
+      for (const [text, expected] of clauses) expect(modalities.get(text)).toBe(expected);
+      assertR2ASourcePointers(normalization, sourceText);
+      assertR2AExcerptHashes(normalization);
+      const unicode = normalization.requirementEvidence.find(
+        ({ normalizedValue }) =>
+          normalizedValue.kind === "TEXT" && normalizedValue.value.includes("🧪"),
+      );
+      expect(unicode?.source.excerpt).toContain("🧪");
+      expect(unicode?.source.excerpt).toContain('\\"checks\\"');
+    }
+  });
+
+  it.each(["Required", "Preferred"])(
+    "retains a when prerequisite inside inherited %s scope",
+    (heading) => {
+      const { normalization } = normalizeFictionalHtmlPosting(
+        `<h2>${heading} skills</h2><p>Python programming when deployed at a customer site.</p>` +
+          "<p>Experience with software testing when assigned to the client.</p>",
+      );
+      expect(
+        normalization.requirementEvidence.every(
+          ({ modality, condition }) => modality === "CONDITIONAL" && condition?.startsWith("when "),
+        ),
+      ).toBe(true);
+      expect(
+        normalization.requirementEvidence.find(
+          ({ normalizedValue }) => normalizedValue.kind === "EXPERIENCE",
+        )?.normalizedValue,
+      ).toMatchObject({ value: { condition: "when assigned to the client" } });
+    },
+  );
+
+  it.each([
+    ["Python programming is preferred but not essential.", "PREFERRED"],
+    ["Python programming is preferred but not essential if authorised.", "CONDITIONAL"],
+    ["Python programming is preferred but not essential when authorised.", "CONDITIONAL"],
+    [
+      "Python programming is preferred but not essential unless the scope excludes it.",
+      "CONDITIONAL",
+    ],
+    ["Python programming is not required.", "NEGATED"],
+    ["No certification is required.", "NEGATED"],
+  ])("preserves preference and condition precedence for %s", (text, expected) => {
+    const { normalization } = normalizeFictionalHtmlPosting("<p>" + text + "</p>");
+    expect(normalization.requirementEvidence).toHaveLength(1);
+    expect(normalization.requirementEvidence[0]?.modality).toBe(expected);
+    expect(Boolean(normalization.requirementEvidence[0]?.condition)).toBe(
+      expected === "CONDITIONAL",
+    );
+  });
+
   it.each([
     ["<p>The role is a contract position with contract renewal.</p>", "CONTRACT", "contract"],
     ["<p>This role is full time and full time.</p>", "FULL_TIME", "full time"],

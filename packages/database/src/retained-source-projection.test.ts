@@ -165,7 +165,7 @@ describe("pure retained source projection", () => {
             explicitLocation: result.record.location,
           }),
         );
-        expect(result.normalization.parserVersion).toBe("3.6.5");
+        expect(result.normalization.parserVersion).toBe("3.6.6");
         expect(result.sourceTextDigest).toBe(hash(result.sourceText));
         expect(result.payloadSha256).toBe(hash(input.payloadJson));
         expect(result.sourceIdentity.jobId).toBe(input.job.id);

@@ -167,6 +167,50 @@ export default async function CalibrationPage({
               ))}
             </ul>
           </section>
+          {view.historical ? (
+            <section className="panel">
+              <h2>Historical comparison snapshots</h2>
+              <p>
+                This campaign is not current for the installed engines. These unchanged stored
+                outcomes are history; they cannot authorize judgments or qualification for the new
+                engines. No owner judgments were copied or reinterpreted.
+              </p>
+              <p>
+                Stored parser {view.historical.engine.parserVersion}; scorer{" "}
+                {view.historical.engine.scorerVersion}; eligibility{" "}
+                {view.historical.engine.eligibilityEngineVersion}.
+              </p>
+              <p>
+                Historical pair sample: {view.historical.pairDiagnostics.sample}. Historical
+                observed pair performance: {view.historical.pairDiagnostics.performance}; agreement{" "}
+                {view.historical.pairAgreementBasisPoints}/10000 from{" "}
+                {view.historical.comparedPairCount} complete pairs. Strict agreements{" "}
+                {view.historical.pairDiagnostics.agrees}; ties{" "}
+                {view.historical.pairDiagnostics.ties}; opposite rankings{" "}
+                {view.historical.pairDiagnostics.opposite}. Required comparisons{" "}
+                {view.historical.pairDiagnostics.requiredComparisons}; required agreements at
+                observed sample{" "}
+                {view.historical.pairDiagnostics.requiredAgreementsAtObservedSample ??
+                  "no measured sample"}
+                ; at minimum sample{" "}
+                {view.historical.pairDiagnostics.requiredAgreementsAtMinimumSample}.
+              </p>
+              <p>
+                These diagnostics use unchanged stored outcomes and the original precommitted
+                thresholds. Sample sufficiency and measured performance are separate; ties count as
+                disagreements. More pairs alone do not repair poor agreement. No current
+                qualification is inferred.
+              </p>
+              <ul>
+                {view.historical.members.map((m) => (
+                  <li key={m.id}>
+                    {m.title}: {m.eligibility}; score {m.score}; recommended {String(m.recommended)}
+                    ; coverage {m.coveragePercent}%.
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {!campaign ? (
             <section className="panel">
               <h2>Choose unique retained jobs</h2>
@@ -474,6 +518,30 @@ export default async function CalibrationPage({
                 <p>
                   Label agreement {campaign.assessment.labelAgreementBasisPoints}/10000; pair
                   agreement {campaign.assessment.pairAgreementBasisPoints}/10000.
+                </p>
+                <p>
+                  Pair sample: {campaign.assessment.pairDiagnostics.sample}. Observed pair
+                  performance: {campaign.assessment.pairDiagnostics.performance}.
+                </p>
+                <p>
+                  Strict agreements {campaign.assessment.pairDiagnostics.agrees}; ties{" "}
+                  {campaign.assessment.pairDiagnostics.ties}; opposite rankings{" "}
+                  {campaign.assessment.pairDiagnostics.opposite}; incomplete{" "}
+                  {campaign.assessment.pairDiagnostics.incomplete}. Required comparisons:{" "}
+                  {campaign.assessment.pairDiagnostics.requiredComparisons ?? "thresholds missing"};
+                  required agreements at observed sample:{" "}
+                  {campaign.assessment.pairDiagnostics.requiredAgreementsAtObservedSample ??
+                    "no measured sample"}
+                  ; at minimum sample:{" "}
+                  {campaign.assessment.pairDiagnostics.requiredAgreementsAtMinimumSample ??
+                    "thresholds missing"}
+                  .
+                </p>
+                <p>
+                  Sample sufficiency and measured performance are separate. Ties count as
+                  disagreements. NO_SAMPLE means there is no complete measured pair, not a measured
+                  zero-percent result. More pairs alone do not repair poor agreement. Qualification
+                  also requires every provenance, safety and separate owner approval gate.
                 </p>
                 <ul>
                   {campaign.assessment.blockerCodes.map((code) => (

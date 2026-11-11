@@ -1,4 +1,4 @@
-import { CandidateProfileSchema, isExplicitlyUnsupported } from "@applypilot/candidate-profile";
+import { CandidateProfileSchema } from "@applypilot/candidate-profile";
 import {
   R2ANormalizationSchema,
   type R2ANormalization,
@@ -7,6 +7,13 @@ import {
 } from "@applypilot/job-model";
 import {
   R2_MINIMUM_EXTRACTION_COVERAGE,
+  matchR2Capability,
+  r2LiteralSkillOverlap,
+  r2FactReference,
+  r2SemanticFactKey,
+  r2RequirementHasExcludedScope,
+  supportsR2CapabilityText,
+  isR2ExplicitlyUnsupported as isExplicitlyUnsupported,
   type EvaluationEvidenceClass,
   type R2EligibilityResult,
 } from "@applypilot/eligibility-engine";
@@ -19,7 +26,7 @@ import {
   type R2CalibrationState,
 } from "./calibration";
 
-export const R2_FIT_SCORER_VERSION = "2.2.0";
+export const R2_FIT_SCORER_VERSION = "2.4.0";
 export const R2_FIT_WEIGHT_VERSION = "r2-weights-1";
 export const R2_RECOMMENDATION_THRESHOLD = 50;
 export const R2_GOLDEN_CORPUS_VERSION = "r2-golden-2";
@@ -63,6 +70,10 @@ export const R2_UNREVIEWED_CALIBRATION_CONTEXT: R2CalibrationContext =
   });
 
 export interface R2FitContribution {
+  requirementSupport?: Array<{
+    jobEvidenceReference: string;
+    scope: "FULL_REQUIREMENT" | "PARTIAL_EVIDENCE";
+  }>;
   code: string;
   points: number;
   candidateFactReferences: string[];
@@ -87,6 +98,14 @@ export interface R2FitInput {
 }
 
 export interface R2FitResult {
+  evidenceOpportunity?: {
+    current: boolean;
+    usableRequirementCount: number;
+    fullySupportedRequirementIds: string[];
+    partialEvidenceRequirementIds: string[];
+    unmatchedUsableRequirementIds: string[];
+    excludedRequirementIds: string[];
+  };
   score: number;
   contributions: R2FitContribution[];
   scorerVersion: string;
@@ -179,114 +198,161 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
 
   const usableFields = normalization.fieldEvidence.filter(({ state }) => usableState(state));
   const usableRequirements = normalization.requirementEvidence.filter(
-    ({ state, modality }) =>
-      usableState(state) && modality !== "UNKNOWN" && modality !== "CONDITIONAL",
+    (evidence) => !r2RequirementHasExcludedScope(evidence),
   );
-  const verifiedSkills = profile.skills.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedEmployment = profile.employment.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedEducation = profile.education.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedLicences = profile.licences.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
-  const verifiedCertifications = profile.certifications.filter(
-    ({ verification }) => verification === VerificationStatus.VERIFIED,
-  );
+  const capabilityContributions = new Map<string, R2FitContribution>();
+  const fullSupport = new Set<string>(),
+    partialSupport = new Set<string>();
+  const recordSupport = (
+    key: string,
+    kind: string,
+    references: string[],
+    evidence: R2RequirementEvidence,
+    scope: "FULL_REQUIREMENT" | "PARTIAL_EVIDENCE",
+    weight: number,
+  ) => {
+    const code =
+      scope === "PARTIAL_EVIDENCE"
+        ? "R2_LITERAL_SKILL_EVIDENCE_OVERLAP"
+        : kind === "SKILL"
+          ? evidence.modality === "PREFERRED"
+            ? "R2_PREFERRED_SKILL_VERIFIED_MATCH"
+            : "R2_REQUIRED_SKILL_VERIFIED_MATCH"
+          : "R2_" + kind + "_VERIFIED_MATCH";
+    let contribution = capabilityContributions.get(key);
+    if (!contribution) {
+      contribution = {
+        code,
+        points: weight,
+        candidateFactReferences: [],
+        jobEvidenceReferences: [],
+        requirementSupport: [],
+        evidenceClass: "EMPLOYER_REQUIREMENT",
+        scorerVersion: R2_FIT_SCORER_VERSION,
+        weightVersion: weights.version,
+        safeExplanation:
+          "Verified literal evidence is linked per source as full support or partial overlap. Partial overlap does not establish the remaining requirement, years or seniority; repeated use of one fact counts once at its strongest weight.",
+      };
+      capabilityContributions.set(key, contribution);
+    }
+    contribution.candidateFactReferences = [
+      ...new Set([...contribution.candidateFactReferences, ...references]),
+    ].sort();
+    contribution.jobEvidenceReferences = [
+      ...new Set([...contribution.jobEvidenceReferences, evidence.id]),
+    ].sort();
+    const prior = contribution.requirementSupport!.find(
+      (link) => link.jobEvidenceReference === evidence.id,
+    );
+    if (prior) {
+      if (scope === "FULL_REQUIREMENT") prior.scope = scope;
+    } else contribution.requirementSupport!.push({ jobEvidenceReference: evidence.id, scope });
+    contribution.requirementSupport!.sort((x, y) =>
+      x.jobEvidenceReference.localeCompare(y.jobEvidenceReference),
+    );
+    if (
+      weight > contribution.points ||
+      (weight === contribution.points && code < contribution.code)
+    ) {
+      contribution.points = weight;
+      contribution.code = code;
+    }
+    if (scope === "FULL_REQUIREMENT") fullSupport.add(evidence.id);
+    else partialSupport.add(evidence.id);
+  };
 
   for (const evidence of usableRequirements) {
-    if (evidence.modality === "NEGATED") continue;
     const text = requirementText(evidence);
     if (!text) continue;
     const weight =
       evidence.modality === "PREFERRED"
         ? weights.preferredEvidenceMatch
         : weights.requiredEvidenceMatch;
-    const evidenceClass: EvaluationEvidenceClass = "EMPLOYER_REQUIREMENT";
-    if (evidence.normalizedValue.kind === "EDUCATION") {
-      const match = verifiedEducation.find(
-        ({ qualification, field }) => matches(qualification, text) || matches(field, text),
-      );
-      if (match) {
-        add(
-          "R2_EDUCATION_VERIFIED_MATCH",
+    if (evidence.normalizedValue.kind === "LICENCE_CERTIFICATION") {
+      const value = evidence.normalizedValue.value;
+      // A name alone does not prove separate jurisdiction, class or temporal validity.
+      if (
+        value.condition ||
+        value.jurisdiction ||
+        value.class ||
+        value.validityRequirement ||
+        isExplicitlyUnsupported(profile, value.name)
+      )
+        continue;
+      const records = value.type === "LICENCE" ? profile.licences : profile.certifications;
+      const matchesByName = records
+        .flatMap((record, index) =>
+          record.verification === VerificationStatus.VERIFIED &&
+          supportsR2CapabilityText(record.name, value.name)
+            ? [{ record, index, key: r2SemanticFactKey(value.type, record) }]
+            : [],
+        )
+        .sort((x, y) => x.key.localeCompare(y.key) || x.index - y.index);
+      const match = matchesByName[0];
+      if (match)
+        recordSupport(
+          match.key,
+          value.type,
+          matchesByName
+            .filter((m) => m.key === match.key)
+            .map((m) =>
+              r2FactReference(
+                value.type === "LICENCE" ? "licences" : "certifications",
+                records,
+                m.index,
+              ),
+            ),
+          evidence,
+          "FULL_REQUIREMENT",
           weight,
-          [`education.${match.id}`],
-          [evidence.id],
-          evidenceClass,
-          "A current verified education fact matches current usable job evidence.",
         );
-      } else if (isExplicitlyUnsupported(profile, text)) {
+      continue;
+    }
+    const match = matchR2Capability(profile, evidence);
+    if (match) {
+      recordSupport(
+        match.semanticKey,
+        match.kind,
+        match.references,
+        evidence,
+        "FULL_REQUIREMENT",
+        weight,
+      );
+    } else {
+      // Preserve at most the old one-fact weight per requirement. Selection is
+      // deterministic, never searched against private outcomes or score targets.
+      const overlap = r2LiteralSkillOverlap(profile, evidence).sort(
+        (x, y) =>
+          x.semanticKey.localeCompare(y.semanticKey) || x.reference.localeCompare(y.reference),
+      );
+      const first = overlap[0];
+      if (first)
+        recordSupport(
+          first.semanticKey,
+          "SKILL",
+          overlap.filter((f) => f.semanticKey === first.semanticKey).map((f) => f.reference),
+          evidence,
+          "PARTIAL_EVIDENCE",
+          weight,
+        );
+      if (isExplicitlyUnsupported(profile, text, evidence.normalizedValue.kind === "EXPERIENCE"))
         add(
-          "R2_EDUCATION_VERIFIED_MISMATCH",
+          evidence.normalizedValue.kind === "EDUCATION"
+            ? "R2_EDUCATION_VERIFIED_MISMATCH"
+            : "R2_CAPABILITY_VERIFIED_MISMATCH",
           -weight,
           ["unsupportedExperience"],
           [evidence.id],
-          evidenceClass,
-          "A current explicit negative constraint conflicts with the job evidence.",
+          "EMPLOYER_REQUIREMENT",
+          "An explicit negative constraint conflicts with the full requirement; any separately linked partial evidence does not remove this conflict.",
         );
-      }
-      continue;
-    }
-    if (evidence.normalizedValue.kind === "LICENCE_CERTIFICATION") {
-      const value = evidence.normalizedValue.value;
-      const candidates = value.type === "LICENCE" ? verifiedLicences : verifiedCertifications;
-      const match = candidates.find(({ name }) => matches(name, value.name));
-      if (match) {
-        add(
-          `R2_${value.type}_VERIFIED_MATCH`,
-          weight,
-          [`${value.type === "LICENCE" ? "licences" : "certifications"}.${match.id}`],
-          [evidence.id],
-          evidenceClass,
-          `A current verified ${value.type.toLocaleLowerCase("en-AU")} matches current usable job evidence.`,
-        );
-      }
-      continue;
-    }
-    const skill = verifiedSkills.find(({ name }) => matches(name, text));
-    if (skill) {
-      add(
-        evidence.modality === "PREFERRED"
-          ? "R2_PREFERRED_SKILL_VERIFIED_MATCH"
-          : "R2_REQUIRED_SKILL_VERIFIED_MATCH",
-        weight,
-        [`skills.${skill.id}`],
-        [evidence.id],
-        evidenceClass,
-        "A current verified candidate skill matches current usable job evidence.",
-      );
-      continue;
-    }
-    const role = verifiedEmployment.find(
-      ({ title, responsibilities }) =>
-        matches(title, text) ||
-        responsibilities.some((responsibility) => matches(responsibility, text)),
-    );
-    if (role) {
-      add(
-        "R2_EXPERIENCE_VERIFIED_MATCH",
-        weight,
-        [`employment.${role.id}`],
-        [evidence.id],
-        evidenceClass,
-        "A current verified employment fact matches current usable job evidence.",
-      );
-    } else if (isExplicitlyUnsupported(profile, text)) {
-      add(
-        "R2_CAPABILITY_VERIFIED_MISMATCH",
-        -weight,
-        ["unsupportedExperience"],
-        [evidence.id],
-        evidenceClass,
-        "A current explicit negative constraint conflicts with the job evidence.",
-      );
     }
   }
+  contributions.push(
+    ...[...capabilityContributions.entries()]
+      .sort(([x], [y]) => x.localeCompare(y))
+      .map(([, contribution]) => contribution),
+  );
 
   const employmentEvidence = usableFields.find(
     ({ normalizedValue }) => normalizedValue.kind === "EMPLOYMENT_TYPE",
@@ -455,6 +521,31 @@ export function scoreR2JobFit(input: R2FitInput): R2FitResult {
   if (score < threshold) recommendationBlockers.push("SCORE_BELOW_THRESHOLD");
 
   return {
+    evidenceOpportunity: input.eligibility.current
+      ? {
+          current: true,
+          usableRequirementCount: usableRequirements.length,
+          fullySupportedRequirementIds: [...fullSupport].sort(),
+          partialEvidenceRequirementIds: [...partialSupport]
+            .filter((id) => !fullSupport.has(id))
+            .sort(),
+          unmatchedUsableRequirementIds: usableRequirements
+            .filter((e) => !fullSupport.has(e.id) && !partialSupport.has(e.id))
+            .map((e) => e.id)
+            .sort(),
+          excludedRequirementIds: normalization.requirementEvidence
+            .filter((e) => !usableRequirements.includes(e))
+            .map((e) => e.id)
+            .sort(),
+        }
+      : {
+          current: false,
+          usableRequirementCount: 0,
+          fullySupportedRequirementIds: [],
+          partialEvidenceRequirementIds: [],
+          unmatchedUsableRequirementIds: [],
+          excludedRequirementIds: normalization.requirementEvidence.map((e) => e.id).sort(),
+        },
     score,
     contributions,
     scorerVersion: R2_FIT_SCORER_VERSION,

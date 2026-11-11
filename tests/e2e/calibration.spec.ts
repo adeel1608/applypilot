@@ -177,6 +177,9 @@ test("owner calibration precommits blank policy and records only explicit fictio
     await page.getByRole("button", { name: "Precommit thresholds and this corpus" }).click();
     await expect(page).toHaveURL(/\/calibration\?campaign=/);
     const campaignId = new URL(page.url()).searchParams.get("campaign")!;
+    await expect(
+      page.getByText("Observed pair performance: NO_SAMPLE.", { exact: false }),
+    ).toBeVisible();
     const members = sqlite
       .prepare(
         "SELECT id,job_id FROM r2_calibration_comparisons WHERE campaign_id=? ORDER BY job_id",
@@ -203,6 +206,12 @@ test("owner calibration precommits blank policy and records only explicit fictio
       page.getByRole("link", { name: "Review recorded pair revision 1", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Qualification assessment" })).toBeVisible();
+    await expect(
+      page.getByText("Observed pair performance: FAIL.", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("PRIVATE_PAIR_PERFORMANCE_BELOW_THRESHOLD", { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Approve this matching qualification" }),
     ).toHaveCount(0);
