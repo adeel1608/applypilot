@@ -237,10 +237,14 @@ export function resolveCurrentSourceCapabilityHead(
   return current;
 }
 
+// Bound immutable history growth without increasing per-run request, approval, or transport limits.
+// The private allowlist reader separately retains its 128 KB file ceiling.
+export const SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES = 48;
+
 export const SourceAllowlistV2Schema = z
   .object({
     schemaVersion: z.literal(2),
-    capabilities: z.array(SourceCapabilityV2Schema).max(29),
+    capabilities: z.array(SourceCapabilityV2Schema).max(SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES),
   })
   .strict()
   // Older APPROVED entries remain immutable history; current authority is the latest family head.
