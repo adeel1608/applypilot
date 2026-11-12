@@ -539,6 +539,28 @@ export default async function CalibrationPage({
                   Label agreement {campaign.assessment.labelAgreementBasisPoints}/10000; pair
                   agreement {campaign.assessment.pairAgreementBasisPoints}/10000.
                 </p>
+                <h3>Current label agreement by class</h3>
+                <p>
+                  Aggregate agreement can conceal missed GOOD_MATCH jobs. These class counts are
+                  read-only diagnostics from this campaign, not a separate qualification or
+                  authority to recommend, prepare or submit an application.
+                </p>
+                <ul>
+                  {campaign.labelBreakdown.map((group) => (
+                    <li key={group.ownerLabel}>
+                      {group.ownerLabel}: {group.agrees}/{group.compared} compared labels agree
+                      {group.recorded !== group.compared
+                        ? ` (${group.recorded - group.compared} incomplete)`
+                        : ""}
+                      .
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  Positive-match performance needs separate review. A class with zero compared
+                  labels is unmeasured, not a measured zero-percent result. Even strong overall
+                  label agreement does not prove that useful jobs are being found.
+                </p>
                 <p>
                   Pair sample: {campaign.assessment.pairDiagnostics.sample}. Observed pair
                   performance: {campaign.assessment.pairDiagnostics.performance}.
