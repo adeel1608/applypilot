@@ -1903,7 +1903,14 @@ describe("R2A evidence normalization", () => {
     for (const sourceText of [
       "The shop has a casual dress code.",
       "This is not a casual role.",
+      "This role is not casual.",
+      "This position is not part-time.",
+      "This role is based in Melbourne with casual Fridays.",
       "If you would like a casual role someday, submit an expression of interest.",
+      "If this is a casual role, you might work weekends.",
+      "If the role is full-time, we will confirm later.",
+      "We cannot confirm this is a casual role.",
+      "The sample advert says 'this is a casual role'.",
       "Part-time shifts might become available next year.",
     ]) {
       const result = normalizeR2AJobEvidence({
@@ -1917,19 +1924,29 @@ describe("R2A evidence normalization", () => {
     }
   });
 
-  it("does not credit a second employment category when it is explicitly negated", () => {
-    const sourceText = "This is a casual role, not full-time employment.";
+  it.each([
+    ["This is a casual role, not full-time employment.", "CASUAL"],
+    ["This role is part-time, not full-time employment.", "PART_TIME"],
+    ["Employment type: Casual, not full-time.", "CASUAL"],
+    ["We have full-time warehouse staff. This role is casual.", "CASUAL"],
+    ["The role is a contract position.", "CONTRACT"],
+    ["This position is a fixed-term contract.", "FIXED_TERM"],
+  ] as const)("credits only the asserted employment type: %s", (sourceText, expected) => {
     const result = normalizeR2AJobEvidence({
       sourceText,
-      sourceObservationId: "fictional-casual-not-full-time",
+      sourceObservationId: "fictional-positive-not-negated",
     });
+    const found = result.fieldEvidence.filter(
+      ({ canonicalField }) => canonicalField === "employment.type",
+    );
     expect(
-      result.fieldEvidence
-        .filter(({ canonicalField }) => canonicalField === "employment.type")
-        .map(({ normalizedValue }) =>
-          normalizedValue.kind === "EMPLOYMENT_TYPE" ? normalizedValue.value : null,
-        ),
-    ).toEqual(["CASUAL"]);
+      found.map(({ normalizedValue }) =>
+        normalizedValue.kind === "EMPLOYMENT_TYPE" ? normalizedValue.value : null,
+      ),
+    ).toEqual([expected]);
+    expect(found[0]?.source.excerpt.toLowerCase()).toContain(
+      expected.toLowerCase().replace("_", "-"),
+    );
     assertR2ASourcePointers(result, sourceText);
     assertR2AExcerptHashes(result);
   });
