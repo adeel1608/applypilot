@@ -180,6 +180,26 @@ export default async function CalibrationPage({
                 {view.historical.engine.scorerVersion}; eligibility{" "}
                 {view.historical.engine.eligibilityEngineVersion}.
               </p>
+              <h3>Historical label agreement by class</h3>
+              <p>
+                Aggregate label agreement can hide missed GOOD_MATCH roles. These are stored
+                historical outcomes only; they do not prove current recommendation quality.
+              </p>
+              <ul>
+                {view.historical.labelBreakdown.map((slice) => (
+                  <li key={slice.ownerLabel}>
+                    {slice.ownerLabel}: {slice.agrees}/{slice.compared} compared labels agree
+                    {slice.recorded !== slice.compared
+                      ? ` (${slice.recorded - slice.compared} incomplete)`
+                      : ""}
+                    .
+                  </li>
+                ))}
+              </ul>
+              <p>
+                Positive-match performance must be examined separately from AMBIGUOUS and POOR_MATCH
+                agreement. A high total does not establish that useful jobs are found.
+              </p>
               <p>
                 Historical pair sample: {view.historical.pairDiagnostics.sample}. Historical
                 observed pair performance: {view.historical.pairDiagnostics.performance}; agreement{" "}

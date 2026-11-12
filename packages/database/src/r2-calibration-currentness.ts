@@ -14,6 +14,7 @@ import {
 } from "@applypilot/eligibility-engine";
 import {
   assessR2Calibration,
+  r2CalibrationLabelBreakdown,
   r2OrdinalBand,
   scoreR2JobFit,
   R2_FIT_SCORER_VERSION,
@@ -591,11 +592,33 @@ export function readHistoricalR2CalibrationSummary(
 ) {
   const state = readCalibrationCampaign(sqlite, campaignId, undefined, true);
   const assessment = assessCurrentR2CalibrationCampaign(state, null).assessment;
+  const comparisonsById = new Map(
+    state.comparisons.map((comparison) => [comparison.id, comparison]),
+  );
+  // Aggregate only; no historical judgment or actionable current binding leaves this read path.
+  const labelBreakdown = r2CalibrationLabelBreakdown(
+    state.labels.map((event) => {
+      const comparison = comparisonsById.get(event.comparisonId);
+      if (!comparison) throw new Error("R2_CALIBRATION_LABEL_MEMBER_MISSING");
+      const complete = event.request.occupationalFamily !== "UNKNOWN";
+      return {
+        id: event.id,
+        roleFamily: event.request.occupationalFamily,
+        ownerLabel: event.request.label,
+        eligibility: complete ? comparison.eligibility.status : null,
+        ordinalBand: complete
+          ? r2OrdinalBand(comparison.eligibility.status, comparison.fit.score)
+          : null,
+        recommended: complete ? comparison.fit.recommended : null,
+      };
+    }),
+  );
   return {
     status: "HISTORICAL_NOT_CURRENT" as const,
     campaignId: state.campaign.id,
     engine: state.campaign.engine,
     thresholds: state.campaign.thresholds,
+    labelBreakdown,
     comparedPairCount: assessment.comparedPairCount,
     pairAgreementBasisPoints: assessment.pairAgreementBasisPoints,
     pairDiagnostics: assessment.pairDiagnostics,

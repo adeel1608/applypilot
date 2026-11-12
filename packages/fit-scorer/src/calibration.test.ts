@@ -5,6 +5,7 @@ import { r2GoldenCorpus } from "../../../fixtures/r2/manifest";
 import {
   R2CalibrationContextSchema,
   assessR2Calibration,
+  r2CalibrationLabelBreakdown,
   createR2CalibrationContext,
   evaluateR2GoldenRanking,
   r2AblationDelta,
@@ -90,6 +91,37 @@ describe("R2 executable golden corpus and calibration", () => {
       },
     };
   };
+
+  it("reports historical positive-match misses separately without changing qualification", () => {
+    const [good, ambiguous, poor] = qualifiedPrivateGate().labels;
+    expect(good).toBeDefined();
+    expect(ambiguous).toBeDefined();
+    expect(poor).toBeDefined();
+    const outcomes = [
+      good!,
+      ambiguous!,
+      poor!,
+      {
+        ...good!,
+        id: "fictional-good-not-detected",
+        eligibility: "REVIEW_REQUIRED" as const,
+        ordinalBand: "LOW_PRIORITY" as const,
+        recommended: false,
+      },
+      {
+        ...good!,
+        id: "fictional-good-incomplete",
+        eligibility: null,
+        ordinalBand: null,
+        recommended: null,
+      },
+    ];
+    expect(r2CalibrationLabelBreakdown(outcomes)).toEqual([
+      { ownerLabel: "GOOD_MATCH", recorded: 3, compared: 2, agrees: 1 },
+      { ownerLabel: "AMBIGUOUS", recorded: 1, compared: 1, agrees: 1 },
+      { ownerLabel: "POOR_MATCH", recorded: 1, compared: 1, agrees: 1 },
+    ]);
+  });
 
   it("covers every required role family, matching state, and ordinal class", () => {
     expect(new Set(r2GoldenCorpus.map(({ roleFamily }) => roleFamily))).toEqual(
