@@ -103,6 +103,24 @@ function normalizeFictionalHtmlPosting(content: string) {
 }
 
 describe("Greenhouse R2A evidence projection", () => {
+  it("retains casual employment explicitly stated in a fictional retail description", () => {
+    const { normalization, sourceText } = normalizeFictionalPosting(
+      "<h3>Location and hours</h3>" +
+        "<p>This is a casual role located in Melbourne CBD. " +
+        "Shifts may include weekends and evenings; weekly hours vary.</p>" +
+        "<h3>Responsibilities</h3><p>Assist customers in the store.</p>",
+    );
+    const employment = normalization.fieldEvidence
+      .filter(({ canonicalField }) => canonicalField === "employment.type")
+      .map(({ normalizedValue }) => normalizedValue);
+    expect(employment).toEqual([{ kind: "EMPLOYMENT_TYPE", value: "CASUAL" }]);
+    expect(
+      normalization.fieldEvidence.some(({ normalizedValue }) => normalizedValue.kind === "HOURS"),
+    ).toBe(false);
+    assertR2ASourcePointers(normalization, sourceText);
+    assertR2AExcerptHashes(normalization);
+  });
+
   it("retains bounded HTML requirement and preference headings through the real reader", () => {
     const { normalization, sourceText } = normalizeFictionalHtmlPosting(
       "<h3>Required qualifications</h3><ul><li>Python programming</li>" +

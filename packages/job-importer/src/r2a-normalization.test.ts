@@ -1879,6 +1879,61 @@ describe("R2A evidence normalization", () => {
     },
   );
 
+  it.each([
+    ["This is a casual role located in Melbourne CBD. Shifts include weekends.", "CASUAL"],
+    ["Casual retail work based in Melbourne CBD with variable weekly hours.", "CASUAL"],
+    ["This is a part-time position at our fictional store.", "PART_TIME"],
+    ["This is a full-time retail job based in Melbourne.", "FULL_TIME"],
+  ] as const)("recognizes explicit stated employment: %s", (sourceText, expected) => {
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      sourceObservationId: "fictional-explicit-employment",
+    });
+    const types = result.fieldEvidence
+      .filter(({ canonicalField }) => canonicalField === "employment.type")
+      .map(({ normalizedValue }) =>
+        normalizedValue.kind === "EMPLOYMENT_TYPE" ? normalizedValue.value : null,
+      );
+    expect(types).toEqual([expected]);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+  });
+
+  it("does not credit unrelated or negated employment mentions", () => {
+    for (const sourceText of [
+      "The shop has a casual dress code.",
+      "This is not a casual role.",
+      "If you would like a casual role someday, submit an expression of interest.",
+      "Part-time shifts might become available next year.",
+    ]) {
+      const result = normalizeR2AJobEvidence({
+        sourceText,
+        sourceObservationId: "fictional-not-an-employment-assertion",
+      });
+      expect(
+        result.fieldEvidence.filter(({ canonicalField }) => canonicalField === "employment.type"),
+      ).toHaveLength(0);
+      assertR2ASourcePointers(result, sourceText);
+    }
+  });
+
+  it("does not credit a second employment category when it is explicitly negated", () => {
+    const sourceText = "This is a casual role, not full-time employment.";
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      sourceObservationId: "fictional-casual-not-full-time",
+    });
+    expect(
+      result.fieldEvidence
+        .filter(({ canonicalField }) => canonicalField === "employment.type")
+        .map(({ normalizedValue }) =>
+          normalizedValue.kind === "EMPLOYMENT_TYPE" ? normalizedValue.value : null,
+        ),
+    ).toEqual(["CASUAL"]);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+  });
+
   it("omits invalid numeric semantics instead of coercing or throwing", () => {
     const travel100 = normalizeR2AJobEvidence({
       sourceText: "Travel up to 100% may be required",
