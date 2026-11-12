@@ -91,7 +91,7 @@ function view(): CalibrationView {
       ],
       pairs: [],
       assessment: {
-        assessmentVersion: "r2-calibration-assessment-2",
+        assessmentVersion: "r2-calibration-assessment-3",
         state: "UNCALIBRATED",
         sourceLabelCount: 1,
         comparedLabelCount: 0,
@@ -316,6 +316,12 @@ describe("local calibration owner context and blank controls", () => {
       expect(e.props.defaultValue).toBeUndefined();
     }
     expect(text(tree)).not.toContain("Final-version comparison outcomes");
+    expect(text(tree)).toContain(
+      "Personal Live V1 qualification cannot be obtained below the safety floor",
+    );
+    expect(text(tree)).toContain("at least 30 complete owner-labelled jobs");
+    expect(text(tree)).toMatch(/15\s+distinct/);
+    expect(text(tree)).toMatch(/80\s*%/);
     expect(state.create).not.toHaveBeenCalled();
   });
   it("disables unsupported candidates with fixed escaped hints while keeping provisional choices blank", async () => {

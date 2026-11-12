@@ -718,7 +718,7 @@ describe("real retained-source calibration intake", () => {
   );
   it("records one isolated30-job fictional qualification, then fails closed on event/source/profile/engine/proof drift", async () => {
     const c = await setup(30),
-      id = campaign(c);
+      id = campaign(c, { ...threshold, minimumPairComparisons: 15 });
     const families = [
       "RETAIL_CUSTOMER_SERVICE",
       "ADMINISTRATION_OFFICE",
@@ -754,7 +754,35 @@ describe("real retained-source calibration intake", () => {
         .get(eventId) as string;
       contextDigest = nextCalibrationContext(contextDigest, eventDigest);
     }
-    pairOne(c, id);
+    // Distinct affirmative comparisons are required for a genuine qualifying
+    // campaign. A single pair cannot pass even when all 30 labels are correct.
+    const ranked = [...members].sort(
+      (a, b) => b.fit.score - a.fit.score || a.id.localeCompare(b.id),
+    );
+    let recordedPairs = 0;
+    pairLoop: for (let i = 0; i < ranked.length; i++) {
+      for (let j = i + 1; j < ranked.length; j++) {
+        const preferred = ranked[i]!;
+        const other = ranked[j]!;
+        if (preferred.fit.score <= other.fit.score) continue;
+        const current = c.repository.readCampaign(id, c.hash);
+        const pairRequest = {
+          campaignId: id,
+          leftComparisonId: preferred.id,
+          rightComparisonId: other.id,
+          preferredComparisonId: preferred.id,
+          expectedContextDigest: current.contextDigest,
+          previousEventId: null,
+        };
+        c.repository.recordPair(
+          pairRequest,
+          ownerGate("PAIR", r2CalibrationPairBinding(pairRequest)),
+          c.hash,
+        );
+        if (++recordedPairs === 15) break pairLoop;
+      }
+    }
+    expect(recordedPairs).toBe(15);
     const safety = fictionalSafety(),
       preview = c.repository.previewAssessment(id, safety);
     expect(preview.assessment.sourceLabelCount).toBe(30);
@@ -886,7 +914,7 @@ describe("real retained-source calibration intake", () => {
       }),
     ).toThrow();
     expect(c.sqlite.prepare("SELECT count(*) FROM r2_calibration_runs").pluck().get()).toBe(1);
-  }, 30000);
+  }, 90000);
   it("rejects legacy aggregate runs as new current intake provenance", async () => {
     const c = await setup(),
       safety = fictionalSafety();

@@ -3,6 +3,7 @@ import {
   R2CalibrationIdSchema,
   R2_OCCUPATIONAL_FAMILIES,
   R2_OCCUPATION_TAXONOMY_VERSION,
+  R2_PERSONAL_LIVE_V1_QUALIFICATION_FLOOR,
   r2CalibrationOwnerAction,
   r2CalibrationCreateBinding,
   r2CalibrationLabelBinding,
@@ -269,6 +270,16 @@ export default async function CalibrationPage({
                 Selected unique jobs: {view.selection.members.length}. Choose thresholds before
                 seeing comparison outcomes. These values and the selected final-version corpus are
                 immutable after precommit. A new policy requires a new version and campaign.
+              </p>
+              <p>
+                Personal Live V1 qualification cannot be obtained below the safety floor: at least
+                30 complete owner-labelled jobs,{" "}
+                {R2_PERSONAL_LIVE_V1_QUALIFICATION_FLOOR.minimumPairComparisons} distinct complete
+                pair comparisons, and at least{" "}
+                {R2_PERSONAL_LIVE_V1_QUALIFICATION_FLOOR.minimumPairAgreementBasisPoints / 100}%
+                agreement on both owner labels and preferred-job pairs. Lower precommitted
+                thresholds may be retained for exploration, but they cannot approve matching or
+                release the application.
               </p>
               {view.selection.members.map((member) => (
                 <RoleContext key={member.id} member={member} />
