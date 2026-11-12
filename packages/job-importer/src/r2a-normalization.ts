@@ -2580,26 +2580,36 @@ function normalizeR2AJobEvidenceInternal(
       if (value && span) employmentCandidates.push({ ...span, text: value });
     }
   }
+  // Evidence must assert the advertised position's employment type, not
+  // mention an unrelated role, condition, alternative, negation, or dress code.
+  // Capture the exact positive clause so a later "not full-time" is not credited.
+  const explicitEmploymentType = String.raw`(?:full[ _-]?time|part[ _-]?time|casual|contract(?:or)?|temporary|fixed[ _-]?term|internship|apprenticeship|volunteer)`;
+  const explicitEmploymentStatements = [
+    new RegExp(
+      String.raw`^(?:employment type|work type|job type)\s*:\s*(${explicitEmploymentType})\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`(?:^|[.!?]\s+)((?:this|the)\s+(?:role|position|job)\s+(?:is|will be)\s+(?:(?:a|an)\s+)?${explicitEmploymentType}(?:\s+(?:retail\s+)?(?:role|position|job|work|employment))?\b)`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`(?:^|[.!?]\s+)(this\s+is\s+(?:a|an)\s+${explicitEmploymentType}\s+(?:retail\s+)?(?:role|position|job)\b)`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`^(${explicitEmploymentType}\s+(?:retail\s+)?(?:work|role|position|job)\b)`,
+      "i",
+    ),
+  ] as const;
   for (const span of uniqueSpans) {
-    if (
-      /^(?:employment type|work type|job type)\s*:/i.test(span.text) ||
-      /\b(?:this|the)\s+(?:role|position|job)\s+(?:is|offers?)\b/i.test(span.text)
-    ) {
-      employmentCandidates.push(span);
-      continue;
+    const assertion = explicitEmploymentStatements
+      .map((pattern) => span.text.match(pattern))
+      .find((match) => match?.[1] !== undefined);
+    if (assertion?.[1] && assertion.index !== undefined) {
+      const offset = assertion.index + assertion[0].lastIndexOf(assertion[1]);
+      employmentCandidates.push(childSpan(span, offset, assertion[1]));
     }
-    // Published retail roles often say "This is a casual role" or open with
-    // "Casual retail work ...". Capture only the explicit assertion: unrelated
-    // mentions of full-time, dress codes, or desired work must not become evidence.
-    const assertion =
-      span.text.match(
-        /\bthis\s+is\s+(?:a|an)\s+(?:casual|part[ _-]?time|full[ _-]?time)\s+(?:retail\s+)?(?:role|position|job)\b/i,
-      ) ??
-      span.text.match(
-        /^(?:casual|part[ _-]?time|full[ _-]?time)\s+(?:retail\s+)?(?:work|role|position|job)\b/i,
-      );
-    if (assertion && assertion.index !== undefined)
-      employmentCandidates.push(childSpan(span, assertion.index, assertion[0]));
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
