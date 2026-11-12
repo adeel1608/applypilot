@@ -2580,12 +2580,62 @@ function normalizeR2AJobEvidenceInternal(
       if (value && span) employmentCandidates.push({ ...span, text: value });
     }
   }
+  // Evidence must assert the advertised position's employment type, not
+  // mention an unrelated role, condition, alternative, negation, or dress code.
+  // Capture the exact positive clause so a later "not full-time" is not credited.
+  const explicitEmploymentType = String.raw`(?:full[ _-]?time|part[ _-]?time|casual|contract(?:or)?|temporary|fixed[ _-]?term|internship|apprenticeship|volunteer)`;
+  const explicitEmploymentStatements = [
+    new RegExp(
+      String.raw`(?:^|[.!?]\s+)((?:this|the)\s+(?:role|position|job)\s+(?:is|will be)\s+(?:(?:a|an)\s+)?${explicitEmploymentType}(?:\s+(?:retail\s+)?(?:role|position|job|work|employment))?\b)`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`(?:^|[.!?]\s+)(this\s+is\s+(?:a|an)\s+${explicitEmploymentType}\s+(?:retail\s+)?(?:role|position|job)\b)`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`^(${explicitEmploymentType}\s+(?:retail\s+)?(?:work|role|position|job)\b)`,
+      "i",
+    ),
+  ] as const;
+  // Keep repeated *affirmative occurrences* of the same type at their own exact
+  // source offsets. Stop at a sentence boundary or an explicit negation.
+  const addScopedEmployment = (span: Span, offset: number, firstValue: R2NormalizedValue) => {
+    if (firstValue.kind !== "EMPLOYMENT_TYPE") return;
+    const rest = span.text.slice(offset);
+    let limit = rest.length;
+    const sentenceEnd = rest.search(/[.!?](?=\s|$)/);
+    if (sentenceEnd >= 0) limit = Math.min(limit, sentenceEnd);
+    const negation = rest.search(/\b(?:not|never|without|except|rather than)\b/i);
+    if (negation >= 0) limit = Math.min(limit, negation);
+    for (const item of employmentValues(rest.slice(0, limit))) {
+      if (item.value.kind !== "EMPLOYMENT_TYPE" || item.value.value !== firstValue.value) continue;
+      employmentCandidates.push(childSpan(span, offset + item.index, item.match));
+    }
+  };
   for (const span of uniqueSpans) {
-    if (
-      /^(?:employment type|work type|job type)\s*:/i.test(span.text) ||
-      /\b(?:this|the)\s+(?:role|position|job)\s+(?:is|offers?)\b/i.test(span.text)
-    )
-      employmentCandidates.push(span);
+    const labelled = span.text.match(/^(?:employment type|work type|job type)\s*:\s*/i);
+    if (labelled) {
+      // Punctuation or emoji before the first category is formatting, not a
+      // semantic prefix; words such as "not", "possibly" or "unknown" block it.
+      const rest = span.text.slice(labelled[0].length);
+      const first = employmentValues(rest).sort((left, right) => left.index - right.index)[0];
+      if (first && !/[\p{L}\p{N}]/u.test(rest.slice(0, first.index)))
+        addScopedEmployment(span, labelled[0].length + first.index, first.value);
+      continue;
+    }
+    const assertion = explicitEmploymentStatements
+      .map((pattern) => span.text.match(pattern))
+      .find((match) => match?.[1] !== undefined);
+    if (assertion?.[1] && assertion.index !== undefined) {
+      const first = employmentValues(assertion[1]).sort(
+        (left, right) => left.index - right.index,
+      )[0];
+      if (first) {
+        const offset = assertion.index + assertion[0].lastIndexOf(assertion[1]);
+        addScopedEmployment(span, offset, first.value);
+      }
+    }
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {

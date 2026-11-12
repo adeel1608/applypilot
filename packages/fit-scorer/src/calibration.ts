@@ -170,6 +170,33 @@ function requiredAgreements(total: number, threshold: number): number {
   return low;
 }
 
+/** Read-only class diagnostics. Does not change qualification or owner judgments. */
+export function r2CalibrationLabelBreakdown(
+  outcomes: readonly R2PrivateCalibrationLabelOutcome[],
+): Array<{
+  ownerLabel: R2PrivateCalibrationLabelOutcome["ownerLabel"];
+  recorded: number;
+  compared: number;
+  agrees: number;
+}> {
+  const classes = ["GOOD_MATCH", "AMBIGUOUS", "POOR_MATCH"] as const;
+  return classes.map((ownerLabel) => {
+    const recorded = outcomes.filter((outcome) => outcome.ownerLabel === ownerLabel);
+    const compared = recorded.filter(
+      (outcome) =>
+        outcome.eligibility !== null &&
+        outcome.ordinalBand !== null &&
+        outcome.recommended !== null,
+    );
+    return {
+      ownerLabel,
+      recorded: recorded.length,
+      compared: compared.length,
+      agrees: compared.filter(labelOutcomeAgrees).length,
+    };
+  });
+}
+
 function labelOutcomeAgrees(outcome: R2PrivateCalibrationLabelOutcome): boolean {
   if (
     outcome.eligibility === null ||
