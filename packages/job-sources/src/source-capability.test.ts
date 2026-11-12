@@ -8,6 +8,7 @@ import {
   SecureSourceError,
   SourceCapabilityV2Schema,
   SourceAllowlistV2Schema,
+  SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES,
   SourceRunBudget,
   SourcePersistenceDiagnosticSchema,
   createSourcePersistenceDiagnostic,
@@ -274,18 +275,66 @@ describe("R1A source capability and transport", () => {
     ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
   });
 
-  it("keeps bounded room for the authorized source continuation and fallback ceiling", () => {
-    const capabilities = Array.from({ length: 29 }, (_, index) =>
+  it("retains all 29 historical records and admits an unapproved successor without enabling requests", () => {
+    const history = Array.from({ length: 29 }, (_, index) =>
       capability({ capabilityId: `cap-fictional-history-${index + 1}` }),
     );
-    const parsed = SourceAllowlistV2Schema.parse({ schemaVersion: 2, capabilities });
-
-    expect(parsed.capabilities).toHaveLength(29);
+    const successor = capability({
+      capabilityId: history[0]!.capabilityId,
+      version: 2,
+      predecessorVersion: 1,
+      approvalState: "DRAFT",
+      approvalReference: null,
+      approvedAt: null,
+    });
+    const parsed = SourceAllowlistV2Schema.parse({
+      schemaVersion: 2,
+      capabilities: [...history, successor],
+    });
+    expect(parsed.capabilities).toHaveLength(30);
     expect(latestSourceCapabilityHeads(parsed.capabilities)).toHaveLength(29);
+    expect(latestSourceCapabilityHeads(parsed.capabilities)).toContainEqual(successor);
+    expect(sourceCapabilityReadiness(successor, instant)).toEqual({
+      status: "SOURCE_DISABLED",
+      reason: "NOT_APPROVED",
+    });
+    expect(() =>
+      resolveCurrentSourceCapabilityHead(parsed.capabilities, {
+        capabilityId: history[0]!.capabilityId,
+        version: history[0]!.version,
+        capabilityDigest: sourceCapabilityDigest(history[0]!),
+      }),
+    ).toThrow("SOURCE_CAPABILITY_VIEW_STALE");
+  });
+
+  it("keeps a strict finite ceiling for additional immutable source history", () => {
+    expect(SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES).toBe(48);
+    const capabilities = Array.from({ length: SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES }, (_, index) =>
+      capability({
+        capabilityId: `cap-fictional-history-${index + 1}`,
+        approvalState: "DRAFT",
+        approvedAt: null,
+        approvalReference: null,
+      }),
+    );
+    expect(
+      SourceAllowlistV2Schema.parse({
+        schemaVersion: 2,
+        capabilities,
+      }).capabilities,
+    ).toHaveLength(SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES);
     expect(
       SourceAllowlistV2Schema.safeParse({
         schemaVersion: 2,
-        capabilities: [...capabilities, capability({ capabilityId: "cap-fictional-history-30" })],
+        capabilities: [
+          ...capabilities,
+          capability({
+            capabilityId: "cap-fictional-history-over-ceiling",
+            approvalState: "DRAFT",
+            approvedAt: null,
+            approvalReference: null,
+          }),
+        ],
       }).success,
     ).toBe(false);
   });
@@ -404,6 +453,42 @@ describe("R1A source capability and transport", () => {
         status: "SOURCE_ALLOWLIST_V2_READY",
         capabilities: [{ capabilityId: "cap-fictional-001" }],
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("loads the expanded bounded history but keeps the private 128 KB file limit", async () => {
+    const root = await mkdtemp(join(tmpdir(), "applypilot-history-cap-"));
+    const privateRoot = join(root, "data", "private");
+    await mkdir(privateRoot, { recursive: true });
+    const file = join(privateRoot, "source-allowlist.json");
+    try {
+      const capabilities = Array.from(
+        { length: SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES },
+        (_, index) =>
+          capability({
+            capabilityId: `cap-fictional-history-${index + 1}`,
+            approvalState: "DRAFT",
+            approvalReference: null,
+            approvedAt: null,
+          }),
+      );
+      const content = JSON.stringify({ schemaVersion: 2, capabilities });
+      expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(128_000);
+      await writeFile(file, content);
+      const parsed = await loadPrivateSourceAllowlistV2(root);
+      expect(parsed.status).toBe("SOURCE_ALLOWLIST_V2_READY");
+      expect(parsed.capabilities).toHaveLength(SOURCE_ALLOWLIST_V2_MAX_CAPABILITIES);
+      expect(
+        parsed.capabilities.every(
+          (item) => sourceCapabilityReadiness(item, instant).status === "SOURCE_DISABLED",
+        ),
+      ).toBe(true);
+      await writeFile(file, content + " ".repeat(128_001));
+      await expect(loadPrivateSourceAllowlistV2(root)).rejects.toThrow(
+        "SOURCE_ALLOWLIST_TOO_LARGE",
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
