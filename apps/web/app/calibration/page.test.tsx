@@ -114,6 +114,11 @@ function view(): CalibrationView {
         },
         blockerCodes: ["PRIVATE_ROLE_FAMILY_COVERAGE_INCOMPLETE"],
       },
+      labelBreakdown: [
+        { ownerLabel: "GOOD_MATCH", recorded: 0, compared: 0, agrees: 0 },
+        { ownerLabel: "AMBIGUOUS", recorded: 1, compared: 0, agrees: 0 },
+        { ownerLabel: "POOR_MATCH", recorded: 0, compared: 0, agrees: 0 },
+      ],
       assessmentDigest: "c".repeat(64),
       readyForOwnerApproval: false,
       safetyStatus: "NOT_CURRENT",
@@ -271,6 +276,29 @@ describe("local calibration owner context and blank controls", () => {
     expect(state.create).not.toHaveBeenCalled();
     expect(state.label).not.toHaveBeenCalled();
   });
+  it("exposes missed current GOOD_MATCH labels without granting qualification", async () => {
+    const data = view();
+    data.campaign!.labelBreakdown = [
+      { ownerLabel: "GOOD_MATCH", recorded: 2, compared: 2, agrees: 0 },
+      { ownerLabel: "AMBIGUOUS", recorded: 6, compared: 6, agrees: 6 },
+      { ownerLabel: "POOR_MATCH", recorded: 7, compared: 5, agrees: 5 },
+    ];
+    state.view.mockResolvedValue(data);
+    const tree = await page({ campaign: "campaign-1" });
+    const rendered = text(tree)
+      .replace(/\s+/g, " ")
+      .replace(/\s*:\s*/g, ": ")
+      .replace(/\s*\/\s*/g, "/");
+    expect(rendered).toContain("Current label agreement by class");
+    expect(rendered).toContain("GOOD_MATCH: 0/2 compared labels agree");
+    expect(rendered).toContain("AMBIGUOUS: 6/6 compared labels agree");
+    expect(rendered).toContain("POOR_MATCH: 5/5 compared labels agree (2 incomplete)");
+    expect(rendered).toContain("Even strong overall label agreement does not prove");
+    expect(elements(tree).filter((e) => e.props.action === state.qualify)).toHaveLength(0);
+    expect(state.qualify).not.toHaveBeenCalled();
+    expect(state.label).not.toHaveBeenCalled();
+  });
+
   it("shows exact pair context and leaves both preference radios unchecked", async () => {
     const tree = await page({
       campaign: "campaign-1",
