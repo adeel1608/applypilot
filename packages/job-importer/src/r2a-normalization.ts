@@ -2584,8 +2584,22 @@ function normalizeR2AJobEvidenceInternal(
     if (
       /^(?:employment type|work type|job type)\s*:/i.test(span.text) ||
       /\b(?:this|the)\s+(?:role|position|job)\s+(?:is|offers?)\b/i.test(span.text)
-    )
+    ) {
       employmentCandidates.push(span);
+      continue;
+    }
+    // Published retail roles often say "This is a casual role" or open with
+    // "Casual retail work ...". Capture only the explicit assertion: unrelated
+    // mentions of full-time, dress codes, or desired work must not become evidence.
+    const assertion =
+      span.text.match(
+        /\bthis\s+is\s+(?:a|an)\s+(?:casual|part[ _-]?time|full[ _-]?time)\s+(?:retail\s+)?(?:role|position|job)\b/i,
+      ) ??
+      span.text.match(
+        /^(?:casual|part[ _-]?time|full[ _-]?time)\s+(?:retail\s+)?(?:work|role|position|job)\b/i,
+      );
+    if (assertion && assertion.index !== undefined)
+      employmentCandidates.push(childSpan(span, assertion.index, assertion[0]));
   }
   for (const span of employmentCandidates) {
     for (const item of employmentValues(span.text)) {
