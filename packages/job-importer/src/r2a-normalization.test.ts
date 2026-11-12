@@ -1951,6 +1951,28 @@ describe("R2A evidence normalization", () => {
     assertR2AExcerptHashes(result);
   });
 
+  it.each([
+    ["The role is a contract position with contract renewal.", ["CONTRACT", "CONTRACT"]],
+    ["This role is full time and full time.", ["FULL_TIME", "FULL_TIME"]],
+    ['Employment type: "🚀" full time, full time.', ["FULL_TIME", "FULL_TIME"]],
+  ] as const)("retains distinct affirmative employment occurrences: %s", (sourceText, expected) => {
+    const result = normalizeR2AJobEvidence({
+      sourceText,
+      sourceObservationId: "fictional-repeated-positive-employment",
+    });
+    const occurrences = result.fieldEvidence.filter(
+      ({ canonicalField }) => canonicalField === "employment.type",
+    );
+    expect(
+      occurrences.map(({ normalizedValue }) =>
+        normalizedValue.kind === "EMPLOYMENT_TYPE" ? normalizedValue.value : null,
+      ),
+    ).toEqual([...expected]);
+    expect(new Set(occurrences.map(({ source }) => source.start)).size).toBe(2);
+    assertR2ASourcePointers(result, sourceText);
+    assertR2AExcerptHashes(result);
+  });
+
   it("omits invalid numeric semantics instead of coercing or throwing", () => {
     const travel100 = normalizeR2AJobEvidence({
       sourceText: "Travel up to 100% may be required",
