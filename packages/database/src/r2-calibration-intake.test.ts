@@ -361,6 +361,17 @@ describe("real retained-source calibration intake", () => {
       expect(preview.readyForOwnerApproval).toBe(false);
       const historical = c.repository.readHistoricalSummary(id);
       expect(historical.pairDiagnostics).toEqual(preview.assessment.pairDiagnostics);
+      expect(historical.labelBreakdown.map((group) => group.ownerLabel)).toEqual([
+        "GOOD_MATCH",
+        "AMBIGUOUS",
+        "POOR_MATCH",
+      ]);
+      expect(historical.labelBreakdown.reduce((total, group) => total + group.recorded, 0)).toBe(
+        preview.assessment.sourceLabelCount,
+      );
+      expect(historical.labelBreakdown.reduce((total, group) => total + group.compared, 0)).toBe(
+        preview.assessment.comparedLabelCount,
+      );
       expect(historical).not.toHaveProperty("assessmentDigest");
       expect(historical).not.toHaveProperty("contextDigest");
       expect(c.sqlite.serialize()).toEqual(before);

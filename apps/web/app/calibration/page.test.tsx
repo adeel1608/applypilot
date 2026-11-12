@@ -209,6 +209,11 @@ describe("local calibration owner context and blank controls", () => {
         recommended: false,
         coveragePercent: 50,
       })),
+      labelBreakdown: [
+        { ownerLabel: "GOOD_MATCH", recorded: 5, compared: 4, agrees: 2 },
+        { ownerLabel: "AMBIGUOUS", recorded: 7, compared: 7, agrees: 4 },
+        { ownerLabel: "POOR_MATCH", recorded: 9, compared: 9, agrees: 8 },
+      ],
       comparedPairCount: 7,
       pairAgreementBasisPoints: 4286,
       pairDiagnostics: {
@@ -226,6 +231,14 @@ describe("local calibration owner context and blank controls", () => {
     state.view.mockResolvedValue(data);
     const tree = await page({ campaign: "old-campaign" });
     expect(text(tree).replace(/\s+/g, " ")).toContain("Historical observed pair performance: FAIL");
+    const labelText = text(tree)
+      .replace(/\s+/g, " ")
+      .replace(/\s*:\s*/g, ": ")
+      .replace(/\s*\/\s*/g, "/");
+    expect(labelText).toContain("GOOD_MATCH: 2/4 compared labels agree (1 incomplete)");
+    expect(labelText).toContain("AMBIGUOUS: 4/7 compared labels agree");
+    expect(labelText).toContain("POOR_MATCH: 8/9 compared labels agree");
+    expect(text(tree)).toContain("Aggregate label agreement can hide missed GOOD_MATCH roles");
     expect(text(tree)).toContain("old-parser");
     expect(
       elements(tree).filter(
