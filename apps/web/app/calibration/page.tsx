@@ -556,7 +556,7 @@ export default async function CalibrationPage({
                     </li>
                   ))}
                 </ul>
-                <h3>Why desirable jobs were missed</h3>
+                <h3>Positive-match diagnostic breakdown</h3>
                 <p>
                   Compared GOOD_MATCH labels: {campaign.positiveMatchDiagnostics.compared} of{" "}
                   {campaign.positiveMatchDiagnostics.recorded}; correctly identified:{" "}
@@ -566,8 +566,9 @@ export default async function CalibrationPage({
                   {campaign.positiveMatchDiagnostics.measurement}.
                 </p>
                 <p>
-                  Among missed positives: not eligible{" "}
-                  {campaign.positiveMatchDiagnostics.eligibilityNotEligible}; not recommended{" "}
+                  Among missed positives: eligibility needs review{" "}
+                  {campaign.positiveMatchDiagnostics.eligibilityNeedsReview}; explicitly ineligible{" "}
+                  {campaign.positiveMatchDiagnostics.eligibilityIneligible}; not recommended{" "}
                   {campaign.positiveMatchDiagnostics.notRecommended}; outside review bands{" "}
                   {campaign.positiveMatchDiagnostics.notInReviewBand}. Reasons can overlap and must
                   not be added together as distinct misses.

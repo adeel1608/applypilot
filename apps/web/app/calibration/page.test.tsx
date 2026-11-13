@@ -125,7 +125,8 @@ function view(): CalibrationView {
         incomplete: 0,
         agreements: 0,
         missed: 0,
-        eligibilityNotEligible: 0,
+        eligibilityNeedsReview: 0,
+        eligibilityIneligible: 0,
         notRecommended: 0,
         notInReviewBand: 0,
         measurement: "UNMEASURED",
@@ -300,7 +301,8 @@ describe("local calibration owner context and blank controls", () => {
       incomplete: 0,
       agreements: 0,
       missed: 2,
-      eligibilityNotEligible: 2,
+      eligibilityNeedsReview: 1,
+      eligibilityIneligible: 1,
       notRecommended: 2,
       notInReviewBand: 1,
       measurement: "MEASURED",
@@ -315,10 +317,10 @@ describe("local calibration owner context and blank controls", () => {
     expect(rendered).toContain("GOOD_MATCH: 0/2 compared labels agree");
     expect(rendered).toContain("AMBIGUOUS: 6/6 compared labels agree");
     expect(rendered).toContain("POOR_MATCH: 5/5 compared labels agree (2 incomplete)");
-    expect(rendered).toContain("Why desirable jobs were missed");
+    expect(rendered).toContain("Positive-match diagnostic breakdown");
     expect(rendered).toMatch(/correctly identified:\s*0\s*;\s*missed:\s*2/);
     expect(rendered).toMatch(
-      /not eligible\s*2\s*;\s*not recommended\s*2\s*;\s*outside review bands\s*1/,
+      /eligibility needs review\s*1\s*;\s*explicitly ineligible\s*1\s*;\s*not recommended\s*2\s*;\s*outside review bands\s*1/,
     );
     expect(rendered).toContain("Reasons can overlap");
     expect(rendered).toContain("Even strong overall label agreement does not prove");

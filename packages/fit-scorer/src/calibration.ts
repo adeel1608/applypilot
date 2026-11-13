@@ -233,7 +233,8 @@ export function r2CalibrationPositiveMatchDiagnostics(
   incomplete: number;
   agreements: number;
   missed: number;
-  eligibilityNotEligible: number;
+  eligibilityNeedsReview: number;
+  eligibilityIneligible: number;
   notRecommended: number;
   notInReviewBand: number;
   measurement: "MEASURED" | "UNMEASURED";
@@ -251,7 +252,9 @@ export function r2CalibrationPositiveMatchDiagnostics(
     incomplete: positives.length - compared.length,
     agreements: compared.length - missed.length,
     missed: missed.length,
-    eligibilityNotEligible: missed.filter((outcome) => outcome.eligibility !== "ELIGIBLE").length,
+    eligibilityNeedsReview: missed.filter((outcome) => outcome.eligibility === "REVIEW_REQUIRED")
+      .length,
+    eligibilityIneligible: missed.filter((outcome) => outcome.eligibility === "INELIGIBLE").length,
     notRecommended: missed.filter((outcome) => outcome.recommended === false).length,
     notInReviewBand: missed.filter(
       (outcome) =>
