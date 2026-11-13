@@ -75,7 +75,7 @@ describe("positive owner-label failure diagnostics (inert)", () => {
     });
   });
 
-  it("shows zero retrieved positives even when aggregate outcomes elsewhere agree", () => {
+  it("shows zero owner-positive agreement even when aggregate outcomes elsewhere agree", () => {
     const negatives: R2PrivateCalibrationLabelOutcome[] = Array.from({ length: 28 }, (_, i) => ({
       id: `fictional-negative-${i}`,
       roleFamily: `fictional-family-${i % 4}`,

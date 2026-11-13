@@ -318,7 +318,8 @@ describe("local calibration owner context and blank controls", () => {
     expect(rendered).toContain("AMBIGUOUS: 6/6 compared labels agree");
     expect(rendered).toContain("POOR_MATCH: 5/5 compared labels agree (2 incomplete)");
     expect(rendered).toContain("Positive-match diagnostic breakdown");
-    expect(rendered).toMatch(/correctly identified:\s*0\s*;\s*missed:\s*2/);
+    expect(rendered).toMatch(/owner-label agreements:\s*0\s*;\s*missed GOOD_MATCH labels:\s*2/);
+    expect(rendered).toContain("not discovery recall over all vacancies");
     expect(rendered).toMatch(
       /eligibility needs review\s*1\s*;\s*explicitly ineligible\s*1\s*;\s*not recommended\s*2\s*;\s*outside review bands\s*1/,
     );

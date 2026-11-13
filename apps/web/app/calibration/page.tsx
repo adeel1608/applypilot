@@ -559,8 +559,8 @@ export default async function CalibrationPage({
                 <h3>Positive-match diagnostic breakdown</h3>
                 <p>
                   Compared GOOD_MATCH labels: {campaign.positiveMatchDiagnostics.compared} of{" "}
-                  {campaign.positiveMatchDiagnostics.recorded}; correctly identified:{" "}
-                  {campaign.positiveMatchDiagnostics.agreements}; missed:{" "}
+                  {campaign.positiveMatchDiagnostics.recorded}; owner-label agreements:{" "}
+                  {campaign.positiveMatchDiagnostics.agreements}; missed GOOD_MATCH labels:{" "}
                   {campaign.positiveMatchDiagnostics.missed}; incomplete:{" "}
                   {campaign.positiveMatchDiagnostics.incomplete}. Measurement:{" "}
                   {campaign.positiveMatchDiagnostics.measurement}.
@@ -576,8 +576,10 @@ export default async function CalibrationPage({
                 <p>
                   Positive-match performance needs separate review. A class with zero compared
                   labels is unmeasured, not a measured zero-percent result. Even strong overall
-                  label agreement does not prove that useful jobs are being found. These diagnostics
-                  do not change any qualification decision or provide application consent.
+                  label agreement does not prove that useful jobs are being found. These counts
+                  cover only selected jobs with owner labels, not discovery recall over all
+                  vacancies or an untouched holdout. They do not change qualification or provide
+                  application consent.
                 </p>
                 <p>
                   Pair sample: {campaign.assessment.pairDiagnostics.sample}. Observed pair
