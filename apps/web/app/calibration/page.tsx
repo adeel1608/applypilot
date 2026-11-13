@@ -556,10 +556,27 @@ export default async function CalibrationPage({
                     </li>
                   ))}
                 </ul>
+                <h3>Why desirable jobs were missed</h3>
+                <p>
+                  Compared GOOD_MATCH labels: {campaign.positiveMatchDiagnostics.compared} of{" "}
+                  {campaign.positiveMatchDiagnostics.recorded}; correctly identified:{" "}
+                  {campaign.positiveMatchDiagnostics.agreements}; missed:{" "}
+                  {campaign.positiveMatchDiagnostics.missed}; incomplete:{" "}
+                  {campaign.positiveMatchDiagnostics.incomplete}. Measurement:{" "}
+                  {campaign.positiveMatchDiagnostics.measurement}.
+                </p>
+                <p>
+                  Among missed positives: not eligible{" "}
+                  {campaign.positiveMatchDiagnostics.eligibilityNotEligible}; not recommended{" "}
+                  {campaign.positiveMatchDiagnostics.notRecommended}; outside review bands{" "}
+                  {campaign.positiveMatchDiagnostics.notInReviewBand}. Reasons can overlap and must
+                  not be added together as distinct misses.
+                </p>
                 <p>
                   Positive-match performance needs separate review. A class with zero compared
                   labels is unmeasured, not a measured zero-percent result. Even strong overall
-                  label agreement does not prove that useful jobs are being found.
+                  label agreement does not prove that useful jobs are being found. These diagnostics
+                  do not change any qualification decision or provide application consent.
                 </p>
                 <p>
                   Pair sample: {campaign.assessment.pairDiagnostics.sample}. Observed pair

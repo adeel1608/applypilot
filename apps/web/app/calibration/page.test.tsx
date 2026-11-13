@@ -119,6 +119,17 @@ function view(): CalibrationView {
         { ownerLabel: "AMBIGUOUS", recorded: 1, compared: 0, agrees: 0 },
         { ownerLabel: "POOR_MATCH", recorded: 0, compared: 0, agrees: 0 },
       ],
+      positiveMatchDiagnostics: {
+        recorded: 0,
+        compared: 0,
+        incomplete: 0,
+        agreements: 0,
+        missed: 0,
+        eligibilityNotEligible: 0,
+        notRecommended: 0,
+        notInReviewBand: 0,
+        measurement: "UNMEASURED",
+      },
       assessmentDigest: "c".repeat(64),
       readyForOwnerApproval: false,
       safetyStatus: "NOT_CURRENT",
@@ -283,6 +294,17 @@ describe("local calibration owner context and blank controls", () => {
       { ownerLabel: "AMBIGUOUS", recorded: 6, compared: 6, agrees: 6 },
       { ownerLabel: "POOR_MATCH", recorded: 7, compared: 5, agrees: 5 },
     ];
+    data.campaign!.positiveMatchDiagnostics = {
+      recorded: 2,
+      compared: 2,
+      incomplete: 0,
+      agreements: 0,
+      missed: 2,
+      eligibilityNotEligible: 2,
+      notRecommended: 2,
+      notInReviewBand: 1,
+      measurement: "MEASURED",
+    };
     state.view.mockResolvedValue(data);
     const tree = await page({ campaign: "campaign-1" });
     const rendered = text(tree)
@@ -293,6 +315,12 @@ describe("local calibration owner context and blank controls", () => {
     expect(rendered).toContain("GOOD_MATCH: 0/2 compared labels agree");
     expect(rendered).toContain("AMBIGUOUS: 6/6 compared labels agree");
     expect(rendered).toContain("POOR_MATCH: 5/5 compared labels agree (2 incomplete)");
+    expect(rendered).toContain("Why desirable jobs were missed");
+    expect(rendered).toMatch(/correctly identified:\s*0\s*;\s*missed:\s*2/);
+    expect(rendered).toMatch(
+      /not eligible\s*2\s*;\s*not recommended\s*2\s*;\s*outside review bands\s*1/,
+    );
+    expect(rendered).toContain("Reasons can overlap");
     expect(rendered).toContain("Even strong overall label agreement does not prove");
     expect(elements(tree).filter((e) => e.props.action === state.qualify)).toHaveLength(0);
     expect(state.qualify).not.toHaveBeenCalled();
