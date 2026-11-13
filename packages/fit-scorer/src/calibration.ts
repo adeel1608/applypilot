@@ -221,6 +221,49 @@ function labelOutcomeAgrees(outcome: R2PrivateCalibrationLabelOutcome): boolean 
   );
 }
 
+/**
+ * Read-only evidence for owner-labelled desirable roles. Flags describe distinct
+ * observed conditions and may overlap; they are not a calibration threshold.
+ */
+export function r2CalibrationPositiveMatchDiagnostics(
+  outcomes: readonly R2PrivateCalibrationLabelOutcome[],
+): {
+  recorded: number;
+  compared: number;
+  incomplete: number;
+  agreements: number;
+  missed: number;
+  eligibilityNeedsReview: number;
+  eligibilityIneligible: number;
+  notRecommended: number;
+  notInReviewBand: number;
+  measurement: "MEASURED" | "UNMEASURED";
+} {
+  const positives = outcomes.filter((outcome) => outcome.ownerLabel === "GOOD_MATCH");
+  const compared = positives.filter(
+    (outcome) =>
+      outcome.eligibility !== null && outcome.ordinalBand !== null && outcome.recommended !== null,
+  );
+  // Reuse the executable assessor's positive-match agreement predicate.
+  const missed = compared.filter((outcome) => !labelOutcomeAgrees(outcome));
+  return {
+    recorded: positives.length,
+    compared: compared.length,
+    incomplete: positives.length - compared.length,
+    agreements: compared.length - missed.length,
+    missed: missed.length,
+    eligibilityNeedsReview: missed.filter((outcome) => outcome.eligibility === "REVIEW_REQUIRED")
+      .length,
+    eligibilityIneligible: missed.filter((outcome) => outcome.eligibility === "INELIGIBLE").length,
+    notRecommended: missed.filter((outcome) => outcome.recommended === false).length,
+    notInReviewBand: missed.filter(
+      (outcome) =>
+        outcome.ordinalBand !== "STRONG_REVIEW" && outcome.ordinalBand !== "POSSIBLE_REVIEW",
+    ).length,
+    measurement: compared.length > 0 ? "MEASURED" : "UNMEASURED",
+  };
+}
+
 export function assessR2Calibration(input: R2CalibrationGateInput): R2CalibrationAssessment {
   const gate = R2CalibrationGateInputSchema.parse(input);
   const completeLabels = gate.labels.filter(

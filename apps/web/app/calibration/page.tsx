@@ -556,10 +556,30 @@ export default async function CalibrationPage({
                     </li>
                   ))}
                 </ul>
+                <h3>Positive-match diagnostic breakdown</h3>
+                <p>
+                  Compared GOOD_MATCH labels: {campaign.positiveMatchDiagnostics.compared} of{" "}
+                  {campaign.positiveMatchDiagnostics.recorded}; owner-label agreements:{" "}
+                  {campaign.positiveMatchDiagnostics.agreements}; missed GOOD_MATCH labels:{" "}
+                  {campaign.positiveMatchDiagnostics.missed}; incomplete:{" "}
+                  {campaign.positiveMatchDiagnostics.incomplete}. Measurement:{" "}
+                  {campaign.positiveMatchDiagnostics.measurement}.
+                </p>
+                <p>
+                  Among missed positives: eligibility needs review{" "}
+                  {campaign.positiveMatchDiagnostics.eligibilityNeedsReview}; explicitly ineligible{" "}
+                  {campaign.positiveMatchDiagnostics.eligibilityIneligible}; not recommended{" "}
+                  {campaign.positiveMatchDiagnostics.notRecommended}; outside review bands{" "}
+                  {campaign.positiveMatchDiagnostics.notInReviewBand}. Reasons can overlap and must
+                  not be added together as distinct misses.
+                </p>
                 <p>
                   Positive-match performance needs separate review. A class with zero compared
                   labels is unmeasured, not a measured zero-percent result. Even strong overall
-                  label agreement does not prove that useful jobs are being found.
+                  label agreement does not prove that useful jobs are being found. These counts
+                  cover only selected jobs with owner labels, not discovery recall over all
+                  vacancies or an untouched holdout. They do not change qualification or provide
+                  application consent.
                 </p>
                 <p>
                   Pair sample: {campaign.assessment.pairDiagnostics.sample}. Observed pair

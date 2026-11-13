@@ -14,6 +14,7 @@ import {
   R2CalibrationDigestSchema,
   R2_CALIBRATION_MAXIMUM_MEMBERS,
   r2CalibrationLabelBreakdown,
+  r2CalibrationPositiveMatchDiagnostics,
   type R2CalibrationOwnerGate,
   type R2CalibrationAssessment,
   type R2CalibrationThresholdPrecommit,
@@ -99,6 +100,7 @@ export interface CalibrationCampaignView {
   }>;
   assessment: R2CalibrationAssessment;
   labelBreakdown: ReturnType<typeof r2CalibrationLabelBreakdown>;
+  positiveMatchDiagnostics: ReturnType<typeof r2CalibrationPositiveMatchDiagnostics>;
   assessmentDigest: string;
   readyForOwnerApproval: boolean;
   safetyStatus: "CURRENT" | "NOT_CURRENT";
@@ -251,6 +253,7 @@ function campaignView(
     // Derived from the same complete/incomplete owner-label outcomes used by
     // the executable gate; display only aggregates, never extra approval state.
     labelBreakdown: r2CalibrationLabelBreakdown(preview.gate.labels),
+    positiveMatchDiagnostics: r2CalibrationPositiveMatchDiagnostics(preview.gate.labels),
     assessmentDigest: preview.assessmentDigest,
     readyForOwnerApproval: preview.readyForOwnerApproval,
     safetyStatus: preview.safetyBundleDigest ? "CURRENT" : "NOT_CURRENT",
