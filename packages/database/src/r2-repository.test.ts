@@ -171,7 +171,7 @@ function qualifiedCalibrationGate(): R2CalibrationGateInput {
       recommended: false,
     };
   });
-  const pairs = Array.from({ length: 5 }, (_, index) => ({
+  const pairs = Array.from({ length: 15 }, (_, index) => ({
     id: `pair-${index}`,
     preferredScore: 90 - index,
     otherScore: 30 + index,
@@ -184,7 +184,7 @@ function qualifiedCalibrationGate(): R2CalibrationGateInput {
     performanceThresholds: {
       version: "owner-thresholds-1",
       minimumLabelAgreementBasisPoints: 10_000,
-      minimumPairComparisons: 5,
+      minimumPairComparisons: 15,
       minimumPairAgreementBasisPoints: 10_000,
     },
     safetyGates: {
@@ -708,6 +708,37 @@ describe("R2 persistence", () => {
     ).toThrow();
   });
 
+  it("cannot record a new calibrated aggregate from a five-pair exploratory policy", () => {
+    const { sqlite } = setup();
+    const complete = qualifiedCalibrationGate();
+    const exploratory = {
+      ...complete,
+      pairs: complete.pairs.slice(0, 5),
+      sourcePairCount: 5,
+      performanceThresholds: { ...complete.performanceThresholds!, minimumPairComparisons: 5 },
+    };
+    const repository = new R2Repository(sqlite);
+    expect(() =>
+      repository.recordCalibrationRun({
+        corpusVersion: "r2-golden-2",
+        scorerVersion: R2_FIT_SCORER_VERSION,
+        weightVersion: "r2-weights-1",
+        gate: exploratory,
+        evidenceVersion: "r2-private-calibration-evidence-1",
+        privateEvidenceDigest: "d".repeat(64),
+        metrics: {
+          total: 12,
+          ordinalAgreement: 1,
+          topK: 5,
+          topKReviewUtility: 1,
+          boundsPass: true,
+          calibrationState: "CALIBRATED",
+        },
+      }),
+    ).toThrow("R2_CALIBRATION_ASSESSMENT_MISMATCH");
+    expect(sqlite.prepare("SELECT count(*) FROM r2_calibration_runs").pluck().get()).toBe(0);
+  });
+
   it("preserves aggregate qualification history without admitting new calibrated evaluations", () => {
     const { sqlite, job, normalization } = setup();
     let sequence = 0;
@@ -766,8 +797,8 @@ describe("R2 persistence", () => {
     ).toEqual({
       source_label_count: 30,
       compared_label_count: 30,
-      source_pair_count: 5,
-      compared_pair_count: 5,
+      source_pair_count: 15,
+      compared_pair_count: 15,
       blocker_codes_json: "[]",
     });
     expect(() =>

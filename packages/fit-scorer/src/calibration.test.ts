@@ -55,7 +55,7 @@ describe("R2 executable golden corpus and calibration", () => {
         recommended: false,
       };
     });
-    const pairs = Array.from({ length: 5 }, (_, index) => ({
+    const pairs = Array.from({ length: 15 }, (_, index) => ({
       id: `private-pair-${index}`,
       preferredScore: 80 - index,
       otherScore: 40 + index,
@@ -68,7 +68,7 @@ describe("R2 executable golden corpus and calibration", () => {
       performanceThresholds: {
         version: "owner-thresholds-1",
         minimumLabelAgreementBasisPoints: 10_000,
-        minimumPairComparisons: 5,
+        minimumPairComparisons: 15,
         minimumPairAgreementBasisPoints: 10_000,
       },
       safetyGates: {
@@ -196,6 +196,65 @@ describe("R2 executable golden corpus and calibration", () => {
         }),
       ).state,
     ).toBe("CALIBRATED");
+  });
+
+  it("never qualifies a permissive precommit even with perfect observed results", () => {
+    const good = qualifiedPrivateGate();
+    for (const thresholds of [
+      { ...good.performanceThresholds!, minimumLabelAgreementBasisPoints: 0 },
+      { ...good.performanceThresholds!, minimumPairComparisons: 1 },
+      { ...good.performanceThresholds!, minimumPairAgreementBasisPoints: 0 },
+    ]) {
+      const result = assessR2Calibration({ ...good, performanceThresholds: thresholds });
+      expect(result.state).toBe("CALIBRATION_PENDING");
+      expect(result.blockerCodes).toContain("PRIVATE_PRECOMMITTED_THRESHOLDS_BELOW_LIVE_FLOOR");
+      expect(result.comparedLabelCount).toBe(30);
+      expect(result.comparedPairCount).toBe(15);
+    }
+  });
+
+  it("requires at least fifteen complete pairs and at least eighty percent real agreement", () => {
+    const qualified = qualifiedPrivateGate();
+    const thresholds = {
+      ...qualified.performanceThresholds!,
+      minimumLabelAgreementBasisPoints: 8000,
+      minimumPairAgreementBasisPoints: 8000,
+    };
+    const baseline = { ...qualified, performanceThresholds: thresholds };
+    expect(assessR2Calibration(baseline).state).toBe("CALIBRATED");
+
+    const shortPairs = baseline.pairs.slice(0, 14);
+    expect(
+      assessR2Calibration({
+        ...baseline,
+        pairs: shortPairs,
+        sourcePairCount: shortPairs.length,
+      }).blockerCodes,
+    ).toContain("PRIVATE_PAIR_SAMPLE_BELOW_LIVE_FLOOR");
+
+    const changedPairs = (count: number) =>
+      baseline.pairs.map((p, i) => (i < count ? { ...p, preferredScore: 20, otherScore: 80 } : p));
+    expect(assessR2Calibration({ ...baseline, pairs: changedPairs(3) }).state).toBe("CALIBRATED");
+    expect(assessR2Calibration({ ...baseline, pairs: changedPairs(4) }).blockerCodes).toContain(
+      "PRIVATE_PAIR_AGREEMENT_BELOW_LIVE_FLOOR",
+    );
+
+    const changedLabels = (count: number) =>
+      baseline.labels.map((label, i) =>
+        i < count
+          ? {
+              ...label,
+              ownerLabel:
+                label.ownerLabel === "POOR_MATCH"
+                  ? ("GOOD_MATCH" as const)
+                  : ("POOR_MATCH" as const),
+            }
+          : label,
+      );
+    expect(assessR2Calibration({ ...baseline, labels: changedLabels(6) }).state).toBe("CALIBRATED");
+    expect(assessR2Calibration({ ...baseline, labels: changedLabels(7) }).blockerCodes).toContain(
+      "PRIVATE_LABEL_AGREEMENT_BELOW_LIVE_FLOOR",
+    );
   });
 
   it("rejects inconsistent private contents and premature safety or owner approval", () => {

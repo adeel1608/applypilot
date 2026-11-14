@@ -64,6 +64,15 @@ export const R2PrivateCalibrationPairOutcomeSchema = z
   })
   .strict();
 
+// Personal Live V1 qualification must never be weakened by a permissive
+// owner-defined precommit. Higher precommitted requirements still apply.
+// Historical exploratory campaigns remain readable and unmodified.
+export const R2_PERSONAL_LIVE_V1_QUALIFICATION_FLOOR = {
+  minimumLabelAgreementBasisPoints: 8000,
+  minimumPairComparisons: 15,
+  minimumPairAgreementBasisPoints: 8000,
+} as const;
+
 export const R2CalibrationPerformanceThresholdsSchema = z
   .object({
     version: z.string().min(1).max(100),
@@ -121,7 +130,7 @@ export type R2CalibrationOwnerApproval = z.infer<typeof R2CalibrationOwnerApprov
 export type R2CalibrationGateInput = z.infer<typeof R2CalibrationGateInputSchema>;
 
 export interface R2CalibrationAssessment {
-  assessmentVersion: "r2-calibration-assessment-2";
+  assessmentVersion: "r2-calibration-assessment-3";
   state: R2CalibrationState;
   sourceLabelCount: number;
   comparedLabelCount: number;
@@ -359,6 +368,26 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
     }
   }
 
+  // An owner may precommit stricter thresholds, but a smaller or more
+  // permissive exploratory campaign cannot certify Personal Live V1.
+  const floor = R2_PERSONAL_LIVE_V1_QUALIFICATION_FLOOR;
+  if (
+    gate.performanceThresholds &&
+    (gate.performanceThresholds.minimumLabelAgreementBasisPoints <
+      floor.minimumLabelAgreementBasisPoints ||
+      gate.performanceThresholds.minimumPairComparisons < floor.minimumPairComparisons ||
+      gate.performanceThresholds.minimumPairAgreementBasisPoints <
+        floor.minimumPairAgreementBasisPoints)
+  ) {
+    blockers.add("PRIVATE_PRECOMMITTED_THRESHOLDS_BELOW_LIVE_FLOOR");
+  }
+  if (completePairs.length < floor.minimumPairComparisons)
+    blockers.add("PRIVATE_PAIR_SAMPLE_BELOW_LIVE_FLOOR");
+  if (labelAgreementBasisPoints < floor.minimumLabelAgreementBasisPoints)
+    blockers.add("PRIVATE_LABEL_AGREEMENT_BELOW_LIVE_FLOOR");
+  if (pairAgreementBasisPoints < floor.minimumPairAgreementBasisPoints)
+    blockers.add("PRIVATE_PAIR_AGREEMENT_BELOW_LIVE_FLOOR");
+
   if (!gate.safetyGates) {
     blockers.add("CALIBRATION_SAFETY_GATES_NOT_APPROVED");
   } else if (
@@ -385,7 +414,7 @@ export function assessR2Calibration(input: R2CalibrationGateInput): R2Calibratio
         ? "CALIBRATED"
         : "CALIBRATION_PENDING";
   return {
-    assessmentVersion: "r2-calibration-assessment-2",
+    assessmentVersion: "r2-calibration-assessment-3",
     state,
     sourceLabelCount: gate.sourceLabelCount,
     comparedLabelCount: completeLabels.length,
